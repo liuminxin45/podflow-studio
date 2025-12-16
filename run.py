@@ -5,6 +5,7 @@ import datetime as dt
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -227,10 +228,10 @@ def _edge_tts_to_mp3(*, text: str, out_mp3_path: Path, timeout_s: int) -> bytes:
 
     subprocess.run(
         [
-            "python",
+            sys.executable,
             "-m",
             "edge_tts",
-            "--text-file",
+            "--file",
             str(tmp_txt),
             "--voice",
             voice,
@@ -247,9 +248,22 @@ def _edge_tts_to_mp3(*, text: str, out_mp3_path: Path, timeout_s: int) -> bytes:
 
 
 def _local_tts_to_mp3(*, text: str, out_mp3_path: Path, timeout_s: int) -> bytes:
-    if sys.platform.startswith("win"):
-        return _sapi_tts_to_mp3(text=text, out_mp3_path=out_mp3_path, timeout_s=timeout_s)
-    return _edge_tts_to_mp3(text=text, out_mp3_path=out_mp3_path, timeout_s=timeout_s)
+    last_err: Exception | None = None
+
+    if sys.platform.startswith("win") and shutil.which("ffmpeg") is not None:
+        try:
+            return _sapi_tts_to_mp3(text=text, out_mp3_path=out_mp3_path, timeout_s=timeout_s)
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+
+    try:
+        return _edge_tts_to_mp3(text=text, out_mp3_path=out_mp3_path, timeout_s=timeout_s)
+    except Exception as e:  # noqa: BLE001
+        last_err = e
+
+    raise RuntimeError(
+        "local tts failed: install python package 'edge-tts' or install 'ffmpeg' for SAPI wav->mp3 conversion"
+    ) from last_err
 
 
 def _render_audio_simple(*, main_path: Path, out_path: Path, timeout_seconds: int) -> None:
@@ -1525,7 +1539,11 @@ def step_script(store: Store, cfg: dict, episode_id: str, timeout_s: int, script
 
     items = store.pick_items_for_episode(episode_id=episode_id, limit=pick_items)
     if not items:
-        raise RuntimeError("no items available to script")
+        if use_research and research_content:
+            log.warning("no unused items available; continue with research content only")
+            items = []
+        else:
+            raise RuntimeError("no items available to script")
 
     items_total_chars, items_total_tokens, items_max_item_chars, items_max_item_tokens = _calc_items_text_stats(items)
     research_chars, research_tokens = _text_stats(research_content)
@@ -1667,8 +1685,6 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
         ssml_est_tokens=int(ssml_tokens),
     )
 
-    from src.tts.doubao import DoubaoPodcastClient, DoubaoTTSClient
-
     out_dir = Path((cfg.get("output") or {}).get("out_dir") or "./out")
     episodes_dir = Path((cfg.get("output") or {}).get("episodes_dir") or "./out/episodes")
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1679,6 +1695,8 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
     tts_path = episodes_dir / f"{ep['episode_date']}.tts.mp3"
     wrote_file = False
     try:
+        from src.tts.doubao import DoubaoPodcastClient, DoubaoTTSClient
+
         doubao_mode = (os.environ.get("DOUBAO_MODE") or "tts").strip().lower()
         if doubao_mode == "podcast":
             client = DoubaoPodcastClient(timeout_seconds=timeout_s)
@@ -1753,6 +1771,31 @@ def step_render(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> Non
     episodes_dir.mkdir(parents=True, exist_ok=True)
 
     rendered_path = episodes_dir / f"{ep['episode_date']}.final.mp3"
+
+    if shutil.which("ffmpeg") is None:
+        log.warning("ffmpeg not found; fallback to copy tts audio as rendered output")
+        _log_event(
+            log,
+            "step_stats",
+            step="render",
+            phase="before",
+            episode_id=str(episode_id),
+            tts_bytes=int(_file_size_bytes(Path(ep["tts_audio_path"])) or 0),
+        )
+        rendered_path.write_bytes(Path(ep["tts_audio_path"]).read_bytes())
+        store.set_episode_rendered(episode_id=episode_id, rendered_audio_path=str(rendered_path))
+        store.set_episode_status(episode_id, "rendered")
+        _log_event(
+            log,
+            "step_stats",
+            step="render",
+            phase="after",
+            episode_id=str(episode_id),
+            rendered_bytes=int(_file_size_bytes(rendered_path) or 0),
+            rendered_audio_path=str(rendered_path),
+        )
+        log.info("rendered: %s", rendered_path)
+        return
 
     if not (intro.exists() and outro.exists() and bgm.exists()):
         log.warning(

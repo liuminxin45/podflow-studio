@@ -643,7 +643,7 @@ class DoubaoPodcastClient:
             "input_id": os.environ.get("DOUBAO_PODCAST_INPUT_ID") or "auto_podcast",
             "input_text": txt,
             "scene": scene,
-            "action": int(os.environ.get("DOUBAO_PODCAST_ACTION") or "1"),
+            "action": int(os.environ.get("DOUBAO_PODCAST_ACTION") or "0"),
             "use_head_music": use_head_music,
             "audio_config": {
                 "format": audio_format,
@@ -655,6 +655,8 @@ class DoubaoPodcastClient:
                 "speakers": self._pick_speakers(),
             },
         }
+
+        payload_obj["audio_params"] = payload_obj.get("audio_config")
 
         payload_obj["input_info"] = {"return_audio_url": True}
 
@@ -748,7 +750,7 @@ class DoubaoPodcastClient:
             "input_id": os.environ.get("DOUBAO_PODCAST_INPUT_ID") or "auto_podcast",
             "input_text": txt,
             "scene": scene,
-            "action": int(os.environ.get("DOUBAO_PODCAST_ACTION") or "1"),
+            "action": int(os.environ.get("DOUBAO_PODCAST_ACTION") or "0"),
             "use_head_music": use_head_music,
             "audio_config": {
                 "format": audio_format,
@@ -760,6 +762,8 @@ class DoubaoPodcastClient:
                 "speakers": self._pick_speakers(),
             },
         }
+
+        payload_obj["audio_params"] = payload_obj.get("audio_config")
 
         payload_obj["input_info"] = {"return_audio_url": True}
 
@@ -802,7 +806,7 @@ class DoubaoPodcastClient:
         else:
             # Default to NOT including session_id: some servers reject client-provided session_id
             # and treat its length as payload_size (declared body size mismatch).
-            include_sid_values = [0]
+            include_sid_values = [1, 0]
 
         start_flags_env = int(os.environ.get("DOUBAO_PODCAST_START_FLAGS") or "4", 0)
         strict_start_flags = self._truthy(os.environ.get("DOUBAO_PODCAST_START_FLAGS_STRICT") or "0")
@@ -876,13 +880,17 @@ class DoubaoPodcastClient:
                 )
             finally:
                 try:
-                    finish_message_type = int(os.environ.get("DOUBAO_PODCAST_FINISH_MESSAGE_TYPE") or "1", 0)
+                    finish_message_type = int(os.environ.get("DOUBAO_PODCAST_FINISH_MESSAGE_TYPE") or "9", 0)
                     finish_event_code = int(os.environ.get("DOUBAO_PODCAST_FINISH_EVENT_CODE") or "2", 0)
                     serialization = int(os.environ.get("DOUBAO_PODCAST_SERIALIZATION") or "1", 0)
                     compression = int(os.environ.get("DOUBAO_PODCAST_COMPRESSION") or "0", 0)
 
                     finish_flags_raw = os.environ.get("DOUBAO_PODCAST_FINISH_FLAGS")
-                    flags = int(finish_flags_raw, 0) if (finish_flags_raw is not None and finish_flags_raw.strip()) else attempt_start_flags
+                    flags = (
+                        int(finish_flags_raw, 0)
+                        if (finish_flags_raw is not None and finish_flags_raw.strip())
+                        else (attempt_start_flags or 0x4)
+                    )
 
                     finish_payload = gzip.compress(b"{}") if compression == 0x1 else b"{}"
 
@@ -963,6 +971,7 @@ class DoubaoPodcastClient:
         no_event_timeout_s = min(max(1, no_event_timeout_s), max(1, wait_s))
         progress_timeout_s = int(os.environ.get("DOUBAO_PODCAST_PROGRESS_TIMEOUT_SECONDS") or "40")
         last_json: Optional[Dict[str, Any]] = None
+        audio_chunks: list[bytes] = []
         last_business_ts = time.time()
         start_ts = time.time()
         saw_progress_event = False
@@ -1075,6 +1084,9 @@ class DoubaoPodcastClient:
             business_count += 1
             last_event = event if isinstance(event, int) else last_event
 
+            if serialization == 0x0 and payload:
+                audio_chunks.append(payload)
+
             if isinstance(event, int) and event in {150, 360, 361, 362, 363, 152, 154}:
                 saw_progress_event = True
 
@@ -1088,11 +1100,6 @@ class DoubaoPodcastClient:
                 payload2 = DoubaoTTSClient._maybe_decompress(payload, compression)
                 msg = payload2.decode("utf-8", errors="ignore") if payload2 else ""
                 raise DoubaoTTSException(f"Doubao podcast error frame code={event} msg={msg}")
-
-            if event in {52, 152}:
-                raise DoubaoTTSException(
-                    f"Doubao podcast finished by server event={event} session_id={session_id} last={last_json}"
-                )
 
             if serialization == 0x1 and payload:
                 payload2 = DoubaoTTSClient._maybe_decompress(payload, compression)
@@ -1110,4 +1117,9 @@ class DoubaoPodcastClient:
                         a.raise_for_status()
                         return a.content
 
+            if event in {52, 152}:
+                break
+
+        if audio_chunks:
+            return b"".join(audio_chunks)
         raise DoubaoTTSException(f"Doubao podcast ended without audio_url session_id={session_id} last={last_json}")

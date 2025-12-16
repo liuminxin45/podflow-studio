@@ -19,6 +19,40 @@ class MoonshotClient:
         self.timeout_seconds = timeout_seconds
         self.log = logging.getLogger("script.moonshot")
 
+    def _load_json_from_content(self, content: str) -> Any:
+        s = (content or "").strip()
+        if not s:
+            raise json.JSONDecodeError("empty content", s, 0)
+
+        try:
+            return json.loads(s)
+        except json.JSONDecodeError:
+            pass
+
+        if s.startswith("```"):
+            i = s.find("\n")
+            if i != -1:
+                s2 = s[i + 1 :]
+            else:
+                s2 = ""
+            j = s2.rfind("```")
+            if j != -1:
+                s2 = s2[:j]
+            s2 = s2.strip()
+            if s2:
+                try:
+                    return json.loads(s2)
+                except json.JSONDecodeError:
+                    pass
+
+        start = s.find("{")
+        end = s.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            s3 = s[start : end + 1]
+            return json.loads(s3)
+
+        return json.loads(s)
+
     def _endpoint(self) -> str:
         return f"{self.base_url}/chat/completions"
 
@@ -94,7 +128,7 @@ class MoonshotClient:
         )
 
         try:
-            obj = json.loads(content)
+            obj = self._load_json_from_content(content)
         except json.JSONDecodeError as e:
             self.log.error("LLM returned non-JSON: %s", content)
             raise RuntimeError("Moonshot output is not valid JSON") from e
@@ -162,7 +196,7 @@ class MoonshotClient:
         )
 
         try:
-            obj = json.loads(content)
+            obj = self._load_json_from_content(content)
         except json.JSONDecodeError as e:
             self.log.error("LLM returned non-JSON: %s", content)
             raise RuntimeError("Moonshot output is not valid JSON") from e
