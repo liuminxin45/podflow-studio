@@ -61,7 +61,7 @@ def metaso_research_items(
         return None
 
     model2 = (model or os.environ.get("METASO_MODEL") or "fast").strip() or "fast"
-    max_items2 = int(max_items or os.environ.get("METASO_MAX_ITEMS") or 10)
+    max_items2 = int(max_items) if max_items is not None else int(len(items))
 
     input_sources: dict[str, int] = {}
     for it in items:

@@ -12,6 +12,7 @@ dependencies = [
   "pydantic>=2.7.0",
   "beautifulsoup4>=4.12.3",
   "websocket-client>=1.7.0",
+  "edge-tts>=7.2.7",
 ]
 
  [build-system]

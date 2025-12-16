@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import gzip
 import json
 import os
@@ -48,6 +49,37 @@ class DoubaoTTSClient:
             "X-Api-App-Key": "aGjiRDfUWi",
             "X-Api-Request-Id": str(uuid.uuid4()),
         }
+
+    @staticmethod
+    def _pick_voice(voice: str) -> str:
+        v = (voice or "").strip()
+        if not v:
+            return ""
+        if "," in v:
+            return (v.split(",", 1)[0] or "").strip()
+        return v
+
+    @staticmethod
+    def _split_text_utf8(text: str, max_bytes: int) -> list[str]:
+        s = (text or "").strip()
+        if not s:
+            return []
+
+        out: list[str] = []
+        cur_chars: list[str] = []
+        cur_bytes = 0
+        for ch in s:
+            b = len(ch.encode("utf-8"))
+            if cur_chars and (cur_bytes + b) > max_bytes:
+                out.append("".join(cur_chars).strip())
+                cur_chars = [ch]
+                cur_bytes = b
+            else:
+                cur_chars.append(ch)
+                cur_bytes += b
+        if cur_chars:
+            out.append("".join(cur_chars).strip())
+        return [x for x in out if x]
 
     @staticmethod
     def _strip_ssml(ssml: str) -> str:
@@ -128,6 +160,21 @@ class DoubaoTTSClient:
         idx = header_size_bytes
         event_code: Optional[int] = None
 
+        if msg_type == 0xB:
+            seq: Optional[int] = None
+            if flags in {0x1, 0x2, 0x3}:
+                if len(raw) < idx + 4:
+                    raise DoubaoTTSException("invalid audio frame: missing sequence")
+                seq = int.from_bytes(raw[idx : idx + 4], byteorder="big", signed=True)
+                idx += 4
+
+            if len(raw) < idx + 4:
+                raise DoubaoTTSException("invalid audio frame: missing payload size")
+            payload_size = int.from_bytes(raw[idx : idx + 4], byteorder="big", signed=False)
+            idx += 4
+            payload = raw[idx : idx + payload_size]
+            return msg_type, flags, serialization, compression, seq, payload
+
         # Error frame: doc says byte1 is 0b11110000, and [4~7] is Error code.
         if msg_type == 0xF:
             if len(raw) < idx + 4:
@@ -202,22 +249,22 @@ class DoubaoTTSClient:
         if not text:
             raise DoubaoTTSException("empty ssml/text")
 
-        req: Dict[str, Any] = {
-            "input_id": task_id,
-            "action": 0,
-            "input_text": text,
-            "use_head_music": False,
-            "use_tail_music": False,
-            "aigc_watermark": False,
-            "audio_config": {"format": "mp3", "sample_rate": 24000, "speech_rate": 0},
-            "audio_params": {"format": "mp3", "sample_rate": 24000, "speech_rate": 0},
-            "input_info": {"return_audio_url": True},
-        }
+        if len(text.encode("utf-8")) > 1024:
+            raise DoubaoTTSException("text too long for single doubao websocket request; use synthesize()")
 
-        if voice and "," in voice:
-            parts = [p.strip() for p in voice.split(",") if p.strip()]
-            if len(parts) == 2:
-                req["speaker_info"] = {"random_order": True, "speakers": parts}
+        chosen_voice = self._pick_voice(voice)
+
+        req: Dict[str, Any] = {
+            "app": {"appid": self.cfg.app_id, "token": "access_token", "cluster": "volcano_tts_test"},
+            "user": {"uid": "auto-podcast"},
+            "audio": {"voice": chosen_voice or "", "encoding": "mp3", "rate": 24000, "bits": 16, "bitrate": 160},
+            "request": {
+                "reqid": task_id,
+                "text": text,
+                "text_type": "plain",
+                "operation": "submit",
+            },
+        }
 
         headers = self._ws_headers()
         header_list = [f"{k}: {v}" for k, v in headers.items()]
@@ -230,13 +277,11 @@ class DoubaoTTSClient:
 
         payload_bytes = json.dumps(req, ensure_ascii=False).encode("utf-8")
         ws.send(
-            self._build_event_frame(
-                message_type=0x9,
-                flags=0x4,
+            self._build_frame(
+                message_type=0x1,
+                flags=0x0,
                 serialization=0x1,
                 compression=0x0,
-                event_code=1,
-                session_id=task_id,
                 payload=payload_bytes,
             ),
             opcode=websocket.ABNF.OPCODE_BINARY,
@@ -279,6 +324,12 @@ class DoubaoTTSClient:
                     msg = payload2.decode("utf-8", errors="ignore") if payload2 else ""
                     raise DoubaoTTSException(f"Doubao error frame code={err_code} msg={msg}")
 
+                if msg_type == 0xB and payload:
+                    audio_chunks.append(payload)
+                    if flags in {0x2, 0x3}:
+                        return b"".join(audio_chunks)
+                    continue
+
                 if event == 361 and payload:
                     audio_chunks.append(payload)
                     continue
@@ -294,6 +345,16 @@ class DoubaoTTSClient:
                     except Exception:
                         obj = {"raw": payload2.decode("utf-8", errors="ignore")}
                     last_json = obj if isinstance(obj, dict) else {"data": obj}
+
+                    if isinstance(last_json, dict) and isinstance(last_json.get("data"), str):
+                        try:
+                            audio_chunks.append(base64.b64decode(last_json["data"]))
+                        except Exception:
+                            pass
+
+                    if isinstance(last_json, dict) and isinstance(last_json.get("sequence"), int):
+                        if int(last_json["sequence"]) < 0 and audio_chunks:
+                            return b"".join(audio_chunks)
 
                     # PodcastEnd may contain meta_info.audio_url
                     if event == 363:
@@ -314,13 +375,11 @@ class DoubaoTTSClient:
             try:
                 try:
                     ws.send(
-                        self._build_event_frame(
-                            message_type=0x9,
-                            flags=0x4,
+                        self._build_frame(
+                            message_type=0x1,
+                            flags=0x0,
                             serialization=0x1,
                             compression=0x0,
-                            event_code=2,
-                            session_id=None,
                             payload=b"{}",
                         ),
                         opcode=websocket.ABNF.OPCODE_BINARY,
@@ -354,3 +413,15 @@ class DoubaoTTSClient:
                 pass
             self._conns.pop(task_id, None)
             self._payloads.pop(task_id, None)
+
+    def synthesize(self, ssml: str, voice: str) -> bytes:
+        text = self._strip_ssml(ssml)
+        parts = self._split_text_utf8(text, max_bytes=900)
+        if not parts:
+            raise DoubaoTTSException("empty ssml/text")
+
+        out_chunks: list[bytes] = []
+        for part in parts:
+            task_id = self.submit(ssml=part, voice=voice)
+            out_chunks.append(self.poll(task_id=task_id))
+        return b"".join(out_chunks)

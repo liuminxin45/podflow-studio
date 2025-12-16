@@ -5,6 +5,7 @@ import datetime as dt
 import json
 import logging
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -17,6 +18,7 @@ from src.fetch.lilyrss import build_lily_rss_url
 from src.fetch.newsnow import fetch_newsnow_items_with_status, fetch_newsnow_sources_catalog, probe_newsnow_source_id
 from src.fetch.rss import fetch_rss_items_with_status
 from src.fetch.sixtys import fetch_sixtys_items_with_status
+from src.fetch.aibot_daily import fetch_aibot_daily_items_with_status
 from src.script.deepseek import DeepSeekClient, ScriptInputItem, ScriptOutput
 from src.store.db import Store
 from src.publish.local import publish_local
@@ -132,6 +134,148 @@ def _estimate_tokens(text: str) -> int:
             cjk += 1
     other = max(0, len(text) - cjk)
     return int(cjk + (other / 4.0))
+
+
+def _text_stats(text: str | None) -> tuple[int, int]:
+    s = (text or "").strip()
+    return len(s), _estimate_tokens(s)
+
+
+def _file_size_bytes(path: Path | None) -> int | None:
+    if path is None:
+        return None
+    try:
+        return int(path.stat().st_size)
+    except Exception:
+        return None
+
+
+def _strip_angle_tags(s: str) -> str:
+    out: list[str] = []
+    in_tag = False
+    for ch in (s or ""):
+        if ch == "<":
+            in_tag = True
+            continue
+        if ch == ">":
+            in_tag = False
+            continue
+        if not in_tag:
+            out.append(ch)
+    return "".join(out).strip()
+
+
+def _ps_single_quote(s: str) -> str:
+    return "'" + (s or "").replace("'", "''") + "'"
+
+
+def _sapi_tts_to_mp3(*, text: str, out_mp3_path: Path, timeout_s: int) -> bytes:
+    out_mp3_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_txt = out_mp3_path.with_suffix(out_mp3_path.suffix + ".txt")
+    tmp_wav = out_mp3_path.with_suffix(out_mp3_path.suffix + ".wav")
+    tmp_mp3 = out_mp3_path.with_suffix(out_mp3_path.suffix + ".tmp.mp3")
+    tmp_txt.write_text(text, encoding="utf-8")
+
+    wav_ps = _ps_single_quote(str(tmp_wav))
+    txt_ps = _ps_single_quote(str(tmp_txt))
+    ps_script = (
+        "Add-Type -AssemblyName System.Speech; "
+        "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+        f"$t = Get-Content -Raw -Encoding UTF8 {txt_ps}; "
+        f"$s.SetOutputToWaveFile({wav_ps}); "
+        "$s.Speak($t); "
+        "$s.Dispose();"
+    )
+
+    subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+        check=True,
+        timeout=timeout_s,
+    )
+
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(tmp_wav),
+            "-c:a",
+            "libmp3lame",
+            "-q:a",
+            "3",
+            str(tmp_mp3),
+        ],
+        check=True,
+        timeout=timeout_s,
+    )
+
+    b = tmp_mp3.read_bytes()
+    out_mp3_path.write_bytes(b)
+    return b
+
+
+def _edge_tts_to_mp3(*, text: str, out_mp3_path: Path, timeout_s: int) -> bytes:
+    out_mp3_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_txt = out_mp3_path.with_suffix(out_mp3_path.suffix + ".txt")
+    tmp_mp3 = out_mp3_path.with_suffix(out_mp3_path.suffix + ".tmp.mp3")
+    tmp_txt.write_text(text, encoding="utf-8")
+
+    voice = (os.environ.get("EDGE_TTS_VOICE") or "zh-CN-XiaoxiaoNeural").strip() or "zh-CN-XiaoxiaoNeural"
+
+    subprocess.run(
+        [
+            "python",
+            "-m",
+            "edge_tts",
+            "--text-file",
+            str(tmp_txt),
+            "--voice",
+            voice,
+            "--write-media",
+            str(tmp_mp3),
+        ],
+        check=True,
+        timeout=timeout_s,
+    )
+
+    b = tmp_mp3.read_bytes()
+    out_mp3_path.write_bytes(b)
+    return b
+
+
+def _local_tts_to_mp3(*, text: str, out_mp3_path: Path, timeout_s: int) -> bytes:
+    if sys.platform.startswith("win"):
+        return _sapi_tts_to_mp3(text=text, out_mp3_path=out_mp3_path, timeout_s=timeout_s)
+    return _edge_tts_to_mp3(text=text, out_mp3_path=out_mp3_path, timeout_s=timeout_s)
+
+
+def _render_audio_simple(*, main_path: Path, out_path: Path, timeout_seconds: int) -> None:
+    if not main_path.exists():
+        raise RuntimeError(f"missing main audio: {main_path}")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(main_path),
+            "-filter:a",
+            "loudnorm=I=-16:TP=-1.5:LRA=11",
+            "-c:a",
+            "libmp3lame",
+            "-q:a",
+            "3",
+            str(out_path),
+        ],
+        check=True,
+        timeout=timeout_seconds,
+    )
 
 
 def _calc_items_text_stats(items: list[dict]) -> tuple[int, int, int, int]:
@@ -267,7 +411,14 @@ def _extract_metaso_clean_payload(metaso: dict) -> dict | None:
     }
 
 
-def step_fetch(store: Store, cfg: dict, episode_id: str, timeout_s: int, force_fetch: bool) -> None:
+def step_fetch(
+    store: Store,
+    cfg: dict,
+    episode_id: str,
+    timeout_s: int,
+    force_fetch: bool,
+    metaso_max_items: int | None = None,
+) -> None:
     log = logging.getLogger("step.fetch")
 
     ep = store.get_episode(episode_id)
@@ -278,6 +429,7 @@ def step_fetch(store: Store, cfg: dict, episode_id: str, timeout_s: int, force_f
     rss_sources = (cfg.get("sources") or {}).get("rss") or []
     newsnow_sources = (cfg.get("sources") or {}).get("newsnow") or []
     sixtys_sources = (cfg.get("sources") or {}).get("sixtys") or []
+    aibot_sources = (cfg.get("sources") or {}).get("aibot_daily") or []
     lily_sources_raw = (cfg.get("sources") or {}).get("lily_rss") or []
     newsnow_force_enable_all = bool(((cfg.get("sources") or {}).get("newsnow_force_enable_all")) or False)
     max_items = int((cfg.get("pipeline") or {}).get("max_items") or 8)
@@ -306,6 +458,19 @@ def step_fetch(store: Store, cfg: dict, episode_id: str, timeout_s: int, force_f
         run_id=int(run_id),
         episode_id=str(episode_id),
         max_items=int(max_items),
+    )
+    _log_event(
+        log,
+        "step_stats",
+        step="fetch",
+        phase="before",
+        episode_id=str(episode_id),
+        max_items=int(max_items),
+        rss_sources=int(len(rss_sources)),
+        aibot_sources=int(len(aibot_sources)),
+        newsnow_sources=int(len(newsnow_sources)),
+        sixtys_sources=int(len(sixtys_sources)),
+        lily_entries=int(len(list(lily_sources_raw)) if isinstance(lily_sources_raw, list) else 0),
     )
     try:
         fetched: list[dict] = []
@@ -420,6 +585,121 @@ def step_fetch(store: Store, cfg: dict, episode_id: str, timeout_s: int, force_f
 
             if not ok_any:
                 log.warning("fetch rss all candidates failed: %s", name)
+
+        for src in aibot_sources:
+            enabled = (src or {}).get("enabled")
+            if enabled is False:
+                continue
+
+            name = (src or {}).get("name") or "AI工具集-每日AI快讯"
+            category = ((src or {}).get("category") or "others").strip() or "others"
+            url = (src or {}).get("url")
+            urls = (src or {}).get("urls")
+            candidates: list[str] = []
+            if isinstance(urls, list):
+                for u in urls:
+                    if isinstance(u, str) and u.strip():
+                        candidates.append(u.strip())
+            if isinstance(url, str) and url.strip():
+                candidates.append(url.strip())
+            if not candidates:
+                continue
+
+            ok_any = False
+            for cand in candidates:
+                log.info("fetch aibot_daily: %s %s", name, cand)
+                t0 = time.perf_counter()
+                try:
+                    items, sc = fetch_aibot_daily_items_with_status(
+                        url=cand,
+                        source=name,
+                        episode_date=ep["episode_date"],
+                        timeout_seconds=timeout_s,
+                    )
+                    _apply_category(items, category)
+                    total_chars, total_tokens, max_item_chars, max_item_tokens = _calc_items_text_stats(items)
+                    fetched.extend(items)
+                    dur_ms = int((time.perf_counter() - t0) * 1000)
+                    store.add_fetch_attempt(
+                        run_id=run_id,
+                        source_type="aibot_daily",
+                        source_name=name,
+                        url=str(cand),
+                        ok=True,
+                        status_code=(int(sc) if sc is not None else None),
+                        error=None,
+                        duration_ms=dur_ms,
+                        item_count=len(items),
+                        total_chars=total_chars,
+                        est_tokens=total_tokens,
+                        max_item_chars=max_item_chars,
+                        max_item_tokens=max_item_tokens,
+                    )
+                    _log_event(
+                        log,
+                        "fetch_attempt",
+                        run_id=int(run_id),
+                        source_type="aibot_daily",
+                        source_name=str(name),
+                        url=str(cand),
+                        ok=True,
+                        status_code=(int(sc) if sc is not None else None),
+                        duration_ms=int(dur_ms),
+                        item_count=int(len(items)),
+                        total_chars=int(total_chars),
+                        est_tokens=int(total_tokens),
+                        max_item_chars=int(max_item_chars),
+                        max_item_tokens=int(max_item_tokens),
+                    )
+                    if len(items) == 0:
+                        log.warning("fetch aibot_daily ok but 0 items: %s", name)
+                    if dur_ms >= warn_duration_ms:
+                        log.warning("fetch aibot_daily slow: %s ms=%s", name, dur_ms)
+                    if total_tokens >= warn_total_tokens or max_item_tokens >= warn_max_item_tokens:
+                        log.warning(
+                            "fetch aibot_daily tokens large: %s total=%s max_item=%s",
+                            name,
+                            total_tokens,
+                            max_item_tokens,
+                        )
+                    ok_any = True
+                    break
+                except Exception as e:  # noqa: BLE001
+                    resp = getattr(e, "response", None)
+                    sc2 = getattr(resp, "status_code", None)
+                    dur_ms = int((time.perf_counter() - t0) * 1000)
+                    store.add_fetch_attempt(
+                        run_id=run_id,
+                        source_type="aibot_daily",
+                        source_name=name,
+                        url=str(cand),
+                        ok=False,
+                        status_code=sc2,
+                        error=str(e),
+                        duration_ms=dur_ms,
+                        item_count=0,
+                        total_chars=0,
+                        est_tokens=0,
+                        max_item_chars=0,
+                        max_item_tokens=0,
+                    )
+                    _log_event(
+                        log,
+                        "fetch_attempt",
+                        run_id=int(run_id),
+                        source_type="aibot_daily",
+                        source_name=str(name),
+                        url=str(cand),
+                        ok=False,
+                        status_code=(int(sc2) if sc2 is not None else None),
+                        duration_ms=int(dur_ms),
+                        item_count=0,
+                        error=str(e),
+                    )
+                    log.warning("fetch aibot_daily failed: %s", e)
+
+            if not ok_any:
+                log.warning("fetch aibot_daily all candidates failed: %s", name)
 
         for src in sixtys_sources:
             enabled = (src or {}).get("enabled")
@@ -758,6 +1038,28 @@ def step_fetch(store: Store, cfg: dict, episode_id: str, timeout_s: int, force_f
 
         fetched_raw = list(fetched)
         fetched = dedup_items(fetched, max_items=max_items)
+
+        raw_total_chars, raw_total_tokens, raw_max_item_chars, raw_max_item_tokens = _calc_items_text_stats(fetched_raw)
+        dedup_total_chars, dedup_total_tokens, dedup_max_item_chars, dedup_max_item_tokens = _calc_items_text_stats(fetched)
+
+        _log_event(
+            log,
+            "step_stats",
+            step="fetch",
+            phase="after_dedup",
+            episode_id=str(episode_id),
+            raw_count=int(len(fetched_raw)),
+            raw_total_chars=int(raw_total_chars),
+            raw_est_tokens=int(raw_total_tokens),
+            raw_max_item_chars=int(raw_max_item_chars),
+            raw_max_item_tokens=int(raw_max_item_tokens),
+            dedup_count=int(len(fetched)),
+            dedup_total_chars=int(dedup_total_chars),
+            dedup_est_tokens=int(dedup_total_tokens),
+            dedup_max_item_chars=int(dedup_max_item_chars),
+            dedup_max_item_tokens=int(dedup_max_item_tokens),
+        )
+
         upserted = store.upsert_items(fetched)
         store.set_episode_status(episode_id, "fetched")
 
@@ -809,11 +1111,14 @@ def step_fetch(store: Store, cfg: dict, episode_id: str, timeout_s: int, force_f
                     metaso_cfg = research_cfg.get("metaso") if isinstance(research_cfg, dict) else None
                     metaso_cfg2 = metaso_cfg if isinstance(metaso_cfg, dict) else {}
 
+                    cfg_max_items = metaso_cfg2.get("max_items") if isinstance(metaso_cfg2.get("max_items"), int) else None
+                    max_items_for_metaso = metaso_max_items if metaso_max_items is not None else cfg_max_items
+
                     r = metaso_research_items(
                         items=items3,
                         timeout_seconds=timeout_s,
                         model=(metaso_cfg2.get("model") if isinstance(metaso_cfg2.get("model"), str) else None),
-                        max_items=(metaso_cfg2.get("max_items") if isinstance(metaso_cfg2.get("max_items"), int) else None),
+                        max_items=max_items_for_metaso,
                     )
                     if r is not None:
                         research_payload = {
@@ -1222,6 +1527,25 @@ def step_script(store: Store, cfg: dict, episode_id: str, timeout_s: int, script
     if not items:
         raise RuntimeError("no items available to script")
 
+    items_total_chars, items_total_tokens, items_max_item_chars, items_max_item_tokens = _calc_items_text_stats(items)
+    research_chars, research_tokens = _text_stats(research_content)
+    _log_event(
+        log,
+        "step_stats",
+        step="script",
+        phase="before",
+        episode_id=str(episode_id),
+        script_input=str(script_input),
+        items_count=int(len(items)),
+        items_total_chars=int(items_total_chars),
+        items_est_tokens=int(items_total_tokens),
+        items_max_item_chars=int(items_max_item_chars),
+        items_max_item_tokens=int(items_max_item_tokens),
+        research_chars=int(research_chars),
+        research_est_tokens=int(research_tokens),
+        citations_count=int(len(research_citations)),
+    )
+
     input_items = [
         ScriptInputItem(
             id=row["id"],
@@ -1235,9 +1559,31 @@ def step_script(store: Store, cfg: dict, episode_id: str, timeout_s: int, script
     ]
 
     provider = (os.environ.get("LLM_PROVIDER") or "moonshot").strip().lower()
+    if provider not in {"moonshot", "deepseek"}:
+        log.warning("unknown LLM_PROVIDER=%s; fallback to moonshot", provider)
+        provider = "moonshot"
     temperature = float((cfg.get("deepseek") or {}).get("temperature") or 0.7)
 
-    if provider == "moonshot":
+    if provider == "deepseek":
+        base_url = os.environ.get("DEEPSEEK_BASE_URL", "").strip()
+        api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+        model = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat").strip()
+        if not base_url or not api_key:
+            raise RuntimeError("DeepSeek not configured: set DEEPSEEK_BASE_URL and DEEPSEEK_API_KEY")
+
+        client = DeepSeekClient(base_url=base_url, api_key=api_key, model=model, timeout_seconds=timeout_s)
+        if use_research:
+            log.info("script input=research path=%s", str(research_content_path))
+            out = client.generate_from_research(
+                channel=channel,
+                items=input_items,
+                research_content=research_content,
+                citations=research_citations,
+                temperature=temperature,
+            )
+        else:
+            out = client.generate(channel=channel, items=input_items, temperature=temperature)
+    else:
         from src.script.moonshot import MoonshotClient
 
         base_url = os.environ.get("MOONSHOT_BASE_URL", "https://api.moonshot.cn/v1").strip()
@@ -1258,25 +1604,6 @@ def step_script(store: Store, cfg: dict, episode_id: str, timeout_s: int, script
             )
         else:
             out = client2.generate(channel=channel, items=input_items, temperature=temperature)
-    else:
-        base_url = os.environ.get("DEEPSEEK_BASE_URL", "").strip()
-        api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
-        model = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat").strip()
-        if not base_url or not api_key:
-            raise RuntimeError("DeepSeek not configured: set DEEPSEEK_BASE_URL and DEEPSEEK_API_KEY")
-
-        client = DeepSeekClient(base_url=base_url, api_key=api_key, model=model, timeout_seconds=timeout_s)
-        if use_research:
-            log.info("script input=research path=%s", str(research_content_path))
-            out = client.generate_from_research(
-                channel=channel,
-                items=input_items,
-                research_content=research_content,
-                citations=research_citations,
-                temperature=temperature,
-            )
-        else:
-            out = client.generate(channel=channel, items=input_items, temperature=temperature)
 
     store.set_episode_script(
         episode_id=episode_id,
@@ -1285,6 +1612,24 @@ def step_script(store: Store, cfg: dict, episode_id: str, timeout_s: int, script
         shownotes=out.shownotes,
         tags=out.tags,
         script_json=json.dumps(out.model_dump(), ensure_ascii=False),
+    )
+
+    title_chars, title_tokens = _text_stats(out.title)
+    ssml_chars, ssml_tokens = _text_stats(out.ssml)
+    shownotes_chars, shownotes_tokens = _text_stats(out.shownotes)
+    _log_event(
+        log,
+        "step_stats",
+        step="script",
+        phase="after",
+        episode_id=str(episode_id),
+        title_chars=int(title_chars),
+        title_est_tokens=int(title_tokens),
+        ssml_chars=int(ssml_chars),
+        ssml_est_tokens=int(ssml_tokens),
+        shownotes_chars=int(shownotes_chars),
+        shownotes_est_tokens=int(shownotes_tokens),
+        tags_count=int(len(out.tags)),
     )
 
     store.mark_items_used([row["id"] for row in items], episode_id=episode_id)
@@ -1311,6 +1656,17 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
     if ep["status"] != "scripted":
         raise RuntimeError(f"tts requires scripted episode; current={ep['status']}")
 
+    ssml_chars, ssml_tokens = _text_stats(ep.get("ssml"))
+    _log_event(
+        log,
+        "step_stats",
+        step="tts",
+        phase="before",
+        episode_id=str(episode_id),
+        ssml_chars=int(ssml_chars),
+        ssml_est_tokens=int(ssml_tokens),
+    )
+
     from src.tts.doubao import DoubaoTTSClient
 
     out_dir = Path((cfg.get("output") or {}).get("out_dir") or "./out")
@@ -1320,15 +1676,43 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
 
     voice = ((cfg.get("tts") or {}).get("voice") or "").strip()
 
-    client = DoubaoTTSClient(timeout_seconds=timeout_s)
-    task_id = client.submit(ssml=ep["ssml"], voice=voice)
-
-    audio_bytes = client.poll(task_id=task_id)
     tts_path = episodes_dir / f"{ep['episode_date']}.tts.mp3"
-    tts_path.write_bytes(audio_bytes)
+    wrote_file = False
+    try:
+        client = DoubaoTTSClient(timeout_seconds=timeout_s)
+        try:
+            task_id = client.submit(ssml=ep["ssml"], voice=voice)
+            audio_bytes = client.poll(task_id=task_id)
+        except Exception as e:  # noqa: BLE001
+            if "text too long for single doubao websocket request" in str(e):
+                task_id = "chunked"
+                audio_bytes = client.synthesize(ssml=ep["ssml"], voice=voice)
+            else:
+                raise
+    except BaseException as e:  # noqa: BLE001
+        if isinstance(e, (KeyboardInterrupt, SystemExit)):
+            raise
+        log.warning("doubao tts failed; fallback to local SAPI TTS: %s", e)
+        task_id = "sapi"
+        text = _strip_angle_tags(ep["ssml"])
+        audio_bytes = _local_tts_to_mp3(text=text, out_mp3_path=tts_path, timeout_s=timeout_s)
+        wrote_file = True
+
+    if not wrote_file:
+        tts_path.write_bytes(audio_bytes)
 
     store.set_episode_tts(episode_id=episode_id, task_id=task_id, tts_audio_path=str(tts_path))
     store.set_episode_status(episode_id, "tts_done")
+
+    _log_event(
+        log,
+        "step_stats",
+        step="tts",
+        phase="after",
+        episode_id=str(episode_id),
+        tts_audio_bytes=int(len(audio_bytes)),
+        tts_audio_path=str(tts_path),
+    )
 
     log.info("tts done: %s", tts_path)
 
@@ -1363,6 +1747,51 @@ def step_render(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> Non
 
     rendered_path = episodes_dir / f"{ep['episode_date']}.final.mp3"
 
+    if not (intro.exists() and outro.exists() and bgm.exists()):
+        log.warning(
+            "render assets missing; fallback to simple render: intro=%s outro=%s bgm=%s",
+            str(intro),
+            str(outro),
+            str(bgm),
+        )
+        _log_event(
+            log,
+            "step_stats",
+            step="render",
+            phase="before",
+            episode_id=str(episode_id),
+            intro_bytes=int(_file_size_bytes(intro) or 0),
+            outro_bytes=int(_file_size_bytes(outro) or 0),
+            bgm_bytes=int(_file_size_bytes(bgm) or 0),
+            tts_bytes=int(_file_size_bytes(Path(ep["tts_audio_path"])) or 0),
+        )
+        _render_audio_simple(main_path=Path(ep["tts_audio_path"]), out_path=rendered_path, timeout_seconds=timeout_s)
+        store.set_episode_rendered(episode_id=episode_id, rendered_audio_path=str(rendered_path))
+        store.set_episode_status(episode_id, "rendered")
+        _log_event(
+            log,
+            "step_stats",
+            step="render",
+            phase="after",
+            episode_id=str(episode_id),
+            rendered_bytes=int(_file_size_bytes(rendered_path) or 0),
+            rendered_audio_path=str(rendered_path),
+        )
+        log.info("rendered: %s", rendered_path)
+        return
+
+    _log_event(
+        log,
+        "step_stats",
+        step="render",
+        phase="before",
+        episode_id=str(episode_id),
+        intro_bytes=int(_file_size_bytes(intro) or 0),
+        outro_bytes=int(_file_size_bytes(outro) or 0),
+        bgm_bytes=int(_file_size_bytes(bgm) or 0),
+        tts_bytes=int(_file_size_bytes(Path(ep["tts_audio_path"])) or 0),
+    )
+
     render_episode_audio(
         intro_path=intro,
         main_path=Path(ep["tts_audio_path"]),
@@ -1375,6 +1804,16 @@ def step_render(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> Non
 
     store.set_episode_rendered(episode_id=episode_id, rendered_audio_path=str(rendered_path))
     store.set_episode_status(episode_id, "rendered")
+
+    _log_event(
+        log,
+        "step_stats",
+        step="render",
+        phase="after",
+        episode_id=str(episode_id),
+        rendered_bytes=int(_file_size_bytes(rendered_path) or 0),
+        rendered_audio_path=str(rendered_path),
+    )
 
     log.info("rendered: %s", rendered_path)
 
@@ -1402,6 +1841,19 @@ def step_publish(store: Store, cfg: dict, episode_id: str) -> None:
 
     tags_list = [t for t in (ep["tags"] or "").split(",") if t] if ep.get("tags") else []
 
+    shownotes_chars, shownotes_tokens = _text_stats(ep.get("shownotes"))
+    _log_event(
+        log,
+        "step_stats",
+        step="publish",
+        phase="before",
+        episode_id=str(episode_id),
+        rendered_bytes=int(_file_size_bytes(Path(ep["rendered_audio_path"])) or 0),
+        shownotes_chars=int(shownotes_chars),
+        shownotes_est_tokens=int(shownotes_tokens),
+        tags_count=int(len(tags_list)),
+    )
+
     published_path = publish_local(
         rendered_audio_path=Path(ep["rendered_audio_path"]),
         episodes_dir=episodes_dir,
@@ -1414,6 +1866,20 @@ def step_publish(store: Store, cfg: dict, episode_id: str) -> None:
     store.set_episode_published(episode_id=episode_id, published_path=str(published_path))
     store.set_episode_status(episode_id, "published")
 
+    meta_path = episodes_dir / f"{ep['episode_date']}.metadata.json"
+    notes_path = episodes_dir / f"{ep['episode_date']}.shownotes.md"
+    _log_event(
+        log,
+        "step_stats",
+        step="publish",
+        phase="after",
+        episode_id=str(episode_id),
+        published_bytes=int(_file_size_bytes(published_path) or 0),
+        metadata_bytes=int(_file_size_bytes(meta_path) or 0),
+        shownotes_file_bytes=int(_file_size_bytes(notes_path) or 0),
+        published_path=str(published_path),
+    )
+
     log.info("published: %s", published_path)
 
 
@@ -1421,6 +1887,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="./config/settings.yaml")
     parser.add_argument("--date", default=None)
+    parser.add_argument("--timeout-seconds", type=int, default=None)
     parser.add_argument(
         "--step",
         default="all",
@@ -1439,6 +1906,7 @@ def main() -> int:
     )
     parser.add_argument("--force-fetch", action="store_true")
     parser.add_argument("--max-items", type=int, default=None)
+    parser.add_argument("--metaso-max-items", type=int, default=None)
     parser.add_argument("--script-input", choices=["auto", "items", "research"], default="auto")
     parser.add_argument("--items-limit", type=int, default=10)
     parser.add_argument("--items-source", default=None)
@@ -1466,7 +1934,11 @@ def main() -> int:
     logs_dir = Path(out_cfg.get("logs_dir") or "./out/logs")
     _setup_logging(logs_dir, episode_date)
 
-    timeout_s = int(os.environ.get("HTTP_TIMEOUT_SECONDS", "20"))
+    timeout_s = (
+        int(args.timeout_seconds)
+        if args.timeout_seconds is not None
+        else int(os.environ.get("HTTP_TIMEOUT_SECONDS", "20"))
+    )
 
     db_path = os.environ.get("PODCAST_DB_PATH", "./out/podcast.sqlite")
     store = Store(db_path=db_path)
@@ -1476,7 +1948,7 @@ def main() -> int:
     episode_id = store.get_or_create_episode(channel_id=channel_id, episode_date=episode_date)
 
     log = logging.getLogger("run")
-    log.info("episode_id=%s date=%s step=%s", episode_id, episode_date, args.step)
+    log.info("episode_id=%s date=%s step=%s timeout_s=%s", episode_id, episode_date, args.step, timeout_s)
 
     try:
         if args.step in {"all", "fetch"}:
@@ -1486,6 +1958,7 @@ def main() -> int:
                 episode_id=episode_id,
                 timeout_s=timeout_s,
                 force_fetch=bool(args.force_fetch),
+                metaso_max_items=(int(args.metaso_max_items) if args.metaso_max_items is not None else None),
             )
         if args.step == "list-items":
             step_list_items(

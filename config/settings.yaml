@@ -28,6 +28,13 @@ sources:
         - "https://60s.7se.cn/v2/60s/rss"
         - "https://60s.mizhoubaobei.top/v2/60s/rss"
 
+  aibot_daily:
+    - name: "AI工具集-每日AI快讯"
+      enabled: true
+      category: "others"
+      urls:
+        - "https://ai-bot.cn/daily-ai-news/"
+
   newsnow:
     - name: "NewsNow-知乎"
       id: "zhihu"

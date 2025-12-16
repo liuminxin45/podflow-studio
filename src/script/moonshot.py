@@ -8,7 +8,7 @@ from typing import Any
 
 import requests
 
-from src.script.deepseek import ScriptInputItem, ScriptOutput
+from src.script.deepseek import ScriptInputItem, ScriptOutput, build_research_script_prompt
 
 
 class MoonshotClient:
@@ -40,7 +40,17 @@ class MoonshotClient:
                     data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                     timeout=self._timeout(),
                 )
-                resp.raise_for_status()
+                try:
+                    resp.raise_for_status()
+                except requests.HTTPError as e:
+                    body = (getattr(resp, "text", "") or "")
+                    self.log.error(
+                        "moonshot http error: status=%s url=%s body=%s",
+                        getattr(resp, "status_code", None),
+                        getattr(resp, "url", None),
+                        body[:500],
+                    )
+                    raise
                 data: dict[str, Any] = resp.json()
                 return data
             except (requests.Timeout, requests.ConnectionError) as e:
@@ -60,70 +70,12 @@ class MoonshotClient:
         citations: list[dict],
         temperature: float,
     ) -> ScriptOutput:
-        max_research_chars = int(os.environ.get("SCRIPT_PROMPT_MAX_RESEARCH_CHARS", "6000"))
-        max_items = int(os.environ.get("SCRIPT_PROMPT_MAX_ITEMS", "8"))
-        max_citations = int(os.environ.get("SCRIPT_PROMPT_MAX_CITATIONS", "3"))
-        max_citation_snippet_chars = int(os.environ.get("SCRIPT_PROMPT_MAX_CITATION_SNIPPET_CHARS", "120"))
-
-        style = (channel.get("style") or {}) if isinstance(channel, dict) else {}
-        tone = style.get("tone") or "口语化、生动、像朋友聊天"
-        audience = style.get("audience") or "普通听众"
-
-        item_lines = []
-        for i, it in enumerate((items or [])[:max_items], start=1):
-            item_lines.append(f"{i}. {it.title}\n{it.url}".strip())
-
-        citation_lines = []
-        for i, c in enumerate((citations or [])[:max_citations], start=1):
-            if not isinstance(c, dict):
-                continue
-            title = (c.get("title") or "") if isinstance(c.get("title"), str) else ""
-            link = (c.get("link") or "") if isinstance(c.get("link"), str) else ""
-            snippet = (c.get("snippet") or "") if isinstance(c.get("snippet"), str) else ""
-            snippet2 = snippet.strip().replace("\n", " ")
-            if len(snippet2) > max_citation_snippet_chars:
-                snippet2 = snippet2[:max_citation_snippet_chars] + "..."
-            if title or link or snippet2:
-                citation_lines.append(f"{i}. {title}\n{link}\n{snippet2}".strip())
-
-        research_content2 = (research_content or "").strip()
-        if max_research_chars > 0 and len(research_content2) > max_research_chars:
-            research_content2 = research_content2[:max_research_chars] + "\n...(truncated)"
-
-        system = (
-            "你是一名中文播客脚本作者。"
-            "你要把内容改写成口语化、节奏明快、像真人聊天的播客。"
-            "不要写成新闻稿，不要像公文。"
-            "输出必须是严格 JSON，不能输出多余文字。"
+        system, user = build_research_script_prompt(
+            channel=channel,
+            items=items,
+            research_content=research_content,
+            citations=citations,
         )
-
-        user = f"""
-栏目: {channel.get('name') if isinstance(channel, dict) else ''}
-受众: {audience}
-风格: {tone}
-
-请基于【网络调查结果】生成一期播客脚本。结构固定：
-- 10 秒开场（欢迎 + 今日主题）
-- 3~5 条内容（每条都要包含：发生了什么 / 对普通人影响 / 建议）
-- 结尾总结（复盘 + 行动建议 + 下期预告一句）
-
-强约束：
-- 输出 JSON，字段为：title, ssml, shownotes, tags
-- ssml 必须是可用于 TTS 的 SSML，包含 <break time=\"500ms\"/> 等停顿
-- shownotes 用 Markdown，列出每条新闻的要点与链接
-- tags 3~8 个中文标签
-
-新闻清单（用于链接与 shownotes，已做精简）：
-{chr(10).join(item_lines)}
-
-网络调查结果（正文）：
-{research_content2}
-
-引用资料（如有）：
-{chr(10).join(citation_lines) if citation_lines else '(none)'}
-
-现在输出 JSON：
-""".strip()
 
         payload = {
             "model": self.model,
@@ -132,6 +84,7 @@ class MoonshotClient:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
+            "response_format": {"type": "json_object"},
         }
 
         data = self._post_json(payload)
@@ -199,6 +152,7 @@ class MoonshotClient:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
+            "response_format": {"type": "json_object"},
         }
 
         data = self._post_json(payload)
