@@ -69,6 +69,56 @@ python -c "import os, json, requests; url=os.environ.get('MOONSHOT_BASE_URL','ht
 
 注意：本项目内的 `src/tts/doubao.py` 是“工程骨架”，已经按 **submit() + poll()** 的异步模式把参数、异常、重试/超时边界设计好，但你需要根据自己账号开通的豆包/火山引擎 TTS 接口版本补齐真实 endpoint 与签名。
 
+豆包 TTS 支持多种模式，通过环境变量 `DOUBAO_MODE` 切换：
+
+- **podcast**：PodcastTTS（多 speaker/生成式播客），使用 `wss://openspeech.bytedance.com/api/v3/sami/podcasttts`，资源 `volc.service_type.10050`
+- **tts_v3_http**：单人朗读 TTS（官方 HTTP 单向流式：`https://openspeech.bytedance.com/api/v3/tts/unidirectional`），需要你在控制台开通的 **TTS 资源 ID**（不要用 10050）
+- **tts_v3_ws**：单人朗读 TTS（WebSocket 单向流式：`wss://openspeech.bytedance.com/api/v3/tts/unidirectional/stream`），需要你在控制台开通的 **TTS 资源 ID**（不要用 10050）
+- **tts**：单人朗读默认模式，等同于 **tts_v3_http**
+
+最小配置（写进 `.env`）：
+
+```bash
+# 建议：让 .env 覆盖当前 shell 的环境变量（避免旧变量影响本次运行）
+DOTENV_OVERRIDE=1
+
+# PodcastTTS
+DOUBAO_MODE=podcast
+DOUBAO_WS_URL=wss://openspeech.bytedance.com/api/v3/sami/podcasttts
+DOUBAO_RESOURCE_ID=volc.service_type.10050
+DOUBAO_WS_APP_KEY=aGjiRDfUWi
+DOUBAO_WS_SEQUENCE=1
+
+# 单人TTS
+# DOUBAO_MODE=tts
+# DOUBAO_TTS_V3_URL=https://openspeech.bytedance.com/api/v3/tts/unidirectional
+# DOUBAO_TTS_V3_RESOURCE_ID=seed-tts-2.0
+#
+# 或 WebSocket:
+# DOUBAO_MODE=tts_v3_ws
+# DOUBAO_TTS_V3_WS_URL=wss://openspeech.bytedance.com/api/v3/tts/unidirectional/stream
+# DOUBAO_TTS_V3_RESOURCE_ID=seed-tts-2.0
+# DOUBAO_TTS_V3_WS_APP_KEY=aGjiRDfUWi
+
+# 共享
+DOUBAO_TTS_VOICE=zh_male_m191_uranus_bigtts
+
+# 调试开关
+DOUBAO_TTS_DISABLE_FALLBACK=1
+DOUBAO_TTS_FORCE=0
+```
+
+Windows PowerShell 下也可以在命令行临时覆盖（不改 `.env`）：
+
+```bash
+$env:DOUBAO_MODE="tts"
+$env:DOUBAO_TTS_V3_RESOURCE_ID="seed-tts-2.0"
+$env:DOUBAO_TTS_VOICE="zh_male_m191_uranus_bigtts"
+$env:DOUBAO_TTS_DISABLE_FALLBACK="1"
+$env:DOUBAO_TTS_FORCE="1"
+python run.py --max-items 1
+```
+
 Metaso 网络调查：设置 `METASO_API_KEY` 后，`fetch` 会在生成 `rss_filtered_*.json` 后调用 `metaso.cn/api/v1/chat/completions` 并产出 `rss_research_*.json`。
 
 Metaso `MODEL` 可选值：

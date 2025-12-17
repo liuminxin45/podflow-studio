@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 
 from src.audio.render import render_episode_audio
 from src.fetch.dedup import dedup_items
@@ -1659,20 +1659,24 @@ def step_script(store: Store, cfg: dict, episode_id: str, timeout_s: int, script
 def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
     log = logging.getLogger("step.tts")
 
+    tts_force = (os.environ.get("DOUBAO_TTS_FORCE") or "0").strip().lower() in {"1", "true", "yes", "on"}
+
     ep = store.get_episode(episode_id)
-    if ep["status"] in {"tts_done", "rendered", "published"}:
+    if not tts_force and ep["status"] in {"tts_done", "rendered", "published"}:
         if ep.get("tts_audio_path") and Path(ep["tts_audio_path"]).exists():
             log.info("episode already tts_done or later; skip")
             return
         raise RuntimeError("episode marked tts_done but tts_audio_path missing or file not found")
 
-    if ep.get("tts_audio_path") and Path(ep["tts_audio_path"]).exists():
+    if not tts_force and ep.get("tts_audio_path") and Path(ep["tts_audio_path"]).exists():
         store.set_episode_status(episode_id, "tts_done")
         log.info("found existing tts audio; reconciled status to tts_done")
         return
 
-    if ep["status"] != "scripted":
+    if not tts_force and ep["status"] != "scripted":
         raise RuntimeError(f"tts requires scripted episode; current={ep['status']}")
+    if tts_force and not (ep.get("ssml") or "").strip():
+        raise RuntimeError("tts_force requires existing ssml on episode")
 
     ssml_chars, ssml_tokens = _text_stats(ep.get("ssml"))
     _log_event(
@@ -1691,6 +1695,10 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
     episodes_dir.mkdir(parents=True, exist_ok=True)
 
     voice = ((cfg.get("tts") or {}).get("voice") or "").strip()
+
+    poll_max_wait_s = int(os.environ.get("DOUBAO_TTS_POLL_MAX_WAIT_SECONDS", str(timeout_s)))
+    poll_interval_s = int(os.environ.get("DOUBAO_TTS_POLL_INTERVAL_SECONDS", "1"))
+    disable_fallback = (os.environ.get("DOUBAO_TTS_DISABLE_FALLBACK") or "0").strip().lower() in {"1", "true", "yes", "on"}
 
     tts_path = episodes_dir / f"{ep['episode_date']}.tts.mp3"
     wrote_file = False
@@ -1712,21 +1720,48 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
             task_id = "podcast"
             text = _strip_angle_tags(ep["ssml"])
             audio_bytes = client.generate_mp3(input_text=text)
-        else:
+        elif doubao_mode in {"tts", "tts_v3_http"}:
+            client = DoubaoPodcastClient(timeout_seconds=timeout_s)
+            task_id = "tts_v3_http" if doubao_mode == "tts_v3_http" else "tts"
+            text = _strip_angle_tags(ep["ssml"])
+            log.info(
+                "doubao tts start: mode=%s task_id=%s url=%s resource_id=%s",
+                doubao_mode,
+                task_id,
+                (os.environ.get("DOUBAO_TTS_V3_URL") or "https://openspeech.bytedance.com/api/v3/tts/unidirectional").strip(),
+                (os.environ.get("DOUBAO_TTS_V3_RESOURCE_ID") or os.environ.get("DOUBAO_RESOURCE_ID") or "").strip(),
+            )
+            audio_bytes = client.generate_mp3_v3_unidirectional_http(input_text=text, speaker=voice)
+        elif doubao_mode == "tts_v3_ws":
             client = DoubaoTTSClient(timeout_seconds=timeout_s)
             try:
-                task_id = client.submit(ssml=ep["ssml"], voice=voice)
-                audio_bytes = client.poll(task_id=task_id)
+                task_id = client.submit_v3_ws(ssml=ep["ssml"], voice=voice)
+                log.info(
+                    "doubao tts start: mode=%s task_id=%s poll_max_wait_s=%s poll_interval_s=%s",
+                    doubao_mode,
+                    task_id,
+                    poll_max_wait_s,
+                    poll_interval_s,
+                )
+                audio_bytes = client.poll(
+                    task_id=task_id,
+                    max_wait_seconds=poll_max_wait_s,
+                    interval_seconds=poll_interval_s,
+                )
             except Exception as e:  # noqa: BLE001
                 if "text too long for single doubao websocket request" in str(e):
                     task_id = "chunked"
-                    audio_bytes = client.synthesize(ssml=ep["ssml"], voice=voice)
+                    audio_bytes = client.synthesize_v3_ws(ssml=ep["ssml"], voice=voice)
                 else:
                     raise
+        else:
+            raise RuntimeError(f"Unknown DOUBAO_MODE={doubao_mode}. Use podcast / tts (http) / tts_v3_http / tts_v3_ws")
     except BaseException as e:  # noqa: BLE001
         if isinstance(e, (KeyboardInterrupt, SystemExit)):
             raise
-        log.warning("doubao tts failed; fallback to local SAPI TTS: %s", e)
+        if disable_fallback:
+            raise
+        log.exception("doubao tts failed; fallback to local SAPI TTS: %s", e)
         task_id = "sapi"
         text = _strip_angle_tags(ep["ssml"])
         audio_bytes = _local_tts_to_mp3(text=text, out_mp3_path=tts_path, timeout_s=timeout_s)
@@ -1978,7 +2013,9 @@ def main() -> int:
     parser.add_argument("--newsnow-limit", type=int, default=80)
     args = parser.parse_args()
 
-    load_dotenv(override=False)
+    dotenv_override = (os.environ.get("DOTENV_OVERRIDE") or "0").strip().lower() in {"1", "true", "yes", "on"}
+    load_dotenv(override=dotenv_override)
+    dotenv_cfg = dotenv_values(".env")
 
     cfg = _load_yaml(Path(args.config))
     if args.max_items is not None:
@@ -1993,11 +2030,11 @@ def main() -> int:
     logs_dir = Path(out_cfg.get("logs_dir") or "./out/logs")
     _setup_logging(logs_dir, episode_date)
 
-    timeout_s = (
-        int(args.timeout_seconds)
-        if args.timeout_seconds is not None
-        else int(os.environ.get("HTTP_TIMEOUT_SECONDS", "20"))
-    )
+    if args.timeout_seconds is not None:
+        timeout_s = int(args.timeout_seconds)
+    else:
+        dotenv_timeout = (dotenv_cfg.get("HTTP_TIMEOUT_SECONDS") or "").strip() if isinstance(dotenv_cfg, dict) else ""
+        timeout_s = int(dotenv_timeout or os.environ.get("HTTP_TIMEOUT_SECONDS", "20"))
 
     db_path = os.environ.get("PODCAST_DB_PATH", "./out/podcast.sqlite")
     store = Store(db_path=db_path)

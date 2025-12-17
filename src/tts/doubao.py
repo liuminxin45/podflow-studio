@@ -350,6 +350,8 @@ class DoubaoTTSClient:
                 except websocket.WebSocketConnectionClosedException as e:
                     code = getattr(ws, "close_status_code", None)
                     reason = getattr(ws, "close_reason", None)
+                    if audio_chunks:
+                        return b"".join(audio_chunks)
                     raise DoubaoTTSException(f"Doubao websocket closed code={code} reason={reason}") from e
 
                 if raw is None:
@@ -368,6 +370,8 @@ class DoubaoTTSClient:
                 if msg_type == 0xB and payload:
                     audio_chunks.append(payload)
                     if flags in {0x2, 0x3}:
+                        return b"".join(audio_chunks)
+                    if isinstance(event, int) and int(event) < 0:
                         return b"".join(audio_chunks)
                     continue
 
@@ -467,6 +471,128 @@ class DoubaoTTSClient:
             out_chunks.append(self.poll(task_id=task_id))
         return b"".join(out_chunks)
 
+    def _tts_v3_ws_url(self) -> str:
+        explicit = (os.environ.get("DOUBAO_TTS_V3_WS_URL") or "").strip()
+        if explicit:
+            return explicit
+
+        ws_url = (os.environ.get("DOUBAO_WS_URL") or "").strip()
+        if "/tts/unidirectional/stream" in ws_url:
+            return ws_url
+
+        return "wss://openspeech.bytedance.com/api/v3/tts/unidirectional/stream"
+
+    def _tts_v3_ws_headers(self) -> Dict[str, str]:
+        resource_id = (
+            os.environ.get("DOUBAO_TTS_V3_RESOURCE_ID") or os.environ.get("DOUBAO_TTS_RESOURCE_ID") or ""
+        ).strip()
+        if not resource_id:
+            fallback = (os.environ.get("DOUBAO_RESOURCE_ID") or "").strip()
+            if fallback and fallback != "volc.service_type.10050":
+                resource_id = fallback
+
+        if not resource_id:
+            raise DoubaoTTSException(
+                "Doubao TTS V3 WS requires a TTS resource id: set DOUBAO_TTS_V3_RESOURCE_ID (e.g. volc.service_type.10029/10048)."
+            )
+
+        app_key = (
+            os.environ.get("DOUBAO_TTS_V3_WS_APP_KEY")
+            or os.environ.get("DOUBAO_WS_APP_KEY")
+            or "aGjiRDfUWi"
+        ).strip()
+
+        headers = {
+            "Authorization": f"Bearer; {self.cfg.access_key}",
+            "X-Api-App-Key": app_key,
+            "X-Api-Request-Id": str(uuid.uuid4()),
+        }
+        if self.cfg.app_id:
+            headers["X-Api-App-Id"] = self.cfg.app_id
+        if self.cfg.access_key:
+            headers["X-Api-Access-Key"] = self.cfg.access_key
+        headers["X-Api-Resource-Id"] = resource_id
+        return headers
+
+    def submit_v3_ws(self, ssml: str, voice: str) -> str:
+        if not (self.cfg.app_id and self.cfg.access_key) or self.cfg.access_key in {"replace_me", "你的token"}:
+            raise DoubaoTTSException(
+                "Doubao TTS not configured: set DOUBAO_APP_ID and DOUBAO_ACCESS_KEY (access token)"
+            )
+
+        task_id = str(uuid.uuid4())
+        text = self._strip_ssml(ssml)
+        if not text:
+            raise DoubaoTTSException("empty ssml/text")
+
+        if len(text.encode("utf-8")) > 1024:
+            raise DoubaoTTSException("text too long for single doubao websocket request; use synthesize()")
+
+        chosen_voice = self._pick_voice(voice)
+        if not chosen_voice:
+            raise DoubaoTTSException("Doubao TTS voice_type is empty")
+
+        cluster = (os.environ.get("DOUBAO_TTS_CLUSTER") or "volcano_tts").strip() or "volcano_tts"
+        encoding = (os.environ.get("DOUBAO_TTS_ENCODING") or "mp3").strip() or "mp3"
+        rate = int(os.environ.get("DOUBAO_TTS_RATE") or "24000")
+        speed_ratio = float(os.environ.get("DOUBAO_TTS_SPEED_RATIO") or "1.0")
+
+        req: Dict[str, Any] = {
+            "app": {"appid": self.cfg.app_id, "token": "access_token", "cluster": cluster},
+            "user": {"uid": "auto-podcast"},
+            "audio": {
+                "voice_type": chosen_voice,
+                "encoding": encoding,
+                "rate": rate,
+                "speed_ratio": speed_ratio,
+            },
+            "request": {"reqid": task_id, "text": text, "operation": "submit"},
+        }
+
+        headers = self._tts_v3_ws_headers()
+        header_list = [f"{k}: {v}" for k, v in headers.items()]
+
+        trace = (os.environ.get("DOUBAO_WS_TRACE") or "").strip().lower()
+        if trace in {"1", "true", "yes", "on"}:
+            try:
+                websocket.enableTrace(True)
+            except Exception:
+                pass
+
+        try:
+            ws = websocket.create_connection(self._tts_v3_ws_url(), header=header_list, timeout=self.timeout_seconds)
+            ws.settimeout(self.timeout_seconds)
+        except Exception as e:  # noqa: BLE001
+            raise DoubaoTTSException("Doubao websocket connect failed") from e
+
+        payload_bytes = json.dumps(req, ensure_ascii=False).encode("utf-8")
+        ws.send(
+            self._build_frame(
+                message_type=0x1,
+                flags=0x0,
+                serialization=0x1,
+                compression=0x0,
+                payload=payload_bytes,
+            ),
+            opcode=websocket.ABNF.OPCODE_BINARY,
+        )
+
+        self._conns[task_id] = ws
+        self._payloads[task_id] = req
+        return task_id
+
+    def synthesize_v3_ws(self, ssml: str, voice: str) -> bytes:
+        text = self._strip_ssml(ssml)
+        parts = self._split_text_utf8(text, max_bytes=900)
+        if not parts:
+            raise DoubaoTTSException("empty ssml/text")
+
+        out_chunks: list[bytes] = []
+        for part in parts:
+            task_id = self.submit_v3_ws(ssml=part, voice=voice)
+            out_chunks.append(self.poll(task_id=task_id))
+        return b"".join(out_chunks)
+
 
 class DoubaoPodcastClient:
     def __init__(self, timeout_seconds: int):
@@ -514,7 +640,7 @@ class DoubaoPodcastClient:
     def _tts_v3_unidirectional_url(self) -> str:
         return (os.environ.get("DOUBAO_TTS_V3_URL") or "https://openspeech.bytedance.com/api/v3/tts/unidirectional").strip()
 
-    def generate_mp3_v3_unidirectional_http(self, *, input_text: str) -> bytes:
+    def generate_mp3_v3_unidirectional_http(self, *, input_text: str, speaker: str = "") -> bytes:
         if not (self.cfg.app_id and self.cfg.access_key) or self.cfg.access_key in {"replace_me", "你的token"}:
             raise DoubaoTTSException(
                 "Doubao TTS V3 not configured: set DOUBAO_APP_ID and DOUBAO_ACCESS_KEY (access token)"
@@ -532,23 +658,29 @@ class DoubaoPodcastClient:
         if resource_id == "volc.service_type.10050":
             raise DoubaoTTSException(
                 "Doubao TTS V3 resource_id is set to podcast (volc.service_type.10050). "
-                "Set DOUBAO_TTS_V3_RESOURCE_ID to seed-tts-1.0 / seed-tts-2.0 / volc.service_type.10029 / volc.service_type.10048."
+                "Set DOUBAO_TTS_V3_RESOURCE_ID to seed-tts-1.0 / seed-tts-1.0-concurr / seed-tts-2.0 / volc.service_type.10029 / volc.service_type.10048."
             )
 
         audio_format = (os.environ.get("DOUBAO_TTS_V3_FORMAT") or os.environ.get("DOUBAO_PODCAST_FORMAT") or "mp3").strip() or "mp3"
         sample_rate = int(os.environ.get("DOUBAO_TTS_V3_SAMPLE_RATE") or os.environ.get("DOUBAO_PODCAST_SAMPLE_RATE") or "24000")
         speech_rate = int(os.environ.get("DOUBAO_TTS_V3_SPEECH_RATE") or os.environ.get("DOUBAO_PODCAST_SPEECH_RATE") or "0")
 
-        speaker = (os.environ.get("DOUBAO_TTS_V3_SPEAKER") or "").strip()
+        speaker = (speaker or "").strip() or (os.environ.get("DOUBAO_TTS_V3_SPEAKER") or "").strip()
+        if not speaker:
+            speaker = (os.environ.get("DOUBAO_TTS_VOICE") or "").strip()
         if not speaker:
             speaker = (self._pick_speakers()[0] or "").strip()
         if not speaker:
             raise DoubaoTTSException("Doubao TTS V3 speaker is empty")
 
+        is_ssml = ("<" in txt and ">" in txt)
+        model = (os.environ.get("DOUBAO_TTS_V3_MODEL") or "").strip()
         req_body: Dict[str, Any] = {
             "user": {"uid": (os.environ.get("DOUBAO_TTS_V3_UID") or "auto_podcast").strip() or "auto_podcast"},
             "req_params": {
-                "text": txt,
+                "text": "" if is_ssml else txt,
+                "ssml": txt if is_ssml else "",
+                "model": model,
                 "speaker": speaker,
                 "audio_params": {
                     "format": audio_format,
