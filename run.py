@@ -1697,7 +1697,16 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
     try:
         from src.tts.doubao import DoubaoPodcastClient, DoubaoTTSClient
 
-        doubao_mode = (os.environ.get("DOUBAO_MODE") or "tts").strip().lower()
+        doubao_mode_env = os.environ.get("DOUBAO_MODE")
+        if doubao_mode_env is not None and doubao_mode_env.strip():
+            doubao_mode = doubao_mode_env.strip().lower()
+        else:
+            rid = (os.environ.get("DOUBAO_RESOURCE_ID") or "").strip()
+            ws_url = (os.environ.get("DOUBAO_WS_URL") or "").strip()
+            if rid == "volc.service_type.10050" or ("podcasttts" in ws_url):
+                doubao_mode = "podcast"
+            else:
+                doubao_mode = "tts"
         if doubao_mode == "podcast":
             client = DoubaoPodcastClient(timeout_seconds=timeout_s)
             task_id = "podcast"

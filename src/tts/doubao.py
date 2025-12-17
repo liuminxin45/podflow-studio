@@ -221,19 +221,16 @@ class DoubaoTTSClient:
             event_code = int.from_bytes(raw[idx : idx + 4], byteorder="big", signed=False)
             idx += 4
 
-            session_payload = b""
-            if len(raw) >= idx + 4:
-                sid_len = int.from_bytes(raw[idx : idx + 4], byteorder="big", signed=False)
-                if 0 < sid_len <= 512 and len(raw) >= idx + 4 + sid_len + 4:
-                    idx += 4 + sid_len
-                    session_payload = raw[idx:]
+            if len(raw) < idx + 4:
+                raise DoubaoTTSException("invalid frame: missing session_id len")
+            maybe_sid_len = int.from_bytes(raw[idx : idx + 4], byteorder="big", signed=False)
 
-            if session_payload:
-                if len(session_payload) < 4:
-                    raise DoubaoTTSException("invalid frame: missing payload size")
-                payload_size = int.from_bytes(session_payload[0:4], byteorder="big", signed=False)
-                payload = session_payload[4 : 4 + payload_size]
-                return msg_type, flags, serialization, compression, event_code, payload
+            if len(raw) >= idx + 4 + maybe_sid_len + 4:
+                sid_len = maybe_sid_len
+                idx += 4
+                if sid_len > 2048 or len(raw) < idx + sid_len + 4:
+                    raise DoubaoTTSException("invalid frame: bad session_id len")
+                idx += sid_len
 
             if len(raw) < idx + 4:
                 raise DoubaoTTSException("invalid frame: missing payload size")
@@ -264,7 +261,7 @@ class DoubaoTTSClient:
     def submit(self, ssml: str, voice: str) -> str:
         # Doc uses Access Token (X-Api-Access-Key). secret_key is not required for this websocket API,
         # but we keep it for compatibility with other Volcengine auth styles.
-        if not (self.cfg.app_id and self.cfg.access_key):
+        if not (self.cfg.app_id and self.cfg.access_key) or self.cfg.access_key in {"replace_me", "你的token"}:
             raise DoubaoTTSException(
                 "Doubao TTS not configured: set DOUBAO_APP_ID and DOUBAO_ACCESS_KEY (access token)"
             )
@@ -518,7 +515,7 @@ class DoubaoPodcastClient:
         return (os.environ.get("DOUBAO_TTS_V3_URL") or "https://openspeech.bytedance.com/api/v3/tts/unidirectional").strip()
 
     def generate_mp3_v3_unidirectional_http(self, *, input_text: str) -> bytes:
-        if not (self.cfg.app_id and self.cfg.access_key):
+        if not (self.cfg.app_id and self.cfg.access_key) or self.cfg.access_key in {"replace_me", "你的token"}:
             raise DoubaoTTSException(
                 "Doubao TTS V3 not configured: set DOUBAO_APP_ID and DOUBAO_ACCESS_KEY (access token)"
             )
@@ -619,7 +616,7 @@ class DoubaoPodcastClient:
         return bytes(out)
 
     def generate_session(self, *, input_text: str) -> str:
-        if not (self.cfg.app_id and self.cfg.access_key):
+        if not (self.cfg.app_id and self.cfg.access_key) or self.cfg.access_key in {"replace_me", "你的token"}:
             raise DoubaoTTSException(
                 "Doubao Podcast not configured: set DOUBAO_APP_ID and DOUBAO_ACCESS_KEY (access token)"
             )
@@ -682,23 +679,55 @@ class DoubaoPodcastClient:
         try:
             start_message_type = int(os.environ.get("DOUBAO_PODCAST_START_MESSAGE_TYPE") or "1", 0)
             start_flags = int(os.environ.get("DOUBAO_PODCAST_START_FLAGS") or "4", 0)
+            connect_event_code = int(os.environ.get("DOUBAO_PODCAST_CONNECT_EVENT_CODE") or "1", 0)
             start_event_code = int(os.environ.get("DOUBAO_PODCAST_START_EVENT_CODE") or "1", 0)
+            task_event_code_raw = os.environ.get("DOUBAO_PODCAST_TASK_EVENT_CODE")
+            if task_event_code_raw is not None and task_event_code_raw.strip():
+                task_event_code = int(task_event_code_raw, 0)
+            else:
+                task_event_code = start_event_code if start_event_code != connect_event_code else 100
             serialization = int(os.environ.get("DOUBAO_PODCAST_SERIALIZATION") or "1", 0)
             compression = int(os.environ.get("DOUBAO_PODCAST_COMPRESSION") or "0", 0)
 
             payload_to_send = gzip.compress(payload) if compression == 0x1 else payload
 
             if start_flags & 0x4:
-                include_sid = self._truthy(os.environ.get("DOUBAO_PODCAST_START_INCLUDE_SESSION_ID") or "0")
-                sid: Optional[str] = None if (start_message_type & 0xF) == 0x1 else (session_id if include_sid else None)
+                connect_payload = gzip.compress(b"{}") if compression == 0x1 else b"{}"
                 ws.send(
                     DoubaoTTSClient._build_event_frame(
                         message_type=start_message_type,
                         flags=start_flags,
                         serialization=serialization,
                         compression=compression,
-                        event_code=start_event_code,
-                        session_id=sid,
+                        event_code=connect_event_code,
+                        session_id=None,
+                        payload=connect_payload,
+                    ),
+                    opcode=websocket.ABNF.OPCODE_BINARY,
+                )
+
+                try:
+                    raw0 = ws.recv()
+                    if raw0 is not None:
+                        raw0b = raw0.encode("utf-8") if isinstance(raw0, str) else bytes(raw0)
+                        mt0, _fl0, _sr0, _cm0, ev0, pl0 = DoubaoTTSClient._parse_frame(raw0b)
+                        if mt0 == 0xF:
+                            pl0d = DoubaoTTSClient._maybe_decompress(pl0, _cm0)
+                            msg0 = pl0d.decode("utf-8", errors="ignore") if pl0d else ""
+                            raise DoubaoTTSException(f"Doubao podcast error frame code={ev0} msg={msg0}")
+                except websocket.WebSocketTimeoutException:
+                    pass
+                except Exception:
+                    pass
+
+                ws.send(
+                    DoubaoTTSClient._build_event_frame(
+                        message_type=start_message_type,
+                        flags=start_flags,
+                        serialization=serialization,
+                        compression=compression,
+                        event_code=task_event_code,
+                        session_id=session_id,
                         payload=payload_to_send,
                     ),
                     opcode=websocket.ABNF.OPCODE_BINARY,
@@ -726,7 +755,7 @@ class DoubaoPodcastClient:
         if self._truthy(os.environ.get("DOUBAO_PODCAST_USE_V3_UNIDIRECTIONAL") or "0"):
             return self.generate_mp3_v3_unidirectional_http(input_text=input_text)
 
-        if not (self.cfg.app_id and self.cfg.access_key):
+        if not (self.cfg.app_id and self.cfg.access_key) or self.cfg.access_key in {"replace_me", "你的token"}:
             raise DoubaoTTSException(
                 "Doubao Podcast not configured: set DOUBAO_APP_ID and DOUBAO_ACCESS_KEY (access token)"
             )
@@ -801,11 +830,8 @@ class DoubaoPodcastClient:
             if include_sid_strict:
                 include_sid_values = [1 if include_sid_truthy else 0]
             else:
-                # If user asks to include session_id, try without it first as many servers reject client-provided sid.
-                include_sid_values = [0, 1] if include_sid_truthy else [0]
+                include_sid_values = [1, 0]
         else:
-            # Default to NOT including session_id: some servers reject client-provided session_id
-            # and treat its length as payload_size (declared body size mismatch).
             include_sid_values = [1, 0]
 
         start_flags_env = int(os.environ.get("DOUBAO_PODCAST_START_FLAGS") or "4", 0)
@@ -839,20 +865,54 @@ class DoubaoPodcastClient:
 
             try:
                 start_event_code = int(os.environ.get("DOUBAO_PODCAST_START_EVENT_CODE") or "1", 0)
+                connect_event_code = int(os.environ.get("DOUBAO_PODCAST_CONNECT_EVENT_CODE") or "1", 0)
+                task_event_code_raw = os.environ.get("DOUBAO_PODCAST_TASK_EVENT_CODE")
+                if task_event_code_raw is not None and task_event_code_raw.strip():
+                    task_event_code = int(task_event_code_raw, 0)
+                else:
+                    task_event_code = start_event_code if start_event_code != connect_event_code else 100
                 serialization = int(os.environ.get("DOUBAO_PODCAST_SERIALIZATION") or "1", 0)
                 compression = int(os.environ.get("DOUBAO_PODCAST_COMPRESSION") or "0", 0)
 
                 payload_to_send = gzip.compress(payload) if compression == 0x1 else payload
 
                 if attempt_start_flags & 0x4:
-                    sid: Optional[str] = None if (attempt_start_mt & 0xF) == 0x1 else (session_id if include_sid_v else None)
+                    connect_payload = gzip.compress(b"{}") if compression == 0x1 else b"{}"
                     ws.send(
                         DoubaoTTSClient._build_event_frame(
                             message_type=attempt_start_mt,
                             flags=attempt_start_flags,
                             serialization=serialization,
                             compression=compression,
-                            event_code=start_event_code,
+                            event_code=connect_event_code,
+                            session_id=None,
+                            payload=connect_payload,
+                        ),
+                        opcode=websocket.ABNF.OPCODE_BINARY,
+                    )
+
+                    try:
+                        raw0 = ws.recv()
+                        if raw0 is not None:
+                            raw0b = raw0.encode("utf-8") if isinstance(raw0, str) else bytes(raw0)
+                            mt0, _fl0, _sr0, _cm0, ev0, pl0 = DoubaoTTSClient._parse_frame(raw0b)
+                            if mt0 == 0xF:
+                                pl0d = DoubaoTTSClient._maybe_decompress(pl0, _cm0)
+                                msg0 = pl0d.decode("utf-8", errors="ignore") if pl0d else ""
+                                raise DoubaoTTSException(f"Doubao podcast error frame code={ev0} msg={msg0}")
+                    except websocket.WebSocketTimeoutException:
+                        pass
+                    except Exception:
+                        pass
+
+                    sid: Optional[str] = session_id if include_sid_v else None
+                    ws.send(
+                        DoubaoTTSClient._build_event_frame(
+                            message_type=attempt_start_mt,
+                            flags=attempt_start_flags,
+                            serialization=serialization,
+                            compression=compression,
+                            event_code=task_event_code,
                             session_id=sid,
                             payload=payload_to_send,
                         ),
@@ -985,7 +1045,7 @@ class DoubaoPodcastClient:
             try:
                 opcode, data = ws.recv_data(control_frame=True)
             except websocket.WebSocketTimeoutException:
-                if (not saw_progress_event) and (time.time() - start_ts) > progress_timeout_s:
+                if business_count == 0 and (time.time() - start_ts) > progress_timeout_s:
                     raise DoubaoTTSException(
                         f"Doubao podcast stuck without progress events. session_id={session_id} "
                         f"business_frames={business_count} last_event={last_event} pings={ping_count} last={last_json}"
@@ -1010,7 +1070,7 @@ class DoubaoPodcastClient:
 
             if opcode == websocket.ABNF.OPCODE_PING:
                 ping_count += 1
-                if (not saw_progress_event) and (time.time() - start_ts) > progress_timeout_s:
+                if business_count == 0 and (time.time() - start_ts) > progress_timeout_s:
                     raise DoubaoTTSException(
                         f"Doubao podcast stuck without progress events. session_id={session_id} "
                         f"business_frames={business_count} last_event={last_event} pings={ping_count} last={last_json}"
@@ -1033,7 +1093,7 @@ class DoubaoPodcastClient:
                     pass
                 continue
             if opcode == websocket.ABNF.OPCODE_PONG:
-                if (not saw_progress_event) and (time.time() - start_ts) > progress_timeout_s:
+                if business_count == 0 and (time.time() - start_ts) > progress_timeout_s:
                     raise DoubaoTTSException(
                         f"Doubao podcast stuck without progress events. session_id={session_id} "
                         f"business_frames={business_count} last_event={last_event} pings={ping_count} last={last_json}"
@@ -1086,11 +1146,15 @@ class DoubaoPodcastClient:
 
             if serialization == 0x0 and payload:
                 audio_chunks.append(payload)
-
-            if isinstance(event, int) and event in {150, 360, 361, 362, 363, 152, 154}:
                 saw_progress_event = True
 
-            if not saw_progress_event and (time.time() - start_ts) > progress_timeout_s:
+            if msg_type == 0xB:
+                saw_progress_event = True
+
+            if isinstance(event, int) and event in {50, 150, 360, 361, 362, 363, 152, 154}:
+                saw_progress_event = True
+
+            if business_count == 0 and (time.time() - start_ts) > progress_timeout_s:
                 raise DoubaoTTSException(
                     f"Doubao podcast stuck without progress events. session_id={session_id} "
                     f"business_frames={business_count} last_event={last_event} last={last_json}"
@@ -1109,6 +1173,12 @@ class DoubaoPodcastClient:
                     obj = {"raw": payload2.decode("utf-8", errors="ignore")}
                 last_json = obj if isinstance(obj, dict) else {"data": obj}
 
+                if isinstance(last_json, dict) and isinstance(last_json.get("data"), str):
+                    try:
+                        audio_chunks.append(base64.b64decode(last_json["data"]))
+                    except Exception:
+                        pass
+
                 if event == 363 and isinstance(last_json, dict):
                     meta = last_json.get("meta_info") or {}
                     audio_url = (meta.get("audio_url") or "").strip() if isinstance(meta, dict) else ""
@@ -1117,7 +1187,14 @@ class DoubaoPodcastClient:
                         a.raise_for_status()
                         return a.content
 
+                if isinstance(last_json, dict) and isinstance(last_json.get("sequence"), int):
+                    if int(last_json["sequence"]) < 0 and audio_chunks:
+                        break
+
             if event in {52, 152}:
+                break
+
+            if msg_type == 0xB and isinstance(event, int) and event < 0 and audio_chunks:
                 break
 
         if audio_chunks:

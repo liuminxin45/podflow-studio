@@ -70,7 +70,12 @@ def test_deepseek(timeout_s: int) -> None:
 
 def test_doubao_config() -> None:
     required = ["DOUBAO_APP_ID", "DOUBAO_ACCESS_KEY"]
-    missing = [k for k in required if not os.environ.get(k, "").strip() or os.environ.get(k) == "replace_me"]
+    placeholder_values = {"replace_me", "你的token"}
+    missing = [
+        k
+        for k in required
+        if (not os.environ.get(k, "").strip()) or (os.environ.get(k, "").strip() in placeholder_values)
+    ]
     if missing:
         raise RuntimeError(f"Doubao env missing/placeholder: {', '.join(missing)}")
 
@@ -87,7 +92,7 @@ def test_doubao_ws(timeout_s: int) -> None:
 
     app_id = os.environ.get("DOUBAO_APP_ID", "").strip()
     access_token = os.environ.get("DOUBAO_ACCESS_KEY", "").strip()
-    if not app_id or not access_token:
+    if not app_id or not access_token or access_token in {"replace_me", "你的token"}:
         raise RuntimeError("Doubao not configured: set DOUBAO_APP_ID and DOUBAO_ACCESS_KEY")
 
     headers = {
