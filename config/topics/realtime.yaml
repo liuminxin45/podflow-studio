@@ -1,0 +1,82 @@
+# Realtime Mode Topic Configuration
+# 实时模式：关注时效性、快速更新、热点话题
+
+mode: realtime
+description: "实时热点追踪模式，关注最新动态和突发事件"
+
+# 主题关键词
+topics:
+  - name: "科技前沿"
+    keywords:
+      - "AI"
+      - "人工智能"
+      - "大模型"
+      - "ChatGPT"
+      - "机器学习"
+      - "深度学习"
+      - "自动驾驶"
+      - "量子计算"
+    weight: 1.0
+    
+  - name: "商业财经"
+    keywords:
+      - "IPO"
+      - "融资"
+      - "上市"
+      - "财报"
+      - "股价"
+      - "市值"
+      - "并购"
+      - "投资"
+    weight: 0.8
+    
+  - name: "社会热点"
+    keywords:
+      - "政策"
+      - "法规"
+      - "民生"
+      - "教育"
+      - "医疗"
+      - "环保"
+      - "安全"
+    weight: 0.7
+
+# 时间约束
+time_constraints:
+  max_age_hours: 24  # 最多24小时内的新闻
+  prefer_recent_hours: 6  # 优先6小时内的新闻
+  freshness_weight: 0.4  # 新鲜度权重
+
+# 选择策略
+selection:
+  max_items: 10
+  min_score: 0.6
+  diversity:
+    max_per_topic: 4
+    max_per_domain: 3
+  constraints:
+    cooldown_hours: 48  # 相似话题冷却期
+    title_similarity_threshold: 0.7
+
+# 证据要求
+evidence:
+  scenario: "realtime"
+  max_age_days: 7  # 证据最多7天内
+  time_weight: 0.3  # 时间权重较高
+
+# 目标听众
+audience:
+  target: "关注科技和商业动态的专业人士"
+  tone: "专业、简洁、快速"
+  length_preference: "15-20分钟"
+
+# 合规要求
+compliance:
+  policy_level: "standard"
+  min_score: 0.6
+  rules:
+    - "sensitive_words"
+    - "illegal_content"
+    - "pii"
+    - "copyright"
+    - "external_links"

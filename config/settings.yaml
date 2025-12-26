@@ -7,6 +7,36 @@ channel:
     audience: "普通消费者"
     length_minutes: 6
 
+selection:
+  max_clusters: 5
+  constraints:
+    cooldown_days: 2
+
+source_guard:
+  config_dir: "./config/sources"
+  min_content_length: 120
+
+compliance:
+  policy_level: "standard"
+  min_score: 0.6
+  rules:
+    - sensitive_words
+    - illegal_content
+    - copyright
+    - pii
+    - external_links
+  rule_overrides:
+    pii:
+      enabled: true
+      params:
+        scope: "full"
+        max_hits_per_type: 8
+        severity: "medium"
+    external_links:
+      enabled: true
+      params:
+        max_urls: 8
+
 sources:
   rss:
     - name: "示例RSS"

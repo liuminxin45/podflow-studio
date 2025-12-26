@@ -49,7 +49,7 @@ from pathlib import Path
 from dotenv import dotenv_values, load_dotenv
 
 from src.audio.render import render_episode_audio
-from src.fetch.dedup import dedup_items
+from src.store.dedup import dedup_items
 from src.fetch.lilyrss import build_lily_rss_url
 from src.fetch.rss import fetch_rss_items_with_status
 from src.fetch.sixtys import fetch_sixtys_items_with_status
@@ -59,6 +59,15 @@ from src.store.db import Store
 from src.publish.local import publish_local
 from src.fetch.filter import filter_fetch_archive_payload
 from src.research.research_client import create_client_from_env, research_items_with_client
+from src.fetch.compliance import filter_compliant_items, assess_compliance
+from src.fetch.normalize import prepare_items
+from src.fetch.source_guard import SourceGuard
+from src.store.clusters import ClusterConfig, cluster_items
+from src.store.selector import SelectionConfig, select_clusters
+from src.store.scoring import ScoringConfig, ScoreWeights
+from src.store.constraints import ConstraintConfig
+from src.store.artifacts import write_cluster_artifacts, write_jsonl
+from src.utils.hash_utils import stable_hash
 
 
 class _JsonFormatter(logging.Formatter):
@@ -257,6 +266,148 @@ def _estimate_tokens(text: str) -> int:
 def _text_stats(text: str | None) -> tuple[int, int]:
     s = (text or "").strip()
     return len(s), _estimate_tokens(s)
+
+
+def _first_number(*candidates: object, default: float = 0.0) -> float:
+    for cand in candidates:
+        if isinstance(cand, (int, float)):
+            return float(cand)
+        if isinstance(cand, str) and cand.strip():
+            try:
+                return float(cand)
+            except ValueError:
+                continue
+    return float(default)
+
+
+def _ensure_item_id(item: dict) -> None:
+    if item.get("id"):
+        return
+    source = item.get("source") or {}
+    candidates = [
+        source.get("id"),
+        source.get("url"),
+        item.get("url"),
+        item.get("title"),
+    ]
+    for cand in candidates:
+        if isinstance(cand, str) and cand.strip():
+            item["id"] = cand.strip()
+            return
+    fingerprint = stable_hash(
+        [
+            item.get("title") or "",
+            item.get("summary") or "",
+            item.get("content") or "",
+            item.get("url") or "",
+        ]
+    )
+    item["id"] = f"item:{fingerprint}"
+
+
+def _build_cluster_config(cfg: dict) -> ClusterConfig:
+    selection_cfg = (cfg.get("selection") or {})
+    cluster_cfg = selection_cfg.get("clustering") or {}
+    pipeline_cfg = (cfg.get("pipeline") or {}).get("selection") or {}
+
+    return ClusterConfig(
+        simhash_max_distance=int(_first_number(cluster_cfg.get("simhash_max_distance"), default=4)),
+        title_min_jaccard=float(_first_number(cluster_cfg.get("title_min_jaccard"), default=0.4)),
+        time_window_days=int(_first_number(cluster_cfg.get("time_window_days"), default=3)),
+        cooldown_days=int(
+            _first_number(
+                cluster_cfg.get("cooldown_days"),
+                selection_cfg.get("cooldown_days"),
+                pipeline_cfg.get("cooldown_days"),
+                default=2,
+            )
+        ),
+    )
+
+
+def _build_selection_config(cfg: dict) -> SelectionConfig:
+    selection_cfg = (cfg.get("selection") or {})
+    pipeline_cfg = cfg.get("pipeline") or {}
+    pipeline_selection = pipeline_cfg.get("selection") or {}
+    scoring_cfg = selection_cfg.get("scoring") or {}
+    weights_cfg = scoring_cfg.get("weights") or {}
+
+    scoring = ScoringConfig(
+        freshness_half_life_days=float(
+            _first_number(
+                scoring_cfg.get("freshness_half_life_days"),
+                (pipeline_cfg.get("freshness") or {}).get("half_life_days"),
+                default=3.0,
+            )
+        ),
+        source_trust_overrides=scoring_cfg.get("source_trust_overrides"),
+        weights=ScoreWeights(
+            freshness=float(_first_number(weights_cfg.get("freshness"), default=ScoreWeights().freshness)),
+            impact=float(_first_number(weights_cfg.get("impact"), default=ScoreWeights().impact)),
+            source_trust=float(_first_number(weights_cfg.get("source_trust"), default=ScoreWeights().source_trust)),
+            quality=float(_first_number(weights_cfg.get("quality"), default=ScoreWeights().quality)),
+        ),
+    )
+
+    constraints_cfg = selection_cfg.get("constraints") or {}
+    exception_keywords = constraints_cfg.get("exception_keywords")
+    if isinstance(exception_keywords, list):
+        exception_tuple = tuple(str(x) for x in exception_keywords if x)
+    else:
+        exception_tuple = None
+
+    min_distance = constraints_cfg.get("min_distance_between_clusters")
+    max_title_similarity = constraints_cfg.get("max_title_similarity")
+    if isinstance(min_distance, (int, float)):
+        max_title_similarity = max(0.0, min(1.0, 1.0 - float(min_distance)))
+
+    constraints = ConstraintConfig(
+        cooldown_days=int(
+            _first_number(
+                constraints_cfg.get("cooldown_days"),
+                selection_cfg.get("cooldown_days"),
+                pipeline_selection.get("cooldown_days"),
+                default=2,
+            )
+        ),
+        exception_keywords=exception_tuple or ConstraintConfig().exception_keywords,
+        max_per_topic=int(
+            _first_number(
+                constraints_cfg.get("max_per_topic"),
+                pipeline_selection.get("max_per_topic"),
+                default=2,
+            )
+        ),
+        max_per_domain=int(
+            _first_number(
+                constraints_cfg.get("max_per_domain"),
+                pipeline_selection.get("max_per_domain"),
+                default=1,
+            )
+        ),
+        max_title_similarity=float(
+            _first_number(
+                max_title_similarity,
+                default=0.7,
+            )
+        ),
+    )
+
+    max_clusters = int(
+        _first_number(
+            selection_cfg.get("max_clusters"),
+            pipeline_selection.get("items_per_episode"),
+            pipeline_cfg.get("pick_items"),
+            pipeline_cfg.get("max_items"),
+            default=5,
+        )
+    )
+
+    return SelectionConfig(
+        max_clusters=max_clusters,
+        scoring=scoring,
+        constraints=constraints,
+    )
 
 
 def _file_size_bytes(path: Path | None) -> int | None:
@@ -1061,10 +1212,98 @@ def step_fetch(
                 log.warning("fetch lilyrss failed: %s", e)
 
         fetched_raw = list(fetched)
-        fetched = dedup_items(fetched, max_items=max_items)
+
+        # Source guard & normalization
+        source_guard_cfg = cfg.get("source_guard") or {}
+        source_guard_dir = source_guard_cfg.get("config_dir") or "./config/sources"
+        min_content_length = int(source_guard_cfg.get("min_content_length") or 0)
+        
+        source_guard = SourceGuard(config_dir=source_guard_dir)
+        log.info(f"source guard loaded {len(source_guard._policies)} policies")
+        
+        normalized, blocked = prepare_items(
+            fetched_raw,
+            source_guard=source_guard,
+            min_content_length=min_content_length,
+        )
+        log.info(f"normalization: {len(normalized)} items, {len(blocked)} blocked by source guard")
+        
+        # Write normalization artifacts
+        fetch_artifacts_dir = fetch_archives_dir / "artifacts"
+        fetch_artifacts_dir.mkdir(parents=True, exist_ok=True)
+        if normalized:
+            write_jsonl(fetch_artifacts_dir / "normalized_items.jsonl", normalized)
+        if blocked:
+            write_jsonl(fetch_artifacts_dir / "source_guard_blocked.jsonl", blocked)
+        
+        fetched = dedup_items(normalized, max_items=max_items)
+
+        # 合规验证
+        compliance_cfg = cfg.get("compliance") or {}
+        compliance_rules = compliance_cfg.get("rules")
+        compliance_min_score = float(compliance_cfg.get("min_score") or 0.6)
+        compliance_policy_level = compliance_cfg.get("policy_level") or "standard"
+        compliance_rule_overrides = compliance_cfg.get("rule_overrides")
+        
+        log.info("开始合规验证...")
+        compliant_items, non_compliant_items = filter_compliant_items(
+            fetched,
+            rules=compliance_rules,
+            min_score=compliance_min_score,
+            policy_level=compliance_policy_level,
+            rule_overrides=compliance_rule_overrides,
+        )
+        log.info(f"合规验证完成：合规{len(compliant_items)}条，不合规{len(non_compliant_items)}条")
+        
+        # 生成合规性评估报告
+        compliance_report = assess_compliance(compliant_items + non_compliant_items)
+        log.info(f"合规性评估：{compliance_report['summary']}")
+        
+        # Write compliance artifacts
+        if non_compliant_items:
+            write_jsonl(fetch_artifacts_dir / "non_compliant_items.jsonl", non_compliant_items)
+        
+        # 使用合规内容
+        fetched = compliant_items
+
+        for item in fetched:
+            _ensure_item_id(item)
+
+        items_by_id = {item["id"]: item for item in fetched if item.get("id")}
+
+        cluster_cfg = _build_cluster_config(cfg)
+        clusters = cluster_items(list(items_by_id.values()), config=cluster_cfg)
+
+        selection_cfg = _build_selection_config(cfg)
+        selection_result = select_clusters(clusters, item_lookup=items_by_id, config=selection_cfg)
+
+        selected_items: list[dict] = []
+        seen_selected_ids: set[str] = set()
+        for entry in selection_result["selected"]:
+            for snapshot in entry.get("items") or []:
+                item_id = snapshot.get("id")
+                if item_id and item_id in items_by_id and item_id not in seen_selected_ids:
+                    selected_items.append(items_by_id[item_id])
+                    seen_selected_ids.add(item_id)
+
+        if selected_items:
+            fetched = selected_items
+        elif clusters:
+            log.warning("cluster selection produced no items; fallback to deduplicated items")
+
+        selection_metrics = write_cluster_artifacts(
+            out_dir=Path((cfg.get("output") or {}).get("out_dir") or "./out"),
+            clusters=clusters,
+            selection=selection_result,
+        )
 
         raw_total_chars, raw_total_tokens, raw_max_item_chars, raw_max_item_tokens = _calc_items_text_stats(fetched_raw)
-        dedup_total_chars, dedup_total_tokens, dedup_max_item_chars, dedup_max_item_tokens = _calc_items_text_stats(fetched)
+        dedup_total_chars, dedup_total_tokens, dedup_max_item_chars, dedup_max_item_tokens = _calc_items_text_stats(
+            list(items_by_id.values())
+        )
+        selected_total_chars, selected_total_tokens, selected_max_item_chars, selected_max_item_tokens = _calc_items_text_stats(
+            fetched
+        )
 
         _log_event(
             log,
@@ -1077,11 +1316,26 @@ def step_fetch(
             raw_est_tokens=int(raw_total_tokens),
             raw_max_item_chars=int(raw_max_item_chars),
             raw_max_item_tokens=int(raw_max_item_tokens),
-            dedup_count=int(len(fetched)),
+            dedup_count=int(len(items_by_id)),
             dedup_total_chars=int(dedup_total_chars),
             dedup_est_tokens=int(dedup_total_tokens),
             dedup_max_item_chars=int(dedup_max_item_chars),
             dedup_max_item_tokens=int(dedup_max_item_tokens),
+        )
+
+        _log_event(
+            log,
+            "cluster_selection",
+            episode_id=str(episode_id),
+            clusters_total=int(selection_metrics["clusters_total"]),
+            selected_clusters=int(selection_metrics["selected_clusters"]),
+            rejected_clusters=int(selection_metrics["rejected_clusters"]),
+            selection_rejection_reasons=selection_metrics["rejection_reasons"],
+            selected_item_count=int(len(fetched)),
+            selected_total_chars=int(selected_total_chars),
+            selected_est_tokens=int(selected_total_tokens),
+            selected_max_item_chars=int(selected_max_item_chars),
+            selected_max_item_tokens=int(selected_max_item_tokens),
         )
 
         upserted = store.upsert_items(fetched)
@@ -1668,6 +1922,7 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
     tts_path = tts_dir / f"{ep['episode_date']}.tts.mp3"
     wrote_file = False
     try:
+        task_id = ""
         from src.tts.tts_client import TTSClientFactory
 
         doubao_mode_env = os.environ.get("DOUBAO_MODE")

@@ -1,0 +1,98 @@
+# Research Mode Topic Configuration
+# 调研模式：深度分析、长期趋势、系统性研究
+
+mode: research
+description: "深度调研模式，关注长期趋势和系统性分析"
+
+# 主题关键词
+topics:
+  - name: "技术趋势"
+    keywords:
+      - "技术发展"
+      - "行业趋势"
+      - "未来展望"
+      - "技术演进"
+      - "创新方向"
+      - "产业变革"
+    weight: 1.0
+    
+  - name: "商业模式"
+    keywords:
+      - "商业模式"
+      - "盈利模式"
+      - "市场分析"
+      - "竞争格局"
+      - "战略布局"
+      - "行业报告"
+    weight: 0.9
+    
+  - name: "政策研究"
+    keywords:
+      - "政策解读"
+      - "法规分析"
+      - "监管动态"
+      - "政策影响"
+      - "合规要求"
+    weight: 0.8
+    
+  - name: "学术前沿"
+    keywords:
+      - "研究成果"
+      - "论文"
+      - "学术会议"
+      - "科研进展"
+      - "理论突破"
+    weight: 0.7
+
+# 时间约束（更宽松）
+time_constraints:
+  max_age_days: 30  # 最多30天内的内容
+  prefer_recent_days: 7  # 优先7天内
+  freshness_weight: 0.1  # 新鲜度权重较低
+
+# 选择策略
+selection:
+  max_items: 15  # 更多内容用于深度分析
+  min_score: 0.5  # 稍低的阈值
+  diversity:
+    max_per_topic: 5
+    max_per_domain: 4
+  constraints:
+    cooldown_hours: 168  # 7天冷却期（允许更多相关内容）
+    title_similarity_threshold: 0.6  # 稍低的相似度阈值
+
+# 证据要求
+evidence:
+  scenario: "research"
+  max_age_days: 90  # 证据可以更久远
+  time_weight: 0.0  # 时间权重很低或为0
+
+# 研究预算
+research_budget:
+  max_news_items: 15
+  max_claims_per_item: 8
+  max_total_claims: 50  # 更多断言用于深度调查
+
+# 目标听众
+audience:
+  target: "需要深度分析和系统性理解的决策者和研究人员"
+  tone: "深入、全面、分析性"
+  length_preference: "30-45分钟"
+
+# 合规要求
+compliance:
+  policy_level: "standard"
+  min_score: 0.5
+  rules:
+    - "sensitive_words"
+    - "illegal_content"
+    - "pii"
+    - "copyright"
+
+# 编辑重点
+editorial_focus:
+  - "What: 全面的事实梳理"
+  - "So What: 深入的意义分析"
+  - "Impact: 多维度的影响评估"
+  - "Uncertainty: 充分的不确定性讨论"
+  - "Takeaway: 系统性的结论和建议"

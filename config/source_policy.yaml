@@ -1,0 +1,156 @@
+# Source Policy Configuration
+# 源策略配置：定义不同来源的可信度、许可和抓取规则
+
+version: "1.0.0"
+
+# 默认策略
+default:
+  trust_score: 0.5
+  license: "unknown"
+  crawl_allowed: true
+  source_type: "general"
+
+# 高可信度源
+trusted_sources:
+  - domain: "reuters.com"
+    trust_score: 0.95
+    license: "allowed"
+    crawl_allowed: true
+    source_type: "news_agency"
+    notes: "路透社 - 国际权威新闻机构"
+  
+  - domain: "apnews.com"
+    trust_score: 0.95
+    license: "allowed"
+    crawl_allowed: true
+    source_type: "news_agency"
+    notes: "美联社 - 权威新闻机构"
+  
+  - domain: "bloomberg.com"
+    trust_score: 0.9
+    license: "allowed"
+    crawl_allowed: true
+    source_type: "financial"
+    notes: "彭博社 - 财经权威"
+  
+  - domain: "techcrunch.com"
+    trust_score: 0.85
+    license: "allowed"
+    crawl_allowed: true
+    source_type: "tech"
+    notes: "TechCrunch - 科技媒体"
+  
+  - domain: "arxiv.org"
+    trust_score: 0.9
+    license: "allowed"
+    crawl_allowed: true
+    source_type: "academic"
+    notes: "arXiv - 学术预印本"
+
+# 中等可信度源
+moderate_sources:
+  - domain: "theverge.com"
+    trust_score: 0.75
+    license: "allowed"
+    crawl_allowed: true
+    source_type: "tech"
+  
+  - domain: "wired.com"
+    trust_score: 0.75
+    license: "allowed"
+    crawl_allowed: true
+    source_type: "tech"
+  
+  - domain: "forbes.com"
+    trust_score: 0.7
+    license: "allowed"
+    crawl_allowed: true
+    source_type: "business"
+
+# 需要谨慎的源
+caution_sources:
+  - domain: "medium.com"
+    trust_score: 0.5
+    license: "unknown"
+    crawl_allowed: true
+    source_type: "blog"
+    notes: "个人博客平台，内容质量参差不齐"
+  
+  - domain: "reddit.com"
+    trust_score: 0.4
+    license: "unknown"
+    crawl_allowed: false
+    source_type: "social"
+    notes: "社交媒体，需人工验证"
+
+# 禁止源
+blocked_sources:
+  - domain: "example-spam.com"
+    trust_score: 0.0
+    license: "forbidden"
+    crawl_allowed: false
+    source_type: "spam"
+    notes: "垃圾内容"
+
+# 按类型的默认策略
+source_type_defaults:
+  news_agency:
+    trust_score: 0.9
+    license: "allowed"
+  
+  financial:
+    trust_score: 0.85
+    license: "allowed"
+  
+  tech:
+    trust_score: 0.8
+    license: "allowed"
+  
+  academic:
+    trust_score: 0.9
+    license: "allowed"
+  
+  blog:
+    trust_score: 0.5
+    license: "unknown"
+  
+  social:
+    trust_score: 0.3
+    license: "unknown"
+  
+  unknown:
+    trust_score: 0.5
+    license: "unknown"
+
+# 许可证类型
+license_types:
+  allowed:
+    description: "允许使用和引用"
+    can_quote: true
+    can_summarize: true
+    requires_attribution: true
+  
+  unknown:
+    description: "许可证未知，谨慎使用"
+    can_quote: false
+    can_summarize: true
+    requires_attribution: true
+    requires_disclaimer: true
+  
+  forbidden:
+    description: "禁止使用"
+    can_quote: false
+    can_summarize: false
+    requires_attribution: false
+
+# 抓取规则
+crawl_rules:
+  respect_robots_txt: true
+  user_agent: "Auto-Podcast/2.0 (Research Bot)"
+  rate_limit:
+    requests_per_minute: 10
+    delay_seconds: 1
+  
+  retry:
+    max_attempts: 3
+    backoff_factor: 2

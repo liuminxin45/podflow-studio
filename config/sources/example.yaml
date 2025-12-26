@@ -1,0 +1,12 @@
+sources:
+  - domain: "example.com"
+    license: "allowed"
+    crawl_allowed: true
+    source_type: "news"
+    notes: "示例域名，允许抓取与转载"
+
+  - domain: "forbidden.com"
+    license: "forbidden"
+    crawl_allowed: false
+    source_type: "unknown"
+    notes: "示例：禁止抓取/转载的域名"
