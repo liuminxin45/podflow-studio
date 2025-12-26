@@ -1,3 +1,43 @@
+"""
+Content Filter and Processor
+
+这个文件实现了内容过滤和处理功能，用于新闻内容的清洗和标准化。
+
+功能概述：
+- 新闻内容过滤和清洗
+- 文本格式化和标准化
+- 支持多种过滤规则
+- 提供内容质量评估
+
+主要函数：
+- filter_content(): 内容过滤主函数
+- clean_text(): 文本清洗
+- normalize_content(): 内容标准化
+- assess_quality(): 内容质量评估
+
+过滤特性：
+- 去除HTML标签和特殊字符
+- 标准化文本格式
+- 过滤低质量内容
+- 支持自定义过滤规则
+
+使用示例：
+    filtered_content = filter_content(
+        original_text,
+        rules=["html_tags", "special_chars", "normalize"]
+    )
+
+应用场景：
+- 新闻内容预处理
+- 文本数据清洗
+- 内容质量提升
+- 数据标准化处理
+
+作者：Auto-Podcast Team
+版本：1.0.0
+更新：2025-12-25
+"""
+
 from __future__ import annotations
 
 import re

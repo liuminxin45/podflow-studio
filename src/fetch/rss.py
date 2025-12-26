@@ -1,3 +1,42 @@
+"""
+RSS Feed Fetcher
+
+这个文件实现了RSS订阅源的数据获取功能，支持多种RSS格式和数据标准化。
+
+功能概述：
+- 从RSS订阅源获取新闻和内容
+- 支持RSS 2.0、Atom等格式
+- 提供内容去重和标准化处理
+- 包含完整的错误处理机制
+
+主要函数：
+- fetch_rss_items_with_status(): 获取RSS条目并返回状态
+- parse_rss_entry(): 解析RSS条目
+- normalize_rss_item(): 标准化RSS数据格式
+
+数据特性：
+- 自动提取标题、链接、发布时间
+- 支持内容摘要和全文获取
+- 生成唯一ID用于去重
+- 保留原始元数据信息
+
+使用示例：
+    items, status = fetch_rss_items_with_status(
+        url="https://example.com/rss.xml",
+        source="Example News",
+        timeout_seconds=30
+    )
+
+支持的RSS格式：
+- RSS 2.0标准格式
+- Atom 1.0格式
+- 自定义RSS扩展
+
+作者：Auto-Podcast Team
+版本：1.0.0
+更新：2025-12-25
+"""
+
 from __future__ import annotations
 
 import datetime as dt

@@ -1,3 +1,46 @@
+"""
+Database Storage Module
+
+这个文件实现了数据库存储功能，用于播客数据的持久化和管理。
+
+功能概述：
+- SQLite数据库操作封装
+- 数据模型定义和管理
+- 批量数据处理
+- 数据备份和恢复
+
+主要类：
+- Database: 数据库连接管理类
+- DataModel: 数据模型基类
+
+主要函数：
+- init_database(): 初始化数据库
+- store_episode(): 存储播客数据
+- query_episodes(): 查询播客数据
+- backup_database(): 备份数据库
+
+存储特性：
+- 自动数据库初始化
+- 事务管理
+- 数据完整性检查
+- 性能优化
+
+使用示例：
+    db = Database("podcast.db")
+    db.store_episode(episode_data)
+    results = db.query_episodes(date="2025-12-25")
+
+应用场景：
+- 播客数据持久化
+- 历史数据管理
+- 数据分析和统计
+- 系统状态跟踪
+
+作者：Auto-Podcast Team
+版本：1.0.0
+更新：2025-12-25
+"""
+
 from __future__ import annotations
 
 import sqlite3

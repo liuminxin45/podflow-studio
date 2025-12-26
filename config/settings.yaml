@@ -8,7 +8,6 @@ channel:
     length_minutes: 6
 
 sources:
-  newsnow_force_enable_all: false
   rss:
     - name: "示例RSS"
       url: "https://www.zhihu.com/rss"
@@ -34,265 +33,6 @@ sources:
       category: "others"
       urls:
         - "https://ai-bot.cn/daily-ai-news/"
-
-  newsnow:
-    - name: "NewsNow-知乎"
-      id: "zhihu"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-微博"
-      id: "weibo"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-百度热搜"
-      id: "baidu"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-哔哩哔哩-热搜"
-      id: "bilibili-hot-search"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-36氪-快讯"
-      id: "36kr-quick"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-36氪-人气榜"
-      id: "36kr-renqi"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-财联社-电报"
-      id: "cls-telegraph"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-财联社-热门"
-      id: "cls-hot"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-财联社-深度"
-      id: "cls-depth"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-酷安-今日最热"
-      id: "coolapk"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-少数派"
-      id: "sspai"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-稀土掘金"
-      id: "juejin"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-IT之家"
-      id: "ithome"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-腾讯新闻-综合早报"
-      id: "tencent-hot"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-今日头条"
-      id: "toutiao"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-澎湃新闻-热榜"
-      id: "thepaper"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-凤凰网-热点资讯"
-      id: "ifeng"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-虎扑-主干道热帖"
-      id: "hupu"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-豆瓣-热门电影"
-      id: "douban"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-V2EX-最新分享"
-      id: "v2ex-share"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-Github-Trending"
-      id: "github-trending-today"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-Hacker News"
-      id: "hackernews"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-Product Hunt"
-      id: "producthunt"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-Solidot"
-      id: "solidot"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-FreeBuf"
-      id: "freebuf"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-联合早报"
-      id: "zaobao"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-参考消息"
-      id: "cankaoxiaoxi"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-靠谱新闻"
-      id: "kaopu"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-卫星通讯社"
-      id: "sputniknewscn"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-抖音"
-      id: "douyin"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-百度贴吧-热议"
-      id: "tieba"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-牛客"
-      id: "nowcoder"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-虫部落-最新"
-      id: "chongbuluo-latest"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-虫部落-最热"
-      id: "chongbuluo-hot"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-远景论坛-Win11"
-      id: "pcbeta-windows11"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-华尔街见闻-快讯"
-      id: "wallstreetcn-quick"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-华尔街见闻-最热"
-      id: "wallstreetcn-hot"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-华尔街见闻-最新"
-      id: "wallstreetcn-news"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-雪球-热门股票"
-      id: "xueqiu-hotstock"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-金十数据"
-      id: "jin10"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-格隆汇-事件"
-      id: "gelonghui"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-FastBull-快讯"
-      id: "fastbull-express"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
-
-    - name: "NewsNow-FastBull-头条"
-      id: "fastbull-news"
-      base_url: "https://newsnow.busiyi.world"
-      count: 10
-      enabled: false
 
   sixtys:
     - name: "60s-每天60秒读懂世界"
@@ -337,30 +77,50 @@ sources:
           enabled: false
 
 pipeline:
-  max_items: 1
+  max_items: 8
   pick_items: 5
+  dedup_enabled: true
+  filter_enabled: true
 
 filter:
   fields:
-    - title
+    - "title"
+    - "content"
+    - "url"
   keep_raw: false
 
-deepseek:
+llm:
+  provider: "deepseek"
+  model: "deepseek-chat"
+  timeout_seconds: 120
+  max_tokens: 4000
   temperature: 0.7
 
 tts:
   provider: "doubao"
-  voice: "${DOUBAO_TTS_VOICE}"
-
-audio:
-  assets_dir: "./assets"
-  intro: "intro.mp3"
-  outro: "outro.mp3"
-  bgm: "bgm.mp3"
-  bgm_volume: 0.18
+  mode: "default"
+  voice: "zh_female_tianqing_moon_bigtts"
+  speed: 1.0
+  volume: 1.0
+  pitch: 1.0
+  timeout_seconds: 60
 
 output:
-  out_dir: "./out"
-  episodes_dir: "./out/episodes"
-  logs_dir: "./out/logs"
-  fetch_archives_dir: "./out/fetch_archives"
+  runs_dir: "./out/runs"
+  fetch_archives_dir: "./out/fetch"
+  script_dir: "./out/script"
+  tts_dir: "./out/tts"
+  render_dir: "./out/render"
+  publish_dir: "./out/publish"
+
+database:
+  path: "./data/podcast.db"
+  backup_enabled: true
+  backup_interval_hours: 24
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "./logs/podcast.log"
+  max_size_mb: 100
+  backup_count: 5

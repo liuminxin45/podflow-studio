@@ -1,0 +1,42 @@
+[
+  {
+    "id": "1",
+    "title": "央行宣布降准0.5个百分点，释放流动性约1万亿元",
+    "summary": "中国人民银行宣布下调金融机构存款准备金率0.5个百分点，释放长期资金约1万亿元，支持实体经济发展。",
+    "url": "https://example.com/news1",
+    "published_at": "2025-12-25T10:00:00Z",
+    "category": "finance"
+  },
+  {
+    "id": "2", 
+    "title": "华为发布新款AI芯片，性能提升50%",
+    "summary": "华为技术有限公司发布新一代人工智能芯片，采用7纳米工艺，性能较上一代提升50%，功耗降低30%。",
+    "url": "https://example.com/news2",
+    "published_at": "2025-12-25T09:30:00Z",
+    "category": "technology"
+  },
+  {
+    "id": "3",
+    "title": "北京地铁新线路开通，日均客流量预计增加20万",
+    "summary": "北京市轨道交通新线路正式开通运营，全长30公里，设站15座，预计日均客流量将增加20万人次。",
+    "url": "https://example.com/news3", 
+    "published_at": "2025-12-25T08:45:00Z",
+    "category": "urban"
+  },
+  {
+    "id": "4",
+    "title": "新能源汽车销量创新高，市场渗透率突破40%",
+    "summary": "11月份新能源汽车销量达到历史新高，市场渗透率首次突破40%，显示消费者接受度大幅提升。",
+    "url": "https://example.com/news4",
+    "published_at": "2025-12-25T08:00:00Z", 
+    "category": "auto"
+  },
+  {
+    "id": "5",
+    "title": "教育部出台新政策，加强中小学编程教育",
+    "summary": "教育部发布通知，要求各地中小学加强编程教育，将编程课程纳入必修体系，培养数字时代创新人才。",
+    "url": "https://example.com/news5",
+    "published_at": "2025-12-25T07:30:00Z",
+    "category": "education"
+  }
+]

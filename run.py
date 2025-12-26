@@ -1,3 +1,37 @@
+"""
+Auto-Podcast Main Runner
+
+这个文件是自动播客生成系统的主入口点，负责协调整个播客生成流程。
+
+功能概述：
+- 支持从多个新闻源获取内容（RSS、60s、AI工具集等）
+- 使用多种LLM服务生成播客脚本（DeepSeek、Moonshot等）
+- 集成多种TTS服务生成音频（豆包TTS、VoiceClone等）
+- 提供完整的配置管理和错误处理
+- 支持分步执行和全流程自动化
+
+主要组件：
+- step_fetch(): 数据获取模块
+- step_script(): 脚本生成模块  
+- step_tts(): 语音合成模块
+- step_publish(): 发布模块
+- main(): 主程序入口
+
+使用方式：
+    python run.py --date 2025-12-25 --step all
+    python run.py --config config/channel_config.json
+    python run.py --step fetch --timeout-seconds 120
+
+环境要求：
+- Python 3.8+
+- 依赖包见 requirements.txt
+- 需要配置相应的API密钥（.env文件）
+
+作者：Auto-Podcast Team
+版本：2.0.0
+更新：2025-12-25
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -17,15 +51,14 @@ from dotenv import dotenv_values, load_dotenv
 from src.audio.render import render_episode_audio
 from src.fetch.dedup import dedup_items
 from src.fetch.lilyrss import build_lily_rss_url
-from src.fetch.newsnow import fetch_newsnow_items_with_status, fetch_newsnow_sources_catalog, probe_newsnow_source_id
 from src.fetch.rss import fetch_rss_items_with_status
 from src.fetch.sixtys import fetch_sixtys_items_with_status
 from src.fetch.aibot_daily import fetch_aibot_daily_items_with_status
-from src.script.deepseek import DeepSeekClient, ScriptInputItem, ScriptOutput
+from src.llm.api_client import DeepSeekClient, ScriptInputItem, ScriptOutput
 from src.store.db import Store
 from src.publish.local import publish_local
-from src.filter import filter_fetch_archive_payload
-from src.research.metaso import metaso_research_items
+from src.fetch.filter import filter_fetch_archive_payload
+from src.research.research_client import create_client_from_env, research_items_with_client
 
 
 class _JsonFormatter(logging.Formatter):
@@ -155,7 +188,7 @@ def _apply_doubao_mode_env() -> None:
         "DOUBAO_TTS_FORCE",
     }
 
-    candidates: list[str] = []
+    candidates = []
     candidates.append(f".env.{mode}")
     candidates.append(f".env.{grp}")
     seen: set[str] = set()
@@ -520,16 +553,11 @@ def step_fetch(
     log = logging.getLogger("step.fetch")
 
     ep = store.get_episode(episode_id)
-    if (not force_fetch) and ep["status"] in {"fetched", "scripted", "tts_done", "rendered", "published"}:
-        log.info("episode already fetched or later; skip")
-        return
 
     rss_sources = (cfg.get("sources") or {}).get("rss") or []
-    newsnow_sources = (cfg.get("sources") or {}).get("newsnow") or []
     sixtys_sources = (cfg.get("sources") or {}).get("sixtys") or []
     aibot_sources = (cfg.get("sources") or {}).get("aibot_daily") or []
     lily_sources_raw = (cfg.get("sources") or {}).get("lily_rss") or []
-    newsnow_force_enable_all = bool(((cfg.get("sources") or {}).get("newsnow_force_enable_all")) or False)
     max_items = int((cfg.get("pipeline") or {}).get("max_items") or 8)
 
     out_cfg = cfg.get("output") or {}
@@ -568,7 +596,6 @@ def step_fetch(
         max_items=int(max_items),
         rss_sources=int(len(rss_sources)),
         aibot_sources=int(len(aibot_sources)),
-        newsnow_sources=int(len(newsnow_sources)),
         sixtys_sources=int(len(sixtys_sources)),
         lily_entries=int(len(list(lily_sources_raw)) if isinstance(lily_sources_raw, list) else 0),
     )
@@ -585,7 +612,7 @@ def step_fetch(
             category = ((src or {}).get("category") or "others").strip() or "others"
             url = (src or {}).get("url")
             urls = (src or {}).get("urls")
-            candidates: list[str] = []
+            candidates = []
             if isinstance(urls, list):
                 for u in urls:
                     if isinstance(u, str) and u.strip():
@@ -695,7 +722,7 @@ def step_fetch(
             category = ((src or {}).get("category") or "others").strip() or "others"
             url = (src or {}).get("url")
             urls = (src or {}).get("urls")
-            candidates: list[str] = []
+            candidates = []
             if isinstance(urls, list):
                 for u in urls:
                     if isinstance(u, str) and u.strip():
@@ -907,109 +934,6 @@ def step_fetch(
                 )
                 log.warning("fetch sixtys failed: %s", e)
 
-        for src in newsnow_sources:
-            name = (src or {}).get("name") or "newsnow"
-            enabled = (src or {}).get("enabled")
-            if (not newsnow_force_enable_all) and enabled is False:
-                continue
-            source_id = ((src or {}).get("id") or "").strip()
-            base_url = ((src or {}).get("base_url") or "").strip() or os.environ.get("NEWSNOW_BASE_URL", "").strip()
-            base_url = base_url or "https://newsnow.busiyi.world"
-            count = int((src or {}).get("count") or 10)
-            if not source_id:
-                continue
-
-            req_url = f"{base_url.rstrip('/')}/api/s?id={source_id}"
-            log.info("fetch newsnow: %s id=%s base=%s", name, source_id, base_url)
-            t0 = time.perf_counter()
-            try:
-                items, sc = fetch_newsnow_items_with_status(
-                    base_url=base_url,
-                    source_id=source_id,
-                    source=name,
-                    timeout_seconds=timeout_s,
-                    count=count,
-                )
-                _apply_category(items, "others")
-                total_chars, total_tokens, max_item_chars, max_item_tokens = _calc_items_text_stats(items)
-                fetched.extend(items)
-                dur_ms = int((time.perf_counter() - t0) * 1000)
-                store.add_fetch_attempt(
-                    run_id=run_id,
-                    source_type="newsnow",
-                    source_name=name,
-                    url=req_url,
-                    ok=True,
-                    status_code=sc,
-                    error=None,
-                    duration_ms=dur_ms,
-                    item_count=len(items),
-                    total_chars=total_chars,
-                    est_tokens=total_tokens,
-                    max_item_chars=max_item_chars,
-                    max_item_tokens=max_item_tokens,
-                )
-                _log_event(
-                    log,
-                    "fetch_attempt",
-                    run_id=int(run_id),
-                    source_type="newsnow",
-                    source_name=str(name),
-                    url=str(req_url),
-                    ok=True,
-                    status_code=(int(sc) if sc is not None else None),
-                    duration_ms=int(dur_ms),
-                    item_count=int(len(items)),
-                    total_chars=int(total_chars),
-                    est_tokens=int(total_tokens),
-                    max_item_chars=int(max_item_chars),
-                    max_item_tokens=int(max_item_tokens),
-                )
-                if len(items) == 0:
-                    log.warning("fetch newsnow ok but 0 items: %s", name)
-                if dur_ms >= warn_duration_ms:
-                    log.warning("fetch newsnow slow: %s ms=%s", name, dur_ms)
-                if total_tokens >= warn_total_tokens or max_item_tokens >= warn_max_item_tokens:
-                    log.warning(
-                        "fetch newsnow tokens large: %s total=%s max_item=%s",
-                        name,
-                        total_tokens,
-                        max_item_tokens,
-                    )
-            except Exception as e:  # noqa: BLE001
-                resp = getattr(e, "response", None)
-                sc2 = getattr(resp, "status_code", None)
-                dur_ms = int((time.perf_counter() - t0) * 1000)
-                store.add_fetch_attempt(
-                    run_id=run_id,
-                    source_type="newsnow",
-                    source_name=name,
-                    url=req_url,
-                    ok=False,
-                    status_code=sc2,
-                    error=str(e),
-                    duration_ms=dur_ms,
-                    item_count=0,
-                    total_chars=0,
-                    est_tokens=0,
-                    max_item_chars=0,
-                    max_item_tokens=0,
-                )
-                _log_event(
-                    log,
-                    "fetch_attempt",
-                    run_id=int(run_id),
-                    source_type="newsnow",
-                    source_name=str(name),
-                    url=str(req_url),
-                    ok=False,
-                    status_code=sc2,
-                    duration_ms=int(dur_ms),
-                    item_count=0,
-                    error=str(e),
-                )
-                log.warning("fetch newsnow failed: %s", e)
-
         def _iter_lily_entries(raw: list[object]) -> list[dict]:
             out: list[dict] = []
             for x in raw:
@@ -1214,13 +1138,25 @@ def step_fetch(
                     cfg_max_items = metaso_cfg2.get("max_items") if isinstance(metaso_cfg2.get("max_items"), int) else None
                     max_items_for_metaso = metaso_max_items if metaso_max_items is not None else cfg_max_items
 
-                    r = metaso_research_items(
+                    # 创建研究客户端
+                    research_client = create_client_from_env("metaso")
+                    
+                    # 执行研究
+                    research_result = research_items_with_client(
+                        client=research_client,
                         items=items3,
-                        timeout_seconds=timeout_s,
-                        model=(metaso_cfg2.get("model") if isinstance(metaso_cfg2.get("model"), str) else None),
                         max_items=max_items_for_metaso,
+                        use_retry=True
                     )
-                    if r is not None:
+                    
+                    if research_result.success:
+                        # 构建兼容旧格式的响应
+                        r = {
+                            "content": research_result.content,
+                            "model": research_result.model,
+                            "metadata": research_result.metadata
+                        }
+                        
                         research_payload = {
                             "episode_id": episode_id,
                             "episode_date": ep["episode_date"],
@@ -1230,6 +1166,7 @@ def step_fetch(
                             "raw_items_count": int(filtered_payload.get("raw_items_count") or 0),
                             "filtered_items_count": int(filtered_payload.get("filtered_items_count") or 0),
                             "metaso": r,
+                            "research_result": research_result.model_dump(),  # 新格式结果
                         }
                         research_path = _archive_fetch_result(
                             archive_base_dir=fetch_archives_dir,
@@ -1521,73 +1458,6 @@ def step_list_items(
                     log.info("item content: %s", content)
 
 
-def step_list_newsnow_sources(cfg: dict, timeout_s: int, base_url: str | None, limit: int) -> None:
-    log = logging.getLogger("step.list_newsnow_sources")
-
-    sources_cfg = (cfg.get("sources") or {}).get("newsnow") or []
-    base_urls: list[str] = []
-    for s in sources_cfg:
-        if not isinstance(s, dict):
-            continue
-        u = ((s.get("base_url") or "").strip() or os.environ.get("NEWSNOW_BASE_URL", "").strip()).strip()
-        if u:
-            base_urls.append(u)
-    if base_url and base_url.strip():
-        base_urls = [base_url.strip()]
-    if not base_urls:
-        base_urls = ["https://newsnow.busiyi.world"]
-
-    catalog = fetch_newsnow_sources_catalog(timeout_seconds=timeout_s)
-    ids = sorted([k for k in catalog.keys() if k])
-    limit2 = max(1, int(limit or 100))
-
-    log.info("newsnow base_urls=%s", ",".join(base_urls))
-    log.info("newsnow catalog candidates=%d", len(ids))
-
-    shown = 0
-    ok_total = 0
-    for sid in ids:
-        if shown >= limit2:
-            break
-
-        meta = catalog.get(sid) or {}
-        name = meta.get("name") if isinstance(meta, dict) else None
-        title = meta.get("title") if isinstance(meta, dict) else None
-        column = meta.get("column") if isinstance(meta, dict) else None
-        redirect = meta.get("redirect") if isinstance(meta, dict) else None
-
-        ok_any = False
-        status_any: int | None = None
-        err_any: str | None = None
-        for bu in base_urls:
-            ok, sc, err = probe_newsnow_source_id(base_url=bu, source_id=sid, timeout_seconds=timeout_s)
-            status_any = sc
-            err_any = err
-            if ok:
-                ok_any = True
-                break
-
-        if ok_any:
-            ok_total += 1
-
-        log.info(
-            "source: id=%s ok=%s status=%s name=%s title=%s column=%s redirect=%s",
-            sid,
-            "Y" if ok_any else "N",
-            "" if status_any is None else status_any,
-            name or "",
-            title or "",
-            column or "",
-            redirect or "",
-        )
-        if err_any:
-            log.info("source err: id=%s err=%s", sid, (err_any or "")[:200])
-
-        shown += 1
-
-    log.info("newsnow sources shown=%d ok=%d", shown, ok_total)
-
-
 def step_script(store: Store, cfg: dict, episode_id: str, timeout_s: int, script_input: str) -> None:
     log = logging.getLogger("step.script")
 
@@ -1690,7 +1560,7 @@ def step_script(store: Store, cfg: dict, episode_id: str, timeout_s: int, script
         else:
             out = client.generate(channel=channel, items=input_items, temperature=temperature)
     else:
-        from src.script.moonshot import MoonshotClient
+        from src.llm.api_client import MoonshotClient
 
         base_url = os.environ.get("MOONSHOT_BASE_URL", "https://api.moonshot.cn/v1").strip()
         api_key = os.environ.get("MOONSHOT_API_KEY", "").strip()
@@ -1798,7 +1668,7 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
     tts_path = tts_dir / f"{ep['episode_date']}.tts.mp3"
     wrote_file = False
     try:
-        from src.tts.doubao import DoubaoPodcastClient, DoubaoTTSClient
+        from src.tts.tts_client import TTSClientFactory
 
         doubao_mode_env = os.environ.get("DOUBAO_MODE")
         if doubao_mode_env is not None and doubao_mode_env.strip():
@@ -1811,12 +1681,13 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
             else:
                 doubao_mode = "tts"
         if doubao_mode == "podcast":
-            client = DoubaoPodcastClient(timeout_seconds=timeout_s)
+            client = TTSClientFactory.create_doubao_podcast_client(timeout_seconds=timeout_s)
             task_id = "podcast"
             text = _strip_angle_tags(ep["ssml"])
-            audio_bytes = client.generate_mp3(input_text=text)
+            result = client.synthesize(text, mode="podcast")
+            audio_bytes = result.audio_data
         elif doubao_mode == "voiceclone_http":
-            client = DoubaoPodcastClient(timeout_seconds=timeout_s)
+            client = TTSClientFactory.create_doubao_podcast_client(timeout_seconds=timeout_s)
             task_id = "voiceclone_http"
             text = ep["ssml"]
             speaker_id = (os.environ.get("DOUBAO_VOICECLONE_SPEAKER_ID") or "").strip()
@@ -1827,9 +1698,10 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
                 speaker_id,
                 (os.environ.get("DOUBAO_VOICECLONE_CLUSTER") or "volcano_icl").strip() or "volcano_icl",
             )
-            audio_bytes = client.generate_mp3_voiceclone_http(input_text=text, speaker_id=speaker_id)
+            result = client.synthesize(text, mode="voiceclone_http", speaker_id=speaker_id)
+            audio_bytes = result.audio_data
         elif doubao_mode in {"tts", "tts_v3_http"}:
-            client = DoubaoPodcastClient(timeout_seconds=timeout_s)
+            client = TTSClientFactory.create_doubao_podcast_client(timeout_seconds=timeout_s)
             task_id = "tts_v3_http" if doubao_mode == "tts_v3_http" else "tts"
             text = ep["ssml"]
             tts_version = (os.environ.get("DOUBAO_TTS_VERSION") or "1").strip() or "1"
@@ -1857,27 +1729,25 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
                 rid,
                 tts_version,
             )
-            audio_bytes = client.generate_mp3_v3_unidirectional_http(input_text=text, speaker=voice_effective)
+            result = client.synthesize(text, mode="tts_v3_http", speaker=voice_effective)
+            audio_bytes = result.audio_data
         elif doubao_mode == "tts_v3_ws":
-            client = DoubaoTTSClient(timeout_seconds=timeout_s)
+            client = TTSClientFactory.create_doubao_client(voice_type=voice, timeout_seconds=timeout_s)
             try:
-                task_id = client.submit_v3_ws(ssml=ep["ssml"], voice=voice)
+                result = client.synthesize(ep["ssml"], mode="tts_v3_ws")
                 log.info(
                     "doubao tts start: mode=%s task_id=%s poll_max_wait_s=%s poll_interval_s=%s",
                     doubao_mode,
-                    task_id,
+                    "tts_v3_ws",
                     poll_max_wait_s,
                     poll_interval_s,
                 )
-                audio_bytes = client.poll(
-                    task_id=task_id,
-                    max_wait_seconds=poll_max_wait_s,
-                    interval_seconds=poll_interval_s,
-                )
+                audio_bytes = result.audio_data
             except Exception as e:  # noqa: BLE001
                 if "text too long for single doubao websocket request" in str(e):
                     task_id = "chunked"
-                    audio_bytes = client.synthesize_v3_ws(ssml=ep["ssml"], voice=voice)
+                    result = client.synthesize(ep["ssml"], mode="default")
+                    audio_bytes = result.audio_data
                 else:
                     raise
         else:
@@ -2125,7 +1995,6 @@ def main() -> int:
             "list-items",
             "list-fetch-health",
             "list-fetch-health-trend",
-            "list-newsnow-sources",
         ],
     )
     parser.add_argument("--force-fetch", action="store_true")
@@ -2139,8 +2008,6 @@ def main() -> int:
     parser.add_argument("--health-days", type=int, default=7)
     parser.add_argument("--health-limit", type=int, default=50)
     parser.add_argument("--health-only-failed", action="store_true")
-    parser.add_argument("--newsnow-base-url", default=None)
-    parser.add_argument("--newsnow-limit", type=int, default=80)
     args = parser.parse_args()
 
     pre_mode = os.environ.get("DOUBAO_MODE")
@@ -2150,7 +2017,7 @@ def main() -> int:
     if isinstance(dotenv_cfg, dict) and (not dotenv_override_raw or not str(dotenv_override_raw).strip()):
         dotenv_override_raw = str(dotenv_cfg.get("DOTENV_OVERRIDE") or "")
     dotenv_override = (str(dotenv_override_raw or "0").strip().lower() in {"1", "true", "yes", "on"})
-    load_dotenv(override=dotenv_override)
+    load_dotenv(".env", override=dotenv_override)
 
     if pre_mode is not None and str(pre_mode).strip():
         os.environ["DOUBAO_MODE"] = str(pre_mode).strip()
@@ -2255,13 +2122,6 @@ def main() -> int:
                 store=store,
                 days=int(args.health_days),
                 limit=int(args.health_limit),
-            )
-        if args.step == "list-newsnow-sources":
-            step_list_newsnow_sources(
-                cfg=cfg,
-                timeout_s=timeout_s,
-                base_url=args.newsnow_base_url,
-                limit=int(args.newsnow_limit),
             )
         if args.step in {"all", "script"}:
             step_script(store=store, cfg=cfg, episode_id=episode_id, timeout_s=timeout_s, script_input=str(args.script_input))

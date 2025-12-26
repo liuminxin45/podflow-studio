@@ -1,3 +1,43 @@
+"""
+AI Bot Daily News Fetcher
+
+这个文件实现了从AI工具集网站获取每日AI快讯的功能。
+
+功能概述：
+- 从ai-bot.cn网站抓取每日AI新闻快讯
+- 解析网页内容并提取结构化信息
+- 支持按日期获取历史快讯内容
+- 提供内容清洗和格式化
+
+主要函数：
+- fetch_aibot_daily_items_with_status(): 获取AI快讯并返回状态
+- parse_aibot_daily_content(): 解析AI快讯内容
+- extract_news_items(): 提取新闻条目
+
+数据特性：
+- 自动提取标题、链接、发布时间
+- 支持内容摘要和详细信息
+- 按日期组织内容结构
+- 保留原始网页链接
+
+使用示例：
+    items, status = fetch_aibot_daily_items_with_status(
+        url="https://ai-bot.cn/daily-ai-news/",
+        source="AI工具集-每日AI快讯",
+        episode_date="2025-12-25",
+        timeout_seconds=30
+    )
+
+数据来源：
+- AI工具集官网 (ai-bot.cn)
+- 每日AI快讯栏目
+- 历史快讯存档
+
+作者：Auto-Podcast Team
+版本：1.0.0
+更新：2025-12-25
+"""
+
 from __future__ import annotations
 
 import datetime as dt
@@ -120,7 +160,7 @@ def fetch_aibot_daily_items_with_status(
             if not a:
                 continue
             title = a.get_text(strip=True)
-            link_raw = (a.get("href") or "").strip()
+            link_raw = str(a.get("href") or "").strip()
             if not link_raw:
                 continue
             link = urljoin(url, link_raw)

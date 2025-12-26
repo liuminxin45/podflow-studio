@@ -1,3 +1,45 @@
+"""
+Doubao TTS Protocol Implementation
+
+这个文件实现了豆包TTS服务的协议层封装，包含各种API调用和WebSocket通信。
+
+功能概述：
+- 实现豆包TTS的HTTP和WebSocket协议
+- 支持多种TTS模式和语音合成方法
+- 提供VoiceClone语音克隆功能
+- 完整的错误处理和重试机制
+
+主要类：
+- DoubaoTTSClient: 豆包TTS客户端（WebSocket模式）
+- DoubaoPodcastClient: 豆包播客客户端（HTTP模式）
+- DoubaoTTSConfig: TTS配置数据类
+
+支持的API：
+- submit_v3_ws(): WebSocket V3提交任务
+- generate_mp3(): HTTP播客合成
+- generate_mp3_voiceclone_http(): VoiceClone合成
+- generate_mp3_v3_unidirectional_http(): V3单向HTTP合成
+
+协议特性：
+- 支持长文本分块处理
+- WebSocket双向通信
+- 音频数据压缩和编码
+- 任务状态轮询机制
+
+使用示例：
+    client = DoubaoTTSClient(timeout_seconds=60)
+    audio_data = client.synthesize(ssml="<speak>你好</speak>", voice="BV001_streaming")
+
+注意事项：
+- 需要有效的豆包API密钥配置
+- 支持多种语音模型和音色
+- 包含完整的SSML处理功能
+
+作者：Auto-Podcast Team
+版本：2.0.0
+更新：2025-12-25
+"""
+
 from __future__ import annotations
 
 import base64

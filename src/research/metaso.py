@@ -1,3 +1,42 @@
+"""
+MetaSo Research Module
+
+这个文件实现了MetaSo研究服务的数据获取和处理功能。
+
+功能概述：
+- MetaSo API数据获取
+- 研究内容解析和清洗
+- 数据标准化处理
+- 研究结果整合
+
+主要函数：
+- fetch_metaso_data(): 获取MetaSo数据
+- parse_research_content(): 解析研究内容
+- integrate_findings(): 整合研究结果
+
+研究特性：
+- 多源数据整合
+- 智能内容分析
+- 结构化数据输出
+- 实时数据更新
+
+使用示例：
+    research_data = fetch_metaso_data(
+        query="AI technology trends",
+        max_results=10
+    )
+
+应用场景：
+- 深度研究分析
+- 背景资料收集
+- 内容增强处理
+- 知识图谱构建
+
+作者：Auto-Podcast Team
+版本：1.0.0
+更新：2025-12-25
+"""
+
 from __future__ import annotations
 
 import http.client

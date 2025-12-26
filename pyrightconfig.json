@@ -1,9 +1,18 @@
 {
-  "venvPath": ".",
+  "venvPath": "env",
   "venv": ".venv",
   "include": [
     "run.py",
     "check_env.py",
-    "src"
+    "src",
+    "env",
+    "demo",
+    "config"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/*.pyc",
+    "out/**",
+    ".venv/**"
   ]
 }

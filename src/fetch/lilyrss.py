@@ -1,3 +1,42 @@
+"""
+Lily RSS Fetcher
+
+这个文件实现了从Lily RSS服务获取数据的功能。
+
+功能概述：
+- 专门处理Lily RSS格式的数据源
+- 支持自定义RSS解析规则
+- 提供数据标准化和清洗
+- 包含完整的错误处理机制
+
+主要函数：
+- fetch_lilyrss_items(): 获取Lily RSS数据
+- parse_lilyrss_content(): 解析Lily RSS内容
+- normalize_lilyrss_item(): 标准化数据格式
+
+RSS特性：
+- 支持Lily特定的RSS扩展
+- 自定义字段解析
+- 内容格式优化
+- 元数据提取
+
+使用示例：
+    items = fetch_lilyrss_items(
+        rss_url="https://lily.example.com/rss.xml",
+        source="Lily News"
+    )
+
+应用场景：
+- 特定RSS源数据获取
+- 内容聚合处理
+- 新闻数据标准化
+- 自定义RSS格式支持
+
+作者：Auto-Podcast Team
+版本：1.0.0
+更新：2025-12-25
+"""
+
 from __future__ import annotations
 
 import re

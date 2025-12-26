@@ -1,3 +1,26 @@
+# Auto-Podcast Project Dependencies
+# 自动播客生成系统依赖包列表
+#
+# 安装方式：
+#   pip install -r requirements.txt
+#
+# 依赖包说明：
+# - feedparser: RSS订阅解析
+# - requests: HTTP请求库
+# - python-dotenv: 环境变量管理
+# - PyYAML: YAML配置文件解析
+# - pydantic: 数据验证和序列化
+# - beautifulsoup4: HTML解析
+# - websocket-client: WebSocket通信
+# - edge-tts: 微软Edge TTS（可选）
+#
+# 版本要求：
+# - Python 3.8+
+# - 推荐使用虚拟环境
+#
+# 更新日期：2025-12-25
+# 作者：Auto-Podcast Team
+
 feedparser>=6.0.11
 requests>=2.31.0
 python-dotenv>=1.0.1

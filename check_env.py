@@ -1,3 +1,44 @@
+"""
+Environment Configuration Checker
+
+这个文件用于检查和验证项目的环境配置，确保所有必要的API密钥和配置项都已正确设置。
+
+功能概述：
+- 检查所有必需的环境变量
+- 验证API密钥的有效性
+- 提供配置状态报告
+- 支持生成配置模板
+
+检查项目：
+- DeepSeek API配置
+- Moonshot API配置
+- 豆包TTS配置
+- VoiceClone配置
+- 数据库连接配置
+- 其他服务配置
+
+使用方式：
+    python check_env.py                    # 检查所有配置
+    python check_env.py --service deepseek # 检查特定服务
+    python check_env.py --verbose          # 详细输出
+    python check_env.py --generate         # 生成配置模板
+
+输出信息：
+- 配置项状态（已配置/未配置）
+- API密钥有效性验证
+- 配置建议和修复方案
+- 环境变量示例
+
+配置文件：
+- .env: 主配置文件
+- .env.example: 配置模板
+- 各种服务特定的配置文件
+
+作者：Auto-Podcast Team
+版本：1.0.0
+更新：2025-12-25
+"""
+
 import argparse
 import json
 import os

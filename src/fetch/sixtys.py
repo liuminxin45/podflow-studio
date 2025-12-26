@@ -1,3 +1,42 @@
+"""
+60s News Fetcher
+
+这个文件实现了从60s新闻网站获取每日新闻摘要的功能。
+
+功能概述：
+- 从60s.viki.moe网站抓取每日新闻摘要
+- 支持多个数据源的容错处理
+- 提供内容清洗和格式化
+- 包含完整的错误处理机制
+
+主要函数：
+- fetch_sixtys_items_with_status(): 获取60s新闻并返回状态
+- parse_sixtys_content(): 解析60s新闻内容
+- extract_news_items(): 提取新闻条目
+
+数据特性：
+- 每日60秒新闻摘要
+- 支持多个备用数据源
+- 自动提取标题、链接、发布时间
+- 按日期组织内容结构
+
+使用示例：
+    items, status, source = fetch_sixtys_items_with_status(
+        base_url="https://60s.viki.moe",
+        source="60s-每天60秒读懂世界(数据源)",
+        timeout_seconds=30
+    )
+
+数据来源：
+- 60s新闻网站 (60s.viki.moe)
+- 每日新闻摘要服务
+- 支持历史数据获取
+
+作者：Auto-Podcast Team
+版本：1.0.0
+更新：2025-12-25
+"""
+
 from __future__ import annotations
 
 import hashlib

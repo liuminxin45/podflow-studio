@@ -1,0 +1,21 @@
+{
+  "name": "科技财经快评",
+  "style": {
+    "tone": "专业、客观、有深度",
+    "audience": "关注科技和财经的职场人士",
+    "length": "10-15分钟",
+    "frequency": "每日更新"
+  },
+  "topics": [
+    "人工智能",
+    "金融科技", 
+    "新能源",
+    "教育创新",
+    "城市发展"
+  ],
+  "output_format": {
+    "ssml_enabled": true,
+    "break_timing": "500ms",
+    "emphasis_level": "moderate"
+  }
+}

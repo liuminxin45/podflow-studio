@@ -1,8 +1,29 @@
+# Auto-Podcast Project Configuration
+# 自动播客生成系统项目配置文件
+#
+# 这个文件定义了项目的元数据、依赖关系、构建配置和开发工具设置
+#
+# 配置说明：
+# - [project]: 项目基本信息和依赖
+# - [build-system]: 构建系统配置
+# - [tool.setuptools]: 包构建设置
+# - [tool.ruff]: 代码格式化配置
+# - [tool.pyright]: 类型检查配置
+#
+# 使用方式：
+#   pip install -e .              # 开发模式安装
+#   python -m build              # 构建分发包
+#   ruff check .                 # 代码检查
+#   pyright                      # 类型检查
+#
+# 更新日期：2025-12-25
+# 作者：Auto-Podcast Team
+
 [project]
 name = "podcast-bot"
 version = "0.1.0"
 description = "Automated AI podcast production pipeline"
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 readme = "README.md"
 dependencies = [
   "feedparser>=6.0.11",
@@ -27,6 +48,6 @@ dependencies = [
 line-length = 100
 
 [tool.pyright]
-pythonVersion = "3.11"
-venvPath = "."
+pythonVersion = "3.8"
+venvPath = "env"
 venv = ".venv"
