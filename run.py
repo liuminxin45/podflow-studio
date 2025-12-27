@@ -740,15 +740,16 @@ def step_fetch(
     )
     _log_event(
         log,
-        "step_stats",
+        "fetch_step_start",
         step="fetch",
-        phase="before",
         episode_id=str(episode_id),
         max_items=int(max_items),
-        rss_sources=int(len(rss_sources)),
-        aibot_sources=int(len(aibot_sources)),
-        sixtys_sources=int(len(sixtys_sources)),
-        lily_entries=int(len(list(lily_sources_raw)) if isinstance(lily_sources_raw, list) else 0),
+        sources_config={
+            "rss_count": len(rss_sources),
+            "aibot_count": len(aibot_sources),
+            "sixtys_count": len(sixtys_sources),
+            "lily_count": len(list(lily_sources_raw)) if isinstance(lily_sources_raw, list) else 0
+        }
     )
     try:
         fetched: list[dict] = []
@@ -1350,15 +1351,22 @@ def step_fetch(
                     "episode_id": episode_id,
                     "episode_date": ep["episode_date"],
                     "run_id": run_id,
-                    "created_at": dt.datetime.now(tz=dt.timezone.utc).isoformat(),
-                    "max_items": max_items,
-                    "raw_count": len(fetched_raw),
-                    "dedup_count": len(fetched),
-                    "items_raw": fetched_raw,
                     "items": fetched,
                 },
             )
-            log.info("fetch archive saved: %s", archive_path)
+            _log_event(
+                log,
+                "fetch_step_complete",
+                step="fetch",
+                episode_id=str(episode_id),
+                results_summary={
+                    "items_fetched": len(fetched),
+                    "items_upserted": upserted,
+                    "final_chars": selected_total_chars,
+                    "final_tokens": selected_total_tokens,
+                    "archive_path": str(archive_path)
+                }
+            )
 
             try:
                 filtered_payload = filter_fetch_archive_payload(
@@ -1761,19 +1769,21 @@ def step_script(store: Store, cfg: dict, episode_id: str, timeout_s: int, script
     research_chars, research_tokens = _text_stats(research_content)
     _log_event(
         log,
-        "step_stats",
+        "script_step_start",
         step="script",
-        phase="before",
         episode_id=str(episode_id),
-        script_input=str(script_input),
-        items_count=int(len(items)),
-        items_total_chars=int(items_total_chars),
-        items_est_tokens=int(items_total_tokens),
-        items_max_item_chars=int(items_max_item_chars),
-        items_max_item_tokens=int(items_max_item_tokens),
-        research_chars=int(research_chars),
-        research_est_tokens=int(research_tokens),
-        citations_count=int(len(research_citations)),
+        input_analysis={
+            "script_input": str(script_input),
+            "items_count": len(items),
+            "items_total_chars": items_total_chars,
+            "items_est_tokens": items_total_tokens,
+            "items_max_item_chars": items_max_item_chars,
+            "items_max_item_tokens": items_max_item_tokens,
+            "research_chars": research_chars,
+            "research_est_tokens": research_tokens,
+            "citations_count": len(research_citations),
+            "use_research": use_research
+        }
     )
 
     input_items = [
@@ -1856,17 +1866,21 @@ def step_script(store: Store, cfg: dict, episode_id: str, timeout_s: int, script
     shownotes_chars, shownotes_tokens = _text_stats(out.shownotes)
     _log_event(
         log,
-        "step_stats",
+        "script_step_complete",
         step="script",
-        phase="after",
         episode_id=str(episode_id),
-        title_chars=int(title_chars),
-        title_est_tokens=int(title_tokens),
-        ssml_chars=int(ssml_chars),
-        ssml_est_tokens=int(ssml_tokens),
-        shownotes_chars=int(shownotes_chars),
-        shownotes_est_tokens=int(shownotes_tokens),
-        tags_count=int(len(out.tags)),
+        output_analysis={
+            "title_chars": title_chars,
+            "title_tokens": title_tokens,
+            "ssml_chars": ssml_chars,
+            "ssml_tokens": ssml_tokens,
+            "shownotes_chars": shownotes_chars,
+            "shownotes_tokens": shownotes_tokens,
+            "tags_count": len(out.tags),
+            "script_json_path": str(script_json_path),
+            "ssml_path": str(ssml_path),
+            "shownotes_path": str(shownotes_path)
+        }
     )
 
     store.mark_items_used([row["id"] for row in items], episode_id=episode_id)
@@ -1900,12 +1914,15 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
     ssml_chars, ssml_tokens = _text_stats(ep.get("ssml"))
     _log_event(
         log,
-        "step_stats",
+        "tts_step_start",
         step="tts",
-        phase="before",
         episode_id=str(episode_id),
-        ssml_chars=int(ssml_chars),
-        ssml_est_tokens=int(ssml_tokens),
+        input_analysis={
+            "ssml_chars": ssml_chars,
+            "ssml_tokens": ssml_tokens,
+            "tts_force": tts_force,
+            "doubao_mode": os.environ.get("DOUBAO_MODE", "")
+        }
     )
 
     out_dir = Path((cfg.get("output") or {}).get("out_dir") or "./out")
@@ -2028,12 +2045,15 @@ def step_tts(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> None:
 
     _log_event(
         log,
-        "step_stats",
+        "tts_step_complete",
         step="tts",
-        phase="after",
         episode_id=str(episode_id),
-        tts_audio_bytes=int(len(audio_bytes)),
-        tts_audio_path=str(tts_path),
+        output_analysis={
+            "tts_audio_bytes": len(audio_bytes),
+            "tts_audio_path": str(tts_path),
+            "task_id": task_id,
+            "mode_used": doubao_mode
+        }
     )
 
     log.info("tts done: %s", tts_path)
@@ -2073,23 +2093,31 @@ def step_render(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> Non
         log.warning("ffmpeg not found; fallback to copy tts audio as rendered output")
         _log_event(
             log,
-            "step_stats",
+            "render_step_start",
             step="render",
-            phase="before",
             episode_id=str(episode_id),
-            tts_bytes=int(_file_size_bytes(Path(ep["tts_audio_path"])) or 0),
+            input_analysis={
+                "tts_audio_path": ep["tts_audio_path"],
+                "tts_bytes": _file_size_bytes(Path(ep["tts_audio_path"])) or 0,
+                "intro_exists": intro.exists(),
+                "outro_exists": outro.exists(),
+                "bgm_exists": bgm.exists(),
+                "ffmpeg_available": shutil.which("ffmpeg") is not None
+            }
         )
         rendered_path.write_bytes(Path(ep["tts_audio_path"]).read_bytes())
         store.set_episode_rendered(episode_id=episode_id, rendered_audio_path=str(rendered_path))
         store.set_episode_status(episode_id, "rendered")
         _log_event(
             log,
-            "step_stats",
+            "render_step_complete",
             step="render",
-            phase="after",
             episode_id=str(episode_id),
-            rendered_bytes=int(_file_size_bytes(rendered_path) or 0),
-            rendered_audio_path=str(rendered_path),
+            output_analysis={
+                "rendered_bytes": _file_size_bytes(rendered_path) or 0,
+                "rendered_audio_path": str(rendered_path),
+                "render_mode": "copy_fallback"
+            }
         )
         log.info("rendered: %s", rendered_path)
         return
@@ -2103,40 +2131,49 @@ def step_render(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> Non
         )
         _log_event(
             log,
-            "step_stats",
+            "render_step_start",
             step="render",
-            phase="before",
             episode_id=str(episode_id),
-            intro_bytes=int(_file_size_bytes(intro) or 0),
-            outro_bytes=int(_file_size_bytes(outro) or 0),
-            bgm_bytes=int(_file_size_bytes(bgm) or 0),
-            tts_bytes=int(_file_size_bytes(Path(ep["tts_audio_path"])) or 0),
+            input_analysis={
+                "tts_audio_path": ep["tts_audio_path"],
+                "tts_bytes": _file_size_bytes(Path(ep["tts_audio_path"])) or 0,
+                "intro_bytes": _file_size_bytes(intro) or 0,
+                "outro_bytes": _file_size_bytes(outro) or 0,
+                "bgm_bytes": _file_size_bytes(bgm) or 0,
+                "render_mode": "simple_fallback"
+            }
         )
         _render_audio_simple(main_path=Path(ep["tts_audio_path"]), out_path=rendered_path, timeout_seconds=timeout_s)
         store.set_episode_rendered(episode_id=episode_id, rendered_audio_path=str(rendered_path))
         store.set_episode_status(episode_id, "rendered")
         _log_event(
             log,
-            "step_stats",
+            "render_step_complete",
             step="render",
-            phase="after",
             episode_id=str(episode_id),
-            rendered_bytes=int(_file_size_bytes(rendered_path) or 0),
-            rendered_audio_path=str(rendered_path),
+            output_analysis={
+                "rendered_bytes": _file_size_bytes(rendered_path) or 0,
+                "rendered_audio_path": str(rendered_path),
+                "render_mode": "simple_fallback"
+            }
         )
         log.info("rendered: %s", rendered_path)
         return
 
     _log_event(
         log,
-        "step_stats",
+        "render_step_start",
         step="render",
-        phase="before",
         episode_id=str(episode_id),
-        intro_bytes=int(_file_size_bytes(intro) or 0),
-        outro_bytes=int(_file_size_bytes(outro) or 0),
-        bgm_bytes=int(_file_size_bytes(bgm) or 0),
-        tts_bytes=int(_file_size_bytes(Path(ep["tts_audio_path"])) or 0),
+        input_analysis={
+            "tts_audio_path": ep["tts_audio_path"],
+            "tts_bytes": _file_size_bytes(Path(ep["tts_audio_path"])) or 0,
+            "intro_bytes": _file_size_bytes(intro) or 0,
+            "outro_bytes": _file_size_bytes(outro) or 0,
+            "bgm_bytes": _file_size_bytes(bgm) or 0,
+            "bgm_volume": bgm_volume,
+            "render_mode": "full_render"
+        }
     )
 
     render_episode_audio(
@@ -2154,12 +2191,14 @@ def step_render(store: Store, cfg: dict, episode_id: str, timeout_s: int) -> Non
 
     _log_event(
         log,
-        "step_stats",
+        "render_step_complete",
         step="render",
-        phase="after",
         episode_id=str(episode_id),
-        rendered_bytes=int(_file_size_bytes(rendered_path) or 0),
-        rendered_audio_path=str(rendered_path),
+        output_analysis={
+            "rendered_bytes": _file_size_bytes(rendered_path) or 0,
+            "rendered_audio_path": str(rendered_path),
+            "render_mode": "full_render"
+        }
     )
 
     log.info("rendered: %s", rendered_path)
@@ -2191,14 +2230,16 @@ def step_publish(store: Store, cfg: dict, episode_id: str) -> None:
     shownotes_chars, shownotes_tokens = _text_stats(ep.get("shownotes"))
     _log_event(
         log,
-        "step_stats",
+        "publish_step_start",
         step="publish",
-        phase="before",
         episode_id=str(episode_id),
-        rendered_bytes=int(_file_size_bytes(Path(ep["rendered_audio_path"])) or 0),
-        shownotes_chars=int(shownotes_chars),
-        shownotes_est_tokens=int(shownotes_tokens),
-        tags_count=int(len(tags_list)),
+        input_analysis={
+            "rendered_bytes": _file_size_bytes(Path(ep["rendered_audio_path"])) or 0,
+            "shownotes_chars": shownotes_chars,
+            "shownotes_tokens": shownotes_tokens,
+            "tags_count": len(tags_list),
+            "tags_list": tags_list
+        }
     )
 
     published_path = publish_local(
@@ -2217,17 +2258,54 @@ def step_publish(store: Store, cfg: dict, episode_id: str) -> None:
     notes_path = publish_dir / f"{ep['episode_date']}.shownotes.md"
     _log_event(
         log,
-        "step_stats",
+        "publish_step_complete",
         step="publish",
-        phase="after",
         episode_id=str(episode_id),
-        published_bytes=int(_file_size_bytes(published_path) or 0),
-        metadata_bytes=int(_file_size_bytes(meta_path) or 0),
-        shownotes_file_bytes=int(_file_size_bytes(notes_path) or 0),
-        published_path=str(published_path),
+        output_analysis={
+            "published_bytes": _file_size_bytes(published_path) or 0,
+            "metadata_bytes": _file_size_bytes(meta_path) or 0,
+            "shownotes_file_bytes": _file_size_bytes(notes_path) or 0,
+            "published_path": str(published_path),
+            "metadata_path": str(meta_path),
+            "shownotes_path": str(notes_path)
+        }
     )
 
     log.info("published: %s", published_path)
+
+
+def _generate_workflow_report(log: logging.Logger, episode_id: str, start_time: float, steps_executed: list[str], store: Store) -> None:
+    """生成工作流运行报告"""
+    duration = time.perf_counter() - start_time
+    
+    log.info("=" * 80)
+    log.info("工作流运行报告")
+    log.info("=" * 80)
+    log.info("Episode ID: %s", episode_id)
+    log.info("执行步骤: %s", " -> ".join(steps_executed))
+    log.info("总耗时: %.2f 秒 (%.2f 分钟)", duration, duration / 60)
+    
+    try:
+        ep = store.get_episode(episode_id)
+        log.info("-" * 80)
+        log.info("Episode 状态: %s", ep.get("status", "unknown"))
+        if ep.get("title"):
+            log.info("标题: %s", ep["title"])
+        if ep.get("tags"):
+            log.info("标签: %s", ep["tags"])
+        if ep.get("tts_audio_path"):
+            tts_size = _file_size_bytes(Path(ep["tts_audio_path"]))
+            log.info("TTS 音频: %s (%.2f MB)", ep["tts_audio_path"], (tts_size or 0) / 1024 / 1024)
+        if ep.get("rendered_audio_path"):
+            render_size = _file_size_bytes(Path(ep["rendered_audio_path"]))
+            log.info("渲染音频: %s (%.2f MB)", ep["rendered_audio_path"], (render_size or 0) / 1024 / 1024)
+        if ep.get("published_path"):
+            pub_size = _file_size_bytes(Path(ep["published_path"]))
+            log.info("发布文件: %s (%.2f MB)", ep["published_path"], (pub_size or 0) / 1024 / 1024)
+    except Exception as e:
+        log.warning("无法获取 episode 详情: %s", e)
+    
+    log.info("=" * 80)
 
 
 def main() -> int:
@@ -2344,10 +2422,18 @@ def main() -> int:
     episode_id = store.get_or_create_episode(channel_id=channel_id, episode_date=episode_date)
 
     log = logging.getLogger("run")
-    log.info("episode_id=%s date=%s step=%s timeout_s=%s", episode_id, episode_date, args.step, timeout_s)
+    log.info("=" * 80)
+    log.info("开始工作流执行")
+    log.info("Episode ID: %s | 日期: %s | 步骤: %s | 超时: %ss", episode_id, episode_date, args.step, timeout_s)
+    log.info("=" * 80)
+    
+    workflow_start = time.perf_counter()
+    steps_executed: list[str] = []
 
     try:
         if args.step in {"all", "fetch"}:
+            log.info(">>> 步骤 1/5: 数据获取 (FETCH)")
+            step_start = time.perf_counter()
             step_fetch(
                 store=store,
                 cfg=cfg,
@@ -2356,6 +2442,9 @@ def main() -> int:
                 force_fetch=bool(args.force_fetch),
                 metaso_max_items=(int(args.metaso_max_items) if args.metaso_max_items is not None else None),
             )
+            steps_executed.append("fetch")
+            log.info("<<< 步骤 1/5 完成，耗时: %.2fs", time.perf_counter() - step_start)
+            
         if args.step == "list-items":
             step_list_items(
                 store=store,
@@ -2378,19 +2467,44 @@ def main() -> int:
                 days=int(args.health_days),
                 limit=int(args.health_limit),
             )
+            
         if args.step in {"all", "script"}:
+            log.info(">>> 步骤 2/5: 脚本生成 (SCRIPT)")
+            step_start = time.perf_counter()
             step_script(store=store, cfg=cfg, episode_id=episode_id, timeout_s=timeout_s, script_input=str(args.script_input))
+            steps_executed.append("script")
+            log.info("<<< 步骤 2/5 完成，耗时: %.2fs", time.perf_counter() - step_start)
+            
         if args.step in {"all", "tts"}:
+            log.info(">>> 步骤 3/5: 语音合成 (TTS)")
+            step_start = time.perf_counter()
             step_tts(store=store, cfg=cfg, episode_id=episode_id, timeout_s=timeout_s)
+            steps_executed.append("tts")
+            log.info("<<< 步骤 3/5 完成，耗时: %.2fs", time.perf_counter() - step_start)
+            
         if args.step in {"all", "render"}:
+            log.info(">>> 步骤 4/5: 音频渲染 (RENDER)")
+            step_start = time.perf_counter()
             step_render(store, cfg, episode_id, timeout_s)
+            steps_executed.append("render")
+            log.info("<<< 步骤 4/5 完成，耗时: %.2fs", time.perf_counter() - step_start)
+            
         if args.step in {"all", "publish"}:
+            log.info(">>> 步骤 5/5: 发布输出 (PUBLISH)")
+            step_start = time.perf_counter()
             step_publish(store, cfg, episode_id)
+            steps_executed.append("publish")
+            log.info("<<< 步骤 5/5 完成，耗时: %.2fs", time.perf_counter() - step_start)
+            
     except Exception as e:
-        log.error("error: %s", e)
+        log.error("=" * 80)
+        log.error("工作流执行失败: %s", e)
+        log.error("=" * 80)
         return 1
 
-    log.info("done")
+    if steps_executed:
+        _generate_workflow_report(log, episode_id, workflow_start, steps_executed, store)
+    
     return 0
 
 

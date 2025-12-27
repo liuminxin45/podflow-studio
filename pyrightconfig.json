@@ -1,5 +1,5 @@
 {
-  "venvPath": "env",
+  "venvPath": ".",
   "venv": ".venv",
   "include": [
     "run.py",
