@@ -148,11 +148,14 @@ class TopicGate:
 
 评估标准：
 1. 听众价值：是否对听众有用/有趣/有启发
-2. 可讲性：是否有足够素材和角度
+2. 可讲性：是否有足够素材和角度（单条重要新闻也可以深度解读）
 3. 时效性：是否现在就该讲
-4. 风险：是否无聊/争议/数据不足
+4. 风险：是否明显无聊/极度争议/完全无法展开
 
-输出决策时要严格，宁缺毋滥。"""
+注意：
+- 单条新闻不等于数据不足，重要事件值得深度解读
+- 有争议的话题往往更有讨论价值
+- 保持平衡的标准，不要过度严格"""
     
     def _build_prompt(self, candidate: TopicCandidate, item_lookup: dict) -> str:
         # 获取代表性item样本
@@ -172,7 +175,7 @@ class TopicGate:
 
 【主题】{candidate.title}
 【实体】{', '.join(candidate.entities[:5])}
-【包含新闻数】{len(candidate.items)}
+【包含新闻数】{len(candidate.items)}（注：单条重要新闻也值得深度解读）
 【主题总分】{candidate.topic_score:.1f}/100
 
 【分数构成】
@@ -235,10 +238,10 @@ class TopicGate:
         """
         
         # 基于topic_score决策 (0-100)
-        if candidate.topic_score >= 70.0:
+        if candidate.topic_score >= 65.0:
             should_publish = True
             priority = 5  # 必播，最高优先级
-        elif candidate.topic_score >= 55.0:
+        elif candidate.topic_score >= 50.0:
             should_publish = True
             priority = 3  # 可播，中等优先级
         else:
