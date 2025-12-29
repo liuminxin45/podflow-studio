@@ -116,6 +116,12 @@ pipeline:
   dedup_enabled: true
   filter_enabled: true
 
+# 汇总型RSS拆分配置
+digest_split:
+  enabled: true
+  cache_ttl_seconds: 86400
+  enable_cache: true
+
 filter:
   fields:
     - "title"
@@ -148,7 +154,7 @@ output:
   publish_dir: "./out/publish"
 
 research:
-  provider: "metaso"  # Options: metaso, anspire
+  provider: "anspire"  # Options: metaso, anspire
   enabled: true
   timeout_seconds: 60
   max_items: 10
@@ -160,6 +166,61 @@ research:
   anspire:
     top_k: 5
     is_stream: false
+
+# Pipeline 配置（二次检索+二阶段LLM）
+pipeline_v2:
+  retrieval:
+    max_concurrent: 2
+    timeout_seconds: 60
+    cache_ttl_seconds: 86400  # 24小时
+    cache_dir: ".cache/research"
+    history_podcast_dir: "out/history_podcasts"
+    top_k_history: 5
+  llm_stage1:
+    timeout_seconds: 60
+    max_tokens: 3000
+  llm_stage2:
+    timeout_seconds: 60
+    max_tokens: 2500
+  fallback:
+    use_draft_on_failure: true  # LLM#2失败时使用draft
+
+# 自动选题配置（主题候选挖掘 + 听众兴趣评分 + 选题决策）
+auto_topic:
+  enabled: true  # 开关：true启用自动选题，false使用传统流程
+  time_window_days: 7  # 主题聚合时间窗口（天）
+  
+  # 打分配置 - 统一0-100分数体系
+  scoring:
+    # 内容价值分 (0-60)
+    archetype_mean_max: 40.0        # 母型平均分最大值
+    personal_impact_max: 10.0       # 个人影响分最大值
+    counter_intuitive_max: 10.0     # 反直觉分最大值
+    
+    # 代理信号分 (0-25)
+    trend_max: 10.0                 # 趋势信号最大值
+    time_max: 5.0                   # 时间信号最大值
+    persona_max: 5.0                # 人群相关性最大值
+    history_echo_max: 5.0           # 历史呼应最大值
+    
+    # 结构加成 (-10 ~ +15)
+    continuity_max: 6.0             # 连续性加成最大值
+    data_enrichable_max: 6.0        # 数据可补充加成最大值
+    follow_up_max: 3.0              # 可跟进加成最大值
+    
+    # 阈值配置 (0-100)
+    threshold_must_publish: 70.0    # 必播阈值（>=70分）
+    threshold_maybe_publish: 55.0   # 可能播阈值（55-70分）
+  
+  # LLM Gate配置
+  gate:
+    top_n: 10                   # 对TopN候选做LLM决策
+    fallback_to_score: true     # LLM失败时降级到规则打分
+  
+  # 历史播客检索配置
+  history:
+    dir: "out/history_podcasts"
+    top_k: 3
 
 database:
   path: "./data/podcast.db"
