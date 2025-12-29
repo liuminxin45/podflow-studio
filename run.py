@@ -61,9 +61,17 @@ from src.fetch.filter import filter_fetch_archive_payload
 from src.research.research_client import create_client_from_env, research_items_with_client
 from src.research.news_splitter import split_news_for_research, NewsTopic
 from src.research.batch_researcher import BatchResearcher
+from src.research.llm_stages import LLMStage1, LLMStage2
+from src.research.retrieval_v2 import RetrievalV2Executor
+from src.research.cache_manager import CacheManager
+from src.research.history_search import HistoryPodcastSearcher
 from src.fetch.compliance import filter_compliant_items, assess_compliance
+from src.topic_selection import AutoTopicPipeline, AutoTopicPipelineConfig
+from src.topic_selection.topic_scoring import TopicScorerConfig
 from src.fetch.normalize import prepare_items
 from src.fetch.source_guard import SourceGuard
+from src.fetch.digest_detector import detect_digest_items
+from src.fetch.digest_splitter import DigestSplitter, split_digest_items
 from src.store.clusters import ClusterConfig, cluster_items
 from src.store.selector import SelectionConfig, select_clusters
 from src.store.scoring import ScoringConfig, ScoreWeights
@@ -1269,6 +1277,48 @@ def step_fetch(
         # 使用合规内容
         fetched = compliant_items
 
+        # ===== 汇总型RSS拆分（在聚类之前） =====
+        digest_split_cfg = cfg.get("digest_split") or {}
+        digest_split_enabled = digest_split_cfg.get("enabled", False)
+        
+        if digest_split_enabled:
+            log.info("=" * 60)
+            log.info("开始汇总型RSS检测与拆分...")
+            log.info("=" * 60)
+            
+            # 1. 检测汇总型items
+            normal_items, digest_items = detect_digest_items(fetched)
+            log.info(f"检测完成: {len(normal_items)} 普通items, {len(digest_items)} 汇总items")
+            
+            # 2. 拆分汇总型items
+            if digest_items:
+                splitter = DigestSplitter(
+                    cache_ttl_seconds=int(digest_split_cfg.get("cache_ttl_seconds", 86400)),
+                    enable_cache=digest_split_cfg.get("enable_cache", True)
+                )
+                
+                split_items, split_stats = split_digest_items(digest_items, splitter)
+                
+                log.info(f"拆分完成:")
+                log.info(f"  - 成功拆分: {split_stats['successfully_split']}/{split_stats['total_digest_items']}")
+                log.info(f"  - 失败拆分: {split_stats['failed_split']}")
+                log.info(f"  - 生成子事件: {split_stats['total_sub_events']}")
+                log.info(f"  - 平均每个汇总拆出: {split_stats['avg_sub_events_per_digest']:.1f} 个子事件")
+                
+                # Write digest split artifacts
+                if digest_items:
+                    write_jsonl(fetch_artifacts_dir / "digest_items.jsonl", digest_items)
+                if split_items:
+                    write_jsonl(fetch_artifacts_dir / "split_items.jsonl", split_items)
+                
+                # 3. 合并普通items和拆分后的items
+                fetched = normal_items + split_items
+                log.info(f"合并后总计: {len(fetched)} items ({len(normal_items)} 普通 + {len(split_items)} 拆分)")
+            else:
+                log.info("未检测到汇总型items，跳过拆分")
+            
+            log.info("=" * 60)
+
         for item in fetched:
             _ensure_item_id(item)
 
@@ -1277,6 +1327,54 @@ def step_fetch(
         cluster_cfg = _build_cluster_config(cfg)
         clusters = cluster_items(list(items_by_id.values()), config=cluster_cfg)
 
+        # 自动选题模块（可选）
+        auto_topic_cfg = cfg.get("auto_topic", {})
+        auto_topic_enabled = auto_topic_cfg.get("enabled", False)
+        
+        auto_topic_result = None
+        if auto_topic_enabled:
+            log.info("启用自动选题模块...")
+            
+            # 构建配置 - 新的0-100分数体系
+            scoring_cfg = auto_topic_cfg.get("scoring", {})
+            scorer_cfg = TopicScorerConfig(
+                # 内容价值分 (0-60)
+                archetype_mean_max=float(scoring_cfg.get("archetype_mean_max", 40.0)),
+                personal_impact_max=float(scoring_cfg.get("personal_impact_max", 10.0)),
+                counter_intuitive_max=float(scoring_cfg.get("counter_intuitive_max", 10.0)),
+                # 代理信号分 (0-25)
+                trend_max=float(scoring_cfg.get("trend_max", 10.0)),
+                time_max=float(scoring_cfg.get("time_max", 5.0)),
+                persona_max=float(scoring_cfg.get("persona_max", 5.0)),
+                history_echo_max=float(scoring_cfg.get("history_echo_max", 5.0)),
+                # 结构加成 (-10 ~ +15)
+                continuity_max=float(scoring_cfg.get("continuity_max", 6.0)),
+                data_enrichable_max=float(scoring_cfg.get("data_enrichable_max", 6.0)),
+                follow_up_max=float(scoring_cfg.get("follow_up_max", 3.0)),
+                # 阈值 (0-100)
+                threshold_must_publish=float(scoring_cfg.get("threshold_must_publish", 70.0)),
+                threshold_maybe_publish=float(scoring_cfg.get("threshold_maybe_publish", 55.0)),
+            )
+            
+            pipeline_cfg = AutoTopicPipelineConfig(
+                enabled=True,
+                time_window_days=int(auto_topic_cfg.get("time_window_days", 7)),
+                scorer_config=scorer_cfg,
+                gate_top_n=int(auto_topic_cfg.get("gate", {}).get("top_n", 10)),
+                gate_fallback=bool(auto_topic_cfg.get("gate", {}).get("fallback_to_score", True)),
+                history_dir=auto_topic_cfg.get("history", {}).get("dir", "out/history_podcasts"),
+            )
+            
+            # 运行自动选题pipeline
+            auto_topic_pipeline = AutoTopicPipeline(config=pipeline_cfg)
+            auto_topic_result = auto_topic_pipeline.run(
+                items=list(items_by_id.values()),
+                clusters=clusters,
+                item_lookup=items_by_id
+            )
+            
+            log.info(f"自动选题完成: {auto_topic_result['stats']}")
+        
         selection_cfg = _build_selection_config(cfg)
         selection_result = select_clusters(clusters, item_lookup=items_by_id, config=selection_cfg)
 
@@ -1423,7 +1521,90 @@ def step_fetch(
                     batch_result = batch_researcher.research_topics(topics)
                     log.info(f"批量研究完成: 成功 {batch_result.successful_topics}/{batch_result.total_topics}")
                     
-                    # 步骤3: 构建研究结果
+                    # 步骤3: Pipeline内容增强（LLM#1 + Retrieval#2 + LLM#2）
+                    pipeline_v2_cfg = cfg.get("pipeline_v2", {})
+                    
+                    enhanced_results = {}
+                    if batch_result.successful_topics > 0:
+                        log.info("步骤3: Pipeline内容增强（LLM#1 + Retrieval#2 + LLM#2）...")
+                        
+                        # 初始化V2组件
+                        cache_manager = CacheManager(
+                            cache_dir=pipeline_v2_cfg.get("retrieval", {}).get("cache_dir", ".cache/research"),
+                            default_ttl=pipeline_v2_cfg.get("retrieval", {}).get("cache_ttl_seconds", 86400)
+                        )
+                        history_searcher = HistoryPodcastSearcher(
+                            history_dir=pipeline_v2_cfg.get("retrieval", {}).get("history_podcast_dir", "out/history_podcasts")
+                        )
+                        retrieval_executor = RetrievalV2Executor(
+                            cache_manager=cache_manager,
+                            history_searcher=history_searcher,
+                            max_concurrent=pipeline_v2_cfg.get("retrieval", {}).get("max_concurrent", 2),
+                            timeout_seconds=pipeline_v2_cfg.get("retrieval", {}).get("timeout_seconds", 60),
+                        )
+                        llm_stage1 = LLMStage1()
+                        llm_stage2 = LLMStage2()
+                        
+                        # 对每个成功的主题进行V2增强
+                        for topic_result in batch_result.topic_results:
+                            if not topic_result.success or not topic_result.metadata:
+                                continue
+                            
+                            topic_title = topic_result.topic.title
+                            research_summary = topic_result.metadata.get("response_json", {}).get("summary", "")
+                            
+                            if not research_summary:
+                                continue
+                            
+                            try:
+                                # LLM#1: 生成draft + retrieval_plan
+                                log.info(f"  LLM#1增强: {topic_title[:30]}...")
+                                llm1_output = llm_stage1.process(topic_title, research_summary)
+                                
+                                if not llm1_output:
+                                    log.warning(f"  LLM#1失败: {topic_title[:30]}")
+                                    continue
+                                
+                                # Retrieval#2: 二次检索
+                                log.info(f"  Retrieval#2检索: {len(llm1_output.retrieval_plan.queries)}个查询...")
+                                retrieval_bundle = retrieval_executor.execute(llm1_output.retrieval_plan)
+                                log.info(f"  检索完成: {retrieval_bundle.successful_queries}/{retrieval_bundle.total_queries}成功")
+                                
+                                # LLM#2: 生成终稿
+                                log.info(f"  LLM#2终稿生成...")
+                                llm2_output = llm_stage2.process(llm1_output, retrieval_bundle)
+                                
+                                if llm2_output:
+                                    enhanced_results[topic_result.topic.id] = {
+                                        "llm1_output": llm1_output.model_dump(),
+                                        "retrieval_bundle": {
+                                            "total_queries": retrieval_bundle.total_queries,
+                                            "successful_queries": retrieval_bundle.successful_queries,
+                                            "cache_hits": retrieval_bundle.cache_hits,
+                                            "hard_facts_count": len(retrieval_bundle.hard_facts),
+                                        },
+                                        "llm2_output": llm2_output.model_dump(),
+                                        "final_script": llm2_output.final_podcast_script,
+                                        "has_hard_data": llm2_output.has_hard_data,
+                                        "data_quality_score": llm2_output.data_quality_score,
+                                    }
+                                    log.info(f"  ✅ 增强成功: {topic_title[:30]} (质量分数: {llm2_output.data_quality_score:.2f})")
+                                else:
+                                    # 降级：使用draft
+                                    enhanced_results[topic_result.topic.id] = {
+                                        "llm1_output": llm1_output.model_dump(),
+                                        "final_script": llm1_output.draft_script,
+                                        "degraded": True,
+                                    }
+                                    log.warning(f"  ⚠️ LLM#2失败，使用draft: {topic_title[:30]}")
+                                    
+                            except Exception as e:
+                                log.error(f"  ❌ 增强异常: {topic_title[:30]} - {e}")
+                                continue
+                        
+                        log.info(f"Pipeline增强完成: {len(enhanced_results)}/{batch_result.successful_topics}个主题")
+                    
+                    # 步骤4: 构建研究结果
                     if batch_result.successful_topics > 0:
                         # 获取provider名称
                         provider_name = research_client.config.provider
@@ -1476,6 +1657,7 @@ def step_fetch(
                             "filtered_items_count": int(filtered_payload.get("filtered_items_count") or 0),
                             provider_name: r,  # 动态字段名
                             "batch_research_result": batch_result.model_dump(),  # 批量研究结果
+                            "enhanced_results": enhanced_results,  # Pipeline增强结果
                         }
                         research_path = _archive_fetch_result(
                             archive_base_dir=fetch_archives_dir,

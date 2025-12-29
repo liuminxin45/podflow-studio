@@ -40,6 +40,23 @@ from .batch_researcher import (
     BatchResearcher,
     research_topics_batch,
 )
+from .podcast_enhancer import (
+    EnhancedContent,
+    PodcastEnhancer,
+    enhance_topic_for_podcast,
+)
+from .models import (
+    RetrievalQuery,
+    RetrievalPlan,
+    RetrievalBundle,
+    LLM1Output,
+    LLM2Output,
+    PipelineResult,
+)
+from .cache_manager import CacheManager
+from .history_search import HistoryPodcastSearcher
+from .retrieval_v2 import RetrievalV2Executor
+from .llm_stages import LLMStage1, LLMStage2
 
 __all__ = [
     # 统一客户端
@@ -66,4 +83,20 @@ __all__ = [
     "BatchResearchResult",
     "BatchResearcher",
     "research_topics_batch",
+    # 播客内容增强
+    "EnhancedContent",
+    "PodcastEnhancer",
+    "enhance_topic_for_podcast",
+    # Pipeline V2
+    "RetrievalQuery",
+    "RetrievalPlan",
+    "RetrievalBundle",
+    "LLM1Output",
+    "LLM2Output",
+    "PipelineResult",
+    "CacheManager",
+    "HistoryPodcastSearcher",
+    "RetrievalV2Executor",
+    "LLMStage1",
+    "LLMStage2",
 ]
