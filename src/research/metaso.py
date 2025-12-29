@@ -61,13 +61,22 @@ def _build_prompt(items: list[dict], max_items: int) -> str:
         parts.append(f"\n## 来源：{src} (count={len(groups[src])})")
         for it in groups[src]:
             title = (it.get("title") or "").strip()
+            content = (it.get("content") or "").strip()
             url = (it.get("url") or "").strip()
-            if not title and not url:
+            
+            if not title and not content:
                 continue
+                
+            # 构建条目内容，优先使用完整内容
+            item_text = title
+            if content and content != title:
+                # 如果content和title不同，包含完整内容
+                item_text = f"{title}\n   内容: {content}"
+            
             if url:
-                parts.append(f"{idx}. {title}\n   {url}")
+                parts.append(f"{idx}. {item_text}\n   链接: {url}")
             else:
-                parts.append(f"{idx}. {title}")
+                parts.append(f"{idx}. {item_text}")
             idx += 1
 
     joined = "\n".join([p for p in parts if p.strip()]).strip()
@@ -75,9 +84,9 @@ def _build_prompt(items: list[dict], max_items: int) -> str:
         joined = "(no items)"
 
     return (
-        "请基于以下新闻条目（按来源分组，包含标题+链接）进行一次网络调查：\n"
+        "请基于以下新闻条目（按来源分组，包含标题+完整内容+链接）进行一次网络调查：\n"
         "1) 请按【来源】分组输出调查结果；\n"
-        "2) 每条新闻补充关键背景与事实要点；\n"
+        "2) 针对每条新闻的完整内容补充关键背景与事实要点；\n"
         "3) 若能从链接/公开信息验证或澄清，请给出引用来源；\n"
         "4) 最后给出一个跨来源的【汇总】（用 5-10 条要点）。\n\n"
         "新闻条目：\n"

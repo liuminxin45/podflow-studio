@@ -21,21 +21,25 @@ compliance:
   min_score: 0.6
   rules:
     - sensitive_words
-    - illegal_content
     - copyright
     - pii
     - external_links
   rule_overrides:
-    pii:
-      enabled: true
-      params:
-        scope: "full"
-        max_hits_per_type: 8
-        severity: "medium"
-    external_links:
-      enabled: true
-      params:
-        max_urls: 8
+    copyright:
+      allow_domains:
+        - "60s-static.viki.moe"
+        - "60s.viki.moe"
+        - "github.com"
+
+selection:
+  constraints:
+    max_per_domain: 3
+    max_per_topic: 3
+  max_clusters: 5
+  clustering:
+    simhash_max_distance: 1
+    title_min_jaccard: 0.2
+    time_window_days: 1
 
 sources:
   rss:
@@ -142,6 +146,20 @@ output:
   tts_dir: "./out/tts"
   render_dir: "./out/render"
   publish_dir: "./out/publish"
+
+research:
+  provider: "metaso"  # Options: metaso, anspire
+  enabled: true
+  timeout_seconds: 60
+  max_items: 10
+  max_retries: 3
+  retry_delay: 1.0
+  # Provider-specific settings
+  metaso:
+    model: "fast"
+  anspire:
+    top_k: 5
+    is_stream: false
 
 database:
   path: "./data/podcast.db"

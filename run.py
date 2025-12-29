@@ -59,6 +59,8 @@ from src.store.db import Store
 from src.publish.local import publish_local
 from src.fetch.filter import filter_fetch_archive_payload
 from src.research.research_client import create_client_from_env, research_items_with_client
+from src.research.news_splitter import split_news_for_research, NewsTopic
+from src.research.batch_researcher import BatchResearcher
 from src.fetch.compliance import filter_compliant_items, assess_compliance
 from src.fetch.normalize import prepare_items
 from src.fetch.source_guard import SourceGuard
@@ -598,10 +600,10 @@ def _archive_fetch_result(
         d = dt.date.today()
 
     ts = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_dir = archive_base_dir / f"{d.year:04d}" / f"{d.month:02d}" / f"{d.day:02d}"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    # 直接在基础目录下创建文件，不再创建冗余的日期目录
+    archive_base_dir.mkdir(parents=True, exist_ok=True)
 
-    out_path = out_dir / f"{prefix}_{ts}.json"
+    out_path = archive_base_dir / f"{prefix}_{ts}.json"
     out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return out_path
 
@@ -1346,7 +1348,7 @@ def step_fetch(
             archive_path = _archive_fetch_result(
                 archive_base_dir=fetch_archives_dir,
                 episode_date=ep["episode_date"],
-                prefix="rss",
+                prefix="raw_items",
                 payload={
                     "episode_id": episode_id,
                     "episode_date": ep["episode_date"],
@@ -1377,7 +1379,7 @@ def step_fetch(
                 filtered_path = _archive_fetch_result(
                     archive_base_dir=fetch_archives_dir,
                     episode_date=ep["episode_date"],
-                    prefix="rss_filtered",
+                    prefix="filtered_items",
                     payload=filtered_payload,
                 )
                 log.info("fetch filtered archive saved: %s", filtered_path)
@@ -1401,22 +1403,67 @@ def step_fetch(
                     max_items_for_metaso = metaso_max_items if metaso_max_items is not None else cfg_max_items
 
                     # 创建研究客户端
-                    research_client = create_client_from_env("metaso")
+                    research_client = create_client_from_env()  # 自动从 RESEARCH_PROVIDER 读取
                     
-                    # 执行研究
-                    research_result = research_items_with_client(
-                        client=research_client,
-                        items=items3,
-                        max_items=max_items_for_metaso,
-                        use_retry=True
+                    # 步骤1: 使用LLM拆分新闻主题
+                    log.info("步骤1: 拆分新闻主题...")
+                    topics = split_news_for_research(items3)
+                    log.info(f"拆分完成，共 {len(topics)} 个主题")
+                    
+                    # 测试期：只研究前2个主题
+                    topics = topics[:2]
+                    log.info(f"测试模式：仅研究前 {len(topics)} 个主题")
+                    
+                    # 步骤2: 批量研究各个主题
+                    log.info("步骤2: 批量研究主题...")
+                    batch_researcher = BatchResearcher(
+                        research_client=research_client,
+                        max_concurrent=2  # 测试期减少并发数
                     )
+                    batch_result = batch_researcher.research_topics(topics)
+                    log.info(f"批量研究完成: 成功 {batch_result.successful_topics}/{batch_result.total_topics}")
                     
-                    if research_result.success:
+                    # 步骤3: 构建研究结果
+                    if batch_result.successful_topics > 0:
+                        # 获取provider名称
+                        provider_name = research_client.config.provider
+                        
+                        # 汇总所有成功的研究结果
+                        all_research_items = []
+                        for topic_result in batch_result.topic_results:
+                            if topic_result.success and topic_result.metadata:
+                                response_json = topic_result.metadata.get("response_json", {})
+                                if isinstance(response_json, dict) and "items" in response_json:
+                                    all_research_items.extend(response_json["items"])
+                        
                         # 构建兼容旧格式的响应
                         r = {
-                            "content": research_result.content,
-                            "model": research_result.model,
-                            "metadata": research_result.metadata
+                            "content": batch_result.summary_content,
+                            "model": None,
+                            "metadata": {
+                                "ok": True,
+                                "status": 200,
+                                "provider": provider_name,
+                                "total_topics": batch_result.total_topics,
+                                "successful_topics": batch_result.successful_topics,
+                                "failed_topics": batch_result.failed_topics,
+                                "total_processing_time_ms": batch_result.total_processing_time_ms,
+                                "input_items_count": len(items3),
+                                "topics": [
+                                    {
+                                        "id": tr.topic.id,
+                                        "title": tr.topic.title,
+                                        "topic_type": tr.topic.topic_type,
+                                        "success": tr.success,
+                                        "processing_time_ms": tr.processing_time_ms
+                                    }
+                                    for tr in batch_result.topic_results
+                                ],
+                                "response_json": {
+                                    "summary": batch_result.summary_content,
+                                    "items": all_research_items[:10] if all_research_items else []  # 限制10条
+                                }
+                            }
                         }
                         
                         research_payload = {
@@ -1427,13 +1474,13 @@ def step_fetch(
                             "filtered_path": str(filtered_path),
                             "raw_items_count": int(filtered_payload.get("raw_items_count") or 0),
                             "filtered_items_count": int(filtered_payload.get("filtered_items_count") or 0),
-                            "metaso": r,
-                            "research_result": research_result.model_dump(),  # 新格式结果
+                            provider_name: r,  # 动态字段名
+                            "batch_research_result": batch_result.model_dump(),  # 批量研究结果
                         }
                         research_path = _archive_fetch_result(
                             archive_base_dir=fetch_archives_dir,
                             episode_date=ep["episode_date"],
-                            prefix="rss_research",
+                            prefix="research_analysis",
                             payload=research_payload,
                         )
                         log.info("fetch research archive saved: %s", research_path)
@@ -1452,7 +1499,7 @@ def step_fetch(
                             content_path = _archive_fetch_result(
                                 archive_base_dir=fetch_archives_dir,
                                 episode_date=ep["episode_date"],
-                                prefix="rss_research_content",
+                                prefix="research_content",
                                 payload=clean_payload,
                             )
                             log.info("fetch research content saved: %s", content_path)
@@ -1789,10 +1836,10 @@ def step_script(store: Store, cfg: dict, episode_id: str, timeout_s: int, script
     input_items = [
         ScriptInputItem(
             id=row["id"],
-            title=row["title"],
-            summary=row["summary"],
-            content=row["content"],
-            url=row["url"],
+            title=row["title"] or "",
+            summary=row["summary"] or "",
+            content=row["content"] or "",
+            url=row["url"] or "",
             published_at=row["published_at"],
         )
         for row in items
@@ -2387,11 +2434,11 @@ def main() -> int:
 
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "logs").mkdir(parents=True, exist_ok=True)
-    (run_dir / "fetch").mkdir(parents=True, exist_ok=True)
-    (run_dir / "script").mkdir(parents=True, exist_ok=True)
-    (run_dir / "tts").mkdir(parents=True, exist_ok=True)
-    (run_dir / "render").mkdir(parents=True, exist_ok=True)
-    (run_dir / "publish").mkdir(parents=True, exist_ok=True)
+    (run_dir / "1_fetch").mkdir(parents=True, exist_ok=True)
+    (run_dir / "2_script").mkdir(parents=True, exist_ok=True)
+    (run_dir / "3_tts").mkdir(parents=True, exist_ok=True)
+    (run_dir / "4_render").mkdir(parents=True, exist_ok=True)
+    (run_dir / "5_publish").mkdir(parents=True, exist_ok=True)
 
     output_cfg = cfg.get("output")
     if not isinstance(output_cfg, dict):
@@ -2400,11 +2447,11 @@ def main() -> int:
     output_cfg["runs_dir"] = str(runs_root)
     output_cfg["out_dir"] = str(run_dir)
     output_cfg["logs_dir"] = str(run_dir / "logs")
-    output_cfg["fetch_archives_dir"] = str(run_dir / "fetch")
-    output_cfg["script_dir"] = str(run_dir / "script")
-    output_cfg["tts_dir"] = str(run_dir / "tts")
-    output_cfg["render_dir"] = str(run_dir / "render")
-    output_cfg["publish_dir"] = str(run_dir / "publish")
+    output_cfg["fetch_archives_dir"] = str(run_dir / "1_fetch")
+    output_cfg["script_dir"] = str(run_dir / "2_script")
+    output_cfg["tts_dir"] = str(run_dir / "3_tts")
+    output_cfg["render_dir"] = str(run_dir / "4_render")
+    output_cfg["publish_dir"] = str(run_dir / "5_publish")
 
     _setup_logging(Path(output_cfg["logs_dir"]), episode_date)
 

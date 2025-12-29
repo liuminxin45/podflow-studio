@@ -42,10 +42,12 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import logging
+import re
 from typing import Any
 
 import feedparser
 import requests
+from bs4 import BeautifulSoup
 
 
 def _to_iso8601(value: Any) -> str | None:
@@ -68,6 +70,52 @@ def _to_iso8601(value: Any) -> str | None:
 
 def _stable_item_id(url: str) -> str:
     return hashlib.sha256(url.encode("utf-8")).hexdigest()
+
+
+def _clean_html_content(html_content: str) -> str:
+    """清理HTML内容，提取纯文本"""
+    if not html_content:
+        return ""
+    
+    try:
+        # 使用BeautifulSoup解析HTML
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
+        # 移除script和style标签
+        for script in soup(["script", "style"]):
+            script.decompose()
+        
+        # 获取文本内容
+        text = soup.get_text()
+        
+        # 清理多余的空白字符
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        return text
+    except Exception as e:
+        log = logging.getLogger("fetch.rss")
+        log.warning("Failed to clean HTML content: %s", e)
+        return html_content
+
+
+def _extract_news_content(description: str) -> str:
+    """从RSS描述中提取新闻内容"""
+    if not description:
+        return ""
+    
+    # 如果包含CDATA标记，提取内容
+    if "<![CDATA[" in description:
+        # 提取CDATA内容
+        cdata_match = re.search(r'<!\[CDATA\[(.*?)\]\]>', description, re.DOTALL)
+        if cdata_match:
+            content = cdata_match.group(1)
+        else:
+            content = description
+    else:
+        content = description
+    
+    # 清理HTML标签，提取纯文本
+    return _clean_html_content(content)
 
 
 def fetch_rss_items(url: str, source: str, timeout_seconds: int) -> list[dict]:
@@ -98,10 +146,31 @@ def fetch_rss_items_with_status(url: str, source: str, timeout_seconds: int) -> 
         title = (getattr(e, "title", None) or "").strip()
         summary = (getattr(e, "summary", None) or "").strip()
 
+        # 提取新闻内容
         content = ""
-        content_list = getattr(e, "content", None)
-        if isinstance(content_list, list) and content_list:
-            content = (content_list[0].get("value") or "").strip()
+        description = (getattr(e, "description", None) or "").strip()
+        if description:
+            content = _extract_news_content(description)
+        
+        # 如果没有description，尝试获取content字段
+        if not content:
+            content_list = getattr(e, "content", None)
+            if isinstance(content_list, list) and content_list:
+                raw_content = (content_list[0].get("value") or "").strip()
+                content = _clean_html_content(raw_content)
+
+        # 调试日志：显示处理的条目
+        log.info("processing RSS entry: %s, content length: %d", title, len(content) if content else 0)
+
+        # 跳过API说明文档，只获取真实新闻内容
+        if not content or "每日新闻精选 · 多源托管 · 开放接口" in content or "使用说明" in content:
+            log.info("skipping non-news entry: %s", title)
+            continue
+        
+        # 确保内容长度合理（至少100字符）
+        if len(content) < 100:
+            log.info("skipping short content entry: %s (length: %d)", title, len(content))
+            continue
 
         published_at = None
         if getattr(e, "published", None):
@@ -121,5 +190,9 @@ def fetch_rss_items_with_status(url: str, source: str, timeout_seconds: int) -> 
                 "source": source,
             }
         )
+
+    log.info("RSS parser returning %d items", len(out))
+    for i, item in enumerate(out):
+        log.info("  Item %d: %s", i, item.get("title", "Unknown"))
 
     return out, int(resp.status_code)

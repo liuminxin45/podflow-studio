@@ -38,12 +38,14 @@ from typing import Any, Dict, List, Optional, Union
 import requests
 from pydantic import BaseModel, Field
 
+from src.research.anspire import anspire_research_items
+from src.research.config import ResearchSettings, load_research_config
 from src.research.metaso import metaso_research_items
 
 
 class ResearchConfig(BaseModel):
     """研究配置模型"""
-    provider: str = Field(default="metaso", description="研究服务提供商")
+    provider: str = Field(default="metaso", description="研究服务提供商 (metaso, anspire)")
     api_key: Optional[str] = Field(default=None, description="API密钥")
     base_url: Optional[str] = Field(default=None, description="API基础URL")
     model: Optional[str] = Field(default=None, description="模型名称")
@@ -51,6 +53,8 @@ class ResearchConfig(BaseModel):
     max_items: Optional[int] = Field(default=None, description="最大研究条目数")
     max_retries: int = Field(default=3, description="最大重试次数")
     retry_delay: float = Field(default=1.0, description="重试延迟时间（秒）")
+    top_k: Optional[int] = Field(default=None, description="Anspire: 搜索返回的最大结果数")
+    is_stream: bool = Field(default=False, description="Anspire: 是否使用流式输出")
 
 
 class ResearchOutput(BaseModel):
@@ -95,6 +99,8 @@ class UnifiedResearchClient:
             # 根据提供商调用对应的研究方法
             if self.config.provider == "metaso":
                 result = self._research_with_metaso(items, max_items, model)
+            elif self.config.provider == "anspire":
+                result = self._research_with_anspire(items, max_items)
             else:
                 raise ValueError(f"不支持的研究提供商: {self.config.provider}")
             
@@ -144,6 +150,21 @@ class UnifiedResearchClient:
             return result
         except Exception as e:
             self.logger.error(f"MetaSo研究失败: {e}")
+            raise
+    
+    def _research_with_anspire(self, items: List[Dict[str, Any]], max_items: Optional[int]) -> Optional[Dict[str, Any]]:
+        """使用Anspire进行研究"""
+        try:
+            result = anspire_research_items(
+                items=items,
+                timeout_seconds=self.config.timeout_seconds,
+                top_k=self.config.top_k,
+                is_stream=self.config.is_stream,
+                max_items=max_items
+            )
+            return result
+        except Exception as e:
+            self.logger.error(f"Anspire研究失败: {e}")
             raise
     
     def research_with_retry(self, items: List[Dict[str, Any]], **kwargs) -> ResearchOutput:
@@ -221,15 +242,15 @@ def create_client(
     创建研究客户端的工厂方法
     
     Args:
-        provider: 研究服务提供商 ("metaso")
+        provider: 研究服务提供商 ("metaso", "anspire")
         api_key: API密钥
         base_url: API基础URL
-        model: 模型名称
+        model: 模型名称 (仅MetaSo)
         timeout_seconds: 超时时间
         max_items: 最大条目数
         max_retries: 最大重试次数
         retry_delay: 重试延迟
-        **kwargs: 其他配置参数
+        **kwargs: 其他配置参数 (如top_k, is_stream for Anspire)
         
     Returns:
         UnifiedResearchClient: 配置好的研究客户端
@@ -246,32 +267,48 @@ def create_client(
         **kwargs
     )
     
-    if provider == "metaso":
+    if provider in ["metaso", "anspire"]:
         return UnifiedResearchClient(config)
     else:
         raise ValueError(f"不支持的研究提供商: {provider}")
 
 
-def create_client_from_env(provider: str = "metaso") -> UnifiedResearchClient:
+def create_client_from_env(provider: Optional[str] = None) -> UnifiedResearchClient:
     """
-    从环境变量创建研究客户端
+    从环境变量和配置文件创建研究客户端
     
     Args:
-        provider: 研究服务提供商
+        provider: 研究服务提供商 ("metaso", "anspire")，如果为None则从RESEARCH_PROVIDER读取
         
     Returns:
         UnifiedResearchClient: 配置好的研究客户端
     """
     import os
     
+    # 加载配置文件
+    try:
+        research_config = load_research_config()
+    except Exception as e:
+        logging.getLogger("research.config").warning(f"加载配置文件失败: {e}，使用默认配置")
+        research_config = ResearchSettings()  # 使用默认配置
+    
+    # 确定提供商
+    if provider is None:
+        provider = os.environ.get("RESEARCH_PROVIDER")
+        if provider is None and research_config:
+            provider = research_config.provider
+        if provider is None:
+            provider = "metaso"  # 默认值
+    
+    # 从环境变量获取基础配置，优先使用环境变量
     if provider == "metaso":
         api_key = os.environ.get("METASO_API_KEY")
         base_url = os.environ.get("METASO_BASE_URL")
-        model = os.environ.get("METASO_MODEL", "fast")
-        timeout_seconds = int(os.environ.get("METASO_TIMEOUT_SECONDS", "60"))
+        model = os.environ.get("METASO_MODEL", research_config.metaso.get("model") if research_config else "fast")
+        timeout_seconds = int(os.environ.get("METASO_TIMEOUT_SECONDS", str(research_config.timeout_seconds if research_config else 60)))
         max_items = int(os.environ.get("METASO_MAX_ITEMS", "0")) or None
-        max_retries = int(os.environ.get("METASO_MAX_RETRIES", "3"))
-        retry_delay = float(os.environ.get("METASO_RETRY_DELAY", "1.0"))
+        max_retries = int(os.environ.get("METASO_MAX_RETRIES", str(research_config.max_retries if research_config else 3)))
+        retry_delay = float(os.environ.get("METASO_RETRY_DELAY", str(research_config.retry_delay if research_config else 1.0)))
         
         return create_client(
             provider=provider,
@@ -282,6 +319,27 @@ def create_client_from_env(provider: str = "metaso") -> UnifiedResearchClient:
             max_items=max_items,
             max_retries=max_retries,
             retry_delay=retry_delay
+        )
+    elif provider == "anspire":
+        api_key = os.environ.get("ANSPIRE_API_KEY")
+        base_url = os.environ.get("ANSPIRE_BASE_URL")
+        timeout_seconds = int(os.environ.get("ANSPIRE_TIMEOUT_SECONDS", str(research_config.timeout_seconds if research_config else 60)))
+        max_items = int(os.environ.get("ANSPIRE_MAX_ITEMS", "0")) or None
+        max_retries = int(os.environ.get("ANSPIRE_MAX_RETRIES", str(research_config.max_retries if research_config else 3)))
+        retry_delay = float(os.environ.get("ANSPIRE_RETRY_DELAY", str(research_config.retry_delay if research_config else 1.0)))
+        top_k = int(os.environ.get("ANSPIRE_TOP_K", str(research_config.anspire.get("top_k") if research_config else 5)))
+        is_stream = os.environ.get("ANSPIRE_IS_STREAM", str(research_config.anspire.get("is_stream", False) if research_config else "false")).lower() == "true"
+        
+        return create_client(
+            provider=provider,
+            api_key=api_key,
+            base_url=base_url,
+            timeout_seconds=timeout_seconds,
+            max_items=max_items,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+            top_k=top_k,
+            is_stream=is_stream
         )
     else:
         raise ValueError(f"不支持的研究提供商: {provider}")
