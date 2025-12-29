@@ -1277,7 +1277,64 @@ def step_fetch(
         # 使用合规内容
         fetched = compliant_items
 
-        # ===== 汇总型RSS拆分（在聚类之前） =====
+        # ===== 日期过滤（尽早发生，在digest拆分之前） =====
+        import datetime as dt
+        # 从episode_id中提取日期 (格式: "channel:YYYY-MM-DD")
+        date_str = episode_id.split(":")[-1] if ":" in episode_id else episode_id
+        target_date = dt.datetime.strptime(date_str, "%Y-%m-%d").date()
+        
+        log.info("=" * 60)
+        log.info(f"开始日期过滤：只保留 {target_date} 的数据...")
+        log.info("=" * 60)
+        
+        date_filtered_items = []
+        old_items = []
+        
+        for item in fetched:
+            published_at = item.get("published_at")
+            if published_at:
+                try:
+                    # 解析日期
+                    if isinstance(published_at, str):
+                        item_date = dt.datetime.fromisoformat(published_at.replace("Z", "+00:00")).date()
+                    elif isinstance(published_at, dt.datetime):
+                        item_date = published_at.date()
+                    else:
+                        item_date = None
+                    
+                    # 只保留目标日期的数据
+                    if item_date == target_date:
+                        date_filtered_items.append(item)
+                    else:
+                        old_items.append(item)
+                except Exception as e:
+                    log.warning(f"日期解析失败: {item.get('title', 'unknown')[:50]} - {e}")
+                    # 日期解析失败的保留（避免丢失数据）
+                    date_filtered_items.append(item)
+            else:
+                # 没有日期的保留（避免丢失数据）
+                date_filtered_items.append(item)
+        
+        log.info(f"日期过滤完成:")
+        log.info(f"  - 保留 {target_date} 的数据: {len(date_filtered_items)} 条")
+        log.info(f"  - 过滤掉旧数据: {len(old_items)} 条")
+        
+        if old_items:
+            log.info(f"过滤掉的旧数据示例:")
+            for item in old_items[:3]:
+                title = item.get("title", "unknown")[:50]
+                pub_at = item.get("published_at", "unknown")
+                log.info(f"    - {title} (发布于: {pub_at})")
+        
+        # Write date filter artifacts
+        if old_items:
+            write_jsonl(fetch_artifacts_dir / "date_filtered_old_items.jsonl", old_items)
+        
+        # 使用日期过滤后的数据
+        fetched = date_filtered_items
+        log.info("=" * 60)
+
+        # ===== 汇总型RSS拆分（在聚类之前，但在日期过滤之后） =====
         digest_split_cfg = cfg.get("digest_split") or {}
         digest_split_enabled = digest_split_cfg.get("enabled", False)
         
