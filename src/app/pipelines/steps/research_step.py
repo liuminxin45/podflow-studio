@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from src.app.pipelines.base_step import BaseStep
 
 if TYPE_CHECKING:
-    from src.app.context import EpisodeContext
+    from src.app.core.context import EpisodeContext
 
 
 class ResearchStep(BaseStep):

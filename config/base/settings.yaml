@@ -1,0 +1,244 @@
+# ============================================================
+# 频道配置（全局入口）
+# 切换频道后，自动选题策略、风格、受众定位等配置会自动响应
+# ============================================================
+channel:
+  # 频道ID（可选值：life-consumer | tech-innovation | balanced-mix）
+  # - life-consumer: 生活消费频道，面向普通消费者，关注民生、钱袋子、生活便利
+  # - tech-innovation: 技术创新频道，面向开发者/技术决策者，关注技术突破、开源项目
+  # - balanced-mix: 平衡频道，兼顾技术创新和民生价值
+  id: life-consumer
+  
+  # 以下字段由channel.id自动决定，无需手动修改
+  name: "生活与消费资讯"  # 自动映射
+  language: "zh-CN"
+  style:
+    tone: "口语化、生动、像朋友聊天"  # 自动映射
+    audience: "普通消费者"  # 自动映射
+    length_minutes: 6
+
+# 频道预设（内部映射表，由代码自动读取）
+channel_presets:
+  life-consumer:
+    name: "生活与消费资讯"
+    style:
+      tone: "口语化、生动、像朋友聊天"
+      audience: "普通消费者"
+      length_minutes: 6
+    auto_topic_strategy: "consumer_life_v3"  # 自动选题策略
+  
+  tech-innovation:
+    name: "技术创新资讯"
+    style:
+      tone: "专业、精准、有深度"
+      audience: "开发者、技术决策者"
+      length_minutes: 8
+    auto_topic_strategy: "tech_innovation"
+  
+  balanced-mix:
+    name: "综合资讯"
+    style:
+      tone: "专业且易懂、平衡"
+      audience: "广泛受众"
+      length_minutes: 7
+    auto_topic_strategy: "balanced"
+
+selection:
+  max_clusters: 5
+  constraints:
+    cooldown_days: 2
+
+source_guard:
+  config_dir: "./config/sources"
+  min_content_length: 120
+
+compliance:
+  policy_level: "standard"
+  min_score: 0.6
+  rules:
+    - sensitive_words
+    - copyright
+    - pii
+    - external_links
+  rule_overrides:
+    copyright:
+      allow_domains:
+        - "60s-static.viki.moe"
+        - "60s.viki.moe"
+        - "github.com"
+
+selection:
+  constraints:
+    max_per_domain: 3
+    max_per_topic: 3
+  max_clusters: 5
+  clustering:
+    simhash_max_distance: 1
+    title_min_jaccard: 0.2
+    time_window_days: 1
+
+sources:
+  rss:
+    - name: "60s-每天60秒读懂世界"
+      fetcher: "sixtys_digest"
+      enabled: true
+      category: "others"
+      urls:
+        - "https://60s.viki.moe/v2/60s/rss"
+        - "https://60api.09cdn.xyz/v2/60s/rss"
+        - "https://60s.zeabur.app/v2/60s/rss"
+        - "https://60s.crystelf.top/v2/60s/rss"
+        - "https://cqxx.site/v2/60s/rss"
+        - "https://api.yanyua.icu/v2/60s/rss"
+        - "https://60s.tmini.net/v2/60s/rss"
+        - "https://60s.7se.cn/v2/60s/rss"
+        - "https://60s.mizhoubaobei.top/v2/60s/rss"
+
+    - name: "AI工具集-每日AI快讯"
+      fetcher: "aibot_daily"
+      enabled: true
+      category: "others"
+      urls:
+        - "https://ai-bot.cn/daily-ai-news/"
+
+
+
+pipeline:
+  max_items: 8
+  pick_items: 5
+  dedup_enabled: true
+  filter_enabled: true
+
+# 汇总型RSS拆分配置
+digest_split:
+  enabled: true
+  cache_ttl_seconds: 86400
+  enable_cache: true
+
+filter:
+  fields:
+    - "title"
+    - "content"
+    - "url"
+  keep_raw: false
+
+llm:
+  provider: "deepseek"
+  model: "deepseek-chat"
+  timeout_seconds: 120
+  max_tokens: 4000
+  temperature: 0.7
+
+tts:
+  provider: "doubao"
+  mode: "default"
+  voice: "zh_female_tianqing_moon_bigtts"
+  speed: 1.0
+  volume: 1.0
+  pitch: 1.0
+  timeout_seconds: 60
+
+output:
+  runs_dir: "./out/runs"
+  fetch_archives_dir: "./out/fetch"
+  script_dir: "./out/script"
+  tts_dir: "./out/tts"
+  render_dir: "./out/render"
+  publish_dir: "./out/publish"
+
+research:
+  provider: "anspire"  # Options: metaso, anspire
+  enabled: true
+  timeout_seconds: 60
+  max_items: 10
+  max_retries: 3
+  retry_delay: 1.0
+  # Provider-specific settings
+  metaso:
+    model: "fast"
+  anspire:
+    top_k: 5
+    is_stream: false
+
+# Pipeline 配置（二次检索+二阶段LLM）
+pipeline_v2:
+  retrieval:
+    max_concurrent: 2
+    timeout_seconds: 60
+    cache_ttl_seconds: 86400  # 24小时
+    cache_dir: ".cache/research"
+    history_podcast_dir: "out/history_podcasts"
+    top_k_history: 5
+  llm_stage1:
+    timeout_seconds: 60
+    max_tokens: 3000
+  llm_stage2:
+    timeout_seconds: 60
+    max_tokens: 2500
+  fallback:
+    use_draft_on_failure: true  # LLM#2失败时使用draft
+
+# ============================================================
+# 自动选题配置（主题候选挖掘 + 听众兴趣评分 + 选题决策）
+# 注意：策略由 channel.id 自动决定，无需手动配置
+# ============================================================
+auto_topic:
+  enabled: true  # 开关：true启用自动选题，false使用传统流程
+  time_window_days: 7  # 主题聚合时间窗口（天）
+  
+  # 策略由 channel.id 自动决定：
+  # - life-consumer -> consumer_life_v3
+  # - tech-innovation -> tech_innovation
+  # - balanced-mix -> balanced
+  # 如需手动覆盖，可取消注释下面一行：
+  # strategy: "consumer_life_v3"
+  
+  # 策略增强开关（v3新增）
+  enable_keywords: true         # 启用关键词匹配
+  enable_patterns: true         # 启用正则模式匹配（覆盖同义词）
+  enable_compounds: true        # 启用联合规则（抑制泛词误报）
+  enable_domains: true          # 启用语义域加分（核心修复）
+  
+  # 打分配置 - 统一0-100分数体系（可选，覆盖策略默认值）
+  scoring:
+    # 内容价值分 (0-60)
+    archetype_mean_max: 40.0        # 母型平均分最大值
+    personal_impact_max: 10.0       # 个人影响分最大值
+    counter_intuitive_max: 10.0     # 反直觉分最大值
+    
+    # 代理信号分 (0-25)
+    trend_max: 10.0                 # 趋势信号最大值
+    time_max: 5.0                   # 时间信号最大值
+    persona_max: 5.0                # 人群相关性最大值
+    history_echo_max: 5.0           # 历史呼应最大值
+    
+    # 结构加成 (-10 ~ +15)
+    continuity_max: 6.0             # 连续性加成最大值
+    data_enrichable_max: 6.0        # 数据可补充加成最大值
+    follow_up_max: 3.0              # 可跟进加成最大值
+    
+    # 阈值配置 (0-100)
+    threshold_must_publish: 70.0    # 必播阈值（>=70分）
+    threshold_maybe_publish: 55.0   # 可能播阈值（55-70分）
+  
+  # LLM Gate配置
+  gate:
+    top_n: 10                   # 对TopN候选做LLM决策
+    fallback_to_score: true     # LLM失败时降级到规则打分
+  
+  # 历史播客检索配置
+  history:
+    dir: "out/history_podcasts"
+    top_k: 3
+
+database:
+  path: "./data/podcast.db"
+  backup_enabled: true
+  backup_interval_hours: 24
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "./logs/podcast.log"
+  max_size_mb: 100
+  backup_count: 5

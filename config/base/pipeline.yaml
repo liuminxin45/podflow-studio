@@ -1,0 +1,199 @@
+# Pipeline Configuration
+# 流水线配置：控制各阶段的行为和参数
+
+version: "2.0.0"
+
+# 通用设置
+general:
+  cache_enabled: true
+  metrics_enabled: true
+  trace_enabled: true
+  log_level: "INFO"
+
+# Fetch阶段
+fetch:
+  timeout_seconds: 300
+  max_items: 50
+  dedup:
+    enabled: true
+    methods:
+      - "url_normalize"
+      - "content_sha256"
+      - "simhash"
+  
+  # 日期过滤配置
+  date_filter:
+    enabled: true
+    mode: "exact"  # "exact" | "range" | "disabled"
+    days_before: 0  # 保留目标日期前N天的内容（exact模式下忽略）
+    days_after: 0   # 保留目标日期后N天的内容（exact模式下忽略）
+  
+  # RSS源配置
+  rss:
+    timeout_seconds: 30
+    max_retries: 3
+  
+  # MetaSo配置
+  metaso:
+    enabled: false
+    max_items: 10
+    timeout_seconds: 60
+
+# Store阶段（去重、聚类、选择）
+store:
+  # 聚类配置
+  clustering:
+    simhash_max_distance: 4
+    title_min_jaccard: 0.4
+    time_window_days: 7  # 与 fetch.date_filter.days_before 保持一致
+    cooldown_days: 2
+    min_cluster_size: 1
+  
+  # 评分权重
+  scoring:
+    freshness_weight: 0.3
+    impact_weight: 0.25
+    source_trust_weight: 0.25
+    quality_weight: 0.2
+  
+  # 约束条件
+  constraints:
+    cooldown_hours: 48
+    max_per_topic: 4
+    max_per_domain: 3
+    title_similarity_threshold: 0.7
+    exception_keywords:
+      - "重大突破"
+      - "首次"
+      - "历史性"
+
+# Research阶段
+research:
+  enabled: true
+  
+  # 断言提取
+  claims:
+    max_claims_per_item: 10
+    min_confidence: 0.6
+    include_opinions: false
+  
+  # 预算控制
+  budget:
+    max_news_items: 10
+    max_claims_per_item: 5
+    max_total_claims: 30
+    priority_claim_types:
+      - "factual"
+      - "causal"
+      - "predictive"
+  
+  # 查询构建
+  query:
+    include_contrast: true
+    max_age_days: 30
+
+# Editorial阶段
+editorial:
+  # 5W框架
+  sections:
+    - "what"
+    - "so_what"
+    - "impact"
+    - "uncertainty"
+    - "takeaway"
+  
+  # 证据要求
+  evidence:
+    min_quality: "moderate"
+    require_disclaimer: true
+
+# Script阶段
+script:
+  # 质量门控
+  quality_gate:
+    enabled: true
+    pass_threshold: 0.7
+    drop_threshold: 0.4
+    max_revisions: 3
+  
+  # 章节配置
+  chapters:
+    include_intro: true
+    include_outro: true
+    intro_duration: 10.0
+    outro_duration: 5.0
+
+# TTS阶段
+tts:
+  # 分段配置
+  segmentation:
+    min_length: 25
+    max_length: 35
+    normalize: true
+    merge_short: true
+  
+  # 语音配置
+  voice:
+    default: "zh-CN-XiaoxiaoNeural"
+    speed: 1.0
+    pitch: 0
+
+# Audio阶段
+audio:
+  # 混音配置
+  mixing:
+    target_loudness: -16.0  # LUFS
+    bgm_volume_db: -20.0
+    ducking_amount_db: -12.0
+    ducking_fade_ms: 500
+  
+  # BGM配置
+  bgm:
+    intro_duration: 5.0
+    outro_duration: 3.0
+    mid_enabled: true
+  
+  # 导出配置
+  export:
+    format: "mp3"
+    bitrate: "192k"
+
+# 字幕配置
+subtitles:
+  enabled: true
+  formats:
+    - "srt"
+    - "vtt"
+  max_chars_per_line: 42
+  max_lines: 2
+
+# 成本控制
+cost_control:
+  max_cost_per_episode: 1.0  # USD
+  alert_threshold: 0.8
+  
+  # API成本模型
+  api_costs:
+    metaso:
+      per_request: 0.01
+    llm:
+      per_1k_tokens: 0.002
+    tts:
+      per_second: 0.0001
+
+# 缓存配置
+cache:
+  base_dir: ".cache"
+  ttl_hours: 168  # 7天
+  max_size_mb: 1000
+
+# 输出配置
+output:
+  base_dir: "output"
+  episode_format: "{date}_{topic}_{mode}"
+  artifacts:
+    - "manifest.json"
+    - "chapters.json"
+    - "timeline.json"
+    - "metrics.json"
+    - "trace.json"

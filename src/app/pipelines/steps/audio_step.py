@@ -16,7 +16,7 @@ from src.app.pipelines.base_step import BaseStep
 from src.audio.render import render_episode_audio
 
 if TYPE_CHECKING:
-    from src.app.context import EpisodeContext
+    from src.app.core.context import EpisodeContext
 
 
 class AudioStep(BaseStep):

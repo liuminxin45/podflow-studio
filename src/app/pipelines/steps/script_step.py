@@ -12,10 +12,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from src.app.pipelines.base_step import BaseStep
-from src.llm.api_client import ScriptInputItem, ScriptOutput
+from src.llm.client.api_client import ScriptInputItem, ScriptOutput
 
 if TYPE_CHECKING:
-    from src.app.context import EpisodeContext
+    from src.app.core.context import EpisodeContext
 
 
 class ScriptStep(BaseStep):
@@ -112,7 +112,7 @@ class ScriptStep(BaseStep):
         timeout_s: int,
     ) -> ScriptOutput:
         """使用 DeepSeek 生成脚本"""
-        from src.llm.api_client import DeepSeekClient
+        from src.llm.client.api_client import DeepSeekClient
         
         base_url = os.environ.get("DEEPSEEK_BASE_URL", "").strip()
         api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
@@ -138,7 +138,7 @@ class ScriptStep(BaseStep):
         timeout_s: int,
     ) -> ScriptOutput:
         """使用 Moonshot 生成脚本"""
-        from src.llm.api_client import MoonshotClient
+        from src.llm.client.api_client import MoonshotClient
         
         base_url = os.environ.get("MOONSHOT_BASE_URL", "https://api.moonshot.cn/v1").strip()
         api_key = os.environ.get("MOONSHOT_API_KEY", "").strip()

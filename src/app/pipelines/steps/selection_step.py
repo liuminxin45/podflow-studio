@@ -13,15 +13,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from src.app.pipelines.base_step import BaseStep
-from src.topic_selection.pipeline import AutoTopicPipeline, AutoTopicPipelineConfig
-from src.topic_selection.topic_scoring import TopicScorerConfig
-from src.store.selector import select_clusters, SelectionConfig
-from src.store.scoring import ScoringConfig, ScoreWeights
-from src.store.constraints import ConstraintConfig
-from src.store.artifacts import write_cluster_artifacts
+from src.topic_selection.core.pipeline import AutoTopicPipeline, AutoTopicPipelineConfig
+from src.topic_selection.processing.topic_scoring import TopicScorerConfig
+from src.topic_selection.strategies import get_strategy
+from src.store.selection.selector import select_clusters, SelectionConfig
+from src.store.selection.scoring import ScoringConfig, ScoreWeights
+from src.store.selection.constraints import ConstraintConfig
+from src.store.core.artifacts import write_cluster_artifacts
 
 if TYPE_CHECKING:
-    from src.app.context import EpisodeContext
+    from src.app.core.context import EpisodeContext
 
 
 class SelectionStep(BaseStep):
@@ -101,7 +102,33 @@ class SelectionStep(BaseStep):
     
     def _run_auto_topic(self, ctx: EpisodeContext, auto_topic_cfg: dict) -> dict:
         """运行自动选题 pipeline"""
-        # 优先使用 Track 的 scoring policy
+        # 1. 加载策略：优先使用配置文件的strategy，否则从 channel_presets 自动推导
+        strategy_name = auto_topic_cfg.get("strategy")
+        
+        if not strategy_name:
+            # 从 channel_presets 自动推导策略
+            channel_id = ctx.config.get("channel", {}).get("id", "life-consumer")
+            channel_presets = ctx.config.get("channel_presets", {})
+            
+            if channel_id in channel_presets:
+                strategy_name = channel_presets[channel_id].get("auto_topic_strategy", "balanced")
+                self.logger.info(f"根据频道 '{channel_id}' 自动选择策略: {strategy_name}")
+            else:
+                strategy_name = "balanced"
+                self.logger.warning(f"频道 '{channel_id}' 未配置预设，使用默认策略: balanced")
+        else:
+            self.logger.info(f"使用配置文件指定的策略: {strategy_name}")
+        
+        try:
+            strategy = get_strategy(strategy_name)
+            self.logger.info(f"加载策略成功: {strategy.name} - {strategy.description}")
+        except ValueError as e:
+            self.logger.warning(f"策略加载失败: {e}，回退到 balanced 策略")
+            strategy = get_strategy("balanced")
+        
+        # 2. 优先使用策略的 scorer config，然后是 Track 配置，最后是默认值
+        strategy_scorer_cfg = strategy.get_scorer_config()
+        
         if ctx.track:
             track_scoring_cfg = ctx.track.get_scoring_policy().get_scoring_config()
             self.logger.info(f"使用 Track '{ctx.track.get_name()}' 的打分策略")
@@ -119,32 +146,44 @@ class SelectionStep(BaseStep):
                 default
             )
         
+        # 3. 合并配置：Track 策略 > 配置文件 > 策略默认值
+        def get_value_with_strategy(key: str) -> float:
+            # 优先级：Track 策略 > 配置文件 > 策略默认值
+            if track_scoring_cfg.get(key):
+                return float(track_scoring_cfg[key])
+            if scoring_cfg.get(key):
+                return float(scoring_cfg[key])
+            # 从策略的 scorer_config 获取默认值
+            return getattr(strategy_scorer_cfg, key)
+        
         scorer_cfg = TopicScorerConfig(
             # 内容价值分 (0-60)
-            archetype_mean_max=get_value("archetype_mean_max", 40.0),
-            personal_impact_max=get_value("personal_impact_max", 10.0),
-            counter_intuitive_max=get_value("counter_intuitive_max", 10.0),
+            archetype_mean_max=get_value_with_strategy("archetype_mean_max"),
+            personal_impact_max=get_value_with_strategy("personal_impact_max"),
+            counter_intuitive_max=get_value_with_strategy("counter_intuitive_max"),
             # 代理信号分 (0-25)
-            trend_max=get_value("trend_max", 10.0),
-            time_max=get_value("time_max", 5.0),
-            persona_max=get_value("persona_max", 5.0),
-            history_echo_max=get_value("history_echo_max", 5.0),
+            trend_max=get_value_with_strategy("trend_max"),
+            time_max=get_value_with_strategy("time_max"),
+            persona_max=get_value_with_strategy("persona_max"),
+            history_echo_max=get_value_with_strategy("history_echo_max"),
             # 结构加成 (-10 ~ +15)
-            continuity_max=get_value("continuity_max", 6.0),
-            data_enrichable_max=get_value("data_enrichable_max", 6.0),
-            follow_up_max=get_value("follow_up_max", 3.0),
+            continuity_max=get_value_with_strategy("continuity_max"),
+            data_enrichable_max=get_value_with_strategy("data_enrichable_max"),
+            follow_up_max=get_value_with_strategy("follow_up_max"),
             # 阈值 (0-100)
-            threshold_must_publish=get_value("threshold_must_publish", 70.0),
-            threshold_maybe_publish=get_value("threshold_maybe_publish", 55.0),
+            threshold_must_publish=get_value_with_strategy("threshold_must_publish"),
+            threshold_maybe_publish=get_value_with_strategy("threshold_maybe_publish"),
         )
         
         pipeline_cfg = AutoTopicPipelineConfig(
             enabled=True,
             time_window_days=int(auto_topic_cfg.get("time_window_days", 7)),
+            run_dir=ctx.run_dir,  # 传递run目录
             scorer_config=scorer_cfg,
             gate_top_n=int(auto_topic_cfg.get("gate", {}).get("top_n", 10)),
             gate_fallback=bool(auto_topic_cfg.get("gate", {}).get("fallback_to_score", True)),
             history_dir=auto_topic_cfg.get("history", {}).get("dir", "out/history_podcasts"),
+            strategy=strategy,  # 传递策略实例
         )
         
         auto_topic_pipeline = AutoTopicPipeline(config=pipeline_cfg)

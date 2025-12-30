@@ -9,10 +9,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from src.app.pipelines.base_step import BaseStep
-from src.store.clusters import cluster_items, ClusterConfig
+from src.store.operations.clusters import cluster_items, ClusterConfig
 
 if TYPE_CHECKING:
-    from src.app.context import EpisodeContext
+    from src.app.core.context import EpisodeContext
 
 
 class ClusterStep(BaseStep):
@@ -25,6 +25,7 @@ class ClusterStep(BaseStep):
         # 获取聚类配置 - 支持多个可能的配置路径
         cluster_cfg_dict = (
             cfg.get("clustering") or 
+            cfg.get("store", {}).get("clustering") or
             cfg.get("selection", {}).get("clustering") or 
             {}
         )

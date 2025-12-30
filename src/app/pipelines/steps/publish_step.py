@@ -13,7 +13,7 @@ from src.app.pipelines.base_step import BaseStep
 from src.publish.local import publish_local
 
 if TYPE_CHECKING:
-    from src.app.context import EpisodeContext
+    from src.app.core.context import EpisodeContext
 
 
 class PublishStep(BaseStep):

@@ -19,7 +19,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from src.app.orchestrator import run_episode
+from src.app.core.orchestrator import run_episode
 
 
 class _JsonFormatter(logging.Formatter):
@@ -63,13 +63,13 @@ def _load_config(config_path: str | None = None) -> dict:
     config = {}
     
     # 加载 settings.yaml
-    settings_path = Path("config/settings.yaml")
+    settings_path = Path("config/base/settings.yaml")
     if settings_path.exists():
         with open(settings_path, "r", encoding="utf-8") as f:
             config.update(yaml.safe_load(f) or {})
     
     # 加载 pipeline.yaml
-    pipeline_path = Path("config/pipeline.yaml")
+    pipeline_path = Path("config/base/pipeline.yaml")
     if pipeline_path.exists():
         with open(pipeline_path, "r", encoding="utf-8") as f:
             pipeline_cfg = yaml.safe_load(f) or {}

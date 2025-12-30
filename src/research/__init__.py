@@ -21,9 +21,9 @@ Research Module
     result = client.research_items(items)
 """
 
-from .anspire import anspire_research_items
-from .config import ResearchSettings, load_research_config, get_provider_config
-from .research_client import (
+from .sources.anspire import anspire_research_items
+from .core.config import ResearchSettings, load_research_config, get_provider_config
+from .sources.research_client import (
     ResearchConfig,
     ResearchOutput,
     UnifiedResearchClient,
@@ -32,20 +32,20 @@ from .research_client import (
     create_client_from_env,
     research_items_with_client,
 )
-from .metaso import metaso_research_items
-from .news_splitter import NewsTopic, NewsSplitter, split_news_for_research
-from .batch_researcher import (
+from .sources.metaso import metaso_research_items
+from .processing.news_splitter import NewsTopic, NewsSplitter, split_news_for_research
+from .utils.batch_researcher import (
     TopicResearchResult,
     BatchResearchResult,
     BatchResearcher,
     research_topics_batch,
 )
-from .podcast_enhancer import (
+from .llm_integration.podcast_enhancer import (
     EnhancedContent,
     PodcastEnhancer,
     enhance_topic_for_podcast,
 )
-from .models import (
+from .core.models import (
     RetrievalQuery,
     RetrievalPlan,
     RetrievalBundle,
@@ -53,10 +53,10 @@ from .models import (
     LLM2Output,
     PipelineResult,
 )
-from .cache_manager import CacheManager
-from .history_search import HistoryPodcastSearcher
-from .retrieval_v2 import RetrievalV2Executor
-from .llm_stages import LLMStage1, LLMStage2
+from .utils.cache_manager import CacheManager
+from .retrieval.history_search import HistoryPodcastSearcher
+from .retrieval.retrieval_v2 import RetrievalV2Executor
+from .llm_integration.llm_stages import LLMStage1, LLMStage2
 
 __all__ = [
     # 统一客户端

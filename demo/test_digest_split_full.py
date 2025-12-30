@@ -11,8 +11,8 @@ from pathlib import Path
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.fetch.digest_detector import detect_digest_items
-from src.fetch.digest_splitter import DigestSplitter, split_digest_items
+from src.fetch.processors.digest_detector import detect_digest_items
+from src.fetch.processors.digest_splitter import DigestSplitter, split_digest_items
 from src.store.clusters import ClusterConfig, cluster_items
 from src.store.fingerprints import ensure_item_fingerprints
 
