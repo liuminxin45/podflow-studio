@@ -1,0 +1,256 @@
+logging:
+  level: INFO
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  file: ./logs/podcast.log
+  max_size_mb: 100
+  backup_count: 5
+channel:
+  id: life-consumer
+  name: 生活与消费资讯
+  language: zh-CN
+  style:
+    tone: 口语化、生动、像朋友聊天
+    audience: 普通消费者
+    length_minutes: 6
+channel_presets:
+  life-consumer:
+    name: 生活与消费资讯
+    style:
+      tone: 口语化、生动、像朋友聊天
+      audience: 普通消费者
+      length_minutes: 6
+    auto_topic_strategy: consumer_life_v3
+  tech-innovation:
+    name: 技术创新资讯
+    style:
+      tone: 专业、精准、有深度
+      audience: 开发者、技术决策者
+      length_minutes: 8
+    auto_topic_strategy: tech_innovation
+  balanced-mix:
+    name: 综合资讯
+    style:
+      tone: 专业且易懂、平衡
+      audience: 广泛受众
+      length_minutes: 7
+    auto_topic_strategy: balanced
+selection:
+  constraints:
+    max_per_domain: 3
+    max_per_topic: 3
+  max_clusters: 5
+  clustering:
+    simhash_max_distance: 1
+    title_min_jaccard: 0.2
+    time_window_days: 1
+source_guard:
+  config_dir: ./config/sources
+  min_content_length: 120
+compliance:
+  policy_level: standard
+  min_score: 0.6
+  rules:
+  - sensitive_words
+  - copyright
+  - pii
+  - external_links
+  rule_overrides:
+    copyright:
+      allow_domains:
+      - 60s-static.viki.moe
+      - 60s.viki.moe
+      - github.com
+sources:
+  rss:
+  - name: 60s-每天60秒读懂世界
+    fetcher: sixtys_digest
+    enabled: true
+    category: others
+    urls:
+    - https://60s.viki.moe/v2/60s/rss
+    - https://60api.09cdn.xyz/v2/60s/rss
+    - https://60s.zeabur.app/v2/60s/rss
+    - https://60s.crystelf.top/v2/60s/rss
+    - https://cqxx.site/v2/60s/rss
+    - https://api.yanyua.icu/v2/60s/rss
+    - https://60s.tmini.net/v2/60s/rss
+    - https://60s.7se.cn/v2/60s/rss
+    - https://60s.mizhoubaobei.top/v2/60s/rss
+  - name: AI日报快讯
+    fetcher: ai_daily_news
+    enabled: false
+    category: ai_tech
+    urls:
+    - https://60s.viki.moe
+  - name: 虎嗅网
+    fetcher: standard_rss
+    enabled: false
+    category: tech_business
+    urls:
+    - https://www.huxiu.com/rss/0.xml
+  - name: 36氪
+    fetcher: standard_rss
+    enabled: false
+    category: tech_business
+    urls:
+    - https://36kr.com/feed
+  - name: IT之家
+    fetcher: standard_rss
+    enabled: true
+    category: tech_news
+    urls:
+    - https://www.ithome.com/rss/
+  - name: 理想生活实验室
+    fetcher: standard_rss
+    enabled: false
+    category: lifestyle
+    urls:
+    - https://www.toodaylab.com/feed
+  - name: 新华社新闻
+    fetcher: standard_rss
+    enabled: false
+    category: news
+    urls:
+    - https://plink.anyfeeder.com/newscn/whxw
+  - name: 财富中文网商业
+    fetcher: standard_rss
+    enabled: false
+    category: business
+    urls:
+    - https://plink.anyfeeder.com/fortunechina/shangye
+  - name: 华尔街日报
+    fetcher: standard_rss
+    enabled: false
+    category: business
+    urls:
+    - https://plink.anyfeeder.com/wsj/cn
+  - name: 财富中文网
+    fetcher: standard_rss
+    enabled: false
+    category: business
+    urls:
+    - https://plink.anyfeeder.com/fortunechina
+  - name: 雪球今日话题
+    fetcher: standard_rss
+    enabled: false
+    category: finance
+    urls:
+    - https://xueqiu.com/hots/topic/rss
+  - name: 果壳网
+    fetcher: standard_rss
+    enabled: false
+    category: science
+    urls:
+    - https://plink.anyfeeder.com/guokr/scientific
+  - name: 南方周末
+    fetcher: standard_rss
+    enabled: false
+    category: news
+    urls:
+    - https://plink.anyfeeder.com/infzm/recommends
+  - name: 界面新闻
+    fetcher: standard_rss
+    enabled: false
+    category: news
+    urls:
+    - https://a.jiemian.com/index.php?m=article&a=rss
+pipeline:
+  max_items: 8
+  pick_items: 5
+  dedup_enabled: true
+  filter_enabled: true
+digest_split:
+  enabled: true
+  cache_ttl_seconds: 86400
+  enable_cache: true
+filter:
+  fields:
+  - title
+  - content
+  - url
+  keep_raw: false
+llm:
+  provider: deepseek
+  model: deepseek-chat
+  timeout_seconds: 120
+  max_tokens: 4000
+  temperature: 0.7
+tts:
+  provider: doubao
+  mode: default
+  voice: zh_female_tianqing_moon_bigtts
+  speed: 1.0
+  volume: 1.0
+  pitch: 1.0
+  timeout_seconds: 60
+output:
+  runs_dir: ./out/runs
+  fetch_archives_dir: ./out/fetch
+  script_dir: ./out/script
+  tts_dir: ./out/tts
+  render_dir: ./out/render
+  publish_dir: ./out/publish
+research:
+  provider: anspire
+  enabled: true
+  timeout_seconds: 60
+  max_items: 10
+  max_retries: 3
+  retry_delay: 1.0
+  metaso:
+    model: fast
+  anspire:
+    top_k: 5
+    is_stream: false
+pipeline_v2:
+  retrieval:
+    max_concurrent: 2
+    timeout_seconds: 60
+    cache_ttl_seconds: 86400
+    cache_dir: .cache/research
+    history_podcast_dir: out/history_podcasts
+    top_k_history: 5
+  llm_stage1:
+    timeout_seconds: 60
+    max_tokens: 3000
+  llm_stage2:
+    timeout_seconds: 60
+    max_tokens: 2500
+  fallback:
+    use_draft_on_failure: true
+auto_topic:
+  enabled: true
+  time_window_days: 7
+  enable_keywords: true
+  enable_patterns: true
+  enable_compounds: true
+  enable_domains: true
+  scoring:
+    archetype_mean_max: 37.0
+    personal_impact_max: 8.5
+    counter_intuitive_max: 10.0
+    trend_max: 10.0
+    time_max: 4.2
+    persona_max: 5.0
+    history_echo_max: 5.0
+    continuity_max: 5.1
+    data_enrichable_max: 5.1
+    follow_up_max: 3.0
+    threshold_must_publish: 70.0
+    threshold_maybe_publish: 55.0
+  gate:
+    top_n: 10
+    fallback_to_score: true
+  history:
+    dir: out/history_podcasts
+    top_k: 3
+human_feedback:
+  enabled: false
+  storage_dir: feedback_history
+  auto_continue: true
+  timeout_seconds: 300
+  min_feedback_threshold: 0
+database:
+  path: ./data/podcast.db
+  backup_enabled: true
+  backup_interval_hours: 24

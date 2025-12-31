@@ -1,0 +1,12 @@
+{
+  "session_id": "session_20251231_223235",
+  "timestamp": "2025-12-31 22:32:35.253660",
+  "episode_date": "20251231",
+  "report_path": "out\\runs\\20251231\\215925_766514_life-c\\auto_topic\\report_20251231_220507.json",
+  "total_reviewed": 0,
+  "agree_count": 0,
+  "disagree_count": 0,
+  "feedbacks": [],
+  "reviewer": "auto_test_bot",
+  "notes": "自动化测试 - 模拟人工标注"
+}

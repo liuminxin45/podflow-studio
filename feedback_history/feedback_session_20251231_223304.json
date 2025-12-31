@@ -1,0 +1,241 @@
+{
+  "session_id": "session_20251231_223304",
+  "timestamp": "2025-12-31 22:33:04.367958",
+  "episode_date": "20251231",
+  "report_path": "out\\runs\\20251231\\215925_766514_life-c\\auto_topic\\report_20251231_220507.json",
+  "total_reviewed": 10,
+  "agree_count": 6,
+  "disagree_count": 4,
+  "feedbacks": [
+    {
+      "feedback_id": "fb_session_20251231_223304_1",
+      "topic_id": "topic:d663f9732e59",
+      "timestamp": "2025-12-31 22:33:04.368830",
+      "episode_date": "20251231",
+      "topic_snapshot": {
+        "title": "比亚迪全新 SUV 外观及内饰谍照曝光，消息称系“元 MAX”",
+        "topic_score": 60.077777777777776,
+        "entities": [
+          "元MAX",
+          "比亚迪"
+        ]
+      },
+      "system_decision": "maybe",
+      "system_score": 60.077777777777776,
+      "score_breakdown": {
+        "archetype_mean": 17.77777777777778,
+        "personal_impact": 6.666666666666666,
+        "counter_intuitive": 0.0,
+        "trend": 0.8000000000000002,
+        "time": 5.0,
+        "persona": 4.833333333333333,
+        "history_echo": 0.0,
+        "continuity": 6.0,
+        "data_enrichable": 6.0,
+        "follow_up": 3.0
+      },
+      "human_decision": "reject",
+      "human_priority": 2,
+      "feedback_reason": "小众品牌或新车型，普通消费者关注度低",
+      "tags": [
+        "品牌知名度低",
+        "受众窄"
+      ],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    },
+    {
+      "feedback_id": "fb_session_20251231_223304_2",
+      "topic_id": "topic:2c3474a8f4c4",
+      "timestamp": "2025-12-31 22:33:04.368988",
+      "episode_date": "20251231",
+      "topic_snapshot": {
+        "title": "锂电产业全线涨价：消息称动力电池紧缺已缓解，储能电池仍稀缺",
+        "topic_score": 74.65555555555555,
+        "entities": [
+          "储能电池",
+          "动力电池",
+          "锂电产业"
+        ]
+      },
+      "system_decision": "maybe",
+      "system_score": 74.65555555555555,
+      "score_breakdown": {
+        "archetype_mean": 22.22222222222222,
+        "personal_impact": 6.666666666666666,
+        "counter_intuitive": 3.333333333333333,
+        "trend": 1.6000000000000003,
+        "time": 5.0,
+        "persona": 4.833333333333333,
+        "history_echo": 0.0,
+        "continuity": 6.0,
+        "data_enrichable": 6.0,
+        "follow_up": 3.0
+      },
+      "human_decision": "accept",
+      "human_priority": 4,
+      "feedback_reason": "涉及消费者钱包，关注度高",
+      "tags": [
+        "消费者关注",
+        "价格"
+      ],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    },
+    {
+      "feedback_id": "fb_session_20251231_223304_3",
+      "topic_id": "topic:c0989c962687",
+      "timestamp": "2025-12-31 22:33:04.369144",
+      "episode_date": "20251231",
+      "topic_snapshot": {
+        "title": "铂智 3X 推出 2026 年购置税限时全免政策，“三担责”延至 2026 年底",
+        "topic_score": 72.07777777777778,
+        "entities": [
+          "铂智 3X",
+          "广汽丰田"
+        ]
+      },
+      "system_decision": "maybe",
+      "system_score": 72.07777777777778,
+      "score_breakdown": {
+        "archetype_mean": 17.77777777777778,
+        "personal_impact": 6.666666666666666,
+        "counter_intuitive": 0.0,
+        "trend": 0.8000000000000002,
+        "time": 5.0,
+        "persona": 4.833333333333333,
+        "history_echo": 0.0,
+        "continuity": 6.0,
+        "data_enrichable": 6.0,
+        "follow_up": 3.0
+      },
+      "human_decision": "reject",
+      "human_priority": 2,
+      "feedback_reason": "小众品牌或新车型，普通消费者关注度低",
+      "tags": [
+        "品牌知名度低",
+        "受众窄"
+      ],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    },
+    {
+      "feedback_id": "fb_session_20251231_223304_4",
+      "topic_id": "topic:9b4f3b4b8521",
+      "timestamp": "2025-12-31 22:33:04.369446",
+      "episode_date": "20251231",
+      "topic_snapshot": {
+        "title": "“半固态电池”术语确认可用：我国车用固态电池国标征求意见，首提“混合固液电池”",
+        "topic_score": 64.52222222222221,
+        "entities": [
+          "混合固液电池",
+          "车用固态电池",
+          "国家标准"
+        ]
+      },
+      "system_decision": "maybe",
+      "system_score": 64.52222222222221,
+      "score_breakdown": {
+        "archetype_mean": 22.22222222222222,
+        "personal_impact": 6.666666666666666,
+        "counter_intuitive": 0.0,
+        "trend": 0.8000000000000002,
+        "time": 5.0,
+        "persona": 4.833333333333333,
+        "history_echo": 0.0,
+        "continuity": 6.0,
+        "data_enrichable": 6.0,
+        "follow_up": 3.0
+      },
+      "human_decision": "reject",
+      "human_priority": 2,
+      "feedback_reason": "技术性太强，普通消费者难以理解和关心",
+      "tags": [
+        "技术性强",
+        "受众窄"
+      ],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    },
+    {
+      "feedback_id": "fb_session_20251231_223304_5",
+      "topic_id": "topic:1f0e3905567e",
+      "timestamp": "2025-12-31 22:33:04.369684",
+      "episode_date": "20251231",
+      "topic_snapshot": {
+        "title": "创历史新高！今年 11 月中国品牌在欧洲电动汽车市场拿下近 13% 份额",
+        "topic_score": 89.54444444444445,
+        "entities": [
+          "中国品牌",
+          "欧洲",
+          "电动汽车市场"
+        ]
+      },
+      "system_decision": "must",
+      "system_score": 89.54444444444445,
+      "score_breakdown": {
+        "archetype_mean": 31.11111111111111,
+        "personal_impact": 6.666666666666666,
+        "counter_intuitive": 3.333333333333333,
+        "trend": 1.6000000000000003,
+        "time": 5.0,
+        "persona": 4.833333333333333,
+        "history_echo": 0.0,
+        "continuity": 6.0,
+        "data_enrichable": 6.0,
+        "follow_up": 3.0
+      },
+      "human_decision": "reject",
+      "human_priority": 2,
+      "feedback_reason": "离国内消费者太远，不关心欧洲市场",
+      "tags": [
+        "受众不匹配",
+        "地域性强"
+      ],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    },
+    {
+      "feedback_id": "fb_session_20251231_223304_6",
+      "topic_id": "topic:9eba49e6867f",
+      "timestamp": "2025-12-31 22:33:04.369842",
+      "episode_date": "20251231",
+      "topic_snapshot": {
+        "title": "超 2.2 万辆，本田召回插混英仕派、插混雅阁、纯电 S7、纯电 P7 车型",
+        "topic_score": 90.3,
+        "entities": [
+          "雅阁",
+          "S7",
+          "P7",
+          "本田",
+          "英仕派"
+        ]
+      },
+      "system_decision": "maybe",
+      "system_score": 90.3,
+      "score_breakdown": {
+        "archetype_mean": 20.0,
+        "personal_impact": 6.666666666666666,
+        "counter_intuitive": 0.0,
+        "trend": 0.8000000000000002,
+        "time": 5.0,
+        "persona": 4.833333333333333,
+        "history_echo": 0.0,
+        "continuity": 6.0,
+        "data_enrichable": 6.0,
+        "follow_up": 3.0
+      },
+      "human_decision": "accept",
+      "human_priority": 5,
+      "feedback_reason": "涉及消费者安全，重要话题",
+      "tags": [
+        "消费者关注",
+        "安全"
+      ],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    }
+  ],
+  "reviewer": "auto_test_bot",
+  "notes": "自动化测试 - 模拟人工标注"
+}

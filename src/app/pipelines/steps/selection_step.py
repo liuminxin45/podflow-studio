@@ -64,6 +64,12 @@ class SelectionStep(BaseStep):
                 operation="auto_topic_completed",
                 result=f"{ctx.auto_topic_result['stats']}"
             )
+            
+            # 人工反馈收集（如果启用）
+            feedback_session = self._collect_human_feedback_if_enabled(ctx)
+            if feedback_session:
+                ctx.human_feedback_session = feedback_session
+                self.logger.info(f"人工反馈已应用: {len(feedback_session.feedbacks)} 条反馈")
         
         # ========== 2. 传统 cluster selection（备用） ==========
         log_operation(
@@ -84,16 +90,29 @@ class SelectionStep(BaseStep):
         seen_ids = set()
         
         if auto_topic_enabled and ctx.auto_topic_result and ctx.auto_topic_result.get("passed"):
-            # 使用自动选题结果
-            self.logger.info(f"使用自动选题结果: {len(ctx.auto_topic_result['passed'])} 个主题通过")
+            # 使用自动选题结果（可能经过人工反馈调整）
+            passed_candidates = ctx.auto_topic_result["passed"]
             
-            for candidate in ctx.auto_topic_result["passed"]:
+            # 应用人工反馈（如果有）
+            if hasattr(ctx, 'human_feedback_session') and ctx.human_feedback_session:
+                passed_candidates = self._apply_human_feedback(
+                    passed_candidates,
+                    ctx.human_feedback_session
+                )
+                self.logger.info(
+                    f"应用人工反馈后: {len(passed_candidates)} 个主题通过 "
+                    f"(原始: {len(ctx.auto_topic_result['passed'])})"
+                )
+            else:
+                self.logger.info(f"使用自动选题结果: {len(passed_candidates)} 个主题通过")
+            
+            for candidate in passed_candidates:
                 for item_id in candidate.items:
                     if item_id in ctx.items_dedup and item_id not in seen_ids:
                         selected_items.append(ctx.items_dedup[item_id])
                         seen_ids.add(item_id)
             
-            self.logger.info(f"自动选题提取了 {len(selected_items)} 个items用于脚本生成")
+            self.logger.info(f"最终选题提取了 {len(selected_items)} 个items用于脚本生成")
         else:
             # 使用传统 cluster selection
             self.logger.info("使用传统 cluster selection")
@@ -258,3 +277,122 @@ class SelectionStep(BaseStep):
             scoring=scoring_config,
             constraints=constraint_config,
         )
+    
+    def _apply_human_feedback(self, candidates: list, feedback_session) -> list:
+        """应用人工反馈到候选主题列表
+        
+        Args:
+            candidates: 原始通过的候选主题列表
+            feedback_session: 人工反馈会话
+        
+        Returns:
+            调整后的候选主题列表
+        """
+        # 构建 topic_id -> human_decision 的映射
+        feedback_map = {
+            fb.topic_id: fb.human_decision
+            for fb in feedback_session.feedbacks
+        }
+        
+        adjusted_candidates = []
+        rejected_count = 0
+        
+        for candidate in candidates:
+            topic_id = candidate.topic_id
+            
+            # 检查是否有人工反馈
+            if topic_id in feedback_map:
+                human_decision = feedback_map[topic_id]
+                
+                if human_decision == "reject":
+                    # 人工明确拒绝，跳过
+                    self.logger.info(f"人工反馈拒绝主题: {candidate.title}")
+                    rejected_count += 1
+                    continue
+                elif human_decision == "accept":
+                    # 人工明确接受，保留
+                    self.logger.debug(f"人工反馈接受主题: {candidate.title}")
+                    adjusted_candidates.append(candidate)
+                else:  # uncertain
+                    # 不确定，保留原始决策
+                    adjusted_candidates.append(candidate)
+            else:
+                # 没有反馈，保留原始决策
+                adjusted_candidates.append(candidate)
+        
+        self.logger.info(f"人工反馈过滤: 拒绝 {rejected_count} 个主题")
+        return adjusted_candidates
+    
+    def _collect_human_feedback_if_enabled(self, ctx: EpisodeContext):
+        """收集人工反馈（如果启用）
+        
+        Returns:
+            FeedbackSession or None
+        """
+        from src.topic_selection.feedback.collector import FeedbackCollector
+        
+        cfg = ctx.config
+        feedback_cfg = cfg.get("human_feedback", {})
+        
+        # 检查是否启用
+        if not feedback_cfg.get("enabled", False):
+            self.logger.info("人工反馈系统未启用，跳过反馈收集")
+            return None
+        
+        # 查找最新的 auto_topic report 文件
+        auto_topic_dir = ctx.run_dir / "auto_topic"
+        if not auto_topic_dir.exists():
+            self.logger.warning("未找到 auto_topic 输出目录，跳过反馈收集")
+            return None
+        
+        report_files = list(auto_topic_dir.glob("report_*.json"))
+        if not report_files:
+            self.logger.warning("未找到 auto_topic report 文件，跳过反馈收集")
+            return None
+        
+        # 使用最新的 report 文件
+        report_path = max(report_files, key=lambda p: p.stat().st_mtime)
+        
+        self.logger.info(f"启动人工反馈收集: {report_path.name}")
+        
+        try:
+            # 创建反馈收集器
+            collector = FeedbackCollector(
+                storage_dir=feedback_cfg.get("storage_dir", "feedback_history"),
+                auto_continue=feedback_cfg.get("auto_continue", True),
+                min_feedback_threshold=feedback_cfg.get("min_feedback_threshold", 0),
+            )
+            
+            # 收集反馈
+            session = collector.collect_feedback(
+                report_path=str(report_path),
+                episode_date=ctx.episode_date,
+                standalone=False,
+            )
+            
+            self.logger.info(
+                f"人工反馈收集完成: "
+                f"审核 {session.total_reviewed} 个主题, "
+                f"提供 {len(session.feedbacks)} 条反馈"
+            )
+            
+            # 记录事件
+            ctx.add_event(
+                "human_feedback_collected",
+                session_id=session.session_id,
+                total_reviewed=session.total_reviewed,
+                feedbacks_count=len(session.feedbacks),
+                agree_count=session.agree_count,
+                disagree_count=session.disagree_count,
+            )
+            
+            return session
+            
+        except KeyboardInterrupt:
+            self.logger.warning("用户中断反馈收集")
+            # 继续执行后续流程
+            return None
+        except Exception as e:
+            self.logger.error(f"反馈收集失败: {e}", exc_info=True)
+            # 不中断流程，继续执行
+            return None
