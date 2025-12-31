@@ -330,10 +330,10 @@ auto_topic:
 # 人工反馈系统配置
 # ============================================================
 human_feedback:
-  enabled: false                     # 是否启用人工反馈（默认：true）
+  enabled: true                     # 是否启用人工反馈（默认：true）
   storage_dir: "feedback_history"   # 反馈数据存储目录
   auto_continue: true                # 反馈完成后自动继续后续流程（默认：true）
-  timeout_seconds: 300               # 等待人工反馈的超时时间（秒，0表示无限等待）
+  timeout_seconds: 0               # 等待人工反馈的超时时间（秒，0表示无限等待）
   min_feedback_threshold: 0          # 最少需要反馈的主题数（设为 0 表示可跳过）
 
 database:
