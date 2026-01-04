@@ -26,11 +26,13 @@ class FeedbackCollector:
         storage_dir: str = "feedback_history",
         auto_continue: bool = True,
         min_feedback_threshold: int = 0,
+        review_mode: str = "all",
     ):
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.auto_continue = auto_continue
         self.min_feedback_threshold = min_feedback_threshold
+        self.review_mode = review_mode  # "all" 或 "passed_only"
     
     def collect_feedback(
         self,
@@ -78,9 +80,12 @@ class FeedbackCollector:
         }
         
         for candidate in candidates:
-            # 只审核通过的主题（优化用户体验）
-            if not candidate.get('should_publish', False):
-                continue
+            # 根据审核模式决定是否审核此主题
+            if self.review_mode == "passed_only":
+                # 仅审核通过的主题
+                if not candidate.get('should_publish', False):
+                    continue
+            # review_mode == "all" 时审核所有主题
             
             self._review_single_topic(
                 candidate=candidate,
@@ -108,7 +113,12 @@ class FeedbackCollector:
         console.print(f"   - 候选主题数: {stats.get('candidates_generated', 0)}")
         console.print(f"   - 通过打分: {stats.get('candidates_passed_scoring', 0)}")
         console.print(f"   - 通过门控: {stats.get('candidates_passed_gate', 0)}")
-        console.print("\n💡 提示: 仅审核通过的主题，按 Ctrl+C 可随时退出\n")
+        
+        # 根据审核模式显示提示
+        if self.review_mode == "passed_only":
+            console.print("\n💡 提示: 仅审核通过的主题，按 Ctrl+C 可随时退出\n")
+        else:
+            console.print("\n💡 提示: 审核所有候选主题（包括未通过的），按 Ctrl+C 可随时退出\n")
     
     def _get_reviewer_name(self) -> str:
         """获取审核人姓名"""

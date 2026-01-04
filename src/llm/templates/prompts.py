@@ -1,496 +1,403 @@
+# -*- coding: utf-8 -*-
 """
-LLM Prompts Configuration
+AI播客文案 Prompt 集合（保持接口不变：可直接替换）
 
-这个文件包含了用于播客脚本生成的各种提示词模板和配置。
+你当前项目依赖：
+- prompts.py 导出：SYSTEM_PROMPT / ShowConfig / NewsItem / HostPersona / PRESET_PERSONAS
+- prompts.py 提供：spell_out_acronyms + build_opening_prompt/build_history_prompt/build_brief_news_prompt/build_deep_dive_prompt/build_outro_prompt
+- segment_generator.py 依赖以上导入，并调用 SegmentScriptGenerator.render()
 
-功能概述：
-- 提供多种播客脚本生成提示词模板
-- 支持新闻、研究、详细内容等不同场景
-- 包含SSML优化和语音合成提示
-- 可配置的内容风格和格式设置
-
-主要函数：
-- build_news_script_prompt(): 基础新闻脚本提示词
-- build_research_script_prompt(): 研究型脚本提示词
-- build_detailed_news_script_prompt(): 详细新闻脚本提示词
-- build_enhanced_script_prompt(): 增强型脚本提示词
-- get_content_style_prompt(): 内容风格提示词
-
-提示词特性：
-- 支持中英文混合内容
-- 包含语音停顿和语调控制
-- 可配置的输出格式要求
-- 优化的SSML输出支持
-
-使用示例：
-    system_prompt, user_prompt = build_news_script_prompt(
-        channel=config, items=news_items
-    )
-
-作者：Auto-Podcast Team
-版本：2.0.0
-更新：2025-12-25
+本版本只改“提示词与结构文案”，不改既有导入/类名/函数签名。
 """
-
 from __future__ import annotations
 
-import os
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
 
-# =============================
-# 基础系统提示词
-# =============================
 
-BASE_SYSTEM_PROMPT = """你是一名中文播客脚本作者。
-你要把内容改写成口语化、节奏明快的单口播。
-整体气质轻松自然，但对事实非常严谨。
-输出必须是严格 JSON，不能输出多余文字。"""
+# =========================
+# 0) 全局系统 Prompt
+# =========================
 
-BASE_SYSTEM_PROMPT_V2 = """你是一名中文播客脚本作者。
-你要把新闻内容改写成口语化、节奏明快、像真人聊天的播客。
-不要写成新闻稿，不要像公文。
-输出必须是严格 JSON，不能输出多余文字。"""
+SYSTEM_PROMPT = r"""
+你是一位中文资讯播客脚本写手，目标是生成【适合 TTS 的口语播客文案】。
+节目定位：一档由 A I 参与写作与选题的资讯播客，节奏紧凑但不急促，信息密度高，同时有“民心”的稳定人设。
 
-# =============================
-# 研究内容生成提示词
-# =============================
+写作核心：为耳朵写。
+- 句子短一点，一个句子一个意思。
+- 重要信息先讲，理由后讲。
+- 多用自然转场，让听众跟得上。
 
-def build_research_script_prompt(
-    *,
-    channel: dict,
-    items: list,
-    research_content: str,
-    citations: list[dict],
-) -> tuple[str, str]:
-    """
-    基于研究内容生成播客脚本的提示词
-    
-    Args:
-        channel: 频道配置信息
-        items: 新闻条目列表
-        research_content: 研究内容正文
-        citations: 引用资料列表
-    
-    Returns:
-        (system_prompt, user_prompt) 元组
-    """
-    max_research_chars = int(os.environ.get("SCRIPT_PROMPT_MAX_RESEARCH_CHARS", "6000"))
-    max_items = int(os.environ.get("SCRIPT_PROMPT_MAX_ITEMS", "8"))
-    max_citations = int(os.environ.get("SCRIPT_PROMPT_MAX_CITATIONS", "3"))
-    max_citation_snippet_chars = int(os.environ.get("SCRIPT_PROMPT_MAX_CITATION_SNIPPET_CHARS", "120"))
+硬性要求（必须遵守）：
+1) 口吻：像主播在聊天，不要播音腔，不要公文风。
+2) 可信表达：不编造来源；如果输入没有来源，就不要硬塞“某媒体报道”。可用“公开信息显示/有人算过/有报道提到”。
+3) TTS 友好：
+   - 大部分句子不超过 25 个字；一口气别太长。
+   - 避免连续英文；遇到英文缩写，把字母拆开写：例如 "AI" 写成 "A I"。
+   - 数字用阿拉伯数字即可，但不要堆砌；金额可用“元/亿/万”。
+   - 不要输出项目符号、表格、代码块、时间戳。
+4) 幽默度控制：每段会给“幽默档位 0-3”。必须严格执行。
+   - 幽默只能辅助理解，不得抢信息主线。
+   - 不要冒犯或刻薄；不要使用脏话、地域/群体刻板印象。
+5) 主持人个性一致：每段都会给“主持人人格档案”。
+   - 不要在段与段之间突然换人设。
+   - 口头禅可以出现 1-2 次即可，别刷屏。
+6) 输出只要脚本文案正文，不要写“提示词/分析/大纲/免责声明”。
 
-    style = (channel.get("style") or {}) if isinstance(channel, dict) else {}
-    tone = style.get("tone") or "口语化、生动、像朋友聊天"
-    audience = style.get("audience") or "普通听众"
-
-    item_lines = []
-    for i, it in enumerate((items or [])[:max_items], start=1):
-        source_label = f"[来源: {it.source}]" if hasattr(it, 'source') and it.source else ""
-        item_lines.append(f"{i}. {source_label} {it.title}\n{it.url}".strip())
-
-    citation_lines = []
-    for i, c in enumerate((citations or [])[:max_citations], start=1):
-        if not isinstance(c, dict):
-            continue
-        title = (c.get("title") or "") if isinstance(c.get("title"), str) else ""
-        link = (c.get("link") or "") if isinstance(c.get("link"), str) else ""
-        snippet = (c.get("snippet") or "") if isinstance(c.get("snippet"), str) else ""
-        snippet2 = snippet.strip().replace("\n", " ")
-        if len(snippet2) > max_citation_snippet_chars:
-            snippet2 = snippet2[:max_citation_snippet_chars] + "..."
-        if title or link or snippet2:
-            citation_lines.append(f"{i}. {title}\n{link}\n{snippet2}".strip())
-
-    research_content2 = (research_content or "").strip()
-    if max_research_chars > 0 and len(research_content2) > max_research_chars:
-        research_content2 = research_content2[:max_research_chars] + "\n...(truncated)"
-
-    system = BASE_SYSTEM_PROMPT
-
-    user = f"""
-栏目: {channel.get('name') if isinstance(channel, dict) else ''}
-受众: {audience}
-风格: {tone}
-
-请基于【网络调查结果】生成一期单口播播客脚本（不要对话体，不要分角色）。结构固定：
-- 10 秒开场（欢迎 + 今日主题）
-- 3~5 条内容（每条都要包含：发生了什么 / 对普通人影响 / 建议）
-- 结尾总结（复盘 + 行动建议 + 下期预告一句）
-
-事实约束（必须严格遵守）：
-- 你的所有事实性陈述必须能够在下方【网络调查结果（正文）】或【引用资料】中找到依据。
-- 禁止使用常识补全、禁止推测、禁止编造来源、禁止引入未提供的新事实。
-- 如果资料不足以得出结论，必须明确说"资料未给出/尚无法确认"，并保持谨慎措辞。
-
-输出约束：
-- 输出 JSON，字段为：title, ssml, shownotes, tags
-- ssml 必须是可用于 TTS 的 SSML，包含 <break time="500ms"/> 等停顿
-- shownotes 用 Markdown，列出每条新闻的要点与链接，**必须注明来源**
-- tags 3~8 个中文标签
-- **重要**：在播客内容中提及新闻时，必须说明来源（如"根据XX报道"、"来自XX消息"）
-
-新闻清单（仅用于链接与 shownotes，已做精简）：
-{chr(10).join(item_lines)}
-
-网络调查结果（正文）：
-{research_content2}
-
-引用资料（如有）：
-{chr(10).join(citation_lines) if citation_lines else '(none)'}
-
-现在输出 JSON：
+你会收到：节目配置、日期信息、看点清单、历史事件、资讯列表、深度主题素材。
+请严格按每个段落的格式要求输出。
 """.strip()
 
-    return system, user
 
-# =============================
-# 新闻内容生成提示词
-# =============================
+# =========================
+# 1) 数据结构
+# =========================
 
-def build_news_script_prompt(
-    *,
-    channel: dict,
-    items: list,
-) -> tuple[str, str]:
+@dataclass
+class HostPersona:
     """
-    基于新闻内容生成播客脚本的提示词
-    
-    Args:
-        channel: 频道配置信息
-        items: 新闻条目列表
-    
-    Returns:
-        (system_prompt, user_prompt) 元组
+    主持人个性档案：用于让 LLM 输出稳定的“声音”。
+    - voice: 总体气质（冷静/温暖/俏皮/理性/锋利...）
+    - pov: 视角/价值观（“站在普通人角度”“反营销话术”...）
+    - rhythm: 叙事节奏偏好（短句、转折、停顿感）
+    - signature_phrases: 口头禅（可少量出现）
+    - banned_phrases: 禁用表达（避免像竞品或太像播音腔）
     """
-    max_items = int(os.environ.get("SCRIPT_PROMPT_MAX_ITEMS", "8"))
+    name: str
+    voice: str
+    pov: str
+    rhythm: str
+    signature_phrases: Tuple[str, ...] = ()
+    banned_phrases: Tuple[str, ...] = ()
 
-    style = (channel.get("style") or {}) if isinstance(channel, dict) else {}
-    tone = style.get("tone") or "口语化、生动、像朋友聊天"
-    audience = style.get("audience") or "普通听众"
 
-    item_lines = []
-    for i, it in enumerate((items or [])[:max_items], start=1):
-        source_label = f"[来源: {it.source}]" if hasattr(it, 'source') and it.source else ""
-        item_lines.append(f"{i}. {source_label} {it.title}\n{it.url}".strip())
+# 预设人格（可扩充）
+# 说明：默认更“清醒拆解 + 生活翻译”，避免竞品用词与节奏完全同款。
+PRESET_PERSONAS: Dict[str, HostPersona] = {
+    "balanced": HostPersona(
+        name="民心·清醒拆解派",
+        voice="清爽、克制、偶尔俏皮；不端着，但有判断力。",
+        pov="站在普通人和消费者视角，把复杂事翻译成一句能用的话。",
+        rhythm="短句推进；先结论后理由；用‘所以呢’把信息落地。",
+        signature_phrases=("我把它翻译成一句话", "你可以这么理解", "所以呢", "给你3个可操作点"),
+        banned_phrases=(
+            "今天的节目您将听到",
+            "今天你将会听到",
+            "摸鱼早知道",
+            "折叠时空",
+            "节目最后的消费热新闻",
+            "据悉",
+            "综上所述",
+        ),
+    ),
+    "warm": HostPersona(
+        name="民心·温暖陪伴派",
+        voice="更暖、更像朋友聊天；允许轻微自嘲。",
+        pov="把资讯当‘生活情报’，少说教，多共情。",
+        rhythm="转场更柔和；每条多一句‘你会感受到什么变化’。",
+        signature_phrases=("我们换个频道", "别急，我说人话", "这条你记一下"),
+        banned_phrases=("摸鱼早知道", "今天的节目您将听到"),
+    ),
+    "spicy": HostPersona(
+        name="民心·清醒犀利派",
+        voice="更锋利一点，但不刻薄；吐槽只对现象，不对人。",
+        pov="对营销话术更敏感，喜欢拆掉包装看本质。",
+        rhythm="先戳破泡沫，再给事实；一句‘关键在这儿’收束。",
+        signature_phrases=("别被话术带跑", "关键在这儿", "所以呢"),
+        banned_phrases=("摸鱼早知道", "据悉", "综上所述"),
+    ),
+}
 
-    system = BASE_SYSTEM_PROMPT_V2
 
-    user = f"""
-栏目: {channel.get('name') if isinstance(channel, dict) else ''}
-受众: {audience}
-风格: {tone}
+@dataclass
+class ShowConfig:
+    # 栏目名：明确这是 AI 播客
+    show_name: str = "民心A I切片电台"
+    host_name: str = "民心"
+    tagline: str = "A I先筛一遍，我负责讲成人话。"
 
-请根据以下新闻素材，生成一期播客脚本。结构固定：
-- 10 秒开场（欢迎 + 今日主题）
-- 3~5 条内容（每条都要包含：发生了什么 / 对普通人影响 / 建议）
-- 结尾总结（复盘 + 行动建议 + 下期预告一句）
+    # 旋钮：品牌可调
+    humor_level: int = 1          # 0-3
+    brief_density: str = "short"  # "short" | "long"
 
-强约束：
-- 输出 JSON，字段为：title, ssml, shownotes, tags
-- ssml 必须是可用于 TTS 的 SSML，包含 <break time=\"500ms\"/> 等停顿
-- shownotes 用 Markdown，列出每条新闻的要点与链接，**必须注明来源**
-- tags 3~8 个中文标签
-- **重要**：在播客内容中提及新闻时，必须说明来源（如"根据XX报道"、"来自XX消息"）
+    # 主持人个性：可选 preset + 可选自定义覆盖
+    persona_preset: str = "balanced"
+    persona: Optional[HostPersona] = None
 
-新闻素材（已做精简）：
-{chr(10).join(item_lines)}
+    # 段落口令（品牌化表达，避免竞品同款词）
+    cue_preview: str = "开机自检完成"
+    cue_history: str = "时间倒带"
+    cue_briefs: str = "快进快讯开始"
+    cue_deep: str = "慢放一条"
+    cue_wrap: str = "关机前一句"
 
-现在输出 JSON：
-""".strip()
 
-    return system, user
+@dataclass
+class NewsItem:
+    title: str
+    facts: str
+    context: Optional[str] = None
 
-# =============================
-# 详细新闻内容生成提示词
-# =============================
 
-def build_detailed_news_script_prompt(
-    *,
-    channel: dict,
-    items: list,
-) -> tuple[str, str]:
-    """
-    基于详细新闻内容生成播客脚本的提示词
-    
-    Args:
-        channel: 频道配置信息  
-        items: 新闻条目列表（包含完整信息）
-    
-    Returns:
-        (system_prompt, user_prompt) 元组
-    """
-    max_items = int(os.environ.get("SCRIPT_PROMPT_MAX_ITEMS", "8"))
+# =========================
+# 2) 工具：TTS 友好文字与规则
+# =========================
 
-    style = (channel.get("style") or {}) if isinstance(channel, dict) else {}
-    tone = style.get("tone") or "口语化、生动、像朋友聊天"
-    audience = style.get("audience") or "普通听众"
-
-    item_lines = []
-    for i, it in enumerate((items or [])[:max_items], start=1):
-        source_label = f"来源: {it.source}" if hasattr(it, 'source') and it.source else "来源: 未知"
-        item_lines.append(
-            f"{i}. 标题: {it.title}\n"
-            f"{source_label}\n"
-            f"摘要: {it.summary}\n"
-            f"链接: {it.url}\n"
-            f"发布时间: {it.published_at or ''}"
-        )
-
-    system = BASE_SYSTEM_PROMPT_V2
-
-    user = f"""
-栏目: {channel.get('name') if isinstance(channel, dict) else ''}
-受众: {audience}
-风格: {tone}
-
-请根据以下新闻素材，生成一期播客脚本。结构固定：
-- 10 秒开场（欢迎 + 今日主题）
-- 3~5 条内容（每条都要包含：发生了什么 / 对普通人影响 / 建议）
-- 结尾总结（复盘 + 行动建议 + 下期预告一句）
-
-强约束：
-- 输出 JSON，字段为：title, ssml, shownotes, tags
-- ssml 必须是可用于 TTS 的 SSML，包含 <break time=\"500ms\"/> 等停顿
-- shownotes 用 Markdown，列出每条新闻的要点与链接
-- tags 3~8 个中文标签
-
-新闻素材：
-{chr(10).join(item_lines)}
-
-现在输出 JSON：
-""".strip()
-
-    return system, user
-
-# =============================
-# SSML优化提示词
-# =============================
-
-def get_ssml_optimization_hints() -> str:
-    """
-    获取SSML优化建议，可以在提示词中加入这些指导
-    
-    Returns:
-        SSML优化建议字符串
-    """
-    return """
-SSML生成建议：
-1. 停顿控制：
-   - 开场白后：<break time=\"500ms\"/>\n   - 段落转换：<break time=\"1s\"/>\n   - 句子内停顿：<break time=\"300ms\"/>\n   - 重点信息前：<break time=\"400ms\"/>\n\n2. 语速建议：\n   - 开场：正常语速\n   - 重点信息：可稍慢\n   - 结尾总结：正常语速\n\n3. 情感表达：\n   - 惊讶内容：可适当提高音调\n   - 重要信息：可加强重音\n   - 轻松内容：保持自然语调\n\n4. 结构清晰：\n   - 使用<p>标签包裹段落\n   - 保持一致的停顿模式\n   - 避免过度使用标记"""
-
-# =============================
-# 内容风格提示词模板
-# =============================
-
-CONTENT_STYLE_TEMPLATES = {
-    "news": {
-        "tone": "新闻播报风格：专业、清晰、客观",
-        "ssml_hints": "使用标准停顿，语速适中，重点信息清晰",
-        "structure_hints": "倒金字塔结构，先重要后次要"
-    },
-    
-    "story": {
-        "tone": "故事讲述风格：温暖、生动、有代入感", 
-        "ssml_hints": "语速稍慢，停顿丰富，情感充沛",
-        "structure_hints": "时间顺序，起承转合，情感递进"
-    },
-    
-    "chat": {
-        "tone": "聊天对话风格：轻松、自然、亲切",
-        "ssml_hints": "语速自然，停顿随意，像朋友聊天",
-        "structure_hints": "话题式结构，跳跃性思维，互动感"
-    },
-    
-    "teaching": {
-        "tone": "教学讲解风格：清晰、耐心、逻辑性强",
-        "ssml_hints": "语速较慢，重点重复，停顿明确",
-        "structure_hints": "总分总结构，循序渐进，反复强调"
-    },
-    
-    "emotion": {
-        "tone": "情感表达风格：真诚、感人、有共鸣",
-        "ssml_hints": "语速变化丰富，停顿有感染力",
-        "structure_hints": "情感递进，高潮迭起，首尾呼应"
+def spell_out_acronyms(text: str) -> str:
+    """将常见缩写替换为“字母拆读”，避免 TTS 读成奇怪单词。"""
+    if not text:
+        return text
+    mapping = {
+        "AI": "A I",
+        "CEO": "C E O",
+        "GPU": "G P U",
+        "CPU": "C P U",
+        "AR": "A R",
+        "VR": "V R",
+        "IP": "I P",
+        "PC": "P C",
+        "APP": "A P P",
+        "Sora": "S o r a",
+        "OpenAI": "O p e n A I",
     }
-}
+    for k, v in mapping.items():
+        text = text.replace(k, v)
+    return text
 
-def get_content_style_prompt(style_type: str) -> dict:
+
+def clamp_humor(level: int) -> int:
+    try:
+        level = int(level)
+    except Exception:
+        level = 1
+    return max(0, min(3, level))
+
+
+def brief_length_range(config: ShowConfig) -> Tuple[int, int]:
+    """返回快讯每条目标字数区间。"""
+    if (config.brief_density or "").lower() == "long":
+        return (120, 180)
+    return (60, 100)
+
+
+def humor_guidance_line(level: int) -> str:
+    """把幽默档位转成一句可执行的写作指令。"""
+    level = clamp_humor(level)
+    if level == 0:
+        return "幽默档位 0：不吐槽，不拟人化，语气克制，信息直给。"
+    if level == 1:
+        return "幽默档位 1：轻松自然，允许偶尔俏皮一句，但不影响信息密度。"
+    if level == 2:
+        return "幽默档位 2：可以明显幽默，允许轻微自嘲或拟人化，但每条最多 1 处。"
+    return "幽默档位 3：节奏更有梗，但别油腻；笑点必须服务理解，不许跑题。"
+
+
+def resolve_persona(config: ShowConfig) -> HostPersona:
+    """优先使用 config.persona，否则按 preset 取。"""
+    if config.persona is not None:
+        return config.persona
+    preset = (config.persona_preset or "").strip()
+    return PRESET_PERSONAS.get(preset, PRESET_PERSONAS["balanced"])
+
+
+def persona_guidance_lines(persona: HostPersona) -> str:
+    """把主持人人格压缩成短指令，方便放入 prompt。"""
+    sig = "；".join(persona.signature_phrases) if persona.signature_phrases else "（无）"
+    banned = "；".join(persona.banned_phrases) if persona.banned_phrases else "（无）"
+    return (
+        f"主持人人格：{persona.name}。"
+        f" 气质：{persona.voice}"
+        f" 视角：{persona.pov}"
+        f" 节奏：{persona.rhythm}"
+        f" 口头禅（可少量用）：{sig}。"
+        f" 禁用表达：{banned}。"
+    )
+
+
+# =========================
+# 3) 段落 Prompt 生成器（函数签名保持不变）
+# =========================
+
+def build_opening_prompt(
+    config: ShowConfig,
+    date_line: str,
+    lunar_line: Optional[str],
+    weekday_line: Optional[str],
+    tease_points: List[str],
+) -> str:
     """
-    获取指定类型的内容风格提示词
-    
-    Args:
-        style_type: 风格类型 (news, story, chat, teaching, emotion)
-    
-    Returns:
-        风格配置字典
+    开场：用“开机自检/信息切片”作固定开场，不用竞品句式。
     """
-    return CONTENT_STYLE_TEMPLATES.get(style_type, CONTENT_STYLE_TEMPLATES["chat"])
+    persona = resolve_persona(config)
+    persona_line = persona_guidance_lines(persona)
+    humor_line = humor_guidance_line(config.humor_level)
 
-# =============================
-# 高级SSML控制提示词
-# =============================
+    tease_points = [spell_out_acronyms(p) for p in tease_points]
+    tease = "，".join(tease_points).strip("，")
+    lunar = f"，{lunar_line}" if lunar_line else ""
+    weekday = f"，{weekday_line}" if weekday_line else ""
 
-ADVANCED_SSML_PROMPTS = {
-    "prosody_control": """
-高级语音控制：
-- 语速：<prosody rate="90%">慢速内容</prosody>
-- 音调：<prosody pitch="+5%">提高音调</prosody>
-- 音量：<prosody volume="+3dB">增大音量</prosody>
-- 综合：<prosody rate="95%" pitch="+2%" volume="+2dB">综合控制</prosody>
-""",
+    hook_hint = ""
+    if clamp_humor(config.humor_level) >= 2:
+        hook_hint = " 可以加一句很短的‘反直觉’钩子，但只一口气，不展开。"
 
-    "emphasis_control": """
-强调控制：
-- 轻度强调：<emphasis level="moderate">重要内容</emphasis>
-- 重度强调：<emphasis level="strong">关键信息</emphasis>
-- 对比强调：<emphasis level="strong">对比信息</emphasis> vs 普通信息
-""",
+    return f"""
+请写【开场：开机自检】（约 150-240 字）：
+- 第一句必须以“{config.cue_preview}，”开头。
+- 立刻把看点抛出来：用口语说“今天我们把信息切成几片：{tease}”。
+- 用两句完成节目身份：
+  你正在收听《{config.show_name}》，一档由A I参与写作的资讯播客。我是{config.host_name}。
+- 加一句“AI透明度”：强调“A I先筛，我负责讲成人话”。不要夸张，不要科幻化。
+- 报日期：今天是{date_line}{weekday}{lunar}。
+- 最后用一句把听众带入快讯段：例如“好，咱们直接快进。”
 
-    "break_control": """
-停顿控制：
-- 短暂停顿：<break time="200ms"/>
-- 中等停顿：<break time="500ms"/>
-- 较长停顿：<break time="800ms"/>
-- 段落停顿：<break time="1s"/>
-- 章节停顿：<break time="1.5s"/>
-""",
+写作约束：
+- {persona_line}
+- {humor_line}{hook_hint}
+""".strip()
 
-    "paragraph_control": """
-段落控制：
-- 段落开始：<p>段落内容</p>
-- 重点段落：<p><emphasis level="moderate">重点段落</emphasis></p>
-- 过渡段落：<p><break time="500ms"/>过渡内容</p>
-"""
-}
 
-# =============================
-# 提示词构建工具函数
-# =============================
-
-def build_enhanced_script_prompt(
-    *,
-    channel: dict,
-    items: list,
-    content_type: str = "chat",
-    include_research: bool = False,
-    research_content: str = "",
-    citations: list[dict] | None = None,
-    enable_advanced_ssml: bool = False,
-) -> tuple[str, str]:
+def build_history_prompt(
+    config: ShowConfig,
+    history_event: str,
+) -> str:
     """
-    构建增强版播客脚本生成提示词
-    
-    Args:
-        channel: 频道配置信息
-        items: 新闻条目列表
-        content_type: 内容类型 (news, story, chat, teaching, emotion)
-        include_research: 是否包含研究内容
-        research_content: 研究内容
-        citations: 引用资料
-        enable_advanced_ssml: 是否启用高级SSML控制
-    
-    Returns:
-        (system_prompt, user_prompt) 元组
+    历史段：用“时间倒带”作固定转场，避免“折叠时空”同款表述。
     """
-    
-    # 获取内容风格配置
-    style_config = get_content_style_prompt(content_type)
-    
-    # 构建基础提示词
-    if include_research:
-        system, user = build_research_script_prompt(
-            channel=channel,
-            items=items,
-            research_content=research_content,
-            citations=citations or [],
-        )
+    persona = resolve_persona(config)
+    persona_line = persona_guidance_lines(persona)
+    humor_line = humor_guidance_line(config.humor_level)
+    history_event = spell_out_acronyms(history_event)
+
+    return f"""
+请写【时间倒带：历史上的今天】段（约 80-150 字）：
+- 第一行用固定转场：{config.cue_history}，把镜头往回拨一下。
+- 只讲 1 个事件：{history_event}
+- 末尾加一句“把历史翻译成今天的感觉”：例如“你会发现…其实一直没变”。
+- 段尾再用一句自然转场到快讯：例如“回到今天，我们开始快进。”
+
+写作约束：
+- {persona_line}
+- {humor_line}（这里的幽默像“轻轻一笑”，不要段子化。）
+""".strip()
+
+
+def build_brief_news_prompt(
+    config: ShowConfig,
+    news_items: List[NewsItem],
+) -> str:
+    """
+    快讯段：用“快进快讯”固定口令 + 稳定的条目节奏 + 更像自己品牌的转场词库。
+    """
+    persona = resolve_persona(config)
+    persona_line = persona_guidance_lines(persona)
+    humor_line = humor_guidance_line(config.humor_level)
+    lo, hi = brief_length_range(config)
+
+    items_text = "\n".join(
+        [
+            f"{i+1}. 标题：{spell_out_acronyms(it.title)}；事实：{spell_out_acronyms(it.facts)}；补充：{spell_out_acronyms(it.context or '')}"
+            for i, it in enumerate(news_items)
+        ]
+    )
+
+    if (config.brief_density or "").lower() == "long":
+        explain_hint = "每条多给一句背景或因果，让听众能跟上。"
     else:
-        system, user = build_news_script_prompt(
-            channel=channel,
-            items=items,
-        )
-    
-    # 增强系统提示词
-    enhanced_system = f"""{system}
+        explain_hint = "每条一句背景就好，像‘刷卡’一样快过。"
 
-内容风格要求：{style_config['tone']}
-结构要求：{style_config['structure_hints']}
-"""
+    transitions = (
+        "转场词库（任选其一，别重复太多）："
+        "“下一条，换个频道。”"
+        "“我们快进一下。”"
+        "“镜头切过去。”"
+        "“再给你塞一条信息。”"
+        "“顺手看一眼。”"
+    )
 
-    # 如果启用高级SSML，添加相关提示
-    if enable_advanced_ssml:
-        enhanced_system += f"""
+    return f"""
+请写【快进快讯】（总计约 {len(news_items)*lo}-{len(news_items)*hi} 字）：
+- 开头一句必须是：{config.cue_briefs}。
+- 依次讲下面这些资讯（保持顺序），每条约 {lo}-{hi} 字：
+{items_text}
 
-SSML高级控制：
-{ADVANCED_SSML_PROMPTS['prosody_control']}
-{ADVANCED_SSML_PROMPTS['emphasis_control']}
-{ADVANCED_SSML_PROMPTS['break_control']}
-{ADVANCED_SSML_PROMPTS['paragraph_control']}
-"""
-    
-    # 添加基础SSML提示
-    enhanced_system += f"""
+写作要求：
+- 每条都按固定节奏：
+  先说事实（1-2句）→ 再说人话解释（1句）→ 最后用一句落地（“所以呢/你可以这么理解/你会感受到的变化是…”）。
+- 条与条之间必须有自然转场。{transitions}
+- {explain_hint}
+- 不要编造来源；不要出现竞品栏目词与句式（已在禁用表达里列出）。
 
-SSML基础要求：
-{get_ssml_optimization_hints()}
+写作约束：
+- {persona_line}
+- {humor_line}（快讯里幽默要点到即止，别一条里讲 2 个梗。）
+""".strip()
 
-风格化SSML：{style_config['ssml_hints']}
-"""
-    
-    return enhanced_system, user
 
-# =============================
-# 提示词版本管理
-# =============================
-
-PROMPT_VERSIONS = {
-    "v1.0": {
-        "description": "基础版本，包含基本SSML要求",
-        "system": BASE_SYSTEM_PROMPT,
-        "features": ["基础SSML", "JSON输出", "事实约束"]
-    },
-    
-    "v1.1": {
-        "description": "增强版本，添加内容风格支持",
-        "system": BASE_SYSTEM_PROMPT_V2, 
-        "features": ["风格化SSML", "高级控制", "内容分类"]
-    },
-    
-    "v2.0": {
-        "description": "高级版本，完整SSML控制",
-        "system": "综合所有高级特性",
-        "features": ["完整SSML", "情感控制", "语音优化"]
-    }
-}
-
-def get_prompt_version(version: str = "v1.1") -> dict:
+def build_deep_dive_prompt(
+    config: ShowConfig,
+    topic: str,
+    facts_bundle: str,
+) -> str:
     """
-    获取指定版本的提示词配置
-    
-    Args:
-        version: 版本号
-    
-    Returns:
-        版本配置信息
+    深度段：我们叫“慢放一条”，强调把一条新闻讲透。
     """
-    return PROMPT_VERSIONS.get(version, PROMPT_VERSIONS["v1.1"])
+    persona = resolve_persona(config)
+    persona_line = persona_guidance_lines(persona)
+    humor_line = humor_guidance_line(config.humor_level)
 
-# =============================
-# 环境变量配置
-# =============================
+    topic = spell_out_acronyms(topic)
+    facts_bundle = spell_out_acronyms(facts_bundle)
 
-def get_prompt_env_vars() -> dict:
+    extra = ""
+    if clamp_humor(config.humor_level) >= 2:
+        extra = " 类比可以更生活化一点，但别讲成段子。"
+
+    return f"""
+请写【慢放一条：深度拆解】（420-900 字）：
+- 开头必须明确：{config.cue_deep}，我们慢放这一条：{topic}。
+- 输入事实/素材如下（只可基于这些信息发挥，不要编造“某某机构最新数据”）：
+{facts_bundle}
+
+结构必须包含（用口语串起来，不要项目符号）：
+1) 先给一句“这事儿一句话是什么”。（主持人可用口头禅）
+2) 它到底是什么：大白话解释 + 一个生活类比。
+3) 为什么这阵子突然重要/火了：2-3 句。
+4) 里面的门道：讲 2-4 个点，用“第一/第二/第三”串起来。
+5) 跟你有什么关系：给 2-3 个可操作的观察点或建议。
+6) 结尾留钩子：一句“如果你也好奇…我们之后再拆”。
+7) 最后用一句收回节目主线：例如“好，今天的切片就到这儿。”
+
+写作约束：
+- {persona_line}
+- {humor_line}{extra}
+""".strip()
+
+
+def build_outro_prompt(
+    config: ShowConfig,
+    outro_hint: str = "明天我们再展开",
+    cta_hint: Optional[str] = "喜欢这种A I切片的话，点个关注，就当给我充电。",
+) -> str:
     """
-    获取提示词相关的环境变量配置
-    
-    Returns:
-        环境变量配置字典
+    收尾：用“关机前一句”形成品牌记忆点。
     """
-    return {
-        "SCRIPT_PROMPT_MAX_RESEARCH_CHARS": os.environ.get("SCRIPT_PROMPT_MAX_RESEARCH_CHARS", "6000"),
-        "SCRIPT_PROMPT_MAX_ITEMS": os.environ.get("SCRIPT_PROMPT_MAX_ITEMS", "8"),
-        "SCRIPT_PROMPT_MAX_CITATIONS": os.environ.get("SCRIPT_PROMPT_MAX_CITATIONS", "3"),
-        "SCRIPT_PROMPT_MAX_CITATION_SNIPPET_CHARS": os.environ.get("SCRIPT_PROMPT_MAX_CITATION_SNIPPET_CHARS", "120"),
-        "SCRIPT_PROMPT_CONTENT_TYPE": os.environ.get("SCRIPT_PROMPT_CONTENT_TYPE", "chat"),
-        "SCRIPT_PROMPT_ENABLE_ADVANCED_SSML": os.environ.get("SCRIPT_PROMPT_ENABLE_ADVANCED_SSML", "false"),
-        "SCRIPT_PROMPT_VERSION": os.environ.get("SCRIPT_PROMPT_VERSION", "v1.1"),
-    }
+    persona = resolve_persona(config)
+    persona_line = persona_guidance_lines(persona)
+    humor_line = humor_guidance_line(config.humor_level)
+
+    outro_hint = spell_out_acronyms(outro_hint)
+    cta = f"{cta_hint} " if cta_hint else ""
+
+    return f"""
+请写【收尾：关机前一句】（60-120 字）：
+- 必须包含：节目名《{config.show_name}》、主持人{config.host_name}、感谢收听。
+- 用一句"{config.cue_wrap}"开头，给一个很短的"今天总结/情绪落点"。
+- 可以加一句轻量 CTA：{cta}
+- 最后给出明确下次见：{outro_hint}。
+- 结尾句尽量有节奏感，像把一天合上，不要口号堆叠。
+
+写作约束：
+- {persona_line}
+- {humor_line}（收尾幽默像“眨眼”，不要硬梗。）
+""".strip()

@@ -1,0 +1,128 @@
+{
+  "session_id": "session_20260104_173452",
+  "timestamp": "2026-01-04 17:34:52.442669",
+  "episode_date": "2026-01-04",
+  "report_path": "out\\runs\\20260104\\172946_364133_life-c\\auto_topic\\report_20260104_173452.json",
+  "total_reviewed": 43,
+  "agree_count": 40,
+  "disagree_count": 3,
+  "feedbacks": [
+    {
+      "feedback_id": "fb_session_20260104_173452_24",
+      "topic_id": "topic:cceb4749554d",
+      "timestamp": "2026-01-04 18:20:06.095042",
+      "episode_date": "2026-01-04",
+      "topic_snapshot": {
+        "topic_id": "topic:cceb4749554d",
+        "title": "谷歌工程师公开点赞 Claude Code：一小时搞定我们一年的活",
+        "entities": [
+          "Claude Code",
+          "谷歌"
+        ],
+        "items_count": 1,
+        "topic_score": 11.794444444444444,
+        "should_publish": false,
+        "priority": 1
+      },
+      "system_decision": "discard",
+      "system_score": 11.794444444444444,
+      "score_breakdown": {
+        "archetype_mean": 4.444444444444445,
+        "personal_impact": 0.0,
+        "counter_intuitive": 0.0,
+        "trend": 1.6000000000000003,
+        "time": 5.0,
+        "persona": 0.75,
+        "history_echo": 0.0,
+        "continuity": 0.0,
+        "data_enrichable": 0.0,
+        "follow_up": 0.0
+      },
+      "human_decision": "accept",
+      "human_priority": 3,
+      "feedback_reason": "影响程序员行业的大事件",
+      "tags": [],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    },
+    {
+      "feedback_id": "fb_session_20260104_173452_41",
+      "topic_id": "topic:6a17b6aa481a",
+      "timestamp": "2026-01-04 18:30:35.917570",
+      "episode_date": "2026-01-04",
+      "topic_snapshot": {
+        "topic_id": "topic:6a17b6aa481a",
+        "title": "欧盟公布 2024 年全球研发投入百强企业：亚马逊第一，华为成唯一进前十的中国企业",
+        "entities": [
+          "亚马逊",
+          "欧盟",
+          "华为"
+        ],
+        "items_count": 1,
+        "topic_score": 45.077777777777776,
+        "should_publish": false,
+        "priority": 1
+      },
+      "system_decision": "discard",
+      "system_score": 45.077777777777776,
+      "score_breakdown": {
+        "archetype_mean": 17.77777777777778,
+        "personal_impact": 3.333333333333333,
+        "counter_intuitive": 0.0,
+        "trend": 0.8000000000000002,
+        "time": 5.0,
+        "persona": 3.1666666666666665,
+        "history_echo": 0.0,
+        "continuity": 6.0,
+        "data_enrichable": 6.0,
+        "follow_up": 3.0
+      },
+      "human_decision": "accept",
+      "human_priority": 3,
+      "feedback_reason": "中国最强企业在国际上的强势地位，有利于民族自豪感",
+      "tags": [],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    },
+    {
+      "feedback_id": "fb_session_20260104_173452_43",
+      "topic_id": "topic:0207fd33639a",
+      "timestamp": "2026-01-04 18:32:15.694530",
+      "episode_date": "2026-01-04",
+      "topic_snapshot": {
+        "topic_id": "topic:0207fd33639a",
+        "title": "消息称 AMD 目标 2026 年占据 25% 中国大陆显卡市场",
+        "entities": [
+          "中国大陆显卡市场",
+          "AMD"
+        ],
+        "items_count": 1,
+        "topic_score": 42.855555555555554,
+        "should_publish": false,
+        "priority": 1
+      },
+      "system_decision": "discard",
+      "system_score": 42.855555555555554,
+      "score_breakdown": {
+        "archetype_mean": 15.555555555555555,
+        "personal_impact": 3.333333333333333,
+        "counter_intuitive": 0.0,
+        "trend": 0.8000000000000002,
+        "time": 5.0,
+        "persona": 3.1666666666666665,
+        "history_echo": 0.0,
+        "continuity": 6.0,
+        "data_enrichable": 6.0,
+        "follow_up": 3.0
+      },
+      "human_decision": "accept",
+      "human_priority": 3,
+      "feedback_reason": "大家都知道英伟达不被在中国允许，AMD的规划似乎有新道路",
+      "tags": [],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    }
+  ],
+  "reviewer": "neo",
+  "notes": ""
+}

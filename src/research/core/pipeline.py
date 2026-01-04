@@ -123,11 +123,38 @@ class ResearchPipeline:
         )
         self.logger.info(f"构建 {len(queries)} 个查询")
         
-        # 6. 执行调查（暂时跳过实际调用，返回模拟结果）
+        # 6. 执行调查
         self.logger.info("步骤6: 执行调查")
-        # TODO: 实际调用MetaSo等服务
-        # 这里返回空结果，实际集成时需要调用research_client
         results: Dict[str, Dict[str, Any]] = {}
+        
+        # 为每个查询调用 research client
+        for query in queries:
+            # 构建查询项
+            query_item = {
+                "id": query.claim_id,
+                "title": query.query_text,
+                "summary": "",
+            }
+            
+            try:
+                # 调用 research client
+                output = self.client.research_items([query_item])
+                
+                # 将 ResearchOutput 转换为字典格式
+                if output.success and output.metadata:
+                    # metadata 中包含原始的 response_json 和 response_text
+                    result_dict = output.metadata.copy()
+                    result_dict["ok"] = output.success
+                    results[query.claim_id] = result_dict
+                else:
+                    self.logger.warning(f"Query {query.claim_id} failed: {output.error}")
+                    results[query.claim_id] = {"ok": False, "error": output.error}
+                    
+            except Exception as e:
+                self.logger.error(f"Error executing query {query.claim_id}: {e}")
+                results[query.claim_id] = {"ok": False, "error": str(e)}
+        
+        self.logger.info(f"完成 {len(results)} 个查询调用")
         
         # 7. 组装证据包
         self.logger.info("步骤7: 组装证据包")

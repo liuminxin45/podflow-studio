@@ -15,7 +15,8 @@ from datetime import datetime
 
 from src.app.pipelines.base_step import BaseStep
 from src.models.segment import SegmentScript, SEGMENT_ORDER
-from src.llm.segment_generator import SegmentGenerator
+from src.llm.segment_generator import SegmentScriptGenerator
+from src.llm.templates.prompts import NewsItem, ShowConfig
 
 if TYPE_CHECKING:
     from src.app.core.context import EpisodeContext
@@ -44,42 +45,41 @@ class ScriptStepSegmented(BaseStep):
         )
         
         # 准备上下文
-        context = self._prepare_context(ctx)
+        render_params = self._prepare_render_params(ctx)
         
-        # 获取 LLM 客户端
-        llm_client = self._get_llm_client(cfg)
+        # 获取 LLM 客户端适配器
+        llm_adapter = self._get_llm_adapter(cfg)
+        
+        # 创建配置
+        show_config = ShowConfig(
+            show_name=cfg.get("channel", {}).get("name", "民心A I切片电台"),
+            host_name="民心",
+            humor_level=1,
+            brief_density="short",
+        )
         
         # 生成所有段落
-        timeout_s = int(cfg.get("llm", {}).get("timeout_seconds", 120))
-        generator = SegmentGenerator(llm_client, timeout_seconds=timeout_s)
+        log_operation(
+            self.logger,
+            step="Script",
+            operation="generate_all",
+            result="starting"
+        )
         
-        segments = []
-        for segment_id in SEGMENT_ORDER:
-            try:
-                log_operation(
-                    self.logger,
-                    step="Script",
-                    operation=f"generate_{segment_id}",
-                    result="starting"
-                )
-                segment = generator.generate_segment(segment_id, context, retry=True)
-                segments.append(segment)
-                
-                log_operation(
-                    self.logger,
-                    step="Script",
-                    operation=f"generate_{segment_id}",
-                    result=f"completed, {segment.duration_sec}s, {len(segment.text)} chars"
-                )
-                
-                # 保存单个段落
-                self._save_segment(ctx, segment)
-                
-            except Exception as e:
-                self.logger.error(f"段落 {segment_id} 生成失败: {e}")
-                # 关键段落失败则停止
-                if segment_id in ["S0", "S1"]:
-                    raise RuntimeError(f"关键段落 {segment_id} 生成失败: {e}")
+        generator = SegmentScriptGenerator(llm=llm_adapter, config=show_config)
+        
+        try:
+            outputs = generator.render(**render_params)
+        except Exception as e:
+            self.logger.error(f"脚本生成失败: {e}")
+            raise RuntimeError(f"脚本生成失败: {e}") from e
+        
+        # 将输出转换为 SegmentScript 对象
+        segments = self._convert_outputs_to_segments(outputs)
+        
+        # 保存每个段落
+        for segment in segments:
+            self._save_segment(ctx, segment)
         
         # 保存到 context
         ctx.script_segments = segments
@@ -90,45 +90,60 @@ class ScriptStepSegmented(BaseStep):
         self.logger.info(f"脚本生成完成: {len(segments)} 个段落")
         ctx.add_event("script_segments_generated", segments_count=len(segments))
     
-    def _prepare_context(self, ctx: EpisodeContext) -> dict:
-        """准备生成上下文"""
-        cfg = ctx.config
-        
+    def _prepare_render_params(self, ctx: EpisodeContext) -> dict:
+        """准备 render 方法的参数"""
         # 获取日期信息
         date_str = str(ctx.episode_date)
         weekday_map = {0: "一", 1: "二", 2: "三", 3: "四", 4: "五", 5: "六", 6: "日"}
         
         try:
-            from datetime import datetime
             dt_obj = datetime.strptime(date_str, "%Y-%m-%d")
-            weekday = weekday_map.get(dt_obj.weekday(), "")
+            weekday = f"星期{weekday_map.get(dt_obj.weekday(), '')}"
         except:
-            weekday = ""
+            weekday = None
         
-        # 准备新闻列表
+        # 准备新闻列表，转换为 NewsItem 对象
         news_items = []
         for item in ctx.items_selected:
-            news_items.append({
-                "id": item.get("id", ""),
-                "title": item.get("title", ""),
-                "source_name": item.get("source_name", ""),
-                "text": item.get("text", ""),  # 使用简化后的text字段
-            })
+            title = item.get("title", "")
+            text = item.get("text", "")
+            
+            # 如果是合并新闻，使用叙述提示
+            if item.get("is_merged"):
+                narrative_hint = item.get("narrative_hint", "")
+                facts = narrative_hint if narrative_hint else text
+            else:
+                facts = text
+            
+            news_item = NewsItem(
+                title=title,
+                facts=facts,
+                context=item.get("source_name", "")
+            )
+            news_items.append(news_item)
         
-        # 选择deep dive主题（第一条新闻）
-        deep_dive_topic = news_items[0]["title"] if news_items else "今日热点"
+        # 选择 deep dive 主题（第一条新闻）
+        deep_topic = news_items[0].title if news_items else "今日热点"
+        deep_facts = news_items[0].facts if news_items else ""
+        
+        # 历史事件（暂时使用占位符）
+        history_event = "历史上的今天发生了一些重要事件"
         
         return {
-            "show_name": cfg.get("channel", {}).get("name", "生活与消费资讯"),
-            "date": date_str,
-            "weekday": weekday,
+            "date_line": date_str,
+            "weekday_line": weekday,
+            "lunar_line": None,
+            "tease_points": [item.title for item in news_items[:4]],
+            "history_event": history_event,
             "news_items": news_items,
-            "deep_dive_topic": deep_dive_topic,
-            "related_news": news_items[:2] if len(news_items) >= 2 else news_items,
+            "deep_topic": deep_topic,
+            "deep_facts": deep_facts,
+            "outro_hint": "明天我们再展开",
+            "cta_hint": "喜欢这种A I切片的话，点个关注，就当给我充电。",
         }
     
-    def _get_llm_client(self, cfg: dict):
-        """获取 LLM 客户端"""
+    def _get_llm_adapter(self, cfg: dict):
+        """获取 LLM 客户端适配器"""
         provider = (os.environ.get("LLM_PROVIDER") or "moonshot").strip().lower()
         if provider not in {"moonshot", "deepseek"}:
             self.logger.warning(f"未知的 LLM_PROVIDER={provider}，回退到 moonshot")
@@ -137,9 +152,13 @@ class ScriptStepSegmented(BaseStep):
         timeout_s = int(cfg.get("llm", {}).get("timeout_seconds", 120))
         
         if provider == "deepseek":
-            return self._create_deepseek_client(timeout_s)
+            client = self._create_deepseek_client(timeout_s)
         else:
-            return self._create_moonshot_client(timeout_s)
+            client = self._create_moonshot_client(timeout_s)
+        
+        # 包装为适配器
+        from src.llm.client.segment_adapter import LLMClientAdapter
+        return LLMClientAdapter(client)
     
     def _create_deepseek_client(self, timeout_s: int):
         """创建 DeepSeek 客户端"""
@@ -176,6 +195,39 @@ class ScriptStepSegmented(BaseStep):
             model=model,
             timeout_seconds=timeout_s
         )
+    
+    def _convert_outputs_to_segments(self, outputs: dict) -> List[SegmentScript]:
+        """将 render() 的输出转换为 SegmentScript 对象列表"""
+        # 段落映射：新版本的 segment_id -> 旧版本的 id 和 type
+        segment_mapping = {
+            "opening": ("S0", "OPENING", "开场", 30),
+            "history": ("S1", "HISTORY", "历史上的今天", 20),
+            "briefs": ("S2", "DETAIL_NEWS", "快讯", 120),
+            "deep_dive": ("S3", "DEEP_DIVE", "深度", 180),
+            "outro": ("S4", "CLOSING", "结尾", 20),
+        }
+        
+        segments = []
+        for new_id, (old_id, seg_type, title, default_duration) in segment_mapping.items():
+            text = outputs.get(new_id, "")
+            if not text:
+                self.logger.warning(f"段落 {new_id} 没有生成内容")
+                continue
+            
+            # 估算时长（按每秒3个字计算）
+            duration_sec = max(default_duration, len(text) // 3)
+            
+            segment = SegmentScript(
+                id=old_id,
+                type=seg_type,
+                title=title,
+                text=text,
+                duration_sec=duration_sec,
+                facts_used=[],
+            )
+            segments.append(segment)
+        
+        return segments
     
     def _save_segment(self, ctx: EpisodeContext, segment: SegmentScript) -> None:
         """保存单个段落"""

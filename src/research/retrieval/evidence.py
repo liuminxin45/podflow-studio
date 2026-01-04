@@ -86,6 +86,112 @@ class EvidencePack:
         }
 
 
+def parse_anspire_result(result: Dict[str, Any]) -> List[Evidence]:
+    """
+    解析Anspire Search Agent API结果为证据列表
+    
+    Anspire API 返回格式:
+    {
+        "ok": bool,
+        "response_json": {
+            "summary": "...",
+            "items": [
+                {
+                    "index": 1,
+                    "title": "...",
+                    "url": "...",
+                    "date": "...",
+                    "score": 0.9,
+                    "content": "..."
+                }
+            ],
+            "request_id": "..."
+        }
+    }
+    
+    Args:
+        result: Anspire返回的结果字典
+        
+    Returns:
+        证据列表
+    """
+    evidence_list: List[Evidence] = []
+    
+    if not result or not isinstance(result, dict):
+        return evidence_list
+    
+    # Anspire返回格式: {"ok": bool, "response_json": {...}, "response_text": "..."}
+    response_json = result.get("response_json", {})
+    
+    if not isinstance(response_json, dict):
+        return evidence_list
+    
+    # 提取 items 列表（顶层字段）
+    items = response_json.get("items", [])
+    
+    if items and isinstance(items, list):
+        # 从 items 列表提取证据
+        for idx, item in enumerate(items[:10]):  # 最多10条
+            if not isinstance(item, dict):
+                continue
+            
+            url = item.get("url", "")
+            title = item.get("title", "") or f"搜索结果 {idx+1}"
+            content = item.get("content", "") or ""
+            date = item.get("date", "")
+            score = item.get("score", 0.7)
+            
+            # 确保有有效内容
+            if not content or len(content.strip()) < 10:
+                continue
+            
+            # 计算时效性分数（基于日期）
+            timeliness = 0.7
+            if date:
+                try:
+                    # 简单判断：如果包含最近日期，提高分数
+                    if "2024" in date or "2025" in date:
+                        timeliness = 0.85
+                    elif "2023" in date:
+                        timeliness = 0.75
+                except:
+                    pass
+            
+            evidence = Evidence(
+                source_url=url if url else None,
+                source_title=title,
+                content=content[:800],  # 限制长度
+                relevance_score=min(float(score), 1.0) if isinstance(score, (int, float)) else 0.75,
+                credibility_score=0.75,  # Anspire 搜索结果的可信度较高
+                timeliness_score=timeliness,
+                published_at=date if date else None,
+                metadata={
+                    "source": "anspire",
+                    "index": item.get("index", idx + 1),
+                    "score": score,
+                },
+            )
+            evidence_list.append(evidence)
+    
+    # 如果没有提取到 items，尝试使用 summary
+    if not evidence_list:
+        summary = response_json.get("summary", "")
+        
+        if summary and len(summary.strip()) > 30:  # 至少30个字符
+            evidence = Evidence(
+                source_url=None,
+                source_title="Anspire 搜索摘要",
+                content=summary[:1000],
+                relevance_score=0.70,
+                credibility_score=0.70,
+                timeliness_score=0.65,
+                metadata={"source": "anspire_summary"},
+            )
+            evidence_list.append(evidence)
+    
+    return evidence_list
+
+
 def parse_metaso_result(result: Dict[str, Any]) -> List[Evidence]:
     """
     解析MetaSo调查结果为证据列表
@@ -238,6 +344,30 @@ def assess_evidence_pack(pack: EvidencePack) -> None:
     })
 
 
+def _detect_result_type(result: Dict[str, Any]) -> str:
+    """
+    检测结果类型（anspire 或 metaso）
+    
+    Args:
+        result: 查询结果字典
+        
+    Returns:
+        "anspire" 或 "metaso"
+    """
+    if not result or not isinstance(result, dict):
+        return "unknown"
+    
+    # Anspire特征：有ok, response_json, response_text字段
+    if "response_json" in result or "response_text" in result:
+        return "anspire"
+    
+    # MetaSo特征：有citations字段
+    if "citations" in result:
+        return "metaso"
+    
+    return "unknown"
+
+
 def create_evidence_pack(
     claim: Claim,
     main_query: ResearchQuery,
@@ -258,13 +388,20 @@ def create_evidence_pack(
     Returns:
         证据包
     """
-    # 解析主证据
-    main_evidence = parse_metaso_result(main_result)
+    # 检测结果类型并使用对应的解析器
+    result_type = _detect_result_type(main_result)
     
-    # 解析对照证据
-    contrast_evidence: List[Evidence] = []
-    if contrast_result:
-        contrast_evidence = parse_metaso_result(contrast_result)
+    if result_type == "anspire":
+        main_evidence = parse_anspire_result(main_result)
+        contrast_evidence: List[Evidence] = []
+        if contrast_result:
+            contrast_evidence = parse_anspire_result(contrast_result)
+    else:
+        # 默认使用 MetaSo 解析器（向后兼容）
+        main_evidence = parse_metaso_result(main_result)
+        contrast_evidence: List[Evidence] = []
+        if contrast_result:
+            contrast_evidence = parse_metaso_result(contrast_result)
     
     # 创建证据包
     pack = EvidencePack(
@@ -345,4 +482,6 @@ __all__ = [
     "create_evidence_pack",
     "create_evidence_packs_batch",
     "assess_evidence_pack",
+    "parse_anspire_result",
+    "parse_metaso_result",
 ]

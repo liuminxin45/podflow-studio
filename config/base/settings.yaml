@@ -330,11 +330,29 @@ auto_topic:
 # 人工反馈系统配置
 # ============================================================
 human_feedback:
-  enabled: true                     # 是否启用人工反馈（默认：true）
+  enabled: false                     # 是否启用人工反馈（默认：true）
   storage_dir: "feedback_history"   # 反馈数据存储目录
   auto_continue: true                # 反馈完成后自动继续后续流程（默认：true）
   timeout_seconds: 0               # 等待人工反馈的超时时间（秒，0表示无限等待）
   min_feedback_threshold: 0          # 最少需要反馈的主题数（设为 0 表示可跳过）
+  review_mode: "all"                 # 审核模式："all" 审核所有主题，"passed_only" 仅审核通过的主题
+
+# ============================================================
+# 脚本生成配置
+# ============================================================
+script:
+  news_merger:
+    enabled: true                       # 是否启用新闻合并
+    method: "llm"                       # 合并方法："llm" 或 "rules"
+    
+    # LLM 合并配置（method: "llm"）
+    merge_threshold: 0.7                # 合并置信度阈值（0-1）
+    max_merge_count: 5                  # 单组最多合并新闻数
+    
+    # 规则合并配置（method: "rules"，备用方案）
+    entity_similarity_threshold: 0.5    # 实体重叠度阈值（0-1）
+    title_similarity_threshold: 0.3     # 标题相似度阈值（0-1）
+    min_shared_keywords: 2              # 最少共享关键词数
 
 database:
   path: "./data/podcast.db"

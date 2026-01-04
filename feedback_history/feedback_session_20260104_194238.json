@@ -1,0 +1,168 @@
+{
+  "session_id": "session_20260104_194238",
+  "timestamp": "2026-01-04 19:42:38.828389",
+  "episode_date": "2026-01-04",
+  "report_path": "out\\runs\\20260104\\193731_401337_life-c\\auto_topic\\report_20260104_194238.json",
+  "total_reviewed": 43,
+  "agree_count": 39,
+  "disagree_count": 4,
+  "feedbacks": [
+    {
+      "feedback_id": "fb_session_20260104_194238_4",
+      "topic_id": "topic:b4ba1f58cbc3",
+      "timestamp": "2026-01-04 19:44:59.523535",
+      "episode_date": "2026-01-04",
+      "topic_snapshot": {
+        "topic_id": "topic:b4ba1f58cbc3",
+        "title": "消息称小鹏副总裁陈永海离职，王凤英暂代产品部职务",
+        "entities": [
+          "王凤英",
+          "小鹏汽车",
+          "陈永海"
+        ],
+        "items_count": 1,
+        "topic_score": 60.63333333333333,
+        "should_publish": true,
+        "priority": 3
+      },
+      "system_decision": "maybe",
+      "system_score": 60.63333333333333,
+      "score_breakdown": {
+        "archetype_mean": 20.0,
+        "personal_impact": 3.333333333333333,
+        "counter_intuitive": 3.333333333333333,
+        "trend": 0.8000000000000002,
+        "time": 5.0,
+        "persona": 3.1666666666666665,
+        "history_echo": 0.0,
+        "continuity": 6.0,
+        "data_enrichable": 6.0,
+        "follow_up": 3.0
+      },
+      "human_decision": "reject",
+      "human_priority": 2,
+      "feedback_reason": "高管（非CEO级别）的职务变更对普通人来说没什么影响",
+      "tags": [],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    },
+    {
+      "feedback_id": "fb_session_20260104_194238_18",
+      "topic_id": "topic:8cb593ebdff9",
+      "timestamp": "2026-01-04 19:46:27.252806",
+      "episode_date": "2026-01-04",
+      "topic_snapshot": {
+        "topic_id": "topic:8cb593ebdff9",
+        "title": "国务院：引导电器电子产品、汽车、动力电池等生产企业参与回收利用",
+        "entities": [
+          "动力电池",
+          "汽车",
+          "国务院",
+          "电器电子产品"
+        ],
+        "items_count": 1,
+        "topic_score": 75.9,
+        "should_publish": true,
+        "priority": 4
+      },
+      "system_decision": "maybe",
+      "system_score": 75.9,
+      "score_breakdown": {
+        "archetype_mean": 20.0,
+        "personal_impact": 6.666666666666666,
+        "counter_intuitive": 0.0,
+        "trend": 2.4,
+        "time": 5.0,
+        "persona": 4.833333333333333,
+        "history_echo": 0.0,
+        "continuity": 6.0,
+        "data_enrichable": 6.0,
+        "follow_up": 3.0
+      },
+      "human_decision": "reject",
+      "human_priority": 3,
+      "feedback_reason": "对普通人来讲，似乎有点遥远",
+      "tags": [],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    },
+    {
+      "feedback_id": "fb_session_20260104_194238_24",
+      "topic_id": "topic:6d999a63e5ac",
+      "timestamp": "2026-01-04 19:47:17.513928",
+      "episode_date": "2026-01-04",
+      "topic_snapshot": {
+        "topic_id": "topic:6d999a63e5ac",
+        "title": "腾讯回应元宝 AI 辱骂用户：小概率下的模型异常输出，不存在人工回复",
+        "entities": [
+          "元宝AI",
+          "腾讯"
+        ],
+        "items_count": 1,
+        "topic_score": 48.52222222222222,
+        "should_publish": false,
+        "priority": 1
+      },
+      "system_decision": "discard",
+      "system_score": 48.52222222222222,
+      "score_breakdown": {
+        "archetype_mean": 15.555555555555555,
+        "personal_impact": 6.666666666666666,
+        "counter_intuitive": 6.666666666666666,
+        "trend": 0.8000000000000002,
+        "time": 5.0,
+        "persona": 4.833333333333333,
+        "history_echo": 0.0,
+        "continuity": 0.0,
+        "data_enrichable": 6.0,
+        "follow_up": 3.0
+      },
+      "human_decision": "accept",
+      "human_priority": 3,
+      "feedback_reason": "平民级产品的有趣事件，值得分享",
+      "tags": [],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    },
+    {
+      "feedback_id": "fb_session_20260104_194238_42",
+      "topic_id": "topic:cceb4749554d",
+      "timestamp": "2026-01-04 19:48:16.248038",
+      "episode_date": "2026-01-04",
+      "topic_snapshot": {
+        "topic_id": "topic:cceb4749554d",
+        "title": "谷歌工程师公开点赞 Claude Code：一小时搞定我们一年的活",
+        "entities": [
+          "Claude Code",
+          "谷歌"
+        ],
+        "items_count": 1,
+        "topic_score": 18.772222222222222,
+        "should_publish": false,
+        "priority": 1
+      },
+      "system_decision": "discard",
+      "system_score": 18.772222222222222,
+      "score_breakdown": {
+        "archetype_mean": 8.88888888888889,
+        "personal_impact": 0.0,
+        "counter_intuitive": 3.333333333333333,
+        "trend": 0.8000000000000002,
+        "time": 5.0,
+        "persona": 0.75,
+        "history_echo": 0.0,
+        "continuity": 0.0,
+        "data_enrichable": 0.0,
+        "follow_up": 0.0
+      },
+      "human_decision": "accept",
+      "human_priority": 4,
+      "feedback_reason": "对于程序员界影响大的事件，受众广",
+      "tags": [],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    }
+  ],
+  "reviewer": "neo",
+  "notes": ""
+}

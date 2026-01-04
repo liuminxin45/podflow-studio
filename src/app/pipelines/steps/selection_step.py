@@ -95,8 +95,10 @@ class SelectionStep(BaseStep):
             
             # 应用人工反馈（如果有）
             if hasattr(ctx, 'human_feedback_session') and ctx.human_feedback_session:
+                all_candidates = ctx.auto_topic_result.get("candidates", [])
                 passed_candidates = self._apply_human_feedback(
                     passed_candidates,
+                    all_candidates,
                     ctx.human_feedback_session
                 )
                 self.logger.info(
@@ -128,6 +130,9 @@ class SelectionStep(BaseStep):
         if not selected_items and ctx.clusters:
             self.logger.warning("selection produced no items; fallback to all dedup items")
             selected_items = list(ctx.items_dedup.values())
+        
+        # ========== 4. 合并同主题新闻（在 LLM Gate 和人工反馈之后） ==========
+        selected_items = self._merge_related_news_if_enabled(selected_items, cfg)
         
         ctx.items_selected = selected_items
         self.logger.info(f"Selection 步骤完成: {len(ctx.items_selected)} items selected")
@@ -278,11 +283,14 @@ class SelectionStep(BaseStep):
             constraints=constraint_config,
         )
     
-    def _apply_human_feedback(self, candidates: list, feedback_session) -> list:
+    def _apply_human_feedback(self, passed_candidates: list, all_candidates: list, feedback_session) -> list:
         """应用人工反馈到候选主题列表
         
+        支持人工否决系统的 discard 决策，将被系统淘汰但人工接受的主题重新加入。
+        
         Args:
-            candidates: 原始通过的候选主题列表
+            passed_candidates: 系统通过的候选主题列表
+            all_candidates: 所有候选主题列表（包括被 discard 的）
             feedback_session: 人工反馈会话
         
         Returns:
@@ -290,28 +298,34 @@ class SelectionStep(BaseStep):
         """
         # 构建 topic_id -> human_decision 的映射
         feedback_map = {
-            fb.topic_id: fb.human_decision
+            fb.topic_id: fb
             for fb in feedback_session.feedbacks
         }
         
+        # 构建 topic_id -> candidate 的映射（所有候选）
+        all_candidates_map = {c.topic_id: c for c in all_candidates}
+        
         adjusted_candidates = []
         rejected_count = 0
+        rescued_count = 0
         
-        for candidate in candidates:
+        # 1. 处理系统通过的主题
+        passed_topic_ids = {c.topic_id for c in passed_candidates}
+        for candidate in passed_candidates:
             topic_id = candidate.topic_id
             
             # 检查是否有人工反馈
             if topic_id in feedback_map:
-                human_decision = feedback_map[topic_id]
+                human_decision = feedback_map[topic_id].human_decision
                 
                 if human_decision == "reject":
                     # 人工明确拒绝，跳过
-                    self.logger.info(f"人工反馈拒绝主题: {candidate.title}")
+                    self.logger.info(f"人工拒绝（系统通过）: {candidate.title}")
                     rejected_count += 1
                     continue
                 elif human_decision == "accept":
                     # 人工明确接受，保留
-                    self.logger.debug(f"人工反馈接受主题: {candidate.title}")
+                    self.logger.debug(f"人工接受（系统通过）: {candidate.title}")
                     adjusted_candidates.append(candidate)
                 else:  # uncertain
                     # 不确定，保留原始决策
@@ -320,7 +334,26 @@ class SelectionStep(BaseStep):
                 # 没有反馈，保留原始决策
                 adjusted_candidates.append(candidate)
         
-        self.logger.info(f"人工反馈过滤: 拒绝 {rejected_count} 个主题")
+        # 2. 检查是否有被系统 discard 但人工 accept 的主题（人工否决系统）
+        for fb in feedback_session.feedbacks:
+            topic_id = fb.topic_id
+            
+            # 如果这个主题不在系统通过列表中，但人工明确 accept
+            if topic_id not in passed_topic_ids and fb.human_decision == "accept":
+                if topic_id in all_candidates_map:
+                    rescued_candidate = all_candidates_map[topic_id]
+                    adjusted_candidates.append(rescued_candidate)
+                    rescued_count += 1
+                    self.logger.info(
+                        f"人工否决系统 DISCARD: {rescued_candidate.title} "
+                        f"(系统决策={fb.system_decision}, 系统得分={fb.system_score:.2f})"
+                    )
+        
+        self.logger.info(
+            f"人工反馈应用完成: "
+            f"拒绝 {rejected_count} 个, "
+            f"否决系统淘汰并接受 {rescued_count} 个"
+        )
         return adjusted_candidates
     
     def _collect_human_feedback_if_enabled(self, ctx: EpisodeContext):
@@ -356,11 +389,13 @@ class SelectionStep(BaseStep):
         self.logger.info(f"启动人工反馈收集: {report_path.name}")
         
         try:
-            # 创建反馈收集器
+            # 创建反馈收集器（传递 review_mode）
+            review_mode = feedback_cfg.get("review_mode", "all")
             collector = FeedbackCollector(
                 storage_dir=feedback_cfg.get("storage_dir", "feedback_history"),
                 auto_continue=feedback_cfg.get("auto_continue", True),
                 min_feedback_threshold=feedback_cfg.get("min_feedback_threshold", 0),
+                review_mode=review_mode,
             )
             
             # 收集反馈
@@ -391,8 +426,103 @@ class SelectionStep(BaseStep):
         except KeyboardInterrupt:
             self.logger.warning("用户中断反馈收集")
             # 继续执行后续流程
-            return None
+            return session
         except Exception as e:
-            self.logger.error(f"反馈收集失败: {e}", exc_info=True)
-            # 不中断流程，继续执行
+            self.logger.error(f"人工反馈收集失败: {e}")
             return None
+    
+    def _merge_related_news_if_enabled(self, items: list, cfg: dict) -> list:
+        """
+        合并相关新闻（如果启用）
+        
+        在 LLM Gate 和人工反馈之后执行，确保合并的都是高质量新闻
+        
+        Args:
+            items: 选中的新闻列表
+            cfg: 配置
+        
+        Returns:
+            合并后的新闻列表
+        """
+        if len(items) <= 1:
+            return items
+        
+        # 获取配置
+        merger_cfg = cfg.get("script", {}).get("news_merger", {})
+        
+        # 检查是否启用
+        if not merger_cfg.get("enabled", True):
+            self.logger.info("新闻合并已禁用，跳过合并")
+            return items
+        
+        # 检查合并方法
+        merge_method = merger_cfg.get("method", "llm")
+        
+        try:
+            if merge_method == "llm":
+                return self._merge_with_llm(items, merger_cfg, cfg)
+            else:
+                return self._merge_with_rules(items, merger_cfg)
+        except Exception as e:
+            self.logger.error(f"新闻合并失败: {e}，返回原始列表")
+            return items
+    
+    def _merge_with_llm(self, items: list, merger_cfg: dict, cfg: dict) -> list:
+        """使用 LLM 合并新闻"""
+        from src.script.llm_news_merger import LLMNewsMerger
+        
+        # 获取 LLM 客户端
+        import os
+        provider = (os.environ.get("LLM_PROVIDER") or "deepseek").strip().lower()
+        
+        if provider == "deepseek":
+            from src.llm.client.api_client import DeepSeekClient
+            llm_client = DeepSeekClient(
+                base_url=os.environ.get("DEEPSEEK_BASE_URL", ""),
+                api_key=os.environ.get("DEEPSEEK_API_KEY", ""),
+                model=os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
+                timeout_seconds=30
+            )
+        else:
+            from src.llm.client.api_client import MoonshotClient
+            llm_client = MoonshotClient(
+                api_key=os.environ.get("MOONSHOT_API_KEY", ""),
+                model=os.environ.get("MOONSHOT_MODEL", "moonshot-v1-8k"),
+                timeout_seconds=30
+            )
+        
+        # 创建 LLM 合并器
+        merger = LLMNewsMerger(
+            llm_client=llm_client,
+            merge_threshold=merger_cfg.get("merge_threshold", 0.7),
+            max_merge_count=merger_cfg.get("max_merge_count", 5),
+        )
+        
+        # 执行合并
+        merged_items = merger.merge_news_items(items)
+        
+        if len(merged_items) < len(items):
+            self.logger.info(
+                f"LLM 新闻合并完成: {len(items)} 条 → {len(merged_items)} 条"
+            )
+        
+        return merged_items
+    
+    def _merge_with_rules(self, items: list, merger_cfg: dict) -> list:
+        """使用规则合并新闻（备用方案）"""
+        from src.script.news_merger import NewsMerger
+        
+        merger = NewsMerger(
+            entity_similarity_threshold=merger_cfg.get("entity_similarity_threshold", 0.5),
+            title_similarity_threshold=merger_cfg.get("title_similarity_threshold", 0.3),
+            min_shared_keywords=merger_cfg.get("min_shared_keywords", 2),
+        )
+        
+        merged_items = merger.merge_news_items(items)
+        
+        if len(merged_items) < len(items):
+            self.logger.info(
+                f"规则新闻合并完成: {len(items)} 条 → {len(merged_items)} 条"
+            )
+        
+        return merged_items

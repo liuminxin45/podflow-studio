@@ -65,7 +65,12 @@ class TopicScorer:
         self,
         candidates: List[TopicCandidate]
     ) -> Tuple[List[TopicCandidate], List[TopicScoreBreakdown]]:
-        """打分并过滤"""
+        """打分并过滤
+        
+        返回:
+        - filtered_candidates: 通过筛选的候选（用于后续处理）
+        - breakdowns: 所有候选的打分明细（包括 discard 的，用于人工反馈）
+        """
         
         breakdowns = []
         filtered_candidates = []
@@ -91,12 +96,15 @@ class TopicScorer:
                     
                     filtered_candidates.append(candidate)
                 else:
+                    # discard 的主题，设置 should_publish_by_rule = False
+                    candidate.should_publish_by_rule = False
+                    candidate.publish_priority = 1
                     self.logger.debug(f"淘汰主题: {candidate.topic_id} (分数={breakdown.total_score:.2f})")
                     
             except Exception as e:
                 self.logger.error(f"打分失败: {candidate.topic_id} - {e}")
         
-        self.logger.info(f"打分完成: {len(filtered_candidates)}/{len(candidates)} 通过筛选")
+        self.logger.info(f"打分完成: {len(filtered_candidates)}/{len(candidates)} 通过筛选 ({len(candidates) - len(filtered_candidates)} 个被淘汰)")
         return filtered_candidates, breakdowns
     
     def _score_single(self, candidate: TopicCandidate) -> TopicScoreBreakdown:
@@ -113,21 +121,20 @@ class TopicScorer:
         
         from src.topic_selection.core.models import TopicArchetype
         
-        # === 1. 结构性淘汰规则（先淘汰） ===
+        # === 1. 记录淘汰原因（但继续计算分数，便于人工判断） ===
+        discard_reasons = []
+        
         if signals.continuity < 0.2:
-            self.logger.debug(f"淘汰: {candidate.topic_id} - 一次性事件 (continuity={signals.continuity:.2f})")
-            return self._create_discard_breakdown(candidate.topic_id, "一次性事件")
+            discard_reasons.append(f"一次性事件 (continuity={signals.continuity:.2f})")
         
         if signals.data_enrichable < 0.3 and signals.follow_up_potential < 0.3:
-            self.logger.debug(f"淘汰: {candidate.topic_id} - 无法补充数据且无后续")
-            return self._create_discard_breakdown(candidate.topic_id, "无法扩展")
+            discard_reasons.append(f"无法扩展 (data_enrichable={signals.data_enrichable:.2f}, follow_up={signals.follow_up_potential:.2f})")
         
         archetype_mean = signals.mean_archetype_score()
         personal_impact_raw = signals.archetypes.get(TopicArchetype.PERSONAL_IMPACT, 0.0)
         
         if archetype_mean < 0.7 and personal_impact_raw < 0.7:
-            self.logger.debug(f"淘汰: {candidate.topic_id} - 听众价值弱")
-            return self._create_discard_breakdown(candidate.topic_id, "听众价值弱")
+            discard_reasons.append(f"听众价值弱 (archetype_mean={archetype_mean:.2f}, personal_impact={personal_impact_raw:.2f})")
         
         # === 2. 内容价值分 (0-60) ===
         # archetype_mean: 0-3 → 0-40
@@ -174,15 +181,20 @@ class TopicScorer:
         total_score = content_score + proxy_score + structure_bonus
         total_score = max(0.0, min(100.0, total_score))  # clamp到0-100
         
-        # === 6. 决策 ===
-        if total_score >= self.config.threshold_must_publish:
+        # === 6. 决策（考虑结构性淘汰原因） ===
+        if discard_reasons:
+            # 有结构性淘汰原因，强制标记为 discard（但保留实际分数）
+            decision = "discard"
+            discard_reason = "; ".join(discard_reasons)
+            self.logger.debug(f"淘汰主题: {candidate.topic_id} - {discard_reason} (实际得分={total_score:.2f})")
+        elif total_score >= self.config.threshold_must_publish:
             decision = "must"
         elif total_score >= self.config.threshold_maybe_publish:
             decision = "maybe"
         else:
             decision = "discard"
         
-        return TopicScoreBreakdown(
+        breakdown = TopicScoreBreakdown(
             topic_id=candidate.topic_id,
             content_score=content_score,
             archetype_mean_score=archetype_mean_score,
@@ -202,6 +214,12 @@ class TopicScorer:
             threshold_maybe_publish=self.config.threshold_maybe_publish,
             decision=decision
         )
+        
+        # 附加淘汰原因（如果有）
+        if discard_reasons and hasattr(breakdown, '__dict__'):
+            breakdown.__dict__['discard_reason'] = "; ".join(discard_reasons)
+        
+        return breakdown
     
     def _create_discard_breakdown(self, topic_id: str, reason: str) -> TopicScoreBreakdown:
         """创建淘汰的breakdown（分数全0）"""

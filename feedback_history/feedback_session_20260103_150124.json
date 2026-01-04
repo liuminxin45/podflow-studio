@@ -1,0 +1,129 @@
+{
+  "session_id": "session_20260103_150124",
+  "timestamp": "2026-01-03 15:01:24.527639",
+  "episode_date": "2026-01-03",
+  "report_path": "out\\runs\\20260103\\145840_868148_life-c\\auto_topic\\report_20260103_150124.json",
+  "total_reviewed": 24,
+  "agree_count": 21,
+  "disagree_count": 3,
+  "feedbacks": [
+    {
+      "feedback_id": "fb_session_20260103_150124_4",
+      "topic_id": "topic:5bbaf73c2abf",
+      "timestamp": "2026-01-03 15:41:15.762669",
+      "episode_date": "2026-01-03",
+      "topic_snapshot": {
+        "topic_id": "topic:5bbaf73c2abf",
+        "title": "百度萝卜快跑无人驾驶汽车悄悄登陆青岛，成立子公司有望率先于城阳区开展服务",
+        "entities": [
+          "萝卜快跑",
+          "青岛",
+          "百度",
+          "城阳区"
+        ],
+        "items_count": 1,
+        "topic_score": 42.855555555555554,
+        "should_publish": false,
+        "priority": 1
+      },
+      "system_decision": "discard",
+      "system_score": 42.855555555555554,
+      "score_breakdown": {
+        "archetype_mean": 15.555555555555555,
+        "personal_impact": 3.333333333333333,
+        "counter_intuitive": 0.0,
+        "trend": 0.8000000000000002,
+        "time": 5.0,
+        "persona": 3.1666666666666665,
+        "history_echo": 0.0,
+        "continuity": 6.0,
+        "data_enrichable": 6.0,
+        "follow_up": 3.0
+      },
+      "human_decision": "accept",
+      "human_priority": 3,
+      "feedback_reason": "无人驾驶出租车与老百姓生活息息相关",
+      "tags": [],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    },
+    {
+      "feedback_id": "fb_session_20260103_150124_14",
+      "topic_id": "topic:cd6362472aea",
+      "timestamp": "2026-01-03 15:42:48.756104",
+      "episode_date": "2026-01-03",
+      "topic_snapshot": {
+        "topic_id": "topic:cd6362472aea",
+        "title": "美团 1200 元神券省钱券包 19.9 元开年发车：堂食外卖剪发泡澡都能用",
+        "entities": [
+          "美团"
+        ],
+        "items_count": 1,
+        "topic_score": 60.133333333333326,
+        "should_publish": false,
+        "priority": 1
+      },
+      "system_decision": "discard",
+      "system_score": 60.133333333333326,
+      "score_breakdown": {
+        "archetype_mean": 26.666666666666664,
+        "personal_impact": 10.0,
+        "counter_intuitive": 6.666666666666666,
+        "trend": 0.8000000000000002,
+        "time": 5.0,
+        "persona": 5.0,
+        "history_echo": 0.0,
+        "continuity": 0.0,
+        "data_enrichable": 6.0,
+        "follow_up": 0.0
+      },
+      "human_decision": "accept",
+      "human_priority": 4,
+      "feedback_reason": "美团神券省钱，与民众生活息息相关",
+      "tags": [],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    },
+    {
+      "feedback_id": "fb_session_20260103_150124_21",
+      "topic_id": "topic:7d5885e6ceac",
+      "timestamp": "2026-01-03 15:47:30.589646",
+      "episode_date": "2026-01-03",
+      "topic_snapshot": {
+        "topic_id": "topic:7d5885e6ceac",
+        "title": "微软 Win11“Copilot 共享”上线，AI 助手可看屏指导但无法操作",
+        "entities": [
+          "Copilot",
+          "Windows 11",
+          "微软"
+        ],
+        "items_count": 1,
+        "topic_score": 18.96666666666667,
+        "should_publish": false,
+        "priority": 1
+      },
+      "system_decision": "discard",
+      "system_score": 18.96666666666667,
+      "score_breakdown": {
+        "archetype_mean": 6.666666666666666,
+        "personal_impact": 3.333333333333333,
+        "counter_intuitive": 0.0,
+        "trend": 0.8000000000000002,
+        "time": 5.0,
+        "persona": 3.1666666666666665,
+        "history_echo": 0.0,
+        "continuity": 0.0,
+        "data_enrichable": 0.0,
+        "follow_up": 0.0
+      },
+      "human_decision": "accept",
+      "human_priority": 4,
+      "feedback_reason": "windows操作系统AI功能：与百姓生活息息相关，效率工具",
+      "tags": [],
+      "suggested_archetype": null,
+      "suggested_score_adjustment": null
+    }
+  ],
+  "reviewer": "default",
+  "notes": ""
+}

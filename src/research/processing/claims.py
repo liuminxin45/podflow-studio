@@ -192,8 +192,12 @@ def _extract_claims_from_text(
         claim_type: Optional[str] = None
         confidence = 0.6
         
+        # 特殊处理：标题直接作为断言（新闻标题通常包含核心事实）
+        if location == "title" and len(sentence) >= 10:
+            claim_type = "factual"
+            confidence = 0.75  # 标题的基础置信度
         # 按优先级匹配模式
-        if _match_patterns(sentence, FACTUAL_PATTERNS):
+        elif _match_patterns(sentence, FACTUAL_PATTERNS):
             claim_type = "factual"
             confidence = 0.8
         elif _match_patterns(sentence, CAUSAL_PATTERNS):

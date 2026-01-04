@@ -144,21 +144,14 @@ def main():
                 return 1
             
             log.info(f"成功选中 {len(ctx.items_selected)} 个 items")
-        
-        if args.step == "all" or args.step == "script":
-            log.info(">>> 步骤 2/5: 脚本生成 (SCRIPT)")
-            log.info("脚本生成步骤（待实现）")
-            log.info("<<< 步骤 2/5 完成")
-        
-        if args.step == "all" or args.step == "audio":
-            log.info(">>> 步骤 3/5: 音频生成 (AUDIO)")
-            log.info("音频生成步骤（待实现）")
-            log.info("<<< 步骤 3/5 完成")
-        
-        if args.step == "all" or args.step == "publish":
-            log.info(">>> 步骤 4/5: 发布 (PUBLISH)")
-            log.info("发布步骤（待实现）")
-            log.info("<<< 步骤 4/5 完成")
+            
+            # 检查是否有音频输出
+            if hasattr(ctx, 'audio_outputs') and ctx.audio_outputs:
+                log.info(f"生成了 {len(ctx.audio_outputs)} 个音频文件")
+            
+            # 检查是否有脚本输出
+            if hasattr(ctx, 'script_segments') and ctx.script_segments:
+                log.info(f"生成了 {len(ctx.script_segments)} 个脚本段落")
         
         log.info("=" * 80)
         log.info("工作流执行成功")

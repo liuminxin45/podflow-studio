@@ -9,22 +9,9 @@ Unified LLM API Client
 - 支持脚本生成、研究分析等多种应用场景
 - 完整的错误处理和重试机制
 
-主要类：
-- UnifiedLLMClient: 统一LLM客户端
-- DeepSeekClient: DeepSeek API客户端（向后兼容）
-- MoonshotClient: Moonshot API客户端（向后兼容）
-- ScriptInputItem/ScriptOutput: 脚本数据模型
-
-工厂方法：
-- create_client(): 根据配置创建对应客户端
-- 支持环境变量和配置文件
-
-使用示例：
-    client = create_client("deepseek", api_key, base_url, model, timeout)
-    result = client.generate_from_research(items, research_content, citations)
 
 作者：Auto-Podcast Team
-版本：2.0.0
+版本：3.0.0
 更新：2025-12-25
 """
 
@@ -38,11 +25,12 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 from pydantic import BaseModel, Field
 
-from src.llm.templates.prompts import (
-    build_research_script_prompt,
-    build_news_script_prompt,
-    build_detailed_news_script_prompt,
-)
+# 旧版本的 prompt 函数已被移除，使用新版本的 SegmentScriptGenerator 替代
+# from src.llm.templates.prompts import (
+#     build_research_script_prompt,
+#     build_news_script_prompt,
+#     build_detailed_news_script_prompt,
+# )
 
 
 class ScriptInputItem(BaseModel):
@@ -161,130 +149,6 @@ class UnifiedLLMClient:
                 
         assert last_err is not None
         raise last_err
-
-    def generate_from_research(
-        self,
-        *,
-        channel: Dict,
-        items: List[ScriptInputItem],
-        research_content: str,
-        citations: List[Dict],
-        temperature: float,
-    ) -> ScriptOutput:
-        """
-        基于研究内容生成播客脚本
-        """
-        from src.utils.logging_config import log_api_call
-        
-        system, user = build_research_script_prompt(
-            channel=channel,
-            items=items,
-            research_content=research_content,
-            citations=citations,
-        )
-        
-        # 计算字符数
-        total_chars = len(system) + len(user)
-        
-        log_api_call(
-            self.log,
-            api_type="LLM",
-            operation=f"{self.provider}_generate_from_research",
-            char_count=total_chars
-        )
-
-        payload = {
-            "model": self.model,
-            "temperature": temperature,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            "response_format": {"type": "json_object"},
-        }
-
-        data = self._post_json(payload)
-        content = ((((data.get("choices") or [])[0] or {}).get("message") or {}).get("content") or "")
-
-        try:
-            obj = self._load_json_from_content(content)
-        except json.JSONDecodeError as e:
-            self.log.error("LLM returned non-JSON: %s", content)
-            raise RuntimeError(f"{self.provider.title()} output is not valid JSON") from e
-
-        try:
-            return ScriptOutput.model_validate(obj)
-        except Exception as e:
-            self.log.error("LLM JSON schema invalid: %s", content)
-            raise RuntimeError(f"{self.provider.title()} output JSON schema invalid") from e
-
-    def generate(self, channel: Dict, items: List[ScriptInputItem], temperature: float) -> ScriptOutput:
-        """
-        基于新闻内容生成播客脚本（简化版）
-        """
-        system, user = build_news_script_prompt(
-            channel=channel,
-            items=items,
-        )
-
-        payload = {
-            "model": self.model,
-            "temperature": temperature,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            "response_format": {"type": "json_object"},
-        }
-
-        data = self._post_json(payload)
-        content = ((((data.get("choices") or [])[0] or {}).get("message") or {}).get("content") or "")
-
-        try:
-            obj = self._load_json_from_content(content)
-        except json.JSONDecodeError as e:
-            self.log.error("LLM returned non-JSON: %s", content)
-            raise RuntimeError(f"{self.provider.title()} output is not valid JSON") from e
-
-        try:
-            return ScriptOutput.model_validate(obj)
-        except Exception as e:
-            self.log.error("LLM JSON schema invalid: %s", content)
-            raise RuntimeError(f"{self.provider.title()} output JSON schema invalid") from e
-
-    def generate_detailed(self, channel: Dict, items: List[ScriptInputItem], temperature: float) -> ScriptOutput:
-        """
-        基于详细新闻内容生成播客脚本（包含摘要等信息）
-        """
-        system, user = build_detailed_news_script_prompt(
-            channel=channel,
-            items=items,
-        )
-
-        payload = {
-            "model": self.model,
-            "temperature": temperature,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            "response_format": {"type": "json_object"},
-        }
-
-        data = self._post_json(payload)
-        content = ((((data.get("choices") or [])[0] or {}).get("message") or {}).get("content") or "")
-
-        try:
-            obj = self._load_json_from_content(content)
-        except json.JSONDecodeError as e:
-            self.log.error("LLM returned non-JSON: %s", content)
-            raise RuntimeError(f"{self.provider.title()} output is not valid JSON") from e
-
-        try:
-            return ScriptOutput.model_validate(obj)
-        except Exception as e:
-            self.log.error("LLM JSON schema invalid: %s", content)
-            raise RuntimeError(f"{self.provider.title()} output JSON schema invalid") from e
 
 
 # 为了向后兼容，保留原有的类名

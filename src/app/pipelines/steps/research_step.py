@@ -46,17 +46,23 @@ class ResearchStep(BaseStep):
         self.logger.info(f"开始 Research：{len(ctx.items_selected)} items")
         
         try:
-            # 1. 只提取 title 和 id 字段用于 research（节省 token）
+            # 1. 提取 title 和 summary 字段用于 research
             research_items = []
             total_chars = 0
             for item in ctx.items_selected:
                 title = item.get("title", "")
+                summary = item.get("summary", "") or item.get("content", "")
+                # 限制 summary 长度（前 500 字符）
+                if summary and len(summary) > 500:
+                    summary = summary[:500]
+                
                 research_items.append({
                     "id": item.get("id"),
                     "title": title,
+                    "summary": summary,
                     "source_name": item.get("source_name", ""),
                 })
-                total_chars += len(title)
+                total_chars += len(title) + len(summary)
             
             log_operation(
                 self.logger,
@@ -90,6 +96,21 @@ class ResearchStep(BaseStep):
                 include_opinions=research_cfg.get("include_opinions", False),
                 include_contrast_queries=research_cfg.get("include_contrast_queries", True),
             )
+            
+            # 检查 research 结果是否为空
+            stats = result.get("stats", {})
+            total_claims = stats.get("total_claims", 0)
+            total_evidence_packs = stats.get("total_evidence_packs", 0)
+            
+            if total_claims == 0 and total_evidence_packs == 0:
+                error_msg = (
+                    "Research 失败: 没有生成任何 claims 或 evidence packs。"
+                    "可能原因：API 调用失败、解析错误或配置问题。"
+                    f"\n结果详情: {result}"
+                )
+                self.logger.error(error_msg)
+                ctx.add_event("research_empty_result", error=error_msg)
+                raise RuntimeError(error_msg)
             
             # 4. 将 research 结果组装回原始 items
             evidence_packs = result.get("evidence_packs", [])
