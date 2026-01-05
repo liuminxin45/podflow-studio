@@ -1,4 +1,16 @@
 # ============================================================
+# 系统配置
+# ============================================================
+version: "2.0.0"
+
+# 通用设置
+general:
+  cache_enabled: true
+  metrics_enabled: true
+  trace_enabled: true
+  log_level: "INFO"
+
+# ============================================================
 # 日志配置
 # ============================================================
 logging:
@@ -8,6 +20,11 @@ logging:
   console_level: INFO
   # 文件日志级别
   file_level: DEBUG
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "./logs/podcast.log"
+  max_size_mb: 100
+  backup_count: 5
 
 # ============================================================
 # 频道配置（全局入口）
@@ -54,10 +71,82 @@ channel_presets:
       length_minutes: 7
     auto_topic_strategy: "balanced"
 
+# ============================================================
+# Fetch 阶段配置
+# ============================================================
+fetch:
+  timeout_seconds: 300
+  max_items: 50
+  
+  # 去重配置
+  dedup:
+    enabled: true
+    methods:
+      - "url_normalize"
+      - "content_sha256"
+      - "simhash"
+  
+  # 日期过滤配置
+  date_filter:
+    enabled: true
+    mode: "exact"  # "exact" | "range" | "disabled"
+    days_before: 0
+    days_after: 0
+  
+  # RSS源配置
+  rss:
+    timeout_seconds: 30
+    max_retries: 3
+  
+  # MetaSo配置
+  metaso:
+    enabled: false
+    max_items: 10
+    timeout_seconds: 60
+
+# ============================================================
+# Store 阶段配置（去重、聚类、选择）
+# ============================================================
+store:
+  # 聚类配置
+  clustering:
+    simhash_max_distance: 4
+    title_min_jaccard: 0.4
+    time_window_days: 7
+    cooldown_days: 2
+    min_cluster_size: 1
+  
+  # 评分权重
+  scoring:
+    freshness_weight: 0.3
+    impact_weight: 0.25
+    source_trust_weight: 0.25
+    quality_weight: 0.2
+  
+  # 约束条件
+  constraints:
+    cooldown_hours: 48
+    max_per_topic: 4
+    max_per_domain: 3
+    title_similarity_threshold: 0.7
+    exception_keywords:
+      - "重大突破"
+      - "首次"
+      - "历史性"
+
+# ============================================================
+# Selection 配置
+# ============================================================
 selection:
   max_clusters: 5
   constraints:
     cooldown_days: 2
+    max_per_domain: 3
+    max_per_topic: 3
+  clustering:
+    simhash_max_distance: 1
+    title_min_jaccard: 0.2
+    time_window_days: 1
 
 source_guard:
   config_dir: "./config/sources"
@@ -77,16 +166,6 @@ compliance:
         - "60s-static.viki.moe"
         - "60s.viki.moe"
         - "github.com"
-
-selection:
-  constraints:
-    max_per_domain: 3
-    max_per_topic: 3
-  max_clusters: 5
-  clustering:
-    simhash_max_distance: 1
-    title_min_jaccard: 0.2
-    time_window_days: 1
 
 sources:
   rss:
@@ -198,6 +277,9 @@ sources:
 
 
 
+# ============================================================
+# Pipeline 配置
+# ============================================================
 pipeline:
   max_items: 8
   pick_items: 5
@@ -217,22 +299,141 @@ filter:
     - "url"
   keep_raw: false
 
+# ============================================================
+# LLM 配置
+# ============================================================
 llm:
-  provider: "deepseek"
-  model: "deepseek-chat"
+  provider: "deepseek"  # deepseek | moonshot
   timeout_seconds: 120
   max_tokens: 4000
   temperature: 0.7
+  
+  # DeepSeek 配置
+  deepseek:
+    base_url: "https://api.deepseek.com"
+    api_key: "sk-24dbbd8a266a463a8706aae3f8f64372"  # 请替换为您的API Key
+    model: "deepseek-chat"
+  
+  # Moonshot (Kimi) 配置
+  moonshot:
+    base_url: "https://api.moonshot.cn/v1"
+    api_key: "sk-7I3yv5XBtRUG9R9KoYordU1mDfVJBD0HZ5LmE6T0ev1hGqsR"  # 请替换为您的API Key
+    model: "kimi-k2-0905-preview"
 
+# ============================================================
+# TTS 配置
+# ============================================================
 tts:
   provider: "doubao"
-  mode: "default"
-  voice: "zh_female_vv_uranus_bigtts"
-  speed: 1.0
-  volume: 1.0
-  pitch: 1.0
   timeout_seconds: 60
+  
+  # Doubao TTS 基础配置
+  doubao:
+    # 认证信息
+    app_id: "8434414106"
+    access_key: "8P0hDShVjXBCAJdWeNrODdcA0Kiy6toN"
+    secret_key: "VH-DAgdVnv7XUrP04HKwG72IGuKdT7Kh"
+    
+    # TTS 模式选择：voiceclone_http | tts | tts_v3_http | tts_v3_ws | podcast
+    mode: "tts"
+    
+    # 共享设置（所有模式通用）
+    voice: "zh_female_vv_uranus_bigtts"
+    disable_fallback: false
+    force: false
+    
+    # Voice Clone 模式配置 (mode=voiceclone_http)
+    voiceclone:
+      api_key: "dc159349-9fab-43b9-8812-0bacd403833a"
+      speaker_id: "S_yiQKtNFN1"
+    
+    # Podcast 模式配置 (mode=podcast)
+    podcast:
+      ws_url: "wss://openspeech.bytedance.com/api/v3/sami/podcasttts"
+      resource_id: "volc.service_type.10050"
+      format: "mp3"
+      sample_rate: 24000
+      speech_rate: -5
+    
+    # TTS V3 HTTP 模式配置 (mode=tts 或 tts_v3_http)
+    tts_v3:
+      url: "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
+      version: 2  # 1 或 2
+      resource_id: "seed-tts-2.0"
+      uid: "auto_podcast"
+      format: "mp3"
+      sample_rate: 24000
+      speech_rate: -5
+      emotion_scale: 4
+      silence_duration: 800  # 句尾静音时长（毫秒）
+      context_texts: ["请用温和亲切的语气说话"]  # 语音风格控制
+    
+    # TTS V3 WebSocket 模式配置 (mode=tts_v3_ws)
+    tts_v3_ws:
+      url: "wss://openspeech.bytedance.com/api/v3/tts/unidirectional/stream"
+      resource_id: "seed-tts-2.0"
 
+# ============================================================
+# 音频生成工作流配置
+# ============================================================
+audio:
+  # 工作流模式：segmented | unified
+  # - segmented: 分段模式（5段脚本 → 5个MP3 → 合并）适合调试和段落级缓存
+  # - unified: 统一模式（5段脚本 → 合并脚本 → 1个MP3）速度更快，音频更连贯
+  workflow: unified
+  
+  # 分段模式配置
+  segmented:
+    enable_cache: true          # 是否启用段落缓存
+    fail_on_critical: true      # 关键段落(S0,S1)失败时是否停止
+    critical_segments: [S0, S1] # 关键段落列表
+  
+  # 统一模式配置
+  unified:
+    enable_cache: true          # 是否启用完整脚本缓存
+    transition_text: "\n\n"     # 段落间过渡文本
+    add_pauses: true            # 是否在段落间添加停顿标记
+    pause_duration_ms: 800      # 停顿时长（毫秒）
+    merge_strategy: simple      # 合并策略：simple | smart
+    use_ssml: false             # 是否使用SSML标记（需TTS支持）
+  
+  # 通用配置
+  assets_dir: ./assets
+  output_format: mp3
+  sample_rate: 24000
+  
+  # 混音配置
+  mixing:
+    target_loudness: -16.0  # LUFS
+    bgm_volume_db: -20.0
+    ducking_amount_db: -12.0
+    ducking_fade_ms: 500
+  
+  # BGM配置
+  bgm:
+    intro_duration: 5.0
+    outro_duration: 3.0
+    mid_enabled: true
+  
+  # 导出配置
+  export:
+    format: "mp3"
+    bitrate: "192k"
+
+# ============================================================
+# 字幕配置
+# ============================================================
+subtitles:
+  enabled: true
+  formats:
+    - "srt"
+    - "vtt"
+  max_chars_per_line: 42
+  max_lines: 2
+
+# ============================================================
+# 输出配置
+# ============================================================
 output:
   runs_dir: "./out/runs"
   fetch_archives_dir: "./out/fetch"
@@ -240,20 +441,79 @@ output:
   tts_dir: "./out/tts"
   render_dir: "./out/render"
   publish_dir: "./out/publish"
+  base_dir: "output"
+  episode_format: "{date}_{topic}_{mode}"
+  artifacts:
+    - "manifest.json"
+    - "chapters.json"
+    - "timeline.json"
+    - "metrics.json"
+    - "trace.json"
 
+# ============================================================
+# Research 配置
+# ============================================================
 research:
-  provider: "anspire"  # Options: metaso, anspire
+  provider: "anspire"  # metaso | anspire
   enabled: true
   timeout_seconds: 60
   max_items: 10
   max_retries: 3
   retry_delay: 1.0
-  # Provider-specific settings
+  
+  # 断言提取
+  claims:
+    max_claims_per_item: 10
+    min_confidence: 0.6
+    include_opinions: false
+  
+  # 预算控制
+  budget:
+    max_news_items: 10
+    max_claims_per_item: 5
+    max_total_claims: 30
+    priority_claim_types:
+      - "factual"
+      - "causal"
+      - "predictive"
+  
+  # 查询构建
+  query:
+    include_contrast: true
+    max_age_days: 30
+  
+  # Metaso 配置
   metaso:
+    api_key: "mk-ED73D964A6996ADE50A1ACDD47356BA8"  # 请替换为您的API Key
     model: "fast"
+    max_items: 10
+  
+  # Anspire 配置
   anspire:
+    api_key: "sk-ue3OHcH7XllzCRHpo87k9n5QhGh7H0RB"  # 请替换为您的API Key
     top_k: 5
     is_stream: false
+    timeout_seconds: 60
+    max_items: 1
+    max_retries: 3
+    retry_delay: 1.0
+
+# ============================================================
+# Editorial 阶段配置
+# ============================================================
+editorial:
+  # 5W框架
+  sections:
+    - "what"
+    - "so_what"
+    - "impact"
+    - "uncertainty"
+    - "takeaway"
+  
+  # 证据要求
+  evidence:
+    min_quality: "moderate"
+    require_disclaimer: true
 
 # Pipeline 配置（二次检索+二阶段LLM）
 pipeline_v2:
@@ -341,6 +601,21 @@ human_feedback:
 # 脚本生成配置
 # ============================================================
 script:
+  # 质量门控
+  quality_gate:
+    enabled: true
+    pass_threshold: 0.7
+    drop_threshold: 0.4
+    max_revisions: 3
+  
+  # 章节配置
+  chapters:
+    include_intro: true
+    include_outro: true
+    intro_duration: 10.0
+    outro_duration: 5.0
+  
+  # 新闻合并配置
   news_merger:
     enabled: true                       # 是否启用新闻合并
     method: "llm"                       # 合并方法："llm" 或 "rules"
@@ -354,14 +629,38 @@ script:
     title_similarity_threshold: 0.3     # 标题相似度阈值（0-1）
     min_shared_keywords: 2              # 最少共享关键词数
 
+# ============================================================
+# 缓存配置
+# ============================================================
+cache:
+  base_dir: ".cache"
+  ttl_hours: 168  # 7天
+  max_size_mb: 1000
+
+# ============================================================
+# 成本控制
+# ============================================================
+cost_control:
+  max_cost_per_episode: 1.0  # USD
+  alert_threshold: 0.8
+  
+  # API成本模型
+  api_costs:
+    metaso:
+      per_request: 0.01
+    llm:
+      per_1k_tokens: 0.002
+    tts:
+      per_second: 0.0001
+
+# ============================================================
+# 系统配置
+# ============================================================
+system:
+  http_timeout_seconds: 180
+  database_path: "./out/podcast.sqlite"
+
 database:
   path: "./data/podcast.db"
   backup_enabled: true
   backup_interval_hours: 24
-
-logging:
-  level: "INFO"
-  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  file: "./logs/podcast.log"
-  max_size_mb: 100
-  backup_count: 5

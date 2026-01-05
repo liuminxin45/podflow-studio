@@ -51,31 +51,34 @@ def _setup_logging(log_level: str = "INFO"):
     root.addHandler(console_handler)
 
 
+def _deep_merge_dict(base: dict, override: dict) -> dict:
+    """深度合并字典，override 中的值会覆盖 base 中的值"""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            # 递归合并嵌套字典
+            result[key] = _deep_merge_dict(result[key], value)
+        else:
+            # 直接覆盖
+            result[key] = value
+    return result
+
+
 def _load_config(config_path: str | None = None) -> dict:
     """加载配置文件"""
     if config_path:
         with open(config_path, "r", encoding="utf-8") as f:
             return json.load(f)
     
-    # 默认配置：合并 settings.yaml 和 pipeline.yaml
+    # 加载 settings.yaml（统一配置文件）
     import yaml
     
-    config = {}
-    
-    # 加载 settings.yaml
     settings_path = Path("config/base/settings.yaml")
     if settings_path.exists():
         with open(settings_path, "r", encoding="utf-8") as f:
-            config.update(yaml.safe_load(f) or {})
+            return yaml.safe_load(f) or {}
     
-    # 加载 pipeline.yaml
-    pipeline_path = Path("config/base/pipeline.yaml")
-    if pipeline_path.exists():
-        with open(pipeline_path, "r", encoding="utf-8") as f:
-            pipeline_cfg = yaml.safe_load(f) or {}
-            config.update(pipeline_cfg)
-    
-    return config
+    return {}
 
 
 def main():

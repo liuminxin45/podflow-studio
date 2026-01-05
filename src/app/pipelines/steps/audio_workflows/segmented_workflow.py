@@ -1,80 +1,108 @@
 """
-Audio Step (Segmented Version)
+Segmented Audio Workflow
 
-音频生成步骤 - 支持多种工作流模式
-- segmented: 分段生成（5个MP3 → 合并）
-- unified: 统一生成（合并脚本 → 1个MP3）
+分段音频生成工作流：为每个段落独立生成TTS，然后合并
+这是原有实现的封装版本
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import os
+import re
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import TYPE_CHECKING, List
 
-from src.app.pipelines.base_step import BaseStep
-from src.app.pipelines.steps.audio_workflows import WorkflowFactory
+from .base import AudioWorkflow, AudioManifest
+from src.models.segment import SegmentAudio, BGMInsert
+from src.audio.segment_merger import merge_episode_with_bgm, AudioMerger
 
 if TYPE_CHECKING:
     from src.app.core.context import EpisodeContext
+    from src.models.segment import SegmentScript
 
 
-class AudioStepSegmented(BaseStep):
-    """音频生成步骤（支持多种工作流）"""
+class SegmentedWorkflow(AudioWorkflow):
+    """分段音频生成工作流"""
     
-    def execute(self, ctx: EpisodeContext) -> None:
-        """执行 Audio 步骤"""
-        # 1. 读取配置决定使用哪种工作流
-        audio_cfg = ctx.config.get("audio", {})
-        workflow_mode = audio_cfg.get("workflow", "segmented")
+    def execute(self, ctx: EpisodeContext) -> AudioManifest:
+        """
+        执行分段音频生成
         
-        self.logger.info(f"音频工作流模式: {workflow_mode}")
+        流程：
+        1. 为每个段落生成TTS
+        2. 准备BGM
+        3. 合并音频
+        4. 创建manifest
+        """
+        self.logger.info(f"开始分段音频生成：{len(ctx.script_segments)} 个段落")
         
-        # 2. 创建工作流实例
-        try:
-            workflow = WorkflowFactory.create_workflow(
-                mode=workflow_mode,
-                config=audio_cfg,
-                logger=self.logger
-            )
-        except ValueError as e:
-            self.logger.error(f"工作流创建失败: {e}")
-            self.logger.warning("回退到默认的 segmented 模式")
-            workflow = WorkflowFactory.create_workflow(
-                mode="segmented",
-                config=audio_cfg,
-                logger=self.logger
-            )
+        # 获取配置
+        segmented_cfg = self.config.get("segmented", {})
+        enable_cache = segmented_cfg.get("enable_cache", True)
+        fail_on_critical = segmented_cfg.get("fail_on_critical", True)
+        critical_segments = segmented_cfg.get("critical_segments", ["S0", "S1"])
         
-        # 3. 验证前置条件
-        if not workflow.validate(ctx):
-            self.logger.error(f"工作流 {workflow_mode} 验证失败")
-            ctx.audio_manifest = None
-            return
+        # 创建输出目录
+        tts_dir = self._get_output_dir(ctx, "segments")
         
-        # 4. 执行工作流
-        try:
-            manifest = workflow.execute(ctx)
-            
-            # 5. 保存结果到context
-            ctx.audio_manifest = manifest
-            ctx.audio_paths = {
-                "final": manifest.final_path,
-                "manifest": str(manifest.manifest_path) if manifest.manifest_path else "",
-            }
-            
-            self.logger.info(f"✓ 音频生成完成 ({workflow_mode} 模式)")
-            
-        except Exception as e:
-            self.logger.error(f"音频生成失败: {e}")
-            raise
+        # 1. 生成每个段落的TTS
+        segment_audios = []
+        for segment_script in ctx.script_segments:
+            try:
+                audio = self._generate_segment_tts(
+                    ctx, segment_script, tts_dir, enable_cache
+                )
+                segment_audios.append(audio)
+            except Exception as e:
+                self.logger.error(f"段落 {segment_script.id} TTS失败: {e}")
+                # 关键段落失败则停止
+                if fail_on_critical and segment_script.id in critical_segments:
+                    raise RuntimeError(f"关键段落 {segment_script.id} TTS失败: {e}")
+        
+        # 2. 准备BGM
+        bgm_inserts = self._prepare_bgm(ctx)
+        
+        # 3. 合并音频
+        final_path = self._merge_segments(ctx, segment_audios, bgm_inserts)
+        
+        # 4. 创建manifest
+        manifest = AudioManifest(
+            episode_id=ctx.episode_id,
+            segments=segment_audios,
+            bgm=bgm_inserts,
+            final_path=str(final_path),
+            workflow_mode="segmented",
+            created_at=datetime.now().isoformat(),
+        )
+        
+        # 计算总时长
+        merger = AudioMerger()
+        manifest.total_duration_ms = merger.get_audio_duration(final_path)
+        
+        # 保存manifest
+        manifest_path = ctx.run_dir / "4_tts" / "manifest.json"
+        manifest.save(str(manifest_path))
+        
+        self.logger.info(
+            f"音频生成完成: {len(segment_audios)} 个段落, "
+            f"总时长 {manifest.total_duration_ms/1000:.1f}秒"
+        )
+        ctx.add_event(
+            "audio_segments_generated",
+            segments_count=len(segment_audios),
+            total_duration_ms=manifest.total_duration_ms
+        )
+        
+        return manifest
     
-    # 以下方法已迁移到 audio_workflows/segmented_workflow.py
-    # 保留此注释以便追踪代码迁移历史
-    
-    def _generate_segment_tts_legacy(
+    def _generate_segment_tts(
         self,
         ctx: EpisodeContext,
-        segment_script,
-        segments_dir: Path
+        segment_script: "SegmentScript",
+        segments_dir: Path,
+        enable_cache: bool
     ) -> SegmentAudio:
         """生成单个段落的TTS"""
         from src.utils.logging_config import log_api_call, log_operation
@@ -83,7 +111,7 @@ class AudioStepSegmented(BaseStep):
         output_path = segments_dir / f"{segment_id}.mp3"
         
         # 检查缓存
-        if output_path.exists():
+        if enable_cache and output_path.exists():
             log_operation(
                 self.logger,
                 step="Audio",
@@ -124,14 +152,16 @@ class AudioStepSegmented(BaseStep):
             merger = AudioMerger()
             duration_ms = merger.get_audio_duration(output_path)
             
-            self.logger.info(f"✓ {segment_id} TTS完成: {duration_ms/1000:.1f}秒, 耗时 {gen_ms}ms")
+            self.logger.info(
+                f"✓ {segment_id} TTS完成: {duration_ms/1000:.1f}秒, 耗时 {gen_ms}ms"
+            )
             
             return SegmentAudio(
                 segment_id=segment_id,
                 mp3_path=str(output_path),
                 duration_ms=duration_ms,
                 gen_ms=gen_ms,
-                tts_ms=gen_ms,  # 简化：gen_ms = tts_ms
+                tts_ms=gen_ms,
                 cached=False
             )
             
@@ -142,7 +172,7 @@ class AudioStepSegmented(BaseStep):
     def _call_tts(self, ctx: EpisodeContext, text: str) -> bytes:
         """调用TTS服务"""
         cfg = ctx.config
-        timeout_s = int(cfg.get("llm", {}).get("timeout_seconds", 120))
+        timeout_s = self._get_tts_timeout(ctx)
         
         # 获取 Doubao 模式
         doubao_mode_env = os.environ.get("DOUBAO_MODE")
@@ -275,8 +305,7 @@ class AudioStepSegmented(BaseStep):
         final_path = final_dir / f"{ctx.episode_date}.final.mp3"
         
         # 合并
-        cfg = ctx.config
-        timeout_s = int(cfg.get("llm", {}).get("timeout_seconds", 120))
+        timeout_s = self._get_tts_timeout(ctx)
         
         total_duration_ms = merge_episode_with_bgm(
             segments=segment_paths,
@@ -286,7 +315,9 @@ class AudioStepSegmented(BaseStep):
             timeout_seconds=timeout_s
         )
         
-        self.logger.info(f"✓ 合并完成: {final_path}, 总时长 {total_duration_ms/1000:.1f}秒")
+        self.logger.info(
+            f"✓ 合并完成: {final_path}, 总时长 {total_duration_ms/1000:.1f}秒"
+        )
         
         return final_path
     

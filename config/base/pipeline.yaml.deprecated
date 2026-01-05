@@ -125,6 +125,9 @@ script:
 
 # Audio阶段
 audio:
+  # 工作流模式（从 settings.yaml 继承，这里不覆盖）
+  # workflow: unified  # 在 settings.yaml 中配置
+  
   # 混音配置
   mixing:
     target_loudness: -16.0  # LUFS

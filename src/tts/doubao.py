@@ -71,25 +71,35 @@ class DoubaoTTSConfig:
 
 
 class DoubaoTTSClient:
-    def __init__(self, timeout_seconds: int):
+    def __init__(self, timeout_seconds: int, config: Optional[Dict[str, Any]] = None):
         self.timeout_seconds = timeout_seconds
+        
+        # 从配置加载器获取配置
+        if config is None:
+            from src.utils.config_helper import get_tts_config
+            tts_config = get_tts_config()
+            config = tts_config.get("doubao", {})
+        
+        self.config = config
         self.cfg = DoubaoTTSConfig(
-            app_id=os.environ.get("DOUBAO_APP_ID", "").strip(),
-            access_key=os.environ.get("DOUBAO_ACCESS_KEY", "").strip(),
-            secret_key=os.environ.get("DOUBAO_SECRET_KEY", "").strip(),
-            region=os.environ.get("DOUBAO_REGION", "").strip() or "cn-north-1",
+            app_id=str(config.get("app_id", "")).strip(),
+            access_key=config.get("access_key", "").strip(),
+            secret_key=config.get("secret_key", "").strip(),
+            region=config.get("region", "cn-north-1").strip(),
         )
         self._conns: Dict[str, websocket.WebSocket] = {}
         self._payloads: Dict[str, Dict[str, Any]] = {}
 
     def _ws_url(self) -> str:
-        return (os.environ.get("DOUBAO_WS_URL") or "wss://openspeech.bytedance.com/api/v3/sami/podcasttts").strip()
+        podcast_config = self.config.get("podcast", {})
+        return podcast_config.get("ws_url", "wss://openspeech.bytedance.com/api/v3/sami/podcasttts").strip()
 
     def _ws_headers(self) -> Dict[str, str]:
         # From the doc: Podcast API websocket v3
-        resource_id = (os.environ.get("DOUBAO_RESOURCE_ID") or "volc.service_type.10050").strip()
-        app_key = (os.environ.get("DOUBAO_WS_APP_KEY") or "aGjiRDfUWi").strip()
-        sequence = (os.environ.get("DOUBAO_WS_SEQUENCE") or "1").strip() or "1"
+        podcast_config = self.config.get("podcast", {})
+        resource_id = podcast_config.get("resource_id", "volc.service_type.10050").strip()
+        app_key = podcast_config.get("app_key", "aGjiRDfUWi").strip()
+        sequence = str(podcast_config.get("sequence", "1")).strip() or "1"
         return {
             "X-Api-App-Id": self.cfg.app_id,
             "X-Api-Access-Key": self.cfg.access_key,
