@@ -1,0 +1,34 @@
+# 测试配置 - 用于验证模块化 Pipeline
+
+# 限制新闻条数为1 (在 selection 后)
+selection:
+  max_items: 1
+  max_clusters: 1
+
+# 跳过 research 加快测试
+research:
+  enabled: false
+
+# 禁用 audio 和 publish (无需实际生成)
+audio:
+  enabled: true
+  
+publish:
+  local_enabled: true
+
+# Channel 配置
+channel:
+  id: "test-channel"
+  name: "测试频道"
+  host_name: "测试主播"
+  style: "casual"
+
+# LLM 配置
+llm:
+  provider: "deepseek"
+  timeout_seconds: 60
+
+# 日志
+logging:
+  verbose: true
+  console_level: "INFO"

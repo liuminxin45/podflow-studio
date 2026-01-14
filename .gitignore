@@ -15,3 +15,10 @@ dist/
 .ruff_cache/
 .idea/
 .vscode/
+node_modules/
+n8n_bridge/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/

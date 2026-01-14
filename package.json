@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "n8n": "^2.3.4"
+  }
+}
