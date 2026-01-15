@@ -109,7 +109,7 @@ class ItemSignalTagger:
         
         item_id = item.get("id") or item.get("url") or "unknown"
         title = item.get("title", "")
-        content = item.get("content") or item.get("summary", "")
+        content = item.get("content") or item.get("summary") or ""
         
         if not title and not content:
             return None

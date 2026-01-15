@@ -44,7 +44,14 @@ class ClusterStage(BaseStage[ClusterInput, ClusterOutput]):
         artifacts_dir.mkdir(parents=True, exist_ok=True)
         
         # 转换为原始格式
-        items_dict = {k: v.model_dump() for k, v in input_data.items.items()}
+        items_dict = {}
+        for k, v in input_data.items.items():
+            if isinstance(v, dict):
+                # Already a dict (from API serialization)
+                items_dict[k] = v
+            else:
+                # ItemSchema object
+                items_dict[k] = v.model_dump()
         items_list = list(items_dict.values())
         
         if not items_list:
@@ -80,13 +87,41 @@ class ClusterStage(BaseStage[ClusterInput, ClusterOutput]):
         clusters_schema = []
         for i, cluster in enumerate(clusters_raw):
             cluster_id = f"cluster_{i:03d}"
-            item_ids = [item.get("id") for item in cluster.items] if hasattr(cluster, "items") else []
+            
+            # Handle cluster.items
+            if hasattr(cluster, "items"):
+                item_ids = []
+                for item in cluster.items:
+                    if isinstance(item, dict):
+                        item_ids.append(item.get("id", ""))
+                    elif isinstance(item, str):
+                        item_ids.append(item)
+                    else:
+                        item_ids.append(getattr(item, "id", ""))
+            else:
+                item_ids = []
+            
+            # Handle cluster.representative
+            if hasattr(cluster, "representative"):
+                rep = cluster.representative
+                if isinstance(rep, dict):
+                    rep_id = rep.get("id", "")
+                    rep_title = rep.get("title", "")
+                elif isinstance(rep, str):
+                    rep_id = rep
+                    rep_title = ""
+                else:
+                    rep_id = getattr(rep, "id", "")
+                    rep_title = getattr(rep, "title", "")
+            else:
+                rep_id = ""
+                rep_title = ""
             
             clusters_schema.append(ClusterSchema(
                 cluster_id=cluster_id,
-                representative_item_id=cluster.representative.get("id") if hasattr(cluster, "representative") else "",
+                representative_item_id=rep_id,
                 item_ids=item_ids,
-                title=cluster.representative.get("title") if hasattr(cluster, "representative") else "",
+                title=rep_title,
                 size=len(item_ids),
                 score=getattr(cluster, "score", None),
             ))

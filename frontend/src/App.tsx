@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { StagePanel } from './components/StagePanel';
+import { Console } from './components/Console';
+import { GlobalConfig } from './components/GlobalConfig';
 import { STAGES } from './types/stage';
 import type { StageData } from './types/stage';
 import { runStage, getStageInput, getState } from './api/stageApi';
@@ -25,6 +27,7 @@ function App() {
   });
   const [runningStage, setRunningStage] = useState<string | null>(null);
   const [apiConnected, setApiConnected] = useState<boolean | null>(null);
+  const [consoleOpen, setConsoleOpen] = useState(false);
 
   // 检查 API 连接并加载状态
   useEffect(() => {
@@ -130,6 +133,27 @@ function App() {
         [stageId]: response.status === 'success' ? 'success' : 'failed' 
       }));
       
+      // Refresh input for all stages after this one to ensure proper chaining
+      if (response.status === 'success') {
+        const stageIndex = STAGES.findIndex(s => s.id === stageId);
+        if (stageIndex >= 0 && stageIndex < STAGES.length - 1) {
+          // Refresh next stage's input
+          const nextStageId = STAGES[stageIndex + 1].id;
+          try {
+            const inputResp = await getStageInput(nextStageId, episodeDate);
+            setStageDataMap(prev => ({
+              ...prev,
+              [nextStageId]: {
+                ...prev[nextStageId],
+                input: inputResp.input,
+              },
+            }));
+          } catch (err) {
+            console.error('Failed to refresh next stage input:', err);
+          }
+        }
+      }
+      
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       setStageDataMap(prev => ({
@@ -178,11 +202,23 @@ function App() {
         onSelectStage={setSelectedStage}
         stageStatus={stageStatus}
       />
-      <StagePanel
-        stageId={selectedStage}
-        stageData={stageDataMap[selectedStage]}
-        onRun={handleRunStage}
-        isRunning={runningStage === selectedStage}
+      {selectedStage === 'global' ? (
+        <div className="flex-1 overflow-y-auto">
+          <GlobalConfig />
+        </div>
+      ) : (
+        <StagePanel
+          stageId={selectedStage}
+          stageData={stageDataMap[selectedStage]}
+          onRun={handleRunStage}
+          isRunning={runningStage === selectedStage}
+          onToggleConsole={() => setConsoleOpen(!consoleOpen)}
+          consoleOpen={consoleOpen}
+        />
+      )}
+      <Console 
+        isOpen={consoleOpen}
+        onClose={() => setConsoleOpen(false)}
       />
     </div>
   );

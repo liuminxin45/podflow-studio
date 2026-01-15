@@ -77,23 +77,18 @@ class ScriptStage(BaseStage[ScriptInput, ScriptOutput]):
                 source_name=item.source_name or "",
             ))
         
-        # 获取 LLM 配置
-        provider = cfg.provider.lower()
+        # 使用全局 LLM 配置
+        from src.config.global_config import get_llm_config
         
-        if provider == "deepseek":
-            result = self._generate_with_deepseek(
-                channel=channel.model_dump(),
-                items=input_items,
-                temperature=cfg.temperature,
-                timeout_s=cfg.timeout_seconds,
-            )
-        else:
-            result = self._generate_with_moonshot(
-                channel=channel.model_dump(),
-                items=input_items,
-                temperature=cfg.temperature,
-                timeout_s=cfg.timeout_seconds,
-            )
+        llm_config = get_llm_config()
+        
+        result = self._generate_with_llm(
+            channel=channel.model_dump(),
+            items=input_items,
+            temperature=cfg.temperature,
+            timeout_s=cfg.timeout_seconds,
+            llm_config=llm_config,
+        )
         
         # 保存结果
         script_json_path = artifacts_dir / f"{input_data.episode_date}.script.json"
@@ -127,42 +122,26 @@ class ScriptStage(BaseStage[ScriptInput, ScriptOutput]):
             ),
         )
     
-    def _generate_with_deepseek(self, channel, items, temperature, timeout_s):
-        """使用 DeepSeek 生成脚本"""
-        from src.llm.client.api_client import DeepSeekClient
+    def _generate_with_llm(self, channel, items, temperature, timeout_s, llm_config):
+        """使用配置的 LLM 生成脚本"""
+        from src.llm.client.api_client import UnifiedLLMClient
         
-        base_url = os.environ.get("DEEPSEEK_BASE_URL", "").strip()
-        api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
-        model = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat").strip()
+        base_url = llm_config.base_url
+        api_key = llm_config.api_key
+        model = llm_config.model
+        provider = llm_config.provider
         
+        # 验证配置
         if not base_url or not api_key:
-            raise RuntimeError("DeepSeek 未配置")
+            raise RuntimeError(f"LLM Provider '{provider}' 未配置 (缺少 base_url 或 api_key)")
         
-        client = DeepSeekClient(
+        # 使用统一的 LLM 客户端
+        client = UnifiedLLMClient(
             base_url=base_url,
             api_key=api_key,
             model=model,
             timeout_seconds=timeout_s,
-        )
-        
-        return client.generate(channel=channel, items=items, temperature=temperature)
-    
-    def _generate_with_moonshot(self, channel, items, temperature, timeout_s):
-        """使用 Moonshot 生成脚本"""
-        from src.llm.client.api_client import MoonshotClient
-        
-        base_url = os.environ.get("MOONSHOT_BASE_URL", "https://api.moonshot.cn/v1").strip()
-        api_key = os.environ.get("MOONSHOT_API_KEY", "").strip()
-        model = os.environ.get("MOONSHOT_MODEL", "moonshot-v1-8k").strip()
-        
-        if not api_key:
-            raise RuntimeError("Moonshot 未配置")
-        
-        client = MoonshotClient(
-            base_url=base_url,
-            api_key=api_key,
-            model=model,
-            timeout_seconds=timeout_s,
+            provider=provider,
         )
         
         return client.generate(channel=channel, items=items, temperature=temperature)

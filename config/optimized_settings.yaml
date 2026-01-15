@@ -1,71 +1,993 @@
-logging:
-  level: INFO
-  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-  file: ./logs/podcast.log
-  max_size_mb: 100
-  backup_count: 5
+auto_topic:
+  enable_compounds: true
+  enable_domains: true
+  enable_keywords: true
+  enable_patterns: true
+  enabled: true
+  gate:
+    fallback_to_score: true
+    top_n: 10
+  history:
+    dir: out/history_podcasts
+    top_k: 3
+  scoring:
+    archetype_mean_max: 37.0
+    continuity_max: 5.1
+    counter_intuitive_max: 10.0
+    data_enrichable_max: 5.1
+    follow_up_max: 3.0
+    history_echo_max: 5.0
+    persona_max: 5.0
+    personal_impact_max: 8.5
+    threshold_maybe_publish: 55.0
+    threshold_must_publish: 70.0
+    time_max: 4.2
+    trend_max: 10.0
+  time_window_days: 7
 channel:
   id: life-consumer
-  name: 生活与消费资讯
   language: zh-CN
+  name: 生活与消费资讯
   style:
-    tone: 口语化、生动、像朋友聊天
     audience: 普通消费者
     length_minutes: 6
+    tone: 口语化、生动、像朋友聊天
 channel_presets:
-  life-consumer:
-    name: 生活与消费资讯
-    style:
-      tone: 口语化、生动、像朋友聊天
-      audience: 普通消费者
-      length_minutes: 6
-    auto_topic_strategy: consumer_life_v3
-  tech-innovation:
-    name: 技术创新资讯
-    style:
-      tone: 专业、精准、有深度
-      audience: 开发者、技术决策者
-      length_minutes: 8
-    auto_topic_strategy: tech_innovation
   balanced-mix:
+    auto_topic_strategy: balanced
     name: 综合资讯
     style:
-      tone: 专业且易懂、平衡
       audience: 广泛受众
       length_minutes: 7
-    auto_topic_strategy: balanced
-selection:
-  constraints:
-    max_per_domain: 3
-    max_per_topic: 3
-  max_clusters: 5
-  clustering:
-    simhash_max_distance: 1
-    title_min_jaccard: 0.2
-    time_window_days: 1
-source_guard:
-  config_dir: ./config/sources
-  min_content_length: 120
+      tone: 专业且易懂、平衡
+  life-consumer:
+    auto_topic_strategy: consumer_life_v3
+    name: 生活与消费资讯
+    style:
+      audience: 普通消费者
+      length_minutes: 6
+      tone: 口语化、生动、像朋友聊天
+  tech-innovation:
+    auto_topic_strategy: tech_innovation
+    name: 技术创新资讯
+    style:
+      audience: 开发者、技术决策者
+      length_minutes: 8
+      tone: 专业、精准、有深度
 compliance:
-  policy_level: standard
   min_score: 0.6
-  rules:
-  - sensitive_words
-  - copyright
-  - pii
-  - external_links
+  policy_level: standard
   rule_overrides:
     copyright:
       allow_domains:
       - 60s-static.viki.moe
       - 60s.viki.moe
       - github.com
+  rules:
+  - sensitive_words
+  - copyright
+  - pii
+  - external_links
+database:
+  backup_enabled: true
+  backup_interval_hours: 24
+  path: ./data/podcast.db
+digest_split:
+  cache_ttl_seconds: 86400
+  enable_cache: true
+  enabled: true
+filter:
+  fields:
+  - title
+  - content
+  - url
+  keep_raw: false
+human_feedback:
+  auto_continue: true
+  enabled: false
+  min_feedback_threshold: 0
+  storage_dir: feedback_history
+  timeout_seconds: 300
+llm:
+  api_key: <api-key>
+  base_url: https://api.bltcy.ai/v1/chat/completions
+  max_tokens: 4000
+  model: gpt-5.2
+  provider: bltcy
+  temperature: 0.7
+  timeout_seconds: 120
+llm_providers:
+  bltcy:
+    apiKey: <api-key>
+    apiUrl: https://api.bltcy.ai/v1/chat/completions
+    defaultModel: gpt-5.2
+    id: bltcy
+    isCustom: true
+    models:
+    - chatgpt-4o-latest
+    - dall-e-3
+    - gpt-3.5-turbo
+    - gpt-3.5-turbo-0125
+    - gpt-3.5-turbo-0301
+    - gpt-3.5-turbo-0613
+    - gpt-3.5-turbo-1106
+    - gpt-3.5-turbo-16k
+    - gpt-3.5-turbo-16k-0613
+    - gpt-3.5-turbo-instruct
+    - gpt-4
+    - gpt-4-0125-preview
+    - gpt-4-0314
+    - gpt-4-0613
+    - gpt-4-1106-preview
+    - gpt-4-1106-vision-preview
+    - gpt-4-32k
+    - gpt-4-32k-0314
+    - gpt-4-32k-0613
+    - gpt-4-turbo
+    - gpt-4-turbo-2024-04-09
+    - gpt-4-turbo-preview
+    - gpt-4-vision-preview
+    - gpt-4.1
+    - gpt-4.1-2025-04-14
+    - gpt-4.1-mini
+    - gpt-4.1-mini-2025-04-14
+    - gpt-4.1-nano
+    - gpt-4.1-nano-2025-04-14
+    - gpt-4o
+    - gpt-4o-2024-05-13
+    - gpt-4o-2024-08-06
+    - gpt-4o-2024-11-20
+    - gpt-4o-mini
+    - gpt-4o-mini-2024-07-18
+    - gpt-5
+    - gpt-5-2025-08-07
+    - gpt-5-chat
+    - gpt-5-chat-2025-08-07
+    - gpt-5-chat-latest
+    - gpt-5-high
+    - gpt-5-low
+    - gpt-5-medium
+    - gpt-5-mini
+    - gpt-5-mini-2025-08-07
+    - gpt-5-nano
+    - gpt-5-nano-2025-08-07
+    - o1
+    - o1-2024-12-17
+    - o1-mini
+    - o1-mini-2024-09-12
+    - o1-preview
+    - o1-preview-2024-09-12
+    - o3
+    - o3-2025-04-16
+    - o3-mini
+    - o3-mini-2025-01-31
+    - o3-mini-2025-01-31-high
+    - o3-mini-2025-01-31-low
+    - o3-mini-2025-01-31-medium
+    - o3-mini-high
+    - o3-mini-low
+    - o3-mini-medium
+    - o4-mini
+    - o4-mini-2025-04-16
+    - claude-3-7-sonnet-20250219
+    - claude-3-7-sonnet-20250219-thinking
+    - claude-haiku-4-5-20251001
+    - claude-haiku-4-5-20251001-thinking
+    - claude-sonnet-4-20250514
+    - claude-sonnet-4-20250514-thinking
+    - claude-sonnet-4-5-20250929
+    - claude-sonnet-4-5-20250929-thinking
+    - claude-3-5-sonnet-20241022
+    - claude-3-opus-20240229
+    - claude-opus-4-1-20250805
+    - claude-opus-4-1-20250805-thinking
+    - claude-opus-4-20250514
+    - claude-opus-4-20250514-thinking
+    - claude-opus-4-5-20251101
+    - claude-opus-4-5-20251101-thinking
+    - claude-3-5-haiku-20241022
+    - claude-3-5-haiku-latest
+    - claude-3-5-sonnet-20240620
+    - claude-3-5-sonnet-latest
+    - claude-3-7-sonnet-thinking
+    - claude-3-haiku-20240307
+    - claude-3-opus-latest
+    - claude-3-sonnet-20240229
+    - advanced-voice
+    - animate-anyone-detect-gen2
+    - animate-anyone-gen2
+    - animate-anyone-template-gen2
+    - avatar-generate
+    - avatar-voice
+    - BAAI/bge-large-en-v1.5
+    - BAAI/bge-large-zh-v1.5
+    - BAAI/bge-m3
+    - BAAI/bge-reranker-v2-m3
+    - Balanced
+    - bfl/flux-2-flex
+    - bfl/flux-2-max
+    - bfl/flux-2-pro
+    - bfl/flux-dev
+    - bfl/flux-kontext-max
+    - bfl/flux-kontext-pro
+    - bfl/flux-pro
+    - bfl/flux-pro-1.1
+    - bfl/flux-pro-1.1-ultra
+    - bge-m3
+    - Bing
+    - chat_fast_imagine
+    - chat_fast_video
+    - chat_relax_imagine
+    - chirp-v2-xxl-alpha
+    - chirp-v3-0
+    - claude-1.3-100k
+    - claude-3-5-sonnet-all
+    - code-llama-13b
+    - code-llama-34b
+    - code-llama-7b
+    - Creative
+    - deepseek-ai/deepseek-vl2
+    - deepseek-ai/Janus-Pro-7B
+    - deepseek-chat
+    - deepseek-coder-v2-instruct
+    - deepseek-llm-67b-chat
+    - deepseek-r1
+    - deepseek-r1-0528
+    - deepseek-r1-250528
+    - deepseek-r1-metasearch
+    - deepseek-r1-search
+    - deepseek-r1:1.5b
+    - deepseek-r1:70b
+    - deepseek-r1:8b
+    - deepseek-reasoner
+    - deepseek-reasoner-164k
+    - deepseek-reasoner-all
+    - deepseek-search
+    - deepseek-v3
+    - deepseek-v3-0324
+    - deepseek-v3-1-250821
+    - deepseek-v3-1-250821-thinking
+    - deepseek-v3-1-terminus
+    - deepseek-v3-2-exp
+    - deepseek-v3-250324
+    - deepseek-v3.1
+    - deepseek-v3.2
+    - direct-generate-pptx
+    - docmee-ppt-generate
+    - docmee-ppt-proxy
+    - doubao-1-5-pro-256k-250115
+    - doubao-1-5-pro-32k-250115
+    - doubao-1-5-pro-thinking
+    - doubao-1-5-thinking-pro-250415
+    - doubao-1-5-thinking-pro-m-250428
+    - doubao-1-5-thinking-vision-pro-250428
+    - doubao-1-5-vision-pro-32k
+    - doubao-1-5-vision-pro-32k-250115
+    - doubao-1.5-pro-256k
+    - doubao-1.5-vision-pro-250328
+    - doubao-1.5-vision-pro-32k
+    - doubao-lite-128k
+    - doubao-lite-32k
+    - doubao-lite-4k
+    - doubao-pro-128k
+    - doubao-pro-256k
+    - doubao-pro-32k
+    - doubao-pro-32k-character
+    - doubao-pro-4k
+    - doubao-seed-1-6-250615
+    - doubao-seed-1-6-251015
+    - doubao-seed-1-6-flash-250615
+    - doubao-seed-1-6-nothinking-250615
+    - doubao-seed-1-6-nothinking-250715
+    - doubao-seed-1-6-thinking-250615
+    - doubao-seed-1-6-thinking-250715
+    - doubao-seedance-1-0-lite-i2v-250428
+    - doubao-seedance-1-0-lite-t2v-250428
+    - doubao-seedance-1-0-pro-250528
+    - doubao-seedance-1-0-pro-fast-251015
+    - doubao-seedance-1-5-pro-251215
+    - doubao-seededit-3-0-i2i-250628
+    - doubao-seedream-3-0-t2i-250415
+    - doubao-seedream-4-0-250828
+    - doubao-seedream-4-5-251128
+    - doubao-vision-pro-32k
+    - emo-detect-v1
+    - emo-v1
+    - emoji-detect-v1
+    - emoji-v1
+    - flux
+    - flux-2-dev
+    - flux-2-flex
+    - flux-2-max
+    - flux-2-pro
+    - flux-dev
+    - flux-kontext-max
+    - flux-kontext-pro
+    - flux-pro
+    - flux-pro-1.1-ultra
+    - flux-pro-max
+    - flux-schnell
+    - flux.1.1-pro
+    - gemini-1.5-flash
+    - gemini-1.5-flash-002
+    - gemini-1.5-pro
+    - gemini-1.5-pro-002
+    - gemini-2.0-flash
+    - gemini-2.0-flash-001
+    - gemini-2.0-flash-exp-image-generation
+    - gemini-2.0-flash-lite
+    - gemini-2.0-flash-lite-001
+    - gemini-2.0-flash-preview-image-generation
+    - gemini-2.5-flash
+    - gemini-2.5-flash-image
+    - gemini-2.5-flash-image-preview
+    - gemini-2.5-flash-lite
+    - gemini-2.5-flash-lite-preview-06-17
+    - gemini-2.5-flash-lite-preview-09-2025
+    - gemini-2.5-flash-nothinking
+    - gemini-2.5-flash-preview-04-17
+    - gemini-2.5-flash-preview-04-17-nothinking
+    - gemini-2.5-flash-preview-04-17-thinking
+    - gemini-2.5-flash-preview-05-20
+    - gemini-2.5-flash-preview-05-20-nothinking
+    - gemini-2.5-flash-preview-09-2025
+    - gemini-2.5-flash-thinking
+    - gemini-2.5-pro
+    - gemini-2.5-pro-nothinking
+    - gemini-2.5-pro-preview-03-25
+    - gemini-2.5-pro-preview-05-06
+    - gemini-2.5-pro-preview-06-05
+    - gemini-2.5-pro-preview-06-05-nothinking
+    - gemini-2.5-pro-thinking-*
+    - gemini-2.5-pro-thinking-128
+    - gemini-2.5-pro-thinking-32768
+    - gemini-3-flash-preview
+    - gemini-3-flash-preview-nothinking
+    - gemini-3-flash-preview-thinking-*
+    - gemini-3-pro-image-preview
+    - gemini-3-pro-preview
+    - gemini-3-pro-preview-thinking-*
+    - gemini-pro
+    - glm-3-turbo
+    - glm-4
+    - glm-4.5
+    - glm-4.5-air
+    - glm-4.5-airx
+    - glm-4.5-flash
+    - glm-4.5-x
+    - glm-4.7
+    - glm-4v
+    - google-palm
+    - gpt-4-all
+    - gpt-4-dalle
+    - gpt-4-gizmo
+    - gpt-4-gizmo-*
+    - gpt-4-v
+    - gpt-4o-all
+    - gpt-4o-image
+    - gpt-4o-image-vip
+    - gpt-4o-study
+    - gpt-5-codex
+    - gpt-5-codex-high
+    - gpt-5-codex-low
+    - gpt-5-codex-medium
+    - gpt-5-minimal
+    - gpt-5.1
+    - gpt-5.1-2025-11-13
+    - gpt-5.1-all
+    - gpt-5.1-codex
+    - gpt-5.1-codex-mini
+    - gpt-5.1-thinking
+    - gpt-5.1-thinking-all
+    - gpt-5.2
+    - gpt-5.2-2025-12-11
+    - gpt-5.2-all
+    - gpt-5.2-codex
+    - gpt-5.2-thinking
+    - gpt-image-1
+    - gpt-image-1.5
+    - gpt-oss-120b
+    - gpt-oss-20b
+    - gpt-video-2
+    - gpt-video-2-pro
+    - grok-3
+    - grok-4
+    - grok-4-fast-reasoning
+    - grok-video-3
+    - hailuo-video
+    - higgsfield-ads
+    - higgsfield-lite
+    - higgsfield-speech
+    - higgsfield-standard
+    - higgsfield-turbo
+    - hunyuan-t1
+    - I2V-01
+    - I2V-01-Director
+    - I2V-01-live
+    - jimeng-videos
+    - jina-reranker-v2-base-multilingual
+    - kimi-k2-0711-preview
+    - kimi-k2-250905
+    - kling-custom-elements
+    - kling-effects
+    - kling-image
+    - kling-image-expend
+    - kling-image-v1
+    - kling-image-v1-5
+    - kling-image-v2
+    - kling-image-v2-1
+    - kling-kolors-virtual-try-on
+    - kling-lip-sync
+    - kling-multi-image2image
+    - kling-text-to-audio
+    - kling-video
+    - kling-video-extend
+    - kling-video-o1
+    - kling-video-to-audio
+    - kling-video-v1
+    - kling-video-v1-5
+    - kling-video-v1-6
+    - kling-video-v2-1
+    - kling-video-v2-1-master
+    - kling-video-v2-5-turbo
+    - kling-video-v2-6
+    - kling-video-v2-master
+    - kolors-virtual-try-on-v1
+    - kolors-virtual-try-on-v1-5
+    - liveportrait
+    - liveportrait-detect
+    - llama-2-13b
+    - llama-2-70b
+    - llama-2-7b
+    - llama-3-70b
+    - llama-3-70b-instruct
+    - llama-3-8b
+    - llama-3-8b-instruct
+    - llama-3-sonar-large-32k-chat
+    - llama-3-sonar-large-32k-online
+    - llama-3-sonar-small-32k-chat
+    - llama-3-sonar-small-32k-online
+    - llama-3.1-405b
+    - llama-3.1-70b
+    - llama-3.1-8b
+    - llama-3.1-8b-instruct
+    - llama-3.2-11b-vision-instruct
+    - llama-3.2-1b-instruct
+    - llama-3.2-3b-instruct
+    - llama-3.2-90b-vision-instruct
+    - llama-3.3-70b-instruct-fp8-fast
+    - llama-4-scout
+    - llama-4-scout-17b-16e-instruct
+    - luma_video_api
+    - midjourney
+    - MiniMax-Hailuo-02
+    - MiniMax-Hailuo-2.3
+    - MiniMax-Hailuo-2.3-Fast
+    - minimax-m1-80k
+    - minimax-m2.1
+    - minimax/speech-01-hd
+    - minimax/speech-01-turbo
+    - minimax/speech-02-hd
+    - minimax/speech-02-turbo
+    - minimax/speech-2.6-hd
+    - minimax/speech-2.6-turbo
+    - mistral-medium
+    - mixtral-8x22b
+    - mixtral-8x7b
+    - mj_fast_blend
+    - mj_fast_custom_zoom
+    - mj_fast_describe
+    - mj_fast_edits
+    - mj_fast_high_variation
+    - mj_fast_imagine
+    - mj_fast_inpaint
+    - mj_fast_low_variation
+    - mj_fast_modal
+    - mj_fast_outpaint
+    - mj_fast_pan
+    - mj_fast_reroll
+    - mj_fast_ric_reader
+    - mj_fast_ricreader_retry
+    - mj_fast_shorten
+    - mj_fast_upload
+    - mj_fast_upscale
+    - mj_fast_upscale_2x
+    - mj_fast_upscale_4x
+    - mj_fast_variation
+    - mj_fast_video
+    - mj_fast_zoom
+    - mj_relax_blend
+    - mj_relax_custom_zoom
+    - mj_relax_describe
+    - mj_relax_edits
+    - mj_relax_high_variation
+    - mj_relax_imagine
+    - mj_relax_inpaint
+    - mj_relax_low_variation
+    - mj_relax_modal
+    - mj_relax_outpaint
+    - mj_relax_pan
+    - mj_relax_reroll
+    - mj_relax_ric_reader
+    - mj_relax_ricreader_retry
+    - mj_relax_shorten
+    - mj_relax_upload
+    - mj_relax_upscale
+    - mj_relax_upscale_2x
+    - mj_relax_upscale_4x
+    - mj_relax_variation
+    - mj_relax_video
+    - mj_relax_zoom
+    - moonshot-v1-128k
+    - moonshot-v1-32k
+    - moonshot-v1-8k
+    - moonshotai/kimi-k2-instruct
+    - nano-banana
+    - nano-banana-2
+    - nano-banana-2-2k
+    - nano-banana-2-4k
+    - nano-banana-hd
+    - nano-banana-pro
+    - net-gpt-3.5-turbo
+    - net-gpt-3.5-turbo-0613
+    - net-gpt-3.5-turbo-16k
+    - net-gpt-3.5-turbo-16k-0613
+    - net-gpt-4
+    - net-gpt-4-0125-preview
+    - net-gpt-4-0314
+    - net-gpt-4-0613
+    - net-gpt-4-1106-preview
+    - net-gpt-4-32k
+    - net-gpt-4-turbo
+    - net-gpt-4-turbo-preview
+    - net-gpt-4o
+    - netease-youdao/bce-reranker-base_v1
+    - o1-all
+    - o1-mini-all
+    - o1-preview-all
+    - o1-pro
+    - o1-pro-all
+    - o3-all
+    - o3-mini-all
+    - o3-mini-high-all
+    - o3-pro
+    - o3-pro-2025-06-10
+    - o4-mini-all
+    - o4-mini-dr
+    - o4-mini-high-all
+    - Phi-4
+    - phi-4-multimodal-instruct
+    - phi-4-reasoning
+    - pika-generate
+    - pixverse-character
+    - pixverse-video
+    - pixverse-video-v1
+    - playground-v2.5
+    - Precise
+    - qwen-image
+    - qwen-image-edit
+    - qwen-image-edit-2509
+    - qwen-long
+    - qwen-max
+    - qwen-max-2025-01-25
+    - qwen-max-latest
+    - qwen-plus
+    - qwen-turbo
+    - qwen-turbo-2024-11-01
+    - qwen-vl-max-latest
+    - qwen-vl-plus-latest
+    - qwen1.5-110b-chat
+    - qwen1.5-14b-chat
+    - qwen1.5-32b-chat
+    - qwen1.5-7b-chat
+    - qwen2-1.5b-instruct
+    - qwen2-57b-a14b-instruct
+    - qwen2-7b-instruct
+    - qwen2-vl-7b-instruct
+    - qwen2.5-14b-instruct
+    - qwen2.5-32b-instruct
+    - qwen2.5-72b-instruct
+    - qwen2.5-7b-instruct
+    - qwen2.5-coder-32b-instruct
+    - qwen2.5-coder-7b-instruct
+    - qwen2.5-math-72b-instruct
+    - qwen2.5-vl-32b-instruct
+    - qwen2.5-vl-3b-instruct
+    - qwen2.5-vl-72b-instruct
+    - qwen2.5-vl-7b-instruct
+    - qwen3-0.6b
+    - qwen3-1.7b
+    - qwen3-14b
+    - qwen3-235b-a22b
+    - qwen3-235b-a22b-instruct-2507
+    - qwen3-30b-a3b
+    - qwen3-30b-a3b-instruct-2507
+    - qwen3-32b
+    - qwen3-4b
+    - qwen3-8b
+    - qwen3-coder-480b-a35b-instruct
+    - qwen3-coder-flash
+    - qwen3-coder-plus
+    - qwen3-embedding-0.6b
+    - qwen3-embedding-4b
+    - qwen3-embedding-8b
+    - qwen3-max
+    - qwen3-max-preview
+    - qwen3-reranker-0.6b
+    - qwen3-reranker-4b
+    - qwen3-reranker-8b
+    - qwen3-vl-235b-a22b
+    - qwen3-vl-plus
+    - qwq-32b
+    - qwq-32b-preview
+    - recraftv3
+    - riffusion-music
+    - riffusion-upload
+    - runway-act_one
+    - runway-act_two
+    - runway-aleph
+    - runway-generate
+    - runway-video2video
+    - runwayml-gen3a_turbo
+    - runwayml-gen4_turbo
+    - S2V-01
+    - search-gpts
+    - search-gpts-chat
+    - seededit
+    - seedream-3.0
+    - sora_image
+    - sora_image-vip
+    - sora_video2
+    - sora-1:1-480p-10s
+    - sora-1:1-480p-5s
+    - sora-1:1-720p-5s
+    - sora-16:9-480p-10s
+    - sora-16:9-480p-5s
+    - sora-16:9-720p-5s
+    - sora-2
+    - sora-2-pro
+    - sora-9:16-480p-10s
+    - sora-9:16-480p-5s
+    - sora-9:16-720p-5s
+    - sora-characters
+    - speech-01-hd
+    - speech-01-turbo
+    - speech-02-hd
+    - speech-02-turbo
+    - speech-2.6-hd
+    - speech-2.6-turbo
+    - stable-diffusion
+    - stable-diffusion-3-2b
+    - suno_act-stems
+    - suno_concat
+    - suno_lyrics
+    - suno_music
+    - suno_upload
+    - suno-act-midi
+    - suno-act-tags
+    - suno-actions
+    - swap_face
+    - T2V-01
+    - T2V-01-Director
+    - tongyi-deepresearch-30b-a3b
+    - veo2
+    - veo2-fast
+    - veo2-fast-components
+    - veo2-fast-frames
+    - veo2-pro
+    - veo3
+    - veo3-fast
+    - veo3-fast-frames
+    - veo3-pro
+    - veo3-pro-frames
+    - veo3.1
+    - veo3.1-4k
+    - veo3.1-components
+    - veo3.1-components-4k
+    - veo3.1-fast
+    - veo3.1-pro
+    - veo3.1-pro-4k
+    - video-style-transform
+    - videoretalk
+    - vidu1.5
+    - vidu2.0
+    - viduq1
+    - viduq1-classic
+    - viduq2
+    - viduq2-pro
+    - viduq2-turbo
+    - viggle-create
+    - viggle-pro-create
+    - viggle-pro-proxy
+    - viggle-proxy
+    - volcv-dalle
+    - volcv-v1
+    - wan2.2-animate-mix
+    - wan2.2-animate-move
+    - wan2.2-i2v-flash
+    - wan2.2-i2v-plus
+    - wan2.2-kf2v-flash
+    - wan2.2-s2v
+    - wan2.2-s2v-detect
+    - wan2.2-t2v-plus
+    - wan2.5-i2v-preview
+    - wan2.5-t2v-preview
+    - wan2.6-i2v
+    - wan2.6-r2v
+    - wan2.6-t2v
+    - wanx2.1-i2v-plus
+    - wanx2.1-i2v-turbo
+    - wanx2.1-kf2v-plus
+    - wanx2.1-t2v-plus
+    - wanx2.1-t2v-turbo
+    - wanx2.1-vace-plus
+    - z-image-turbo
+    - andreasjansson/stable-diffusion-animation
+    - black-forest-labs/flux-1.1-pro
+    - black-forest-labs/flux-1.1-pro-ultra
+    - black-forest-labs/flux-dev
+    - black-forest-labs/flux-fill-dev
+    - black-forest-labs/flux-fill-pro
+    - black-forest-labs/flux-kontext-dev
+    - black-forest-labs/flux-kontext-max
+    - black-forest-labs/flux-kontext-pro
+    - black-forest-labs/flux-krea-dev
+    - black-forest-labs/flux-pro
+    - black-forest-labs/flux-schnell
+    - cjwbw/rembg
+    - fal-ai/bytedance/dreamina/v3.1/text-to-image
+    - fal-ai/bytedance/seedream/v4/edit
+    - fal-ai/bytedance/seedream/v4/text-to-image
+    - fal-ai/flux-1/dev
+    - fal-ai/flux-1/dev/image-to-image
+    - fal-ai/flux-1/dev/redux
+    - fal-ai/flux-1/schnell
+    - fal-ai/flux-1/schnell/redux
+    - fal-ai/flux-lora
+    - fal-ai/flux-pro/kontext
+    - fal-ai/flux-pro/kontext/max
+    - fal-ai/flux-pro/kontext/max/multi
+    - fal-ai/flux-pro/kontext/max/text-to-image
+    - fal-ai/flux-pro/kontext/multi
+    - fal-ai/flux-pro/kontext/text-to-image
+    - fal-ai/flux-pro/new
+    - fal-ai/flux-pro/v1.1
+    - fal-ai/flux-pro/v1.1-ultra
+    - fal-ai/flux-pro/v1.1-ultra-finetuned
+    - fal-ai/flux-pro/v1.1-ultra/redux
+    - fal-ai/flux-pro/v1.1/redux
+    - fal-ai/flux/krea
+    - fal-ai/flux/krea/image-to-image
+    - fal-ai/flux/krea/redux
+    - fal-ai/luma-dream-machine
+    - fal-ai/luma-dream-machine/image-to-video
+    - fal-ai/luma-dream-machine/ray-2
+    - fal-ai/luma-dream-machine/ray-2-flash
+    - fal-ai/luma-dream-machine/ray-2-flash/image-to-video
+    - fal-ai/luma-dream-machine/ray-2/image-to-video
+    - fal-ai/nano-banana
+    - fal-ai/nano-banana/edit
+    - fal-ai/qwen-image
+    - fal-ai/qwen-image-edit
+    - fal-ai/recraft/upscale/creative
+    - fal-ai/recraft/upscale/crisp
+    - fal-ai/recraft/v3/image-to-image
+    - fal-ai/recraft/v3/text-to-image
+    - fal-ai/recraft/vectorize
+    - fal-ai/vidu/image-to-video
+    - fal-ai/vidu/q1/image-to-video
+    - fal-ai/vidu/q1/reference-to-video
+    - fal-ai/vidu/q1/start-end-to-video
+    - fal-ai/vidu/q1/text-to-video
+    - fal-ai/vidu/reference-to-video
+    - fal-ai/vidu/start-end-to-video
+    - fal-ai/vidu/template-to-video
+    - flux-kontext-apps/multi-image-kontext-max
+    - flux-kontext-apps/multi-image-kontext-pro
+    - google/imagen-4
+    - google/imagen-4-fast
+    - google/imagen-4-ultra
+    - ideogram-ai/ideogram-v2-turbo
+    - ideogram-edit-v3
+    - ideogram-generate-v3
+    - ideogram-reframe-v3
+    - ideogram-remix-v3
+    - ideogram-replace-background-v3
+    - lucataco/animate-diff
+    - lucataco/flux-dev-lora
+    - lucataco/flux-schnell-lora
+    - lucataco/remove-bg
+    - minimax/video-01
+    - minimax/video-01-live
+    - prunaai/vace-14b
+    - recraft-ai/recraft-v3
+    - recraft-ai/recraft-v3-svg
+    - riffusion/riffusion
+    - stability-ai/sdxl
+    - stability-ai/stable-diffusion
+    - stability-ai/stable-diffusion-img2img
+    - stability-ai/stable-diffusion-inpainting
+    - sujaykhandekar/object-removal
+    - babbage-002
+    - davinci-002
+    - gpt-4o-audio-preview
+    - gpt-4o-audio-preview-2024-10-01
+    - gpt-4o-audio-preview-2024-12-17
+    - gpt-4o-audio-preview-2025-06-03
+    - gpt-4o-mini-audio-preview
+    - gpt-4o-mini-audio-preview-2024-12-17
+    - gpt-4o-mini-realtime-preview
+    - gpt-4o-mini-realtime-preview-2024-12-17
+    - gpt-4o-mini-search-preview
+    - gpt-4o-mini-search-preview-2025-03-11
+    - gpt-4o-mini-transcribe
+    - gpt-4o-mini-tts
+    - gpt-4o-realtime-preview
+    - gpt-4o-realtime-preview-2024-10-01
+    - gpt-4o-realtime-preview-2024-12-17
+    - gpt-4o-realtime-preview-2025-06-03
+    - gpt-4o-search-preview
+    - gpt-4o-search-preview-2025-03-11
+    - gpt-4o-transcribe
+    - gpt-5-mini-flex
+    - gpt-5-mini-medium
+    - gpt-5-mini-minimal
+    - gpt-5-pro
+    - gpt-5-pro-high
+    - gpt-5-search-api
+    - gpt-5-search-api-2025-10-14
+    - gpt-5.1-chat-latest
+    - gpt-5.2-chat-latest
+    - gpt-5.2-pro
+    - gpt-5.2-pro-2025-12-11
+    - gpt-audio
+    - gpt-audio-2025-08-28
+    - gpt-audio-mini
+    - gpt-audio-mini-2025-10-06
+    - gpt-image-1-mini
+    - grok-2-1212
+    - grok-2-vision-1212
+    - grok-3-beta
+    - grok-3-fast-beta
+    - grok-3-mini-beta
+    - grok-3-mini-fast-beta
+    - grok-4-0709
+    - grok-4-1-fast-non-reasoning
+    - grok-4-1-fast-reasoning
+    - grok-4-fast-non-reasoning
+    - grok-beta
+    - grok-code-fast-1
+    - grok-vision-beta
+    - o3-deep-research
+    - o3-deep-research-2025-06-26
+    - o4-mini-deep-research
+    - o4-mini-deep-research-2025-06-26
+    - text-ada-001
+    - text-babbage-001
+    - text-curie-001
+    - text-davinci-edit-001
+    - text-embedding-3-large
+    - text-embedding-3-small
+    - text-embedding-ada-002
+    - text-moderation-latest
+    - text-moderation-stable
+    - text-search-ada-doc-001
+    - tts-1
+    - tts-1-1106
+    - tts-1-hd
+    - tts-1-hd-1106
+    - whisper-1
+    - claude-3-5-sonnet
+    - code-davinci-edit-001
+    - deepl-en
+    - deepl-zh
+    - gpt-5-all
+    - gpt-5-thinking
+    - gpt-5-thinking-all
+    - grok-4.1
+    modelsUrl: https://api.bltcy.ai/v1/models
+    name: BLTCY AI
+  deepseek:
+    apiKey: ''
+    apiUrl: https://api.deepseek.com/v1/chat/completions
+    defaultModel: deepseek-chat
+    id: deepseek
+    isCustom: false
+    models:
+    - deepseek-chat
+    - deepseek-coder
+    modelsUrl: https://api.deepseek.com/v1/models
+    name: DeepSeek
+  moonshot:
+    apiKey: ''
+    apiUrl: https://api.moonshot.cn/v1/chat/completions
+    defaultModel: moonshot-v1-8k
+    id: moonshot
+    isCustom: false
+    models:
+    - moonshot-v1-8k
+    - moonshot-v1-32k
+    - moonshot-v1-128k
+    modelsUrl: https://api.moonshot.cn/v1/models
+    name: Moonshot AI
+  openai:
+    apiKey: ''
+    apiUrl: https://api.openai.com/v1/chat/completions
+    defaultModel: gpt-4
+    id: openai
+    isCustom: false
+    models:
+    - gpt-4
+    - gpt-4-turbo
+    - gpt-3.5-turbo
+    modelsUrl: https://api.openai.com/v1/models
+    name: OpenAI
+logging:
+  backup_count: 5
+  file: ./logs/podcast.log
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  level: INFO
+  max_size_mb: 100
+output:
+  fetch_archives_dir: ./out/fetch
+  publish_dir: ./out/publish
+  render_dir: ./out/render
+  runs_dir: ./out/runs
+  script_dir: ./out/script
+  tts_dir: ./out/tts
+pipeline:
+  dedup_enabled: true
+  filter_enabled: true
+  max_items: 8
+  pick_items: 5
+pipeline_v2:
+  fallback:
+    use_draft_on_failure: true
+  llm_stage1:
+    max_tokens: 3000
+    timeout_seconds: 60
+  llm_stage2:
+    max_tokens: 2500
+    timeout_seconds: 60
+  retrieval:
+    cache_dir: .cache/research
+    cache_ttl_seconds: 86400
+    history_podcast_dir: out/history_podcasts
+    max_concurrent: 2
+    timeout_seconds: 60
+    top_k_history: 5
+research:
+  anspire:
+    is_stream: false
+    top_k: 5
+  enabled: true
+  max_items: 10
+  max_retries: 3
+  max_sources: 3
+  metaso:
+    model: fast
+  provider: bocha
+  retry_delay: 1.0
+  search_engine: google
+  timeout_seconds: 60
+selection:
+  clustering:
+    simhash_max_distance: 1
+    time_window_days: 1
+    title_min_jaccard: 0.2
+  constraints:
+    max_per_domain: 3
+    max_per_topic: 3
+  max_clusters: 5
+source_guard:
+  config_dir: ./config/sources
+  min_content_length: 120
 sources:
   rss:
-  - name: 60s-每天60秒读懂世界
-    fetcher: sixtys_digest
+  - category: others
     enabled: true
-    category: others
+    fetcher: sixtys_digest
+    name: 60s-每天60秒读懂世界
     urls:
     - https://60s.viki.moe/v2/60s/rss
     - https://60api.09cdn.xyz/v2/60s/rss
@@ -76,181 +998,89 @@ sources:
     - https://60s.tmini.net/v2/60s/rss
     - https://60s.7se.cn/v2/60s/rss
     - https://60s.mizhoubaobei.top/v2/60s/rss
-  - name: AI日报快讯
-    fetcher: ai_daily_news
+  - category: ai_tech
     enabled: false
-    category: ai_tech
+    fetcher: ai_daily_news
+    name: AI日报快讯
     urls:
     - https://60s.viki.moe
-  - name: 虎嗅网
-    fetcher: standard_rss
+  - category: tech_business
     enabled: false
-    category: tech_business
+    fetcher: standard_rss
+    name: 虎嗅网
     urls:
     - https://www.huxiu.com/rss/0.xml
-  - name: 36氪
-    fetcher: standard_rss
+  - category: tech_business
     enabled: false
-    category: tech_business
+    fetcher: standard_rss
+    name: 36氪
     urls:
     - https://36kr.com/feed
-  - name: IT之家
+  - category: tech_news
+    enabled: false
     fetcher: standard_rss
-    enabled: true
-    category: tech_news
+    name: IT之家
     urls:
     - https://www.ithome.com/rss/
-  - name: 理想生活实验室
-    fetcher: standard_rss
+  - category: lifestyle
     enabled: false
-    category: lifestyle
+    fetcher: standard_rss
+    name: 理想生活实验室
     urls:
     - https://www.toodaylab.com/feed
-  - name: 新华社新闻
-    fetcher: standard_rss
+  - category: news
     enabled: false
-    category: news
+    fetcher: standard_rss
+    name: 新华社新闻
     urls:
     - https://plink.anyfeeder.com/newscn/whxw
-  - name: 财富中文网商业
-    fetcher: standard_rss
+  - category: business
     enabled: false
-    category: business
+    fetcher: standard_rss
+    name: 财富中文网商业
     urls:
     - https://plink.anyfeeder.com/fortunechina/shangye
-  - name: 华尔街日报
-    fetcher: standard_rss
+  - category: business
     enabled: false
-    category: business
+    fetcher: standard_rss
+    name: 华尔街日报
     urls:
     - https://plink.anyfeeder.com/wsj/cn
-  - name: 财富中文网
-    fetcher: standard_rss
+  - category: business
     enabled: false
-    category: business
+    fetcher: standard_rss
+    name: 财富中文网
     urls:
     - https://plink.anyfeeder.com/fortunechina
-  - name: 雪球今日话题
-    fetcher: standard_rss
+  - category: finance
     enabled: false
-    category: finance
+    fetcher: standard_rss
+    name: 雪球今日话题
     urls:
     - https://xueqiu.com/hots/topic/rss
-  - name: 果壳网
-    fetcher: standard_rss
+  - category: science
     enabled: false
-    category: science
+    fetcher: standard_rss
+    name: 果壳网
     urls:
     - https://plink.anyfeeder.com/guokr/scientific
-  - name: 南方周末
-    fetcher: standard_rss
+  - category: news
     enabled: false
-    category: news
+    fetcher: standard_rss
+    name: 南方周末
     urls:
     - https://plink.anyfeeder.com/infzm/recommends
-  - name: 界面新闻
-    fetcher: standard_rss
+  - category: news
     enabled: false
-    category: news
+    fetcher: standard_rss
+    name: 界面新闻
     urls:
     - https://a.jiemian.com/index.php?m=article&a=rss
-pipeline:
-  max_items: 8
-  pick_items: 5
-  dedup_enabled: true
-  filter_enabled: true
-digest_split:
-  enabled: true
-  cache_ttl_seconds: 86400
-  enable_cache: true
-filter:
-  fields:
-  - title
-  - content
-  - url
-  keep_raw: false
-llm:
-  provider: deepseek
-  model: deepseek-chat
-  timeout_seconds: 120
-  max_tokens: 4000
-  temperature: 0.7
 tts:
-  provider: doubao
   mode: default
-  voice: zh_female_tianqing_moon_bigtts
-  speed: 1.0
-  volume: 1.0
   pitch: 1.0
+  provider: doubao
+  speed: 1.0
   timeout_seconds: 60
-output:
-  runs_dir: ./out/runs
-  fetch_archives_dir: ./out/fetch
-  script_dir: ./out/script
-  tts_dir: ./out/tts
-  render_dir: ./out/render
-  publish_dir: ./out/publish
-research:
-  provider: anspire
-  enabled: true
-  timeout_seconds: 60
-  max_items: 10
-  max_retries: 3
-  retry_delay: 1.0
-  metaso:
-    model: fast
-  anspire:
-    top_k: 5
-    is_stream: false
-pipeline_v2:
-  retrieval:
-    max_concurrent: 2
-    timeout_seconds: 60
-    cache_ttl_seconds: 86400
-    cache_dir: .cache/research
-    history_podcast_dir: out/history_podcasts
-    top_k_history: 5
-  llm_stage1:
-    timeout_seconds: 60
-    max_tokens: 3000
-  llm_stage2:
-    timeout_seconds: 60
-    max_tokens: 2500
-  fallback:
-    use_draft_on_failure: true
-auto_topic:
-  enabled: true
-  time_window_days: 7
-  enable_keywords: true
-  enable_patterns: true
-  enable_compounds: true
-  enable_domains: true
-  scoring:
-    archetype_mean_max: 37.0
-    personal_impact_max: 8.5
-    counter_intuitive_max: 10.0
-    trend_max: 10.0
-    time_max: 4.2
-    persona_max: 5.0
-    history_echo_max: 5.0
-    continuity_max: 5.1
-    data_enrichable_max: 5.1
-    follow_up_max: 3.0
-    threshold_must_publish: 70.0
-    threshold_maybe_publish: 55.0
-  gate:
-    top_n: 10
-    fallback_to_score: true
-  history:
-    dir: out/history_podcasts
-    top_k: 3
-human_feedback:
-  enabled: false
-  storage_dir: feedback_history
-  auto_continue: true
-  timeout_seconds: 300
-  min_feedback_threshold: 0
-database:
-  path: ./data/podcast.db
-  backup_enabled: true
-  backup_interval_hours: 24
+  voice: zh_female_tianqing_moon_bigtts
+  volume: 1.0

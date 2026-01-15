@@ -46,6 +46,7 @@ class ResearchStage(BaseStage[ResearchInput, ResearchOutput]):
         # 检查是否启用
         if not cfg.enabled:
             self.logger.info("Research 功能未启用，跳过")
+            self.logger.info(f"Research config: enabled={cfg.enabled}, provider={cfg.provider}")
             return ResearchOutput(
                 run_id=input_data.run_id,
                 episode_date=input_data.episode_date,
@@ -79,6 +80,7 @@ class ResearchStage(BaseStage[ResearchInput, ResearchOutput]):
         from src.research.utils.budget import BudgetConfig
         
         self.logger.info(f"开始 Research: {len(input_data.items)} items")
+        self.logger.info(f"Research config: enabled={cfg.enabled}, provider={cfg.provider}, max_total_claims={cfg.max_total_claims}, max_claims_per_item={cfg.max_claims_per_item}")
         
         # 准备 research items
         research_items = []
@@ -123,19 +125,24 @@ class ResearchStage(BaseStage[ResearchInput, ResearchOutput]):
         # 转换证据包
         evidence_packs_raw = result.get("evidence_packs", [])
         evidence_packs = []
-        
         for pack in evidence_packs_raw:
             evidences = []
-            for ev in pack.get("evidences", []):
+            for e in pack.get("main_evidence", []):
                 evidences.append(EvidenceSchema(
-                    source=ev.get("source", ""),
-                    content=ev.get("content", ""),
-                    url=ev.get("url"),
-                    relevance_score=ev.get("relevance_score"),
+                    source=e.get("source_title", ""),
+                    content=e.get("content", ""),
+                    url=e.get("source_url"),
                 ))
             
+            # Extract claim text - handle both dict and string formats
+            claim_data = pack.get("claim", "")
+            if isinstance(claim_data, dict):
+                claim_text = claim_data.get("text", "")
+            else:
+                claim_text = str(claim_data)
+            
             evidence_packs.append(EvidencePackSchema(
-                claim=pack.get("claim", ""),
+                claim=claim_text,
                 query=pack.get("query"),
                 evidences=evidences,
                 confidence=pack.get("confidence"),
@@ -159,7 +166,7 @@ class ResearchStage(BaseStage[ResearchInput, ResearchOutput]):
             # 添加证据包到 item
             item_dict["evidence_packs"] = [
                 EvidencePackSchema(
-                    claim=p.get("claim", ""),
+                    claim=p.get("claim", {}).get("text", "") if isinstance(p.get("claim"), dict) else str(p.get("claim", "")),
                     query=p.get("query"),
                     evidences=[
                         EvidenceSchema(

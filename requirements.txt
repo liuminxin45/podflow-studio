@@ -43,6 +43,10 @@ langchain>=0.1.0
 langchain-core>=0.1.0
 langgraph>=0.0.40
 
+# API Server dependencies
+fastapi>=0.115.0
+uvicorn>=0.32.0
+
 # MCP Server dependencies
 fastmcp>=0.2.0
 httpx>=0.27.0

@@ -57,6 +57,13 @@ export async function resetState(): Promise<void> {
   }
 }
 
+export async function resetStage(stageId: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/stage/${stageId}/reset`, { method: 'POST' });
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`);
+  }
+}
+
 export async function getStageInput(stageId: string, episodeDate: string): Promise<StageInputResponse> {
   const response = await fetch(`${API_BASE}/stage/${stageId}/input?episode_date=${episodeDate}`);
   if (!response.ok) {

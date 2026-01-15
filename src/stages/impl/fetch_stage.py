@@ -63,19 +63,24 @@ class FetchStage(BaseStage[FetchInput, FetchOutput]):
         else:
             # 从源拉取数据
             items_raw = []
+            self.logger.info(f"开始从 {len(input_data.sources)} 个数据源拉取数据")
             
-            for source_cfg in input_data.sources:
+            for idx, source_cfg in enumerate(input_data.sources, 1):
                 if not source_cfg.enabled:
+                    self.logger.info(f"跳过已禁用的源 [{idx}]: {source_cfg.name}")
                     continue
                 
                 fetcher_type = source_cfg.fetcher
                 source_name = source_cfg.name
+                self.logger.info(f"[{idx}/{len(input_data.sources)}] 正在拉取: {source_name} (fetcher: {fetcher_type})")
                 
                 fetcher = FetcherRegistry.create_instance(fetcher_type)
                 if not fetcher:
-                    self.logger.error(f"Unknown fetcher: {fetcher_type}")
+                    self.logger.error(f"未找到 fetcher: {fetcher_type}，可用的: {FetcherRegistry.list_all()}")
                     stats.sources_failed += 1
                     continue
+                
+                self.logger.info(f"使用 fetcher: {fetcher.__class__.__name__}")
                 
                 try:
                     # 解析日期
@@ -83,11 +88,13 @@ class FetchStage(BaseStage[FetchInput, FetchOutput]):
                         input_data.episode_date, "%Y-%m-%d"
                     ).date()
                     
+                    self.logger.info(f"调用 fetch_items，日期: {episode_date_obj}, 超时: {input_data.timeout_seconds}s")
                     result = fetcher.fetch_items(
                         config=source_cfg.model_dump(),
                         episode_date=episode_date_obj,
                         timeout_seconds=input_data.timeout_seconds,
                     )
+                    self.logger.info(f"fetch_items 返回状态: {result.status}, items数量: {len(result.items)}")
                     
                     if result.status in (FetchStatus.SUCCESS, FetchStatus.PARTIAL):
                         items_raw.extend(result.items)
@@ -99,7 +106,7 @@ class FetchStage(BaseStage[FetchInput, FetchOutput]):
                         
                 except Exception as e:
                     stats.sources_failed += 1
-                    self.logger.error(f"Failed to fetch {source_name}: {e}")
+                    self.logger.error(f"拉取失败 {source_name}: {type(e).__name__}: {e}", exc_info=True)
         
         stats.total_fetched = len(items_raw)
         self.logger.info(f"拉取完成: {stats.total_fetched} items")

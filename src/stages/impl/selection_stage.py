@@ -51,7 +51,12 @@ class SelectionStage(BaseStage[SelectionInput, SelectionOutput]):
         artifacts_dir.mkdir(parents=True, exist_ok=True)
         
         # 转换数据
-        items_dict = {k: v.model_dump() for k, v in input_data.items.items()}
+        items_dict = {}
+        for k, v in input_data.items.items():
+            if isinstance(v, dict):
+                items_dict[k] = v
+            else:
+                items_dict[k] = v.model_dump()
         
         # 构建 SelectionConfig
         cfg = input_data.selection_config
@@ -79,13 +84,12 @@ class SelectionStage(BaseStage[SelectionInput, SelectionOutput]):
         
         clusters_raw = []
         for cluster in input_data.clusters:
-            # 获取代表性 item
-            rep_item = items_dict.get(cluster.representative_item_id, {})
-            cluster_items = [items_dict.get(item_id, {}) for item_id in cluster.item_ids]
-            
+            # StoryCluster expects: cluster_id, headline, topic, items (list of item IDs as strings)
             story_cluster = StoryCluster(
-                representative=rep_item,
-                items=cluster_items,
+                cluster_id=cluster.cluster_id,
+                headline=cluster.title or "Untitled Cluster",
+                topic=None,
+                items=cluster.item_ids,  # List of item IDs as strings
             )
             clusters_raw.append(story_cluster)
         
@@ -119,7 +123,7 @@ class SelectionStage(BaseStage[SelectionInput, SelectionOutput]):
                     run_dir=input_data.run_dir,
                     topic_id=candidate.topic_id,
                     title=candidate.title,
-                    score=candidate.score,
+                    score=candidate.topic_score,
                     decision="pass",
                     items=candidate.items,
                 ))

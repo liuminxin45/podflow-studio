@@ -119,8 +119,11 @@ class AudioStage(BaseStage[AudioInput, AudioOutput]):
     def _generate_tts(self, ssml: str, mode: str, timeout_s: int) -> bytes:
         """生成 TTS 音频"""
         from src.tts.tts_client import TTSClientFactory
+        from src.stages.impl.audio_config import load_audio_stage_config
         
-        doubao_mode = os.environ.get("DOUBAO_MODE", mode).strip().lower()
+        # 使用 audio config，环境变量优先级更高
+        audio_cfg = load_audio_stage_config()
+        doubao_mode = os.environ.get("DOUBAO_MODE", audio_cfg.tts.mode).strip().lower()
         
         if doubao_mode == "podcast":
             return self._tts_podcast(ssml, timeout_s)
