@@ -5,5 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getWorkflow: (workflowId) => ipcRenderer.invoke('workflow:get', workflowId),
   approveNode: (workflowId, nodeName, approved, modifiedOutput) => 
     ipcRenderer.invoke('workflow:approve', workflowId, nodeName, approved, modifiedOutput),
-  onWorkflowUpdate: (callback) => ipcRenderer.on('workflow:update', (_, data) => callback(data))
+  onWorkflowUpdate: (callback) => ipcRenderer.on('workflow:update', (_, data) => callback(data)),
+  getNodeSchema: (nodeName) => ipcRenderer.invoke('node:getSchema', nodeName),
+  getAllNodeSchemas: () => ipcRenderer.invoke('node:getAllSchemas')
 })

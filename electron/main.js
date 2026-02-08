@@ -157,6 +157,79 @@ ipcMain.handle('workflow:approve', async (event, workflowId, nodeName, approved,
   return { status: 'ok' }
 })
 
+ipcMain.handle('node:getSchema', async (event, nodeName) => {
+  return new Promise((resolve, reject) => {
+    const pythonPath = process.platform === 'win32' ? 'python' : 'python3'
+    const proc = spawn(pythonPath, [
+      path.join(__dirname, '..', 'scripts', 'extract_node_schemas.py'),
+      nodeName
+    ], {
+      cwd: path.join(__dirname, '..'),
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+    })
+
+    let stdout = ''
+    let stderr = ''
+
+    proc.stdout.on('data', (data) => {
+      stdout += data.toString()
+    })
+
+    proc.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
+
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Failed to get schema for ${nodeName}: ${stderr}`))
+      } else {
+        try {
+          const schema = JSON.parse(stdout)
+          resolve(schema)
+        } catch (e) {
+          reject(new Error(`Failed to parse schema JSON: ${e.message}`))
+        }
+      }
+    })
+  })
+})
+
+ipcMain.handle('node:getAllSchemas', async (event) => {
+  return new Promise((resolve, reject) => {
+    const pythonPath = process.platform === 'win32' ? 'python' : 'python3'
+    const proc = spawn(pythonPath, [
+      path.join(__dirname, '..', 'scripts', 'extract_node_schemas.py')
+    ], {
+      cwd: path.join(__dirname, '..'),
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+    })
+
+    let stdout = ''
+    let stderr = ''
+
+    proc.stdout.on('data', (data) => {
+      stdout += data.toString()
+    })
+
+    proc.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
+
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Failed to get all schemas: ${stderr}`))
+      } else {
+        try {
+          const schemas = JSON.parse(stdout)
+          resolve(schemas)
+        } catch (e) {
+          reject(new Error(`Failed to parse schemas JSON: ${e.message}`))
+        }
+      }
+    })
+  })
+})
+
 async function runWorkflow(workflowId, resumeFrom = null) {
   const nodes = [
     'fetch', 'preprocess', 'research', 'topic_selection',

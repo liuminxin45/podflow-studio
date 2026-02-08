@@ -16,6 +16,8 @@ declare global {
       getWorkflow: (id: string) => Promise<Workflow | null>
       approveNode: (id: string, node: string, approved: boolean, output?: any) => Promise<{ status: string }>
       onWorkflowUpdate: (callback: (data: Workflow) => void) => void
+      getNodeSchema: (nodeName: string) => Promise<any>
+      getAllNodeSchemas: () => Promise<Record<string, any>>
     }
   }
 }
