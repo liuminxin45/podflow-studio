@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Layout, Button, Space, Typography, message } from 'antd'
+import { Layout, Button, Space, Typography, message, ConfigProvider, theme } from 'antd'
 import { PlayCircleOutlined, SettingOutlined } from '@ant-design/icons'
 import WorkflowCanvas from './components/WorkflowCanvas'
 import NodeDetailPanel from './components/NodeDetailPanel'
@@ -35,6 +35,7 @@ function App() {
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [approvalVisible, setApprovalVisible] = useState(false)
   const [approvalData, setApprovalData] = useState<any>(null)
+  const [logPanelCollapsed, setLogPanelCollapsed] = useState(false)
 
   useEffect(() => {
     window.electronAPI.onWorkflowUpdate((data) => {
@@ -81,55 +82,127 @@ function App() {
     }
   }
 
+  const logPanelHeight = logPanelCollapsed ? '46px' : '240px'
+
   return (
-    <Layout style={{ height: '100vh' }}>
-      <Header style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        background: '#001529',
-        padding: '0 24px'
-      }}>
-        <Title level={3} style={{ color: 'white', margin: 0 }}>
-          🎙️ Auto-Podcast Studio
-        </Title>
-        <Space>
-          <Button 
-            type="primary" 
-            icon={<PlayCircleOutlined />}
-            onClick={handleStart}
-            size="large"
-          >
-            新建项目
-          </Button>
-          <Button icon={<SettingOutlined />}>设置</Button>
-        </Space>
-      </Header>
+    <ConfigProvider
+      theme={{
+        algorithm: theme.darkAlgorithm,
+        token: {
+          colorPrimary: '#1890ff',
+          colorBgBase: '#121212',
+          colorBgContainer: '#1e1e1e',
+          colorBgElevated: '#2d2d2d',
+          colorBorder: '#333333',
+        },
+      }}
+    >
+      <Layout style={{ height: '100vh', background: 'var(--bg-primary)' }}>
+        <Header style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          background: 'var(--bg-secondary)',
+          borderBottom: '1px solid var(--border-color)',
+          padding: '0 24px',
+          height: '64px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '24px' }}>🎙️</span>
+            <Title level={4} style={{ color: 'var(--text-primary)', margin: 0, fontWeight: 600 }}>
+              Auto-Podcast Studio
+            </Title>
+          </div>
+          <Space size="middle">
+            <Button 
+              type="primary" 
+              icon={<PlayCircleOutlined />}
+              onClick={handleStart}
+              size="large"
+              style={{ 
+                background: 'var(--accent-primary)',
+                borderColor: 'var(--accent-primary)',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              }}
+            >
+              Create New Episode
+            </Button>
+            <Button 
+              icon={<SettingOutlined />} 
+              style={{ 
+                background: 'transparent', 
+                borderColor: 'var(--border-light)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              Settings
+            </Button>
+          </Space>
+        </Header>
 
-      <Layout>
-        <Content style={{ position: 'relative', overflow: 'hidden' }}>
-          <WorkflowCanvas workflow={workflow} onNodeClick={setSelectedNode} />
-          {selectedNode && (
-            <NodeDetailPanel 
-              nodeName={selectedNode} 
-              workflow={workflow}
-              onClose={() => setSelectedNode(null)}
+        <Layout style={{ background: 'transparent' }}>
+          <Content style={{ 
+            position: 'relative', 
+            overflow: 'hidden', 
+            height: `calc(100vh - 64px - ${logPanelHeight})`,
+            display: 'flex',
+            flexDirection: 'row',
+            transition: 'height 0.3s ease'
+          }}>
+            <div style={{ flex: 1, position: 'relative', height: '100%' }}>
+              <WorkflowCanvas workflow={workflow} onNodeClick={setSelectedNode} />
+            </div>
+            
+            {selectedNode && (
+              <div style={{ 
+                width: '600px', 
+                height: '100%', 
+                borderLeft: '1px solid var(--border-color)',
+                background: 'var(--bg-secondary)',
+                boxShadow: '-4px 0 16px rgba(0, 0, 0, 0.2)',
+                zIndex: 20,
+                animation: 'slideIn 0.3s ease-out'
+              }}>
+                <NodeDetailPanel 
+                  nodeName={selectedNode} 
+                  workflow={workflow}
+                  onClose={() => setSelectedNode(null)}
+                />
+              </div>
+            )}
+          </Content>
+
+          <Footer style={{ 
+            height: logPanelHeight, 
+            padding: 0, 
+            background: 'var(--bg-secondary)',
+            borderTop: '1px solid var(--border-color)',
+            zIndex: 10,
+            transition: 'height 0.3s ease',
+            overflow: 'hidden'
+          }}>
+            <LogPanel 
+              workflow={workflow} 
+              collapsed={logPanelCollapsed}
+              onToggle={() => setLogPanelCollapsed(!logPanelCollapsed)}
             />
-          )}
-        </Content>
+          </Footer>
+        </Layout>
 
-        <Footer style={{ height: '200px', padding: 0, borderTop: '1px solid #f0f0f0' }}>
-          <LogPanel workflow={workflow} />
-        </Footer>
+        <ApprovalModal
+          visible={approvalVisible}
+          approvalData={approvalData}
+          onApprove={handleApprove}
+          onReject={handleReject}
+        />
       </Layout>
-
-      <ApprovalModal
-        visible={approvalVisible}
-        approvalData={approvalData}
-        onApprove={handleApprove}
-        onReject={handleReject}
-      />
-    </Layout>
+      <style>{`
+        @keyframes slideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      `}</style>
+    </ConfigProvider>
   )
 }
 

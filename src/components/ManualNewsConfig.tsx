@@ -49,22 +49,22 @@ export default function ManualNewsConfig({ value = [], onChange }: Props) {
   }
 
   return (
-    <div style={{ padding: '16px 0' }}>
+    <div style={{ padding: '8px 0' }}>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text strong>手动输入新闻列表</Text>
+        <Text strong style={{ color: 'var(--text-primary)' }}>Manual News List</Text>
         <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={handleAdd}
           size="small"
         >
-          添加新闻
+          Add News
         </Button>
       </div>
 
       {newsItems.length === 0 && (
-        <Card style={{ textAlign: 'center', background: '#fafafa' }}>
-          <Text type="secondary">暂无新闻，点击"添加新闻"按钮开始添加</Text>
+        <Card style={{ textAlign: 'center', background: 'var(--bg-elevated)', borderColor: 'var(--border-color)' }}>
+          <Text type="secondary">No news items yet. Click "Add News" to start.</Text>
         </Card>
       )}
 
@@ -75,7 +75,7 @@ export default function ManualNewsConfig({ value = [], onChange }: Props) {
             size="small"
             title={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text strong>新闻 {index + 1}</Text>
+                <Text strong style={{ color: 'var(--text-primary)' }}>News Item {index + 1}</Text>
                 <Button
                   type="text"
                   danger
@@ -83,41 +83,48 @@ export default function ManualNewsConfig({ value = [], onChange }: Props) {
                   icon={<DeleteOutlined />}
                   onClick={() => handleRemove(index)}
                 >
-                  删除
+                  Remove
                 </Button>
               </div>
             }
-            style={{ background: '#f9f9f9' }}
+            style={{ 
+              background: 'var(--bg-elevated)', 
+              borderColor: 'var(--border-color)',
+            }}
+            headStyle={{ 
+              borderBottom: '1px solid var(--border-color)',
+              color: 'var(--text-primary)' 
+            }}
           >
             <Space direction="vertical" style={{ width: '100%' }} size="small">
               <div>
-                <Text type="secondary" style={{ fontSize: 12 }}>标题 *</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>Title *</Text>
                 <Input
                   value={item.title}
                   onChange={(e) => handleChange(index, 'title', e.target.value)}
-                  placeholder="输入新闻标题"
-                  style={{ marginTop: 4 }}
+                  placeholder="Enter news title"
+                  style={{ marginTop: 4, background: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                 />
               </div>
 
               <div>
-                <Text type="secondary" style={{ fontSize: 12 }}>内容 *</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>Content *</Text>
                 <TextArea
                   value={item.content}
                   onChange={(e) => handleChange(index, 'content', e.target.value)}
-                  placeholder="输入新闻内容"
+                  placeholder="Enter news content"
                   rows={4}
-                  style={{ marginTop: 4 }}
+                  style={{ marginTop: 4, background: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                 />
               </div>
 
               <div>
-                <Text type="secondary" style={{ fontSize: 12 }}>链接（可选）</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>URL (Optional)</Text>
                 <Input
                   value={item.url}
                   onChange={(e) => handleChange(index, 'url', e.target.value)}
                   placeholder="https://..."
-                  style={{ marginTop: 4 }}
+                  style={{ marginTop: 4, background: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                 />
               </div>
             </Space>
@@ -127,10 +134,12 @@ export default function ManualNewsConfig({ value = [], onChange }: Props) {
 
       {newsItems.length > 0 && (
         <>
-          <Divider style={{ margin: '16px 0' }} />
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            已添加 {newsItems.length} 条新闻
-          </Text>
+          <Divider style={{ margin: '16px 0', borderColor: 'var(--border-color)' }} />
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Total: {newsItems.length} items
+            </Text>
+          </div>
         </>
       )}
     </div>

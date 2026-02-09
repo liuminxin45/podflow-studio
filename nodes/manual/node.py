@@ -8,6 +8,12 @@ def run(state: Dict[str, Any], config: ManualConfig = None) -> Dict[str, Any]:
     logs = state.get("logs", [])
     errors = state.get("errors", [])
 
+    # Check if we should skip this node based on source selection
+    if state.get("selected_source_type") == "fetch":
+        logs.append("[ManualNode] Skipping: 'fetch' source selected")
+        state["logs"] = logs
+        return state
+
     logs.append("[ManualNode] Starting manual input processing")
     
     # 处理手动输入的新闻

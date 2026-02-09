@@ -11,6 +11,12 @@ def run(state: Dict[str, Any], config: FetchConfig = None) -> Dict[str, Any]:
     logs = state.get("logs", [])
     errors = state.get("errors", [])
 
+    # Check if we should skip this node based on source selection
+    if state.get("selected_source_type") == "manual":
+        logs.append("[FetchNode] Skipping: 'manual' source selected")
+        state["logs"] = logs
+        return state
+
     logs.append("[FetchNode] Starting fetch")
     logs.append(f"[FetchNode] Enabled sources: {config.enabled_sources}")
     

@@ -14,6 +14,19 @@ const NODE_EXPECTED_OUTPUTS = {
 }
 
 function validateNodeOutput(nodeName, result) {
+  // Handle conditional validation for source nodes
+  const sourceType = result.selected_source_type
+  
+  // If manual source is selected, skip validation for fetch node
+  if (nodeName === 'fetch' && sourceType === 'manual') {
+    return
+  }
+  
+  // If fetch source is selected, skip validation for manual node
+  if (nodeName === 'manual' && sourceType === 'fetch') {
+    return
+  }
+
   const expectedOutputs = NODE_EXPECTED_OUTPUTS[nodeName] || []
   const missingOutputs = []
   const emptyOutputs = []

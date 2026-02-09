@@ -1,5 +1,5 @@
 import { Modal, Typography, Divider, Space, Button } from 'antd'
-import { CheckOutlined, CloseOutlined } from '@ant-design/icons'
+import { CheckOutlined, CloseOutlined, FileTextOutlined } from '@ant-design/icons'
 import { useState } from 'react'
 
 const { Paragraph, Text } = Typography
@@ -45,34 +45,41 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
     const script = approvalData.data.script
     
     if (!script) {
-      return <Text type="secondary">脚本数据不可用</Text>
+      return <Text type="secondary">Script data unavailable</Text>
     }
 
     return (
       <div style={{ maxHeight: 400, overflow: 'auto' }}>
         {/* 脚本元数据 */}
         {script.metadata && (
-          <div style={{ marginBottom: 16, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
-            <Text strong>脚本信息</Text>
-            <div style={{ marginTop: 8 }}>
-              {script.metadata.title && <div><Text type="secondary">标题: </Text>{script.metadata.title}</div>}
-              {script.metadata.duration && <div><Text type="secondary">时长: </Text>{script.metadata.duration}分钟</div>}
-              {script.metadata.hosts && <div><Text type="secondary">主持人: </Text>{script.metadata.hosts.join(', ')}</div>}
+          <div style={{ 
+            marginBottom: 16, 
+            padding: 12, 
+            background: 'var(--bg-elevated)', 
+            borderRadius: 6,
+            border: '1px solid var(--border-color)'
+          }}>
+            <Text strong style={{ color: 'var(--text-primary)' }}>Script Metadata</Text>
+            <div style={{ marginTop: 8, display: 'grid', gap: '4px' }}>
+              {script.metadata.title && <div><Text type="secondary">Title: </Text><Text style={{ color: 'var(--text-primary)' }}>{script.metadata.title}</Text></div>}
+              {script.metadata.duration && <div><Text type="secondary">Duration: </Text><Text style={{ color: 'var(--text-primary)' }}>{script.metadata.duration} min</Text></div>}
+              {script.metadata.hosts && <div><Text type="secondary">Hosts: </Text><Text style={{ color: 'var(--text-primary)' }}>{script.metadata.hosts.join(', ')}</Text></div>}
             </div>
           </div>
         )}
 
         {/* 脚本内容 */}
         <div style={{
-          background: '#1e1e1e',
-          color: '#d4d4d4',
+          background: 'var(--bg-primary)',
+          color: 'var(--text-secondary)',
           padding: 16,
-          borderRadius: 4,
-          fontFamily: 'monospace',
+          borderRadius: 6,
+          fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
           fontSize: 13,
           lineHeight: 1.6,
           whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word'
+          wordBreak: 'break-word',
+          border: '1px solid var(--border-color)'
         }}>
           {typeof script === 'string' 
             ? script 
@@ -90,16 +97,16 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
     return (
       <div style={{ marginBottom: 16 }}>
         {selected_topic && (
-          <div style={{ marginBottom: 12 }}>
-            <Text strong>选定主题：</Text>
+          <div style={{ marginBottom: 16 }}>
+            <Text strong style={{ color: 'var(--text-primary)' }}>Selected Topic:</Text>
             <div style={{ 
               marginTop: 8, 
               padding: 12, 
-              background: '#f0f7ff', 
-              borderRadius: 4,
-              border: '1px solid #91d5ff'
+              background: 'rgba(24, 144, 255, 0.1)', 
+              borderRadius: 6,
+              border: '1px solid var(--info-color)'
             }}>
-              <div><Text strong>{selected_topic.title || '无标题'}</Text></div>
+              <div><Text strong style={{ color: 'var(--text-primary)' }}>{selected_topic.title || 'Untitled'}</Text></div>
               {selected_topic.description && (
                 <div style={{ marginTop: 4 }}>
                   <Text type="secondary">{selected_topic.description}</Text>
@@ -111,20 +118,21 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
 
         {selected_materials && selected_materials.length > 0 && (
           <div>
-            <Text strong>素材列表 ({selected_materials.length}条)：</Text>
-            <div style={{ marginTop: 8, maxHeight: 200, overflow: 'auto' }}>
+            <Text strong style={{ color: 'var(--text-primary)' }}>Selected Materials ({selected_materials.length}):</Text>
+            <div style={{ marginTop: 8, maxHeight: 200, overflow: 'auto', paddingRight: 4 }}>
               {selected_materials.slice(0, 5).map((material: any, index: number) => (
                 <div 
                   key={index}
                   style={{ 
                     marginBottom: 8, 
-                    padding: 8, 
-                    background: '#fafafa', 
-                    borderRadius: 4,
+                    padding: 10, 
+                    background: 'var(--bg-elevated)', 
+                    borderRadius: 6,
+                    border: '1px solid var(--border-color)',
                     fontSize: 12
                   }}
                 >
-                  <Text strong>{material.title || `素材 ${index + 1}`}</Text>
+                  <Text strong style={{ color: 'var(--text-primary)' }}>{material.title || `Material ${index + 1}`}</Text>
                   {material.content && (
                     <div style={{ marginTop: 4 }}>
                       <Text type="secondary" style={{ fontSize: 11 }}>
@@ -136,7 +144,7 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
               ))}
               {selected_materials.length > 5 && (
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  还有 {selected_materials.length - 5} 条素材...
+                  And {selected_materials.length - 5} more materials...
                 </Text>
               )}
             </div>
@@ -150,8 +158,8 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
     <Modal
       title={
         <Space>
-          <span style={{ fontSize: 18 }}>📝</span>
-          <span>脚本审批</span>
+          <FileTextOutlined style={{ color: 'var(--accent-primary)' }} />
+          <span style={{ fontSize: 18 }}>Approval Request</span>
         </Space>
       }
       open={visible}
@@ -159,22 +167,42 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
       footer={null}
       closable={false}
       maskClosable={false}
+      styles={{
+        header: {
+          background: 'var(--bg-elevated)',
+          borderBottom: '1px solid var(--border-color)',
+          padding: '16px 24px',
+          borderRadius: '8px 8px 0 0',
+        },
+        body: {
+          background: 'var(--bg-secondary)',
+          padding: '24px',
+          color: 'var(--text-primary)'
+        },
+        content: {
+          background: 'var(--bg-secondary)',
+          borderRadius: '8px',
+          border: '1px solid var(--border-color)',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+        }
+      }}
     >
-      <Divider style={{ margin: '12px 0' }} />
-
-      <div style={{ marginBottom: 16 }}>
-        <Paragraph>
-          AI已完成脚本生成，请审核以下内容。批准后将继续执行后续流程，拒绝则停止工作流。
+      <div style={{ marginBottom: 20 }}>
+        <Paragraph style={{ color: 'var(--text-primary)' }}>
+          The AI has completed a step that requires your approval. Please review the content below. 
+          Approve to continue or reject to stop the workflow.
         </Paragraph>
       </div>
 
       {renderTopicAndMaterials()}
       
-      <Divider>生成的脚本</Divider>
+      <Divider orientation="left" style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}>
+        Generated Content
+      </Divider>
       
       {renderScriptContent()}
 
-      <Divider style={{ margin: '16px 0' }} />
+      <Divider style={{ margin: '24px 0', borderColor: 'var(--border-color)' }} />
 
       <div style={{ textAlign: 'right' }}>
         <Space>
@@ -185,7 +213,7 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
             onClick={handleReject}
             loading={loading}
           >
-            拒绝
+            Reject
           </Button>
           <Button
             size="large"
@@ -193,8 +221,13 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
             icon={<CheckOutlined />}
             onClick={handleApprove}
             loading={loading}
+            style={{ 
+              background: 'var(--success-color)', 
+              borderColor: 'var(--success-color)',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+            }}
           >
-            批准继续
+            Approve & Continue
           </Button>
         </Space>
       </div>

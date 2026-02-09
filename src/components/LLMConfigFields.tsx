@@ -4,9 +4,9 @@ import { ApiOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import { fetchModels } from '../utils/modelFetcher'
 
 /**
- * LLM配置字段组件
- * 封装API Base、API Key、LLM Model三个字段及其联动逻辑
- * 注意：此组件不接收props，直接使用Form.useFormInstance()获取表单实例
+ * LLM Configuration Fields Component
+ * Encapsulates API Base, API Key, and LLM Model fields with interaction logic
+ * Note: Uses Form.useFormInstance() directly
  */
 export default function LLMConfigFields() {
   const form = Form.useFormInstance()
@@ -14,13 +14,13 @@ export default function LLMConfigFields() {
   const [loadingModels, setLoadingModels] = useState(false)
   const [testingConnection, setTestingConnection] = useState(false)
 
-  // 拉取模型列表
+  // Fetch model list
   const handleFetchModels = async () => {
     const apiBase = form.getFieldValue('api_base')?.trim()
     const apiKey = form.getFieldValue('api_key')?.trim()
 
     if (!apiBase || !apiKey) {
-      message.warning('请先填写API Base和API Key')
+      message.warning('Please fill in API Base and API Key first')
       return
     }
 
@@ -28,29 +28,29 @@ export default function LLMConfigFields() {
     try {
       const models = await fetchModels(apiBase, apiKey)
       setAvailableModels(models)
-      message.success(`成功拉取${models.length}个模型`)
+      message.success(`Successfully fetched ${models.length} models`)
     } catch (e: any) {
-      message.error(`拉取模型失败: ${e.message}`)
+      message.error(`Failed to fetch models: ${e.message}`)
       setAvailableModels([])
     } finally {
       setLoadingModels(false)
     }
   }
 
-  // 测试连通性
+  // Test connection
   const handleTestConnection = async () => {
     const apiBase = form.getFieldValue('api_base')?.trim()
     const apiKey = form.getFieldValue('api_key')?.trim()
     const llmModel = form.getFieldValue('llm_model')?.trim()
 
     if (!apiBase || !apiKey || !llmModel) {
-      message.warning('请先填写完整的LLM配置（API Base、API Key、LLM Model）')
+      message.warning('Please fill in complete LLM config (API Base, API Key, LLM Model)')
       return
     }
 
     setTestingConnection(true)
     try {
-      // 调用测试API
+      // Call test API
       const testUrl = `${apiBase.replace(/\/$/, '')}/chat/completions`
       const response = await fetch(testUrl, {
         method: 'POST',
@@ -66,13 +66,13 @@ export default function LLMConfigFields() {
       })
 
       if (response.ok) {
-        message.success('✅ LLM配置测试成功，连接正常')
+        message.success('✅ LLM Connection Successful')
       } else {
         const errorData = await response.json().catch(() => ({}))
-        message.error(`❌ 连接失败: ${response.status} ${errorData.error?.message || response.statusText}`)
+        message.error(`❌ Connection Failed: ${response.status} ${errorData.error?.message || response.statusText}`)
       }
     } catch (e: any) {
-      message.error(`❌ 连接测试失败: ${e.message}`)
+      message.error(`❌ Connection Test Failed: ${e.message}`)
     } finally {
       setTestingConnection(false)
     }
@@ -83,19 +83,19 @@ export default function LLMConfigFields() {
       <Form.Item
         name="api_base"
         label="API Base"
-        tooltip="API基础URL，例如 https://api.openai.com/v1"
+        tooltip="API Base URL, e.g., https://api.openai.com/v1"
       >
         <Input placeholder="https://api.openai.com/v1" />
       </Form.Item>
 
       <Form.Item
         label="API Key"
-        tooltip="API密钥（留空则使用环境变量OPENAI_API_KEY）"
+        tooltip="API Key (leave empty to use OPENAI_API_KEY env var)"
         style={{ marginBottom: 0 }}
       >
         <Form.Item
           name="api_key"
-          style={{ display: 'inline-block', width: 'calc(100% - 100px)', marginBottom: 0 }}
+          style={{ display: 'inline-block', width: 'calc(100% - 110px)', marginBottom: 0 }}
         >
           <Input.Password placeholder="sk-..." />
         </Form.Item>
@@ -103,24 +103,24 @@ export default function LLMConfigFields() {
           icon={<ApiOutlined />}
           onClick={handleFetchModels}
           loading={loadingModels}
-          style={{ marginLeft: 8 }}
+          style={{ marginLeft: 8, width: '102px' }}
         >
-          拉取模型
+          Fetch
         </Button>
       </Form.Item>
 
       <Form.Item
         name="llm_model"
         label="LLM Model"
-        tooltip="选择或输入模型名称，点击'拉取模型'按钮可自动获取可用模型列表"
+        tooltip="Select or enter model name. Click 'Fetch' to get available models."
       >
         <AutoComplete
           options={availableModels.map(model => ({ value: model, label: model }))}
-          placeholder={availableModels.length > 0 ? '选择或输入模型名称' : '请先拉取模型列表或手动输入'}
+          placeholder={availableModels.length > 0 ? 'Select or enter model name' : 'Fetch models or enter manually'}
           filterOption={(inputValue, option) =>
             option?.value.toLowerCase().includes(inputValue.toLowerCase()) || false
           }
-          notFoundContent="无匹配模型"
+          notFoundContent="No matching models"
         />
       </Form.Item>
 
@@ -131,8 +131,9 @@ export default function LLMConfigFields() {
           onClick={handleTestConnection}
           loading={testingConnection}
           block
+          style={{ borderColor: 'var(--success-color)', color: 'var(--success-color)' }}
         >
-          测试LLM连通性
+          Test LLM Connection
         </Button>
       </Form.Item>
     </>

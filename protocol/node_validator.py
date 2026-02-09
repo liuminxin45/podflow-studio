@@ -17,6 +17,17 @@ def validate_node_output(node_name: str, state: Dict[str, Any], expected_outputs
     Returns:
         (is_valid, error_message)
     """
+    # Handle conditional validation for source nodes
+    source_type = state.get("selected_source_type")
+    
+    # If manual source is selected, skip validation for fetch node
+    if node_name == 'fetch' and source_type == 'manual':
+        return True, ""
+    
+    # If fetch source is selected, skip validation for manual node
+    if node_name == 'manual' and source_type == 'fetch':
+        return True, ""
+
     missing_outputs = []
     empty_outputs = []
     
@@ -40,6 +51,7 @@ def validate_node_output(node_name: str, state: Dict[str, Any], expected_outputs
 # 定义每个节点的预期输出
 NODE_EXPECTED_OUTPUTS = {
     'fetch': ['raw_contents'],
+    'manual': ['raw_contents'],
     'preprocess': ['cleaned_contents'],
     'research': ['researched_contents'],
     'topic_selection': ['selected_topic', 'selected_materials'],

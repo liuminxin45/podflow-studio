@@ -38,29 +38,29 @@ const NODE_LABELS: Record<string, string> = {
 function getNodeStyle(status: string) {
   switch (status) {
     case 'completed':
-      return { bg: '#d4edda', border: '#28a745', emoji: '✓' }
+      return { bg: 'var(--bg-elevated)', border: 'var(--success-color)', emoji: '✓', shadow: '0 0 10px rgba(82, 196, 26, 0.2)' }
     case 'running':
-      return { bg: '#fff3cd', border: '#ffc107', emoji: '⏳' }
+      return { bg: 'var(--bg-elevated)', border: 'var(--warning-color)', emoji: '⏳', shadow: '0 0 15px rgba(250, 173, 20, 0.4)' }
     case 'failed':
-      return { bg: '#f8d7da', border: '#dc3545', emoji: '❌' }
+      return { bg: 'var(--bg-elevated)', border: 'var(--error-color)', emoji: '❌', shadow: '0 0 10px rgba(255, 77, 79, 0.2)' }
     case 'waiting_approval':
-      return { bg: '#d1ecf1', border: '#17a2b8', emoji: '👤' }
+      return { bg: 'var(--bg-elevated)', border: 'var(--info-color)', emoji: '👤', shadow: '0 0 10px rgba(24, 144, 255, 0.2)' }
     default:
-      return { bg: '#f0f0f0', border: '#d9d9d9', emoji: '⏸' }
+      return { bg: 'var(--bg-elevated)', border: 'var(--border-color)', emoji: '⏸', shadow: 'none' }
   }
 }
 
 function buildNodes(workflow: Workflow | null): Node[] {
   const nodes: Node[] = []
   let xPos = 50
-  const yBase = 80
-  const xSpacing = 160
+  const yBase = 150
+  const xSpacing = 200
 
   for (let i = 0; i < NODE_SEQUENCE.length; i++) {
     const name = NODE_SEQUENCE[i]
     const execution = workflow?.nodeExecutions?.[name]
     const status = execution?.status || 'pending'
-    const { bg, border, emoji } = getNodeStyle(status)
+    const { bg, border, emoji, shadow } = getNodeStyle(status)
     const durationText = execution?.duration
       ? `${execution.duration.toFixed(1)}s`
       : ''
@@ -69,9 +69,9 @@ function buildNodes(workflow: Workflow | null): Node[] {
     
     // fetch和manual并行显示
     if (name === 'fetch') {
-      yPos = yBase - 60  // fetch在上方
+      yPos = yBase - 80  // fetch在上方
     } else if (name === 'manual') {
-      yPos = yBase + 60  // manual在下方
+      yPos = yBase + 80  // manual在下方
       xPos -= xSpacing  // manual与fetch同一个x坐标
     }
 
@@ -79,19 +79,25 @@ function buildNodes(workflow: Workflow | null): Node[] {
       id: name,
       type: 'default',
       data: {
-        label: `${emoji} ${NODE_LABELS[name]}${durationText ? '\n' + durationText : ''}`
+        label: (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ fontSize: '14px', fontWeight: 500 }}>{emoji} {NODE_LABELS[name]}</div>
+            {durationText && <div style={{ fontSize: '10px', opacity: 0.7 }}>{durationText}</div>}
+          </div>
+        )
       },
       position: { x: xPos, y: yPos },
-      sourcePosition: Position.Right,  // 连线从右侧出发
-      targetPosition: Position.Left,   // 连线从左侧进入
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
       style: {
         background: bg,
-        border: `2px solid ${border}`,
+        border: `1px solid ${border}`,
         borderRadius: '8px',
-        padding: '10px 16px',
-        width: 120,
-        fontSize: '13px',
-        textAlign: 'center' as const,
+        padding: '12px',
+        width: 140,
+        color: 'var(--text-primary)',
+        boxShadow: shadow,
+        transition: 'all 0.3s ease',
       }
     })
 
@@ -104,13 +110,16 @@ function buildNodes(workflow: Workflow | null): Node[] {
 function buildEdges(workflow: Workflow | null): Edge[] {
   const edges: Edge[] = []
   
+  const commonEdgeStyle = { stroke: 'var(--border-light)', strokeWidth: 2 }
+  const activeEdgeStyle = { stroke: 'var(--accent-primary)', strokeWidth: 2 }
+
   // source_selector 分支到 fetch 和 manual
   edges.push({
     id: 'source_selector-fetch',
     source: 'source_selector',
     target: 'fetch',
     animated: workflow?.currentNode === 'source_selector',
-    style: { stroke: '#999', strokeWidth: 2 }
+    style: workflow?.currentNode === 'source_selector' ? activeEdgeStyle : commonEdgeStyle
   })
   
   edges.push({
@@ -118,7 +127,7 @@ function buildEdges(workflow: Workflow | null): Edge[] {
     source: 'source_selector',
     target: 'manual',
     animated: workflow?.currentNode === 'source_selector',
-    style: { stroke: '#999', strokeWidth: 2 }
+    style: workflow?.currentNode === 'source_selector' ? activeEdgeStyle : commonEdgeStyle
   })
   
   // fetch 和 manual 都连接到 preprocess
@@ -127,7 +136,7 @@ function buildEdges(workflow: Workflow | null): Edge[] {
     source: 'fetch',
     target: 'preprocess',
     animated: workflow?.currentNode === 'fetch',
-    style: { stroke: '#999', strokeWidth: 2 }
+    style: workflow?.currentNode === 'fetch' ? activeEdgeStyle : commonEdgeStyle
   })
   
   edges.push({
@@ -135,18 +144,22 @@ function buildEdges(workflow: Workflow | null): Edge[] {
     source: 'manual',
     target: 'preprocess',
     animated: workflow?.currentNode === 'manual',
-    style: { stroke: '#999', strokeWidth: 2 }
+    style: workflow?.currentNode === 'manual' ? activeEdgeStyle : commonEdgeStyle
   })
   
   // preprocess 之后的节点顺序连接
   const remainingNodes = NODE_SEQUENCE.slice(3)  // 从 preprocess 开始
   for (let i = 0; i < remainingNodes.length - 1; i++) {
+    const source = remainingNodes[i]
+    const target = remainingNodes[i + 1]
+    const isActive = workflow?.currentNode === source
+    
     edges.push({
-      id: `${remainingNodes[i]}-${remainingNodes[i + 1]}`,
-      source: remainingNodes[i],
-      target: remainingNodes[i + 1],
-      animated: workflow?.currentNode === remainingNodes[i],
-      style: { stroke: '#999', strokeWidth: 2 }
+      id: `${source}-${target}`,
+      source: source,
+      target: target,
+      animated: isActive,
+      style: isActive ? activeEdgeStyle : commonEdgeStyle
     })
   }
   

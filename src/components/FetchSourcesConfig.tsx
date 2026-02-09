@@ -57,7 +57,7 @@ export default function FetchSourcesConfig({ value = [], onChange }: Props) {
   if (loading) {
     return (
       <div style={{ padding: 24, textAlign: 'center' }}>
-        <Spin tip="加载数据源列表..." />
+        <Spin tip="Loading sources..." />
       </div>
     )
   }
@@ -65,7 +65,7 @@ export default function FetchSourcesConfig({ value = [], onChange }: Props) {
   if (error) {
     return (
       <Alert
-        message="加载失败"
+        message="Failed to load sources"
         description={error}
         type="error"
         showIcon
@@ -77,8 +77,8 @@ export default function FetchSourcesConfig({ value = [], onChange }: Props) {
   if (sources.length === 0) {
     return (
       <Alert
-        message="没有可用的数据源"
-        description="请在 nodes/fetch/sources/ 目录下添加数据源文件"
+        message="No sources available"
+        description="Please add source files in nodes/fetch/sources/ directory"
         type="warning"
         showIcon
         style={{ margin: 16 }}
@@ -87,40 +87,49 @@ export default function FetchSourcesConfig({ value = [], onChange }: Props) {
   }
 
   return (
-    <div style={{ padding: '16px 0' }}>
-      <Text strong>选择要启用的数据源：</Text>
-      <Divider style={{ margin: '12px 0' }} />
+    <div style={{ padding: '8px 0' }}>
+      <Text strong style={{ color: 'var(--text-primary)' }}>Select sources to enable:</Text>
+      <Divider style={{ margin: '12px 0', borderColor: 'var(--border-color)' }} />
       
-      <Space direction="vertical" style={{ width: '100%' }}>
-        {sources.map(source => (
-          <div
-            key={source.id}
-            style={{
-              padding: 12,
-              border: '1px solid #f0f0f0',
-              borderRadius: 4,
-              background: selectedSources.includes(source.id) ? '#f6ffed' : '#fafafa'
-            }}
-          >
-            <Checkbox
-              checked={selectedSources.includes(source.id)}
-              onChange={(e) => handleCheckboxChange(source.id, e.target.checked)}
+      <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        {sources.map(source => {
+          const isSelected = selectedSources.includes(source.id)
+          return (
+            <div
+              key={source.id}
+              style={{
+                padding: '12px 16px',
+                border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                borderRadius: 6,
+                background: isSelected ? 'rgba(24, 144, 255, 0.1)' : 'var(--bg-elevated)',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer'
+              }}
+              onClick={() => handleCheckboxChange(source.id, !isSelected)}
             >
-              <Text strong>{source.name}</Text>
-            </Checkbox>
-            <div style={{ marginLeft: 24, marginTop: 4 }}>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                {source.description}
-              </Text>
+              <Checkbox
+                checked={isSelected}
+                onChange={(e) => handleCheckboxChange(source.id, e.target.checked)}
+                style={{ width: '100%' }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', marginLeft: 8 }}>
+                  <Text strong style={{ color: 'var(--text-primary)' }}>{source.name}</Text>
+                  <Text type="secondary" style={{ fontSize: 12, marginTop: 4 }}>
+                    {source.description}
+                  </Text>
+                </div>
+              </Checkbox>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </Space>
 
-      <Divider style={{ margin: '12px 0' }} />
-      <Text type="secondary" style={{ fontSize: 12 }}>
-        已选择 {selectedSources.length} 个数据源
-      </Text>
+      <Divider style={{ margin: '16px 0', borderColor: 'var(--border-color)' }} />
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {selectedSources.length} sources selected
+        </Text>
+      </div>
     </div>
   )
 }

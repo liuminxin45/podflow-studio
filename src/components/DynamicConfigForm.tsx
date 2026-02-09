@@ -1,5 +1,6 @@
-import { Form, Input, InputNumber, Switch, Space, Button, Select } from 'antd'
+import { Form, Input, InputNumber, Switch, Space, Button, Select, Row, Col, Card } from 'antd'
 import { useEffect, useState } from 'react'
+import { SaveOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons'
 import FetchSourcesConfig from './FetchSourcesConfig'
 import LLMConfigFields from './LLMConfigFields'
 import ManualNewsConfig from './ManualNewsConfig'
@@ -92,47 +93,50 @@ export default function DynamicConfigForm({ nodeName, initialValues, onChange, o
     // 特殊处理：fetch节点的enabled_sources字段使用专门的组件
     if (nodeName === 'fetch' && fieldName === 'enabled_sources') {
       return (
-        <Form.Item
-          key={fieldName}
-          name={fieldName}
-          label="数据源"
-          tooltip={fieldSchema.description}
-        >
-          <FetchSourcesConfig />
-        </Form.Item>
+        <Col span={24} key={fieldName}>
+          <Form.Item
+            name={fieldName}
+            label="Data Sources"
+            tooltip={fieldSchema.description}
+          >
+            <FetchSourcesConfig />
+          </Form.Item>
+        </Col>
       )
     }
 
     // 特殊处理：manual节点的news_items字段使用专门的组件
     if (nodeName === 'manual' && fieldName === 'news_items') {
       return (
-        <Form.Item
-          key={fieldName}
-          name={fieldName}
-          label="新闻列表"
-          tooltip={fieldSchema.description}
-        >
-          <ManualNewsConfig />
-        </Form.Item>
+        <Col span={24} key={fieldName}>
+          <Form.Item
+            name={fieldName}
+            label="News List"
+            tooltip={fieldSchema.description}
+          >
+            <ManualNewsConfig />
+          </Form.Item>
+        </Col>
       )
     }
 
     // 特殊处理：source_selector节点的source_type字段使用Select
     if (nodeName === 'source_selector' && fieldName === 'source_type') {
       return (
-        <Form.Item
-          key={fieldName}
-          name={fieldName}
-          label="内容来源"
-          tooltip={fieldSchema.description}
-        >
-          <Select
-            options={[
-              { value: 'fetch', label: '🔍 自动抓取 (Fetch)' },
-              { value: 'manual', label: '✍️ 手动输入 (Manual)' }
-            ]}
-          />
-        </Form.Item>
+        <Col span={24} key={fieldName}>
+          <Form.Item
+            name={fieldName}
+            label="Content Source"
+            tooltip={fieldSchema.description}
+          >
+            <Select
+              options={[
+                { value: 'fetch', label: '🔍 Auto Fetch' },
+                { value: 'manual', label: '✍️ Manual Input' }
+              ]}
+            />
+          </Form.Item>
+        </Col>
       )
     }
 
@@ -141,137 +145,91 @@ export default function DynamicConfigForm({ nodeName, initialValues, onChange, o
       return null
     }
 
+    let inputComponent
+    let colSpan = 12
+
     switch (fieldSchema.type) {
       case 'boolean':
+        inputComponent = <Switch />
         return (
-          <Form.Item
-            key={fieldName}
-            name={fieldName}
-            label={label}
-            valuePropName="checked"
-            tooltip={fieldSchema.description}
-          >
-            <Switch />
-          </Form.Item>
+          <Col span={12} key={fieldName}>
+            <Form.Item
+              name={fieldName}
+              label={label}
+              valuePropName="checked"
+              tooltip={fieldSchema.description}
+            >
+              {inputComponent}
+            </Form.Item>
+          </Col>
         )
 
       case 'integer':
       case 'number':
-        return (
-          <Form.Item
-            key={fieldName}
-            name={fieldName}
-            label={label}
-            rules={rules}
-            tooltip={fieldSchema.description}
-          >
-            <InputNumber
-              style={{ width: '100%' }}
-              min={fieldSchema.min}
-              max={fieldSchema.max}
-              step={fieldSchema.type === 'integer' ? 1 : 0.1}
-            />
-          </Form.Item>
+        inputComponent = (
+          <InputNumber
+            style={{ width: '100%' }}
+            min={fieldSchema.min}
+            max={fieldSchema.max}
+            step={fieldSchema.type === 'integer' ? 1 : 0.1}
+          />
         )
+        colSpan = 12
+        break
 
       case 'string':
         if (fieldName.toLowerCase().includes('password') || fieldName.toLowerCase().includes('key')) {
-          return (
-            <Form.Item
-              key={fieldName}
-              name={fieldName}
-              label={label}
-              rules={rules}
-              tooltip={fieldSchema.description}
-            >
-              <Input.Password />
-            </Form.Item>
-          )
+          inputComponent = <Input.Password />
+          colSpan = 12
+        } else if (fieldName.toLowerCase().includes('url') || fieldName.toLowerCase().includes('path')) {
+          inputComponent = <Input placeholder={`Enter ${label.toLowerCase()}`} />
+          colSpan = 24
+        } else if (fieldSchema.maxLength && fieldSchema.maxLength > 100) {
+          inputComponent = <Input.TextArea rows={4} maxLength={fieldSchema.maxLength} />
+          colSpan = 24
+        } else {
+          inputComponent = <Input maxLength={fieldSchema.maxLength} />
+          colSpan = 12
         }
-        
-        if (fieldName.toLowerCase().includes('url') || fieldName.toLowerCase().includes('path')) {
-          return (
-            <Form.Item
-              key={fieldName}
-              name={fieldName}
-              label={label}
-              rules={rules}
-              tooltip={fieldSchema.description}
-            >
-              <Input placeholder={`Enter ${label.toLowerCase()}`} />
-            </Form.Item>
-          )
-        }
-
-        if (fieldSchema.maxLength && fieldSchema.maxLength > 100) {
-          return (
-            <Form.Item
-              key={fieldName}
-              name={fieldName}
-              label={label}
-              rules={rules}
-              tooltip={fieldSchema.description}
-            >
-              <Input.TextArea rows={4} maxLength={fieldSchema.maxLength} />
-            </Form.Item>
-          )
-        }
-
-        return (
-          <Form.Item
-            key={fieldName}
-            name={fieldName}
-            label={label}
-            rules={rules}
-            tooltip={fieldSchema.description}
-          >
-            <Input maxLength={fieldSchema.maxLength} />
-          </Form.Item>
-        )
+        break
 
       case 'array':
-        return (
-          <Form.Item
-            key={fieldName}
-            name={fieldName}
-            label={label}
-            tooltip={fieldSchema.description}
-          >
-            <Input.TextArea 
-              rows={3} 
-              placeholder="Enter JSON array, e.g., [1, 2, 3]"
-            />
-          </Form.Item>
+        inputComponent = (
+          <Input.TextArea 
+            rows={3} 
+            placeholder="Enter JSON array, e.g., [1, 2, 3]"
+          />
         )
+        colSpan = 24
+        break
 
       case 'object':
-        return (
-          <Form.Item
-            key={fieldName}
-            name={fieldName}
-            label={label}
-            tooltip={fieldSchema.description}
-          >
-            <Input.TextArea 
-              rows={4} 
-              placeholder="Enter JSON object, e.g., {&quot;key&quot;: &quot;value&quot;}"
-            />
-          </Form.Item>
+        inputComponent = (
+          <Input.TextArea 
+            rows={4} 
+            placeholder="Enter JSON object, e.g., {&quot;key&quot;: &quot;value&quot;}"
+          />
         )
+        colSpan = 24
+        break
 
       default:
-        return (
-          <Form.Item
-            key={fieldName}
-            name={fieldName}
-            label={label}
-            rules={rules}
-            tooltip={fieldSchema.description}
-          >
-            <Input />
-          </Form.Item>
-        )
+        inputComponent = <Input />
+        colSpan = 12
     }
+
+    return (
+      <Col span={colSpan} key={fieldName}>
+        <Form.Item
+          name={fieldName}
+          label={label}
+          rules={rules}
+          tooltip={fieldSchema.description}
+        >
+          {inputComponent}
+        </Form.Item>
+      </Col>
+    )
   }
 
   if (loading) {
@@ -280,7 +238,7 @@ export default function DynamicConfigForm({ nodeName, initialValues, onChange, o
 
   if (error) {
     return (
-      <div style={{ padding: 16, color: '#ff4d4f' }}>
+      <div style={{ padding: 16, color: 'var(--error-color)' }}>
         <p>Failed to load configuration schema:</p>
         <p style={{ fontSize: 12, fontFamily: 'monospace' }}>{error}</p>
       </div>
@@ -297,25 +255,69 @@ export default function DynamicConfigForm({ nodeName, initialValues, onChange, o
       layout="vertical"
       onFinish={handleSubmit}
       onValuesChange={handleValuesChange}
-      style={{ padding: '16px 0' }}
+      style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
     >
-      {/* LLM配置字段组 */}
-      {hasLLMFields() && <LLMConfigFields />}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px', paddingBottom: 24 }}>
+        {/* LLM配置字段组 */}
+        {hasLLMFields() && (
+          <Card 
+            size="small"
+            title={
+              <Space>
+                <SettingOutlined style={{ color: 'var(--accent-primary)' }} />
+                <span>LLM Configuration</span>
+              </Space>
+            }
+            style={{ 
+              marginBottom: 24, 
+              background: 'var(--bg-elevated)', 
+              borderColor: 'var(--border-color)' 
+            }}
+            headStyle={{
+              borderBottom: '1px solid var(--border-color)',
+              color: 'var(--text-primary)'
+            }}
+          >
+            <LLMConfigFields />
+          </Card>
+        )}
 
-      {/* 其他字段 */}
-      {schema && schema.fields && Object.entries(schema.fields).map(([fieldName, fieldSchema]) => renderField(fieldName, fieldSchema as FieldSchema))}
+        {/* 其他字段 */}
+        <Row gutter={24}>
+          {schema && schema.fields && Object.entries(schema.fields).map(([fieldName, fieldSchema]) => 
+            renderField(fieldName, fieldSchema as FieldSchema)
+          )}
+        </Row>
+      </div>
       
       {onSubmit && (
-        <Form.Item>
+        <div style={{
+          flexShrink: 0,
+          background: 'var(--bg-secondary)',
+          borderTop: '1px solid var(--border-color)',
+          padding: '16px 24px',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          zIndex: 10
+        }}>
           <Space>
-            <Button type="primary" htmlType="submit">
-              Save Configuration
-            </Button>
-            <Button onClick={() => form.resetFields()}>
+            <Button onClick={() => form.resetFields()} icon={<ReloadOutlined />}>
               Reset
             </Button>
+            <Button 
+              type="primary" 
+              htmlType="submit" 
+              icon={<SaveOutlined />}
+              style={{
+                background: 'var(--success-color)',
+                borderColor: 'var(--success-color)',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              }}
+            >
+              Save Changes
+            </Button>
           </Space>
-        </Form.Item>
+        </div>
       )}
     </Form>
   )
