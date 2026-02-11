@@ -17,9 +17,23 @@ import {
   ArrowRightOutlined,
   FieldTimeOutlined,
   RadarChartOutlined,
+  FireOutlined,
+  ThunderboltOutlined,
+  BulbOutlined,
+  LikeOutlined,
+  DislikeOutlined,
+  CaretUpOutlined,
 } from '@ant-design/icons'
 import FetchConfigModal from './FetchConfigModal'
 import type { ContentItem } from '../types/workflow'
+import { 
+  detectCategory, 
+  computeRelevance, 
+  getRelevanceTag, 
+  getSignalStrength, 
+  getSignalColor,
+  formatTimeAgo 
+} from '../utils'
 
 const { TextArea } = Input
 
@@ -38,6 +52,23 @@ interface EnrichedItem extends ContentItem {
   _note?: string
 }
 
+interface HighlightItem extends ContentItem {
+  _originalIndex: number
+  _score: number
+  _reasons: string[]
+  _category?: { id: string; label: string; color: string; bg: string }
+}
+
+interface AnomalyTrend {
+  categoryId: string
+  label: string
+  color: string
+  count: number
+  message: string
+}
+
+type FeedbackType = 'more' | 'less'
+
 interface Props {
   visible: boolean
   onClose: () => void
@@ -49,72 +80,327 @@ interface Props {
   onFetchConfigSave?: (config: Record<string, any>) => Promise<void>
 }
 
+
+function generateHighlightReasons(
+  item: ContentItem,
+  relevance: 'high' | 'medium' | 'low',
+  category: ReturnType<typeof detectCategory>,
+  topic: string,
+): string[] {
+  const reasons: string[] = []
+  if (relevance === 'high' && topic) {
+    const firstTopic = topic.split(/[,，]/)[0]?.trim()
+    if (firstTopic) reasons.push(`与「${firstTopic}」高度相关`)
+  } else if (relevance === 'medium' && topic) {
+    reasons.push('可能与你的关注方向有关')
+  }
+  if (category) reasons.push(`${category.label}领域`)
+  if (item.published) {
+    try {
+      const hours = (Date.now() - new Date(item.published).getTime()) / 3600000
+      if (hours < 6) reasons.push('近期热度上升')
+      else if (hours < 12) reasons.push('今日新动态')
+    } catch { /* ignore */ }
+  }
+  if (item.source) reasons.push('多来源报道')
+  if (reasons.length === 0) reasons.push('综合信号强度较高')
+  return reasons
+}
+
+function selectTodayHighlights(
+  items: ContentItem[],
+  topic: string,
+  maxCount = 3,
+): HighlightItem[] {
+  if (items.length === 0) return []
+
+  const scored = items.map((item, index) => {
+    let score = 0
+    const relevance = computeRelevance(item, topic)
+    if (relevance === 'high') score += 30
+    else if (relevance === 'medium') score += 15
+
+    if (item.published) {
+      try {
+        const hours = (Date.now() - new Date(item.published).getTime()) / 3600000
+        if (hours < 6) score += 20
+        else if (hours < 12) score += 15
+        else if (hours < 24) score += 10
+      } catch { /* ignore */ }
+    }
+
+    const category = detectCategory(item)
+    if (category) score += 10
+
+    const strength = getSignalStrength(index, items.length)
+    if (strength === 'hot') score += 15
+    else if (strength === 'warm') score += 5
+
+    return { item, index, score, relevance, category }
+  })
+
+  scored.sort((a, b) => b.score - a.score)
+  const selected: typeof scored = []
+  const usedCategories = new Set<string>()
+
+  for (const s of scored) {
+    if (selected.length >= maxCount) break
+    const catId = s.category?.id || '_general'
+    if (
+      usedCategories.has(catId) &&
+      scored.some(x => !selected.includes(x) && !usedCategories.has(x.category?.id || '_general'))
+    ) continue
+    selected.push(s)
+    usedCategories.add(catId)
+  }
+
+  while (selected.length < maxCount && selected.length < scored.length) {
+    const next = scored.find(s => !selected.includes(s))
+    if (next) selected.push(next)
+    else break
+  }
+
+  return selected.map(s => ({
+    ...s.item,
+    _originalIndex: s.index,
+    _score: s.score,
+    _reasons: generateHighlightReasons(s.item, s.relevance, s.category, topic),
+    _category: s.category || undefined,
+  }))
+}
+
+function detectAnomalyTrends(items: ContentItem[]): AnomalyTrend[] {
+  if (items.length < 5) return []
+  const categoryCounts = new Map<string, { count: number; label: string; color: string }>()
+  for (const item of items) {
+    const cat = detectCategory(item)
+    if (cat) {
+      const existing = categoryCounts.get(cat.id) || { count: 0, label: cat.label, color: cat.color }
+      existing.count++
+      categoryCounts.set(cat.id, existing)
+    }
+  }
+  const avgCount = items.length / Math.max(categoryCounts.size, 1)
+  const anomalies: AnomalyTrend[] = []
+  categoryCounts.forEach((val, key) => {
+    if (val.count >= 3 && val.count >= avgCount * 1.5) {
+      anomalies.push({
+        categoryId: key,
+        label: val.label,
+        color: val.color,
+        count: val.count,
+        message: `「${val.label}」方向出现 ${val.count} 条密集信号`,
+      })
+    }
+  })
+  return anomalies.slice(0, 2)
+}
+
 // ============================================================
-// Signal Intelligence Helpers
+// Today's Highlight Card
 // ============================================================
 
-const CATEGORY_RULES: Array<{ id: string; label: string; color: string; bg: string; keywords: string[] }> = [
-  { id: 'regulation', label: '监管政策', color: '#ea580c', bg: '#fff7ed', keywords: ['监管', '政策', '法规', '合规', '审查', 'regulation', 'policy', 'compliance', 'ban', 'restrict'] },
-  { id: 'breakthrough', label: '技术突破', color: '#2563eb', bg: '#eff6ff', keywords: ['突破', '发布', '开源', '新模型', 'release', 'launch', 'breakthrough', 'open source', 'GPT', 'model'] },
-  { id: 'market', label: '市场动向', color: '#16a34a', bg: '#f0fdf4', keywords: ['融资', '估值', '收购', '上市', 'IPO', '营收', 'funding', 'valuation', 'acquisition', 'revenue', 'market'] },
-  { id: 'people', label: '人物动态', color: '#7c3aed', bg: '#f5f3ff', keywords: ['CEO', 'CTO', '创始人', '离职', '加入', 'founder', 'hire', 'resign', 'join'] },
-  { id: 'trend', label: '行业趋势', color: '#0891b2', bg: '#ecfeff', keywords: ['趋势', '增长', '变化', '转型', 'trend', 'growth', 'shift', 'transform'] },
-]
+function TodayHighlightCard({
+  item,
+  onAddCandidate,
+  onSaveToInbox,
+  onFeedback,
+  isCandidate,
+  feedbackGiven,
+}: {
+  item: HighlightItem
+  onAddCandidate: () => void
+  onSaveToInbox: () => void
+  onFeedback: (type: FeedbackType) => void
+  isCandidate: boolean
+  feedbackGiven?: FeedbackType
+}) {
+  const category = item._category
+  const timeAgo = formatTimeAgo(item.published)
 
-function detectCategory(item: ContentItem) {
-  const text = `${item.title || ''} ${item.content || ''}`.toLowerCase()
-  for (const rule of CATEGORY_RULES) {
-    if (rule.keywords.some(kw => text.includes(kw.toLowerCase()))) return rule
-  }
-  return null
+  return (
+    <div
+      className="highlight-card"
+      style={{
+        position: 'relative',
+        borderRadius: 12,
+        border: isCandidate ? '1.5px solid var(--success-color)' : '1px solid var(--border-color)',
+        background: isCandidate ? 'rgba(16,185,129,0.02)' : 'var(--bg-secondary)',
+        overflow: 'hidden',
+        transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+      }}
+    >
+      {/* Gradient left accent */}
+      <div style={{
+        position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
+        background: isCandidate
+          ? 'var(--success-color)'
+          : 'linear-gradient(180deg, #2563eb 0%, #7c3aed 100%)',
+      }} />
+
+      <div style={{ padding: '14px 16px 12px 16px' }}>
+        {/* Title row */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+          <div style={{
+            flex: 1, fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)',
+            lineHeight: 1.45,
+            display: '-webkit-box', WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical' as const, overflow: 'hidden',
+          }}>
+            {item.title || '无标题'}
+          </div>
+          {timeAgo && (
+            <span style={{
+              fontSize: 10, color: 'var(--text-tertiary)', flexShrink: 0,
+              display: 'flex', alignItems: 'center', gap: 3, marginTop: 2,
+            }}>
+              <FieldTimeOutlined style={{ fontSize: 9 }} />
+              {timeAgo}
+            </span>
+          )}
+        </div>
+
+        {/* Content snippet */}
+        {item.content && (
+          <div style={{
+            fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.55,
+            display: '-webkit-box', WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical' as const, overflow: 'hidden',
+            marginBottom: 10,
+          }}>
+            {item.content.slice(0, 200)}
+          </div>
+        )}
+
+        {/* Recommendation reasons — transparent */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '5px 10px', borderRadius: 6,
+          background: 'var(--accent-light)',
+          marginBottom: 10,
+        }}>
+          <BulbOutlined style={{ fontSize: 11, color: 'var(--accent-primary)', flexShrink: 0 }} />
+          <span style={{ fontSize: 11, color: 'var(--accent-primary)', lineHeight: 1.4 }}>
+            {item._reasons.join(' · ')}
+          </span>
+        </div>
+
+        {/* Meta tags + Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+            {item.source && (
+              <Tag bordered={false} style={{
+                fontSize: 10, padding: '0 6px', lineHeight: '18px', borderRadius: 4,
+                background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', margin: 0,
+              }}>
+                <GlobalOutlined style={{ fontSize: 9, marginRight: 3 }} />
+                {item.source}
+              </Tag>
+            )}
+            {category && (
+              <Tag bordered={false} style={{
+                fontSize: 10, padding: '0 6px', lineHeight: '18px', borderRadius: 4,
+                background: category.bg, color: category.color, margin: 0,
+              }}>
+                {category.label}
+              </Tag>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            {/* Feedback buttons */}
+            <Tooltip title="多一点这种">
+              <button
+                onClick={() => onFeedback('more')}
+                className="highlight-feedback-btn"
+                style={{
+                  background: feedbackGiven === 'more' ? 'var(--accent-light)' : 'transparent',
+                  border: feedbackGiven === 'more' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                  borderRadius: 5, padding: '2px 6px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 3,
+                  color: feedbackGiven === 'more' ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                  fontSize: 10, transition: 'all 0.15s ease',
+                }}
+              >
+                <LikeOutlined style={{ fontSize: 10 }} />
+              </button>
+            </Tooltip>
+            <Tooltip title="少一点这种">
+              <button
+                onClick={() => onFeedback('less')}
+                className="highlight-feedback-btn"
+                style={{
+                  background: feedbackGiven === 'less' ? '#fef2f2' : 'transparent',
+                  border: feedbackGiven === 'less' ? '1px solid #fca5a5' : '1px solid var(--border-color)',
+                  borderRadius: 5, padding: '2px 6px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 3,
+                  color: feedbackGiven === 'less' ? '#ef4444' : 'var(--text-tertiary)',
+                  fontSize: 10, transition: 'all 0.15s ease',
+                }}
+              >
+                <DislikeOutlined style={{ fontSize: 10 }} />
+              </button>
+            </Tooltip>
+
+            {/* Divider */}
+            <div style={{ width: 1, height: 14, background: 'var(--border-color)', margin: '0 2px' }} />
+
+            {/* Actions */}
+            {isCandidate ? (
+              <Tag color="success" bordered={false} style={{
+                fontSize: 10, borderRadius: 4, margin: 0, lineHeight: '18px', padding: '0 6px',
+              }}>
+                <CheckCircleOutlined /> 已入选
+              </Tag>
+            ) : (
+              <>
+                <Button
+                  size="small" type="primary"
+                  onClick={onAddCandidate}
+                  style={{ fontSize: 10, height: 22, borderRadius: 5, padding: '0 10px' }}
+                >
+                  <PlusOutlined /> 加入整理
+                </Button>
+                <Tooltip title="保存到收集箱">
+                  <Button
+                    size="small" type="text"
+                    icon={<InboxOutlined style={{ fontSize: 11 }} />}
+                    onClick={onSaveToInbox}
+                    style={{ fontSize: 10, height: 22, color: 'var(--text-tertiary)' }}
+                  />
+                </Tooltip>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
-function getSignalStrength(index: number, total: number): 'hot' | 'warm' | 'cool' {
-  const ratio = total > 0 ? index / total : 0
-  if (ratio < 0.25) return 'hot'
-  if (ratio < 0.6) return 'warm'
-  return 'cool'
-}
+// ============================================================
+// Trend Alert Banner
+// ============================================================
 
-function getSignalColor(strength: 'hot' | 'warm' | 'cool') {
-  switch (strength) {
-    case 'hot': return '#ef4444'
-    case 'warm': return '#3b82f6'
-    case 'cool': return '#d1d5db'
-  }
-}
-
-function computeRelevance(item: ContentItem, topic: string): 'high' | 'medium' | 'low' {
-  if (!topic) return 'medium'
-  const text = `${item.title || ''} ${item.content || ''}`.toLowerCase()
-  const words = topic.toLowerCase().split(/[,，、\s]+/).filter(Boolean)
-  const hits = words.filter(w => text.includes(w)).length
-  const ratio = words.length > 0 ? hits / words.length : 0
-  if (ratio > 0.3) return 'high'
-  if (ratio > 0.1) return 'medium'
-  return 'low'
-}
-
-function getRelevanceTag(level: 'high' | 'medium' | 'low') {
-  switch (level) {
-    case 'high': return { label: '高度相关', color: '#16a34a', bg: '#f0fdf4' }
-    case 'medium': return { label: '可能感兴趣', color: '#d97706', bg: '#fffbeb' }
-    case 'low': return { label: '扩展发现', color: '#9ca3af', bg: '#f9fafb' }
-  }
-}
-
-function formatTimeAgo(published?: string): string {
-  if (!published) return ''
-  try {
-    const d = new Date(published)
-    const now = new Date()
-    const h = Math.floor((now.getTime() - d.getTime()) / 3600000)
-    if (h < 1) return '刚刚'
-    if (h < 24) return `${h}小时前`
-    const days = Math.floor(h / 24)
-    if (days < 7) return `${days}天前`
-    return published
-  } catch { return published }
+function TrendAlertBanner({ trend, delay = 0 }: { trend: AnomalyTrend; delay?: number }) {
+  return (
+    <div
+      className="trend-alert-banner"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 12px', marginBottom: 8, borderRadius: 8,
+        background: `${trend.color}08`,
+        border: `1px solid ${trend.color}20`,
+        animation: `trendAlertIn 0.3s ease ${delay}s both`,
+      }}
+    >
+      <CaretUpOutlined style={{ fontSize: 11, color: trend.color }} />
+      <span style={{ fontSize: 11, color: trend.color, fontWeight: 500 }}>
+        {trend.message}
+      </span>
+      <FireOutlined style={{ fontSize: 10, color: trend.color, opacity: 0.5, marginLeft: 'auto' }} />
+    </div>
+  )
 }
 
 // ============================================================
@@ -416,6 +702,9 @@ export default function DiscoverPanel({
   const [quickPasteText, setQuickPasteText] = useState('')
   const [quickPasteVisible, setQuickPasteVisible] = useState(false)
 
+  // Trend Radar feedback
+  const [feedbackMap, setFeedbackMap] = useState<Map<number, FeedbackType>>(new Map())
+
   // User's configured topic
   const userTopic = (fetchConfig?.topic as string) || ''
 
@@ -467,6 +756,16 @@ export default function DiscoverPanel({
     return { total, highRelevance }
   }, [filteredSignals, userTopic])
 
+  // ── Today's Highlights ──────────────────────────────────────
+  const todayHighlights = useMemo(() => {
+    return selectTodayHighlights(filteredSignals, userTopic, 3)
+  }, [filteredSignals, userTopic])
+
+  // ── Anomaly Trends ─────────────────────────────────────────
+  const anomalyTrends = useMemo(() => {
+    return detectAnomalyTrends(filteredSignals)
+  }, [filteredSignals])
+
   // ── Inbox items ───────────────────────────────────────────
   const allInbox = useMemo(() => {
     const manual: EnrichedItem[] = manualContents.map(m => ({ ...m, _source_channel: 'manual' as const }))
@@ -513,6 +812,23 @@ export default function DiscoverPanel({
     setQuickPasteVisible(false)
     message.success({ content: '已添加到收集箱', duration: 1.5, style: { marginTop: 60 } })
   }, [quickPasteText])
+
+  const handleFeedback = useCallback((originalIdx: number, type: FeedbackType) => {
+    setFeedbackMap(prev => {
+      const next = new Map(prev)
+      if (next.get(originalIdx) === type) {
+        next.delete(originalIdx)
+      } else {
+        next.set(originalIdx, type)
+      }
+      return next
+    })
+    message.info({
+      content: type === 'more' ? '收到，会推荐更多类似内容' : '收到，会减少类似推荐',
+      duration: 1.5,
+      style: { marginTop: 60 },
+    })
+  }, [])
 
   const handleProceed = useCallback(() => {
     const candidates: EnrichedItem[] = []
@@ -562,12 +878,12 @@ export default function DiscoverPanel({
           </div>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>
-              今日信号
+              趋势雷达
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.2 }}>
               {stats.total > 0
-                ? `${stats.total} 条信号${stats.highRelevance > 0 ? ` · ${stats.highRelevance} 条高度相关` : ''}`
-                : '雷达待命中'}
+                ? `${stats.total} 条信号${todayHighlights.length > 0 ? ` · 已精选 ${todayHighlights.length} 条重点` : stats.highRelevance > 0 ? ` · ${stats.highRelevance} 条高度相关` : ''}`
+                : '等待信号中…'}
             </div>
           </div>
         </div>
@@ -682,11 +998,11 @@ export default function DiscoverPanel({
                 {fetchContents.length === 0 ? (
                   <>
                     <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-                      雷达正在待命
+                      雷达待命中
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-tertiary)', lineHeight: 1.7, marginBottom: 24 }}>
                       告诉它你关注什么方向，它会帮你持续扫描全网信号。<br />
-                      不需要逐个翻阅——有动静的时候，它会告诉你。
+                      每天为你精选重点，提示异常变化——不需要逐条翻阅。
                     </div>
                     <Button
                       type="primary" icon={<RadarChartOutlined />}
@@ -711,7 +1027,7 @@ export default function DiscoverPanel({
                 )}
               </div>
             ) : (
-              /* ── Signal List ── */
+              /* ── Signal List with Trend Radar ── */
               <>
                 {/* Topic context hint */}
                 {userTopic && (
@@ -730,6 +1046,83 @@ export default function DiscoverPanel({
                     >
                       调整
                     </Button>
+                  </div>
+                )}
+
+                {/* ── Today's Highlights ── */}
+                {todayHighlights.length > 0 && (
+                  <div style={{
+                    marginBottom: 20,
+                    animation: 'highlightSectionIn 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                  }}>
+                    {/* Section header */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      marginBottom: 4,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{
+                          width: 22, height: 22, borderRadius: 6,
+                          background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: '#fff', fontSize: 11,
+                        }}>
+                          <ThunderboltOutlined />
+                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                          今日重点
+                        </span>
+                      </div>
+                      <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+                        {todayHighlights.length} 条精选
+                      </span>
+                    </div>
+                    <div style={{
+                      fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 10, lineHeight: 1.5,
+                    }}>
+                      根据你的关注方向和信号强度，为你挑选了最值得注意的内容
+                    </div>
+
+                    {/* Highlight cards */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {todayHighlights.map((h, i) => (
+                        <div key={h._originalIndex} style={{
+                          animation: `highlightCardIn 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) ${i * 0.08}s both`,
+                        }}>
+                          <TodayHighlightCard
+                            item={h}
+                            onAddCandidate={() => addCandidate(h._originalIndex)}
+                            onSaveToInbox={() => saveToInbox(h)}
+                            onFeedback={(type) => handleFeedback(h._originalIndex, type)}
+                            isCandidate={candidateSet.has(h._originalIndex)}
+                            feedbackGiven={feedbackMap.get(h._originalIndex)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Anomaly Trend Alerts ── */}
+                {anomalyTrends.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    {anomalyTrends.map((t, i) => (
+                      <TrendAlertBanner key={t.categoryId} trend={t} delay={i * 0.1} />
+                    ))}
+                  </div>
+                )}
+
+                {/* ── Section divider ── */}
+                {todayHighlights.length > 0 && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    marginBottom: 12, paddingTop: 4,
+                  }}>
+                    <div style={{ height: 1, flex: 1, background: 'var(--border-light)' }} />
+                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 500 }}>
+                      全部信号
+                    </span>
+                    <div style={{ height: 1, flex: 1, background: 'var(--border-light)' }} />
                   </div>
                 )}
 

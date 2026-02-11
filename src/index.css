@@ -340,3 +340,336 @@ body {
 .signal-card {
   cursor: default;
 }
+
+/* ============================================================
+   Organize Panel
+   ============================================================ */
+
+@keyframes organizeCardIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes organizeCandidateIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes organizeToolbarIn {
+  from { opacity: 0; transform: translateY(-6px); max-height: 0; }
+  to { opacity: 1; transform: translateY(0); max-height: 60px; }
+}
+
+@keyframes organizePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+}
+
+.organize-pool-card:hover {
+  border-color: var(--border-active) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.organize-candidate-card:hover {
+  border-color: var(--border-active) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+.organize-candidate-card:active {
+  cursor: grabbing;
+}
+
+.organize-candidate-card.dragging {
+  opacity: 0.5;
+}
+
+.organize-proceed-pulse {
+  animation: organizePulse 2s ease-in-out infinite;
+}
+
+/* AI Assistant Hints */
+@keyframes organizeAIHintIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes organizeClusterIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.organize-pool-card .ai-hint-tag {
+  animation: organizeAIHintIn 0.2s ease-out;
+}
+
+.organize-ai-cluster-header:hover {
+  filter: brightness(0.97);
+}
+
+/* ============================================================
+   Writing Layer
+   ============================================================ */
+
+@keyframes writingCardIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes writingExpand {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 2000px; }
+}
+
+@keyframes writingToneDropIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes writingActionsIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.writing-segment-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+}
+
+.writing-global-tone-btn:hover {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+}
+
+.writing-tone-btn:hover {
+  border-color: var(--accent-primary) !important;
+}
+
+.writing-collab-btn:hover {
+  border-color: var(--accent-primary) !important;
+  background: var(--accent-light) !important;
+}
+
+.writing-action-item:hover {
+  background: var(--bg-tertiary);
+}
+
+@keyframes writingSuggestionIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.writing-suggestion-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+}
+
+.writing-agent-header:hover {
+  background: var(--bg-tertiary);
+}
+
+/* ============================================================
+   Sound Studio
+   ============================================================ */
+
+@keyframes soundStudioCardIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes soundStudioActionsIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes soundStudioCompletionIn {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes soundStudioPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
+  50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+}
+
+.sound-studio-mode-btn:hover {
+  background: var(--bg-secondary) !important;
+}
+
+.sound-studio-voice-btn:hover {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+}
+
+.sound-studio-bgm-btn:hover {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+}
+
+.sound-studio-rec-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+}
+
+.sound-studio-edit-action-btn:hover {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+  transform: translateX(2px);
+}
+
+.sound-studio-edit-action-btn:active {
+  transform: translateX(0);
+  box-shadow: none;
+}
+
+@keyframes timelineSelectionIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.timeline-selection-highlight {
+  pointer-events: none;
+}
+
+/* ============================================================
+   Publish Layer
+   ============================================================ */
+
+@keyframes publishCardIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes publishAgentIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes publishSuggestionIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes publishActionsIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes publishReadyIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes publishProgressIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes publishSuccessIn {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes publishCelebrate {
+  0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+  60% { transform: scale(1.2) rotate(5deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes publishingPulse {
+  0%, 100% { box-shadow: 0 8px 30px rgba(37, 99, 235, 0.25); transform: scale(1); }
+  50% { box-shadow: 0 8px 40px rgba(37, 99, 235, 0.4); transform: scale(1.05); }
+}
+
+.publish-path-card {
+  position: relative;
+}
+
+.publish-path-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08) !important;
+}
+
+.publish-path-card:active {
+  transform: translateY(-2px);
+}
+
+.publish-main-btn:hover {
+  box-shadow: 0 6px 24px rgba(37, 99, 235, 0.4) !important;
+  transform: translateY(-1px);
+}
+
+/* ============================================================
+   Trend Radar — Discover Panel Upgrade
+   ============================================================ */
+
+@keyframes highlightSectionIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes highlightCardIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes trendAlertIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.highlight-card:hover {
+  border-color: var(--border-active) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+.trend-alert-banner {
+  transition: background 0.2s ease;
+}
+
+.trend-alert-banner:hover {
+  filter: brightness(0.98);
+}
+
+.highlight-feedback-btn:hover {
+  border-color: var(--accent-primary) !important;
+  color: var(--accent-primary) !important;
+}
+
+/* ============================================================
+   Settings Page
+   ============================================================ */
+
+@keyframes settingsPageIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes settingsContentIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes settingsFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.settings-option-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+}
+
+.settings-option-card:active {
+  transform: translateY(0);
+}
+
+.settings-nav-item:hover {
+  background: var(--bg-tertiary) !important;
+}
+
+.settings-subsection:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.settings-node-row:hover {
+  background: var(--bg-tertiary);
+}

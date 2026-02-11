@@ -7,6 +7,11 @@ import LogPanel from './components/LogPanel'
 import ApprovalModal from './components/ApprovalModal'
 import CreationStudio from './components/CreationStudio'
 import DiscoverPanel from './components/DiscoverPanel'
+import OrganizePanel from './components/OrganizePanel'
+import WritingLayer from './components/writing'
+import SoundStudio from './components/SoundStudio'
+import PublishLayer from './components/PublishLayer'
+import SettingsPage from './components/SettingsPage'
 import type { Workflow, WorkflowCreateResult } from './types/workflow'
 
 const { Header, Content, Footer } = Layout
@@ -41,8 +46,24 @@ function App() {
   const [studioVisible, setStudioVisible] = useState(false)
   const [studioAutoOpened, setStudioAutoOpened] = useState(false)
   const [discoverVisible, setDiscoverVisible] = useState(false)
+  const [organizeVisible, setOrganizeVisible] = useState(false)
+  const [writingVisible, setWritingVisible] = useState(false)
   const [fetchSources, setFetchSources] = useState<Array<{ id: string; name: string; description: string }>>([])
   const [fetchConfig, setFetchConfig] = useState<Record<string, any>>({})
+  const [soundStudioVisible, setSoundStudioVisible] = useState(false)
+  const [publishVisible, setPublishVisible] = useState(false)
+  const [settingsVisible, setSettingsVisible] = useState(false)
+
+  // Close all full-screen panels (mutual exclusivity)
+  const closeAllPanels = () => {
+    setDiscoverVisible(false)
+    setOrganizeVisible(false)
+    setStudioVisible(false)
+    setWritingVisible(false)
+    setSoundStudioVisible(false)
+    setPublishVisible(false)
+    setSettingsVisible(false)
+  }
 
   // Load fetch sources and config
   useEffect(() => {
@@ -170,6 +191,7 @@ function App() {
             </Button>
             <Button 
               icon={<SettingOutlined />} 
+              onClick={() => { closeAllPanels(); setSettingsVisible(true) }}
               style={{ 
                 background: 'transparent', 
                 borderColor: 'var(--border-color)',
@@ -196,10 +218,19 @@ function App() {
                 workflow={workflow} 
                 onNodeClick={setSelectedNode}
                 onStageClick={(stageId) => {
+                  closeAllPanels()
                   if (stageId === 'ideate') {
                     setStudioVisible(true)
                   } else if (stageId === 'discover') {
                     setDiscoverVisible(true)
+                  } else if (stageId === 'organize') {
+                    setOrganizeVisible(true)
+                  } else if (stageId === 'write') {
+                    setWritingVisible(true)
+                  } else if (stageId === 'produce') {
+                    setSoundStudioVisible(true)
+                  } else if (stageId === 'publish') {
+                    setPublishVisible(true)
                   }
                 }}
               />
@@ -266,11 +297,58 @@ function App() {
           }}
         />
 
+        <OrganizePanel
+          visible={organizeVisible}
+          onClose={() => setOrganizeVisible(false)}
+          contents={workflow?.state?.raw_contents || workflow?.state?.fetch_contents || []}
+          userTopic={(fetchConfig?.topic as string) || ''}
+          onProceedToIdeate={(_candidates) => {
+            closeAllPanels()
+            setStudioVisible(true)
+          }}
+        />
+
         <CreationStudio
           visible={studioVisible}
           onClose={() => setStudioVisible(false)}
           rawContents={workflow?.state?.raw_contents || []}
           selectedTopic={workflow?.state?.selected_topic}
+          onConfirm={(_structure) => {
+            closeAllPanels()
+            setWritingVisible(true)
+          }}
+        />
+
+        <WritingLayer
+          visible={writingVisible}
+          onClose={() => setWritingVisible(false)}
+          episodeTitle={workflow?.state?.selected_topic?.title || ''}
+          episodeDesc={workflow?.state?.selected_topic?.description || ''}
+          onProceedToProduction={() => {
+            closeAllPanels()
+            setSoundStudioVisible(true)
+          }}
+        />
+
+        <SoundStudio
+          visible={soundStudioVisible}
+          onClose={() => setSoundStudioVisible(false)}
+          episodeTitle={workflow?.state?.selected_topic?.title || ''}
+          onProceedToPublish={() => {
+            closeAllPanels()
+            setPublishVisible(true)
+          }}
+        />
+        <PublishLayer
+          visible={publishVisible}
+          onClose={() => setPublishVisible(false)}
+          episodeTitle={workflow?.state?.selected_topic?.title || ''}
+          episodeDesc={workflow?.state?.selected_topic?.description || ''}
+        />
+
+        <SettingsPage
+          visible={settingsVisible}
+          onClose={() => setSettingsVisible(false)}
         />
       </Layout>
     </ConfigProvider>

@@ -288,7 +288,7 @@ export default function WorkflowCanvas({ workflow, onNodeClick, onStageClick }: 
   const handleNodeClick = useCallback((_: any, node: Node) => {
     const stage = STAGES.find(s => s.id === node.id)
     if (stage) {
-      if ((stage.id === 'ideate' || stage.id === 'discover') && onStageClick) {
+      if ((stage.id === 'ideate' || stage.id === 'discover' || stage.id === 'organize' || stage.id === 'write' || stage.id === 'produce' || stage.id === 'publish') && onStageClick) {
         onStageClick(stage.id)
       } else {
         onNodeClick(stage.subNodes[0])
