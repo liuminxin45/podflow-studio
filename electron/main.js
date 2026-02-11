@@ -109,6 +109,8 @@ ipcMain.handle('workflow:create', async (event, config) => {
       runtime_config: config || {},
       logs: [],
       errors: [],
+      fetch_contents: [],
+      manual_contents: [],
       raw_contents: [],
       cleaned_contents: [],
       researched_contents: [],
@@ -307,10 +309,16 @@ ipcMain.handle('fetch:getSources', async (event) => {
 })
 
 async function runWorkflow(workflowId, resumeFrom = null) {
+  // 6-stage creator workflow: 发现 → 整理 → 构思 → 写作 → 制作 → 发布
+  // Each stage groups internal sub-nodes
   const nodes = [
-    'source_selector', 'fetch', 'manual', 'preprocess', 'research', 'topic_selection',
-    'script', 'stages', 'tts', 'audio_postprocess',
-    'assets', 'store', 'publish'
+    'fetch', 'manual', 'merge',           // 发现 (discover)
+    'preprocess',                          // 整理 (organize)
+    'research', 'topic_selection',         // 构思 (ideate) — creation studio
+    'script',                              // 写作 (write)
+    'tts', 'audio_postprocess', 'assets',  // 制作 (produce)
+    'review',                              // 发布 (publish) — pre-publish check
+    'publish'                              // 发布 (publish) — store + distribute
   ]
 
   let startIndex = resumeFrom ? nodes.indexOf(resumeFrom) : 0

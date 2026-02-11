@@ -13,6 +13,9 @@ import {
   ClockCircleOutlined
 } from '@ant-design/icons'
 import DynamicConfigForm from './DynamicConfigForm'
+import FetchConfigModal from './FetchConfigModal'
+import ManualConfigModal from './ManualConfigModal'
+import { RadarChartOutlined, InboxOutlined } from '@ant-design/icons'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -28,6 +31,9 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
   const [activeTab, setActiveTab] = useState('status')
   const [config, setConfig] = useState<Record<string, any>>({})
   const [configLoaded, setConfigLoaded] = useState(false)
+  const [fetchModalVisible, setFetchModalVisible] = useState(false)
+  const [fetchSources, setFetchSources] = useState<Array<{ id: string; name: string; description: string }>>([])
+  const [manualModalVisible, setManualModalVisible] = useState(false)
 
   // 自动加载配置
   useEffect(() => {
@@ -45,6 +51,24 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
     }
     loadConfig()
   }, [nodeName])
+
+  // 加载 fetch sources（仅 fetch 节点）
+  useEffect(() => {
+    if (nodeName === 'fetch') {
+      window.electronAPI.getFetchSources()
+        .then(sources => setFetchSources(sources))
+        .catch(e => console.error('Failed to load fetch sources:', e))
+    }
+  }, [nodeName])
+
+  const handleNodeConfigSave = async (values: Record<string, any>) => {
+    const result = await window.electronAPI.saveNodeConfig(nodeName, values)
+    if (result.success) {
+      setConfig(values)
+    } else {
+      throw new Error(result.error)
+    }
+  }
 
   const getStatusTag = (status: string) => {
     const colors: Record<string, string> = {
@@ -159,16 +183,17 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
     // 根据节点类型获取对应的输入数据
     const nodeInputMap: Record<string, string[]> = {
       'fetch': [],
+      'manual': [],
+      'merge': ['fetch_contents', 'manual_contents'],
       'preprocess': ['raw_contents'],
       'research': ['cleaned_contents'],
       'topic_selection': ['researched_contents'],
       'script': ['selected_topic', 'selected_materials'],
-      'stages': ['script'],
       'tts': ['stages'],
       'audio_postprocess': ['audio_segments'],
       'assets': ['final_audio_path'],
-      'store': ['final_audio_path', 'cover_path', 'audio_metadata'],
-      'publish': ['storage_info', 'rss_path']
+      'review': ['final_audio_path', 'cover_path', 'script', 'stages'],
+      'publish': ['final_audio_path', 'cover_path', 'audio_metadata', 'review_summary']
     }
     
     const inputKeys = nodeInputMap[nodeName] || []
@@ -186,17 +211,18 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
   // 获取节点的输出数据
   const getNodeOutput = () => {
     const nodeOutputMap: Record<string, string[]> = {
-      'fetch': ['raw_contents'],
+      'fetch': ['fetch_contents'],
+      'manual': ['manual_contents'],
+      'merge': ['raw_contents'],
       'preprocess': ['cleaned_contents'],
       'research': ['researched_contents'],
       'topic_selection': ['selected_topic', 'selected_materials'],
-      'script': ['script'],
-      'stages': ['stages'],
+      'script': ['script', 'stages'],
       'tts': ['audio_segments'],
       'audio_postprocess': ['final_audio_path', 'audio_metadata'],
       'assets': ['cover_path', 'intro_outro_paths'],
-      'store': ['storage_info'],
-      'publish': ['publish_status']
+      'review': ['review_summary'],
+      'publish': ['storage_info', 'publish_status']
     }
     
     const outputKeys = nodeOutputMap[nodeName] || []
@@ -404,14 +430,162 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
         </span>
       ),
       children: configLoaded ? (
-        <div style={{ height: '100%', overflow: 'hidden' }}>
-          <DynamicConfigForm
-            nodeName={nodeName}
-            initialValues={config}
-            onChange={handleConfigChange}
-            onSubmit={handleConfigSave}
-          />
-        </div>
+        nodeName === 'fetch' ? (
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: 16,
+              background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontSize: 24,
+              marginBottom: 16,
+              boxShadow: '0 8px 24px rgba(37, 99, 235, 0.25)',
+            }}>
+              <RadarChartOutlined />
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
+              信息雷达配置
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 20, textAlign: 'center', lineHeight: 1.6 }}>
+              定义信息采集的范围、质量和风格
+            </div>
+            <Button
+              type="primary"
+              size="large"
+              icon={<RadarChartOutlined />}
+              onClick={() => setFetchModalVisible(true)}
+              style={{
+                background: 'var(--accent-primary)',
+                borderColor: 'var(--accent-primary)',
+                borderRadius: 10,
+                height: 42,
+                fontSize: 14,
+                fontWeight: 600,
+                paddingInline: 28,
+                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+              }}
+            >
+              打开配置面板
+            </Button>
+            {config.activePreset && (
+              <div style={{
+                marginTop: 16,
+                fontSize: 12,
+                color: 'var(--text-tertiary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}>
+                <span>当前风格：</span>
+                <Tag bordered={false} style={{
+                  background: 'var(--accent-light)',
+                  color: 'var(--accent-primary)',
+                  fontWeight: 600,
+                  fontSize: 12,
+                  borderRadius: 6,
+                  margin: 0,
+                }}>
+                  {config.activePreset === 'commute' ? '通勤速听' :
+                   config.activePreset === 'daily' ? '每日综述' :
+                   config.activePreset === 'deep_radar' ? '深度雷达' :
+                   config.activePreset === 'risk_alert' ? '风险预警' :
+                   config.activePreset === 'pulse' ? '行业脉搏' :
+                   config.activePreset}
+                </Tag>
+              </div>
+            )}
+            <FetchConfigModal
+              visible={fetchModalVisible}
+              onClose={() => setFetchModalVisible(false)}
+              initialConfig={config}
+              onSave={handleNodeConfigSave}
+              sources={fetchSources}
+            />
+          </div>
+        ) : nodeName === 'manual' ? (
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: 16,
+              background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontSize: 24,
+              marginBottom: 16,
+              boxShadow: '0 8px 24px rgba(245, 158, 11, 0.25)',
+            }}>
+              <InboxOutlined />
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
+              灵感收集箱
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 20, textAlign: 'center', lineHeight: 1.6 }}>
+              随手丢入链接、文本、想法，系统帮你整理成素材
+            </div>
+            <Button
+              type="primary"
+              size="large"
+              icon={<InboxOutlined />}
+              onClick={() => setManualModalVisible(true)}
+              style={{
+                background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+                borderColor: 'transparent',
+                borderRadius: 10,
+                height: 42,
+                fontSize: 14,
+                fontWeight: 600,
+                paddingInline: 28,
+                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.25)',
+              }}
+            >
+              打开收集箱
+            </Button>
+            {config.news_items && config.news_items.length > 0 && (
+              <div style={{
+                marginTop: 16,
+                fontSize: 12,
+                color: 'var(--text-tertiary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}>
+                <span>已收集：</span>
+                <Tag bordered={false} style={{
+                  background: '#fef3c7',
+                  color: '#d97706',
+                  fontWeight: 600,
+                  fontSize: 12,
+                  borderRadius: 6,
+                  margin: 0,
+                }}>
+                  {config.news_items.length} 条素材
+                </Tag>
+              </div>
+            )}
+            <ManualConfigModal
+              visible={manualModalVisible}
+              onClose={() => setManualModalVisible(false)}
+              initialConfig={config}
+              onSave={handleNodeConfigSave}
+            />
+          </div>
+        ) : (
+          <div style={{ height: '100%', overflow: 'hidden' }}>
+            <DynamicConfigForm
+              nodeName={nodeName}
+              initialValues={config}
+              onChange={handleConfigChange}
+              onSubmit={handleConfigSave}
+            />
+          </div>
+        )
       ) : (
         <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Text type="secondary"><ReloadOutlined spin /> Loading configuration...</Text>

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Layout, Button, Space, Typography, message, ConfigProvider, theme } from 'antd'
 import { PlayCircleOutlined, SettingOutlined } from '@ant-design/icons'
-import WorkflowCanvas from './components/WorkflowCanvas'
+import WorkflowCanvas, { STAGES } from './components/WorkflowCanvas'
 import NodeDetailPanel from './components/NodeDetailPanel'
 import LogPanel from './components/LogPanel'
 import ApprovalModal from './components/ApprovalModal'
+import CreationStudio from './components/CreationStudio'
+import DiscoverPanel from './components/DiscoverPanel'
 import type { Workflow, WorkflowCreateResult } from './types/workflow'
 
 const { Header, Content, Footer } = Layout
@@ -36,10 +38,44 @@ function App() {
   const [approvalVisible, setApprovalVisible] = useState(false)
   const [approvalData, setApprovalData] = useState<any>(null)
   const [logPanelCollapsed, setLogPanelCollapsed] = useState(false)
+  const [studioVisible, setStudioVisible] = useState(false)
+  const [studioAutoOpened, setStudioAutoOpened] = useState(false)
+  const [discoverVisible, setDiscoverVisible] = useState(false)
+  const [fetchSources, setFetchSources] = useState<Array<{ id: string; name: string; description: string }>>([])
+  const [fetchConfig, setFetchConfig] = useState<Record<string, any>>({})
+
+  // Load fetch sources and config
+  useEffect(() => {
+    window.electronAPI.getFetchSources()
+      .then(sources => setFetchSources(sources))
+      .catch(e => console.error('Failed to load fetch sources:', e))
+    window.electronAPI.loadNodeConfig('fetch')
+      .then(config => { if (config) setFetchConfig(config) })
+      .catch(e => console.error('Failed to load fetch config:', e))
+  }, [])
 
   useEffect(() => {
     window.electronAPI.onWorkflowUpdate((data) => {
       setWorkflow(data)
+
+      // Auto-open creation studio when organize completes and ideate begins
+      if (!studioAutoOpened && data?.nodeExecutions) {
+        const organizeStage = STAGES.find(s => s.id === 'organize')
+        const ideateStage = STAGES.find(s => s.id === 'ideate')
+        if (organizeStage && ideateStage) {
+          const organizeComplete = organizeStage.subNodes.every(
+            n => data.nodeExecutions?.[n]?.status === 'completed'
+          )
+          const ideateStarted = ideateStage.subNodes.some(
+            n => data.nodeExecutions?.[n]?.status === 'running' ||
+                 data.nodeExecutions?.[n]?.status === 'completed'
+          )
+          if (organizeComplete && ideateStarted) {
+            setStudioVisible(true)
+            setStudioAutoOpened(true)
+          }
+        }
+      }
     })
 
     window.electronAPI.onNeedApproval((data) => {
@@ -156,7 +192,17 @@ function App() {
             transition: 'height 0.3s ease'
           }}>
             <div style={{ flex: 1, position: 'relative', height: '100%' }}>
-              <WorkflowCanvas workflow={workflow} onNodeClick={setSelectedNode} />
+              <WorkflowCanvas 
+                workflow={workflow} 
+                onNodeClick={setSelectedNode}
+                onStageClick={(stageId) => {
+                  if (stageId === 'ideate') {
+                    setStudioVisible(true)
+                  } else if (stageId === 'discover') {
+                    setDiscoverVisible(true)
+                  }
+                }}
+              />
             </div>
             
             {selectedNode && (
@@ -201,6 +247,30 @@ function App() {
           approvalData={approvalData}
           onApprove={handleApprove}
           onReject={handleReject}
+        />
+
+        <DiscoverPanel
+          visible={discoverVisible}
+          onClose={() => setDiscoverVisible(false)}
+          fetchContents={workflow?.state?.fetch_contents || []}
+          manualContents={workflow?.state?.manual_contents || []}
+          fetchSources={fetchSources}
+          fetchConfig={fetchConfig}
+          onFetchConfigSave={async (values) => {
+            const result = await window.electronAPI.saveNodeConfig('fetch', values)
+            if (result.success) {
+              setFetchConfig(values)
+            } else {
+              throw new Error(result.error)
+            }
+          }}
+        />
+
+        <CreationStudio
+          visible={studioVisible}
+          onClose={() => setStudioVisible(false)}
+          rawContents={workflow?.state?.raw_contents || []}
+          selectedTopic={workflow?.state?.selected_topic}
         />
       </Layout>
     </ConfigProvider>

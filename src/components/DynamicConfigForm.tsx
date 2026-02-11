@@ -1,4 +1,4 @@
-import { Form, Input, InputNumber, Switch, Space, Button, Select, Row, Col, Card } from 'antd'
+import { Form, Input, InputNumber, Switch, Space, Button, Row, Col, Card } from 'antd'
 import { useEffect, useState } from 'react'
 import { SaveOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons'
 import FetchSourcesConfig from './FetchSourcesConfig'
@@ -115,26 +115,6 @@ export default function DynamicConfigForm({ nodeName, initialValues, onChange, o
             tooltip={fieldSchema.description}
           >
             <ManualNewsConfig />
-          </Form.Item>
-        </Col>
-      )
-    }
-
-    // 特殊处理：source_selector节点的source_type字段使用Select
-    if (nodeName === 'source_selector' && fieldName === 'source_type') {
-      return (
-        <Col span={24} key={fieldName}>
-          <Form.Item
-            name={fieldName}
-            label="Content Source"
-            tooltip={fieldSchema.description}
-          >
-            <Select
-              options={[
-                { value: 'fetch', label: '🔍 Auto Fetch' },
-                { value: 'manual', label: '✍️ Manual Input' }
-              ]}
-            />
           </Form.Item>
         </Col>
       )

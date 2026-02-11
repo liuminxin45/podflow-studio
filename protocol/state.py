@@ -18,6 +18,8 @@ class PodcastState:
     episode_id: str = field(default_factory=lambda: f"ep_{datetime.now().strftime('%Y%m%d_%H%M')}")
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
+    fetch_contents: List[Dict[str, Any]] = field(default_factory=list)
+    manual_contents: List[Dict[str, Any]] = field(default_factory=list)
     raw_contents: List[Dict[str, Any]] = field(default_factory=list)
     cleaned_contents: List[Dict[str, Any]] = field(default_factory=list)
     researched_contents: List[Dict[str, Any]] = field(default_factory=list)
@@ -35,6 +37,7 @@ class PodcastState:
     cover_path: str = ""
     intro_outro_paths: Dict[str, str] = field(default_factory=dict)
     
+    review_summary: Dict[str, Any] = field(default_factory=dict)
     storage_info: Dict[str, Any] = field(default_factory=dict)
     
     rss_path: str = ""

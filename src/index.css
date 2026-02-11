@@ -203,3 +203,140 @@ body {
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
+/* Fetch Config Modal */
+@keyframes fetchConfigSlideDown {
+  from { opacity: 0; transform: translateY(-8px); max-height: 0; }
+  to { opacity: 1; transform: translateY(0); max-height: 2000px; }
+}
+
+.fetch-config-modal .ant-modal-content {
+  padding: 0 !important;
+  border-radius: 16px !important;
+  overflow: hidden;
+}
+
+.fetch-config-modal .ant-modal-body {
+  padding: 0 !important;
+}
+
+.fetch-config-modal .ant-slider-handle {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12) !important;
+}
+
+.fetch-config-modal .ant-slider-handle:hover,
+.fetch-config-modal .ant-slider-handle:focus {
+  border-color: var(--accent-hover) !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.16) !important;
+}
+
+.fetch-config-modal .ant-slider-mark-text {
+  color: var(--text-tertiary) !important;
+}
+
+.fetch-config-modal .ant-input:focus,
+.fetch-config-modal .ant-input-affix-wrapper:focus,
+.fetch-config-modal .ant-input-affix-wrapper-focused {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.08) !important;
+}
+
+.fetch-config-modal .ant-switch {
+  min-width: 40px;
+}
+
+.fetch-config-section {
+  animation: fadeIn 0.25s ease;
+}
+
+/* Smooth scrollbar inside modal */
+.fetch-config-modal ::-webkit-scrollbar {
+  width: 4px;
+}
+
+.fetch-config-modal ::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+.fetch-config-modal ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Manual Config Modal */
+@keyframes manualCardAppear {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes manualExpandPanel {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 600px; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.manual-config-modal .ant-modal-content {
+  padding: 0 !important;
+  border-radius: 16px !important;
+  overflow: hidden;
+}
+
+.manual-config-modal .ant-modal-body {
+  padding: 0 !important;
+}
+
+.manual-input-zone:focus-within {
+  border-color: var(--accent-primary) !important;
+  border-style: solid !important;
+  background: var(--bg-secondary) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.06);
+}
+
+.manual-input-zone textarea {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.manual-input-zone textarea::placeholder {
+  color: var(--text-tertiary);
+  transition: opacity 0.3s ease;
+}
+
+.manual-material-card:hover {
+  border-color: var(--border-active) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.manual-card-action:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary) !important;
+}
+
+/* Smooth scrollbar inside manual modal */
+.manual-config-modal ::-webkit-scrollbar {
+  width: 4px;
+}
+
+.manual-config-modal ::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+.manual-config-modal ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Signal Card */
+.signal-card:hover {
+  border-color: var(--border-active) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.signal-card {
+  cursor: default;
+}

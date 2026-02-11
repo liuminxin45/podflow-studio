@@ -1,32 +1,22 @@
 const NODE_EXPECTED_OUTPUTS = {
-  'fetch': ['raw_contents'],
-  'manual': ['raw_contents'],
+  'fetch': ['fetch_contents'],
+  'manual': ['manual_contents'],
+  'merge': ['raw_contents'],
   'preprocess': ['cleaned_contents'],
   'research': ['researched_contents'],
   'topic_selection': ['selected_topic', 'selected_materials'],
-  'script': ['script'],
-  'stages': ['stages'],
+  'script': ['script', 'stages'],
   'tts': ['audio_segments'],
   'audio_postprocess': ['final_audio_path'],
   'assets': ['cover_path'],
-  'store': ['storage_info'],
+  'review': ['review_summary'],
   'publish': ['publish_status']
 }
 
-function validateNodeOutput(nodeName, result) {
-  // Handle conditional validation for source nodes
-  const sourceType = result.selected_source_type
-  
-  // If manual source is selected, skip validation for fetch node
-  if (nodeName === 'fetch' && sourceType === 'manual') {
-    return
-  }
-  
-  // If fetch source is selected, skip validation for manual node
-  if (nodeName === 'manual' && sourceType === 'fetch') {
-    return
-  }
+// Nodes that are allowed to produce empty output (graceful empty handling)
+const ALLOW_EMPTY_NODES = ['fetch', 'manual']
 
+function validateNodeOutput(nodeName, result) {
   const expectedOutputs = NODE_EXPECTED_OUTPUTS[nodeName] || []
   const missingOutputs = []
   const emptyOutputs = []
@@ -47,7 +37,8 @@ function validateNodeOutput(nodeName, result) {
     throw new Error(`节点 ${nodeName} 缺少必需的输出字段: ${missingOutputs.join(', ')}`)
   }
   
-  if (emptyOutputs.length > 0) {
+  // Allow fetch and manual to produce empty output (the other channel may have data)
+  if (emptyOutputs.length > 0 && !ALLOW_EMPTY_NODES.includes(nodeName)) {
     throw new Error(`节点 ${nodeName} 的输出字段为空: ${emptyOutputs.join(', ')}`)
   }
 }

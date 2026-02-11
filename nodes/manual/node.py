@@ -3,24 +3,18 @@ from nodes.manual.config import ManualConfig
 
 
 def run(state: Dict[str, Any], config: ManualConfig = None) -> Dict[str, Any]:
-    """Manual input node - 手动输入新闻内容"""
+    """Manual input node - 灵感收集箱：手动输入素材"""
     config = config or ManualConfig()
     logs = state.get("logs", [])
     errors = state.get("errors", [])
 
-    # Check if we should skip this node based on source selection
-    if state.get("selected_source_type") == "fetch":
-        logs.append("[ManualNode] Skipping: 'fetch' source selected")
-        state["logs"] = logs
-        return state
-
     logs.append("[ManualNode] Starting manual input processing")
     
     # 处理手动输入的新闻
-    raw_contents = []
+    manual_contents = []
     
     if not config.news_items:
-        logs.append("[ManualNode] Warning: No manual news items provided")
+        logs.append("[ManualNode] No manual items provided (this is fine, merge will handle it)")
     else:
         logs.append(f"[ManualNode] Processing {len(config.news_items)} manual news items")
         
@@ -38,11 +32,11 @@ def run(state: Dict[str, Any], config: ManualConfig = None) -> Dict[str, Any]:
                 "source": "manual_input",
                 "type": "manual",
             }
-            raw_contents.append(news_item)
+            manual_contents.append(news_item)
         
-        logs.append(f"[ManualNode] Added {len(raw_contents)} manual news items")
+        logs.append(f"[ManualNode] Added {len(manual_contents)} manual news items")
     
-    state["raw_contents"] = raw_contents
+    state["manual_contents"] = manual_contents
     state["logs"] = logs
     state["errors"] = errors
     return state

@@ -26,6 +26,24 @@ def run(state: Dict[str, Any], config: ScriptConfig = None) -> Dict[str, Any]:
         script = _generate_script(topic, materials, config)
         state["script"] = script
         logs.append(f"[ScriptNode] Script done: {script.get('title', '')}")
+
+        # Stage segmentation (merged from stages node)
+        dialogue = script.get("dialogue", [])
+        stages = []
+        wpm = config.words_per_minute
+        for i, line in enumerate(dialogue):
+            text = line.get("text", "")
+            word_count = len(text)
+            duration = word_count / wpm * 60
+            stages.append({
+                "order": i,
+                "speaker": line.get("speaker", ""),
+                "text": text,
+                "estimated_duration": round(duration, 1),
+            })
+        state["stages"] = stages
+        total_dur = sum(s["estimated_duration"] for s in stages)
+        logs.append(f"[ScriptNode] {len(stages)} segments, ~{total_dur:.0f}s total")
     except Exception as e:
         errors.append({"node": "script", "message": str(e), "detail": str(e)})
 

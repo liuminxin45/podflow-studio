@@ -4,6 +4,8 @@ export interface PodcastState {
   runtime_config: Record<string, any>
   logs: string[]
   errors: ErrorInfo[]
+  fetch_contents: ContentItem[]
+  manual_contents: ContentItem[]
   raw_contents: ContentItem[]
   cleaned_contents: ContentItem[]
   researched_contents: ContentItem[]
@@ -16,6 +18,7 @@ export interface PodcastState {
   audio_metadata: Record<string, any>
   cover_path: string
   intro_outro_paths: Record<string, string>
+  review_summary: Record<string, any>
   storage_info: Record<string, any>
   rss_path: string
   publish_status: Record<string, any>
