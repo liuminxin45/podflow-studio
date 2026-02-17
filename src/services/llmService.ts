@@ -2,8 +2,44 @@ import type { LLMCallOptions, LLMResponse, ModelsResponse } from '../types/llm'
 import { LLMError } from '../types/llm'
 import { LLM_DEFAULTS } from '../constants/llm'
 
+interface PerformanceMetrics {
+  totalCalls: number
+  successfulCalls: number
+  failedCalls: number
+  totalDuration: number
+  averageResponseTime: number
+  failureRate: number
+}
+
+interface CacheEntry {
+  response: LLMResponse
+  timestamp: number
+}
+
+interface RateLimitState {
+  tokens: number
+  lastRefill: number
+}
+
 class LLMService {
   private useElectronProxy = false
+  private metrics: PerformanceMetrics = {
+    totalCalls: 0,
+    successfulCalls: 0,
+    failedCalls: 0,
+    totalDuration: 0,
+    averageResponseTime: 0,
+    failureRate: 0,
+  }
+  private cache = new Map<string, CacheEntry>()
+  private readonly CACHE_TTL = 300000
+  private rateLimitState: RateLimitState = {
+    tokens: 100,
+    lastRefill: Date.now(),
+  }
+  private readonly RATE_LIMIT_MAX_TOKENS = 100
+  private readonly RATE_LIMIT_REFILL_RATE = 10
+  private readonly RATE_LIMIT_REFILL_INTERVAL = 1000
 
   constructor() {
     this.useElectronProxy = typeof window !== 'undefined' && !!(window as any).electronAPI?.llmCall
@@ -24,12 +60,34 @@ class LLMService {
       throw new LLMError('Missing API credentials', 'AUTH')
     }
 
+    await this.checkRateLimit()
+
+    const cacheKey = this.getCacheKey(options)
+    const cached = this.getFromCache(cacheKey)
+    if (cached) {
+      console.log('[LLMService] Cache hit:', cacheKey)
+      return cached
+    }
+
+    const startTime = Date.now()
+    this.metrics.totalCalls++
+
     try {
+      let response: LLMResponse
       if (this.useElectronProxy) {
-        return await this.callViaElectron({ apiBase, apiKey, model, messages, temperature, timeout })
+        response = await this.callViaElectron({ apiBase, apiKey, model, messages, temperature, timeout })
+      } else {
+        response = await this.callViaFetch({ apiBase, apiKey, model, messages, temperature, maxTokens, timeout })
       }
-      return await this.callViaFetch({ apiBase, apiKey, model, messages, temperature, maxTokens, timeout })
+
+      const duration = Date.now() - startTime
+      this.updateMetrics(duration, true)
+      this.saveToCache(cacheKey, response)
+
+      return response
     } catch (error: any) {
+      const duration = Date.now() - startTime
+      this.updateMetrics(duration, false)
       throw this.normalizeError(error)
     }
   }
@@ -172,6 +230,155 @@ class LLMService {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  private getCacheKey(options: LLMCallOptions): string {
+    const { apiBase, model, messages, temperature } = options
+    const messagesStr = JSON.stringify(messages)
+    return `${apiBase}:${model}:${temperature}:${messagesStr}`
+  }
+
+  private getFromCache(key: string): LLMResponse | null {
+    const entry = this.cache.get(key)
+    if (!entry) return null
+
+    if (Date.now() - entry.timestamp > this.CACHE_TTL) {
+      this.cache.delete(key)
+      return null
+    }
+
+    return entry.response
+  }
+
+  private saveToCache(key: string, response: LLMResponse): void {
+    this.cache.set(key, { response, timestamp: Date.now() })
+    
+    if (this.cache.size > 100) {
+      const firstKey = this.cache.keys().next().value
+      if (firstKey) this.cache.delete(firstKey)
+    }
+  }
+
+  private updateMetrics(duration: number, success: boolean): void {
+    if (success) {
+      this.metrics.successfulCalls++
+    } else {
+      this.metrics.failedCalls++
+    }
+
+    this.metrics.totalDuration += duration
+    this.metrics.averageResponseTime = this.metrics.totalDuration / this.metrics.totalCalls
+    this.metrics.failureRate = this.metrics.failedCalls / this.metrics.totalCalls
+  }
+
+  private async checkRateLimit(): Promise<void> {
+    const now = Date.now()
+    const timeSinceLastRefill = now - this.rateLimitState.lastRefill
+    const refillIntervals = Math.floor(timeSinceLastRefill / this.RATE_LIMIT_REFILL_INTERVAL)
+
+    if (refillIntervals > 0) {
+      this.rateLimitState.tokens = Math.min(
+        this.RATE_LIMIT_MAX_TOKENS,
+        this.rateLimitState.tokens + refillIntervals * this.RATE_LIMIT_REFILL_RATE
+      )
+      this.rateLimitState.lastRefill = now
+    }
+
+    if (this.rateLimitState.tokens < 1) {
+      const waitTime = this.RATE_LIMIT_REFILL_INTERVAL - (now - this.rateLimitState.lastRefill)
+      console.warn(`[LLMService] Rate limit exceeded, waiting ${waitTime}ms`)
+      await this.delay(waitTime)
+      return this.checkRateLimit()
+    }
+
+    this.rateLimitState.tokens -= 1
+  }
+
+  async callStreaming(
+    options: LLMCallOptions,
+    onChunk: (chunk: string) => void
+  ): Promise<void> {
+    const { apiBase, apiKey, model, messages, temperature = LLM_DEFAULTS.TEMPERATURE } = options
+
+    if (!apiBase || !apiKey) {
+      throw new LLMError('Missing API credentials', 'AUTH')
+    }
+
+    await this.checkRateLimit()
+
+    const baseUrl = apiBase.trim().replace(/\/$/, '')
+    const headers = this.buildHeaders(apiBase, apiKey)
+
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        stream: true,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new LLMError(`HTTP ${response.status}`, 'NETWORK', { status: response.status })
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) {
+      throw new LLMError('No response body', 'NETWORK')
+    }
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed || trimmed === 'data: [DONE]') continue
+          if (!trimmed.startsWith('data: ')) continue
+
+          try {
+            const json = JSON.parse(trimmed.slice(6))
+            const content = json.choices?.[0]?.delta?.content
+            if (content) {
+              onChunk(content)
+            }
+          } catch (e) {
+            console.warn('[LLMService] Failed to parse SSE chunk:', e)
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+  }
+
+  getMetrics(): PerformanceMetrics {
+    return { ...this.metrics }
+  }
+
+  clearCache(): void {
+    this.cache.clear()
+  }
+
+  resetMetrics(): void {
+    this.metrics = {
+      totalCalls: 0,
+      successfulCalls: 0,
+      failedCalls: 0,
+      totalDuration: 0,
+      averageResponseTime: 0,
+      failureRate: 0,
+    }
   }
 }
 
