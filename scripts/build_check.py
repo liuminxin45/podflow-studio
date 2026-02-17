@@ -70,9 +70,18 @@ def check_node_structure() -> Tuple[bool, str]:
     """Check if all nodes have required files"""
     nodes_dir = PROJECT_ROOT / 'nodes'
     expected_nodes = [
-        'fetch', 'preprocess', 'research', 'topic_selection',
-        'script', 'stages', 'tts', 'audio_postprocess',
-        'assets', 'store', 'publish'
+        # discover
+        'fetch', 'manual', 'merge',
+        # organize
+        'preprocess',
+        # ideate
+        'research', 'topic_selection',
+        # write
+        'script',
+        # produce
+        'tts', 'audio_postprocess', 'assets',
+        # publish
+        'review', 'publish',
     ]
     
     issues = []

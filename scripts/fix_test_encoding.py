@@ -7,9 +7,10 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
 NODES = [
-    'fetch', 'preprocess', 'research', 'topic_selection',
-    'script', 'stages', 'tts', 'audio_postprocess',
-    'assets', 'store', 'publish'
+    'fetch', 'manual', 'merge',
+    'preprocess', 'research', 'topic_selection',
+    'script', 'tts', 'audio_postprocess',
+    'assets', 'review', 'publish'
 ]
 
 TEMPLATE = '''"""
@@ -72,6 +73,40 @@ TEST_CONFIGS = {
         assert "url" in item, "Each item should have a url"
 ''',
         'success_message': f"Fetch node test passed: {{len(state['raw_contents'])}} items"
+    },
+    'manual': {
+        'config_class': 'ManualConfig',
+        'extra_imports': '',
+        'test_body': '''
+    config = ManualConfig(news_items=[{
+        "title": "Manual test item",
+        "content": "Manual content for testing",
+        "url": "https://example.com/manual"
+    }])
+    result = run(state, config)
+
+    assert "manual_contents" in result, "Should have manual_contents"
+    assert isinstance(result["manual_contents"], list), "manual_contents should be a list"
+    assert len(result["manual_contents"]) == 1, "Should output one manual item"
+
+    state = result
+''',
+        'success_message': f"Manual node test passed: {{len(state['manual_contents'])}} items"
+    },
+    'merge': {
+        'config_class': 'MergeConfig',
+        'extra_imports': '',
+        'test_body': '''
+    config = MergeConfig(deduplicate=True, similarity_threshold=1.0)
+    result = run(state, config)
+
+    assert "raw_contents" in result, "Should have raw_contents"
+    assert isinstance(result["raw_contents"], list), "raw_contents should be a list"
+    assert len(result["raw_contents"]) > 0, "Merged contents should not be empty"
+
+    state = result
+''',
+        'success_message': f"Merge node test passed: {{len(state['raw_contents'])}} items"
     },
     'preprocess': {
         'config_class': 'PreprocessConfig',
@@ -150,28 +185,6 @@ TEST_CONFIGS = {
 ''',
         'success_message': f"Script node test passed: '{{state['script']['title']}}', {{len(state['script']['dialogue'])}} dialogue lines"
     },
-    'stages': {
-        'config_class': 'StagesConfig',
-        'extra_imports': '',
-        'test_body': '''
-    config = StagesConfig(words_per_minute=150, max_segment_duration=120)
-    dialogue_count = len(state["script"]["dialogue"])
-    result = run(state, config)
-    
-    assert "stages" in result, "Should have stages"
-    assert isinstance(result["stages"], list), "stages should be a list"
-    assert len(result["stages"]) == dialogue_count, "Should have one stage per dialogue line"
-    
-    for stage in result["stages"]:
-        assert "order" in stage, "Each stage should have order"
-        assert "speaker" in stage, "Each stage should have speaker"
-        assert "text" in stage, "Each stage should have text"
-        assert isinstance(stage["order"], int), "order should be an integer"
-    
-    state = result
-''',
-        'success_message': f"Stages node test passed: {{len(state['stages'])}} stages created"
-    },
     'tts': {
         'config_class': 'TTSConfig',
         'extra_imports': '\nfrom tests.mock_data import create_mock_audio_segments',
@@ -218,21 +231,20 @@ TEST_CONFIGS = {
 ''',
         'success_message': f"Assets node test passed: {{state['cover_path']}}"
     },
-    'store': {
-        'config_class': 'StoreConfig',
+    'review': {
+        'config_class': 'ReviewConfig',
         'extra_imports': '',
         'test_body': '''
-    config = StoreConfig(storage_type="local", local_base_dir="out/published", generate_metadata=True)
-    state["storage_info"] = {
-        "audio_path": "out/published/test_ep_001/audio.mp3",
-        "cover_path": "out/published/test_ep_001/cover.jpg",
-        "metadata_path": "out/published/test_ep_001/metadata.json"
-    }
-    
-    assert "storage_info" in state, "Should have storage_info"
-    assert isinstance(state["storage_info"], dict), "storage_info should be a dict"
+    config = ReviewConfig(require_approval=False)
+    result = run(state, config)
+
+    assert "review_summary" in result, "Should have review_summary"
+    assert isinstance(result["review_summary"], dict), "review_summary should be a dict"
+    assert "checks" in result["review_summary"], "Should include checks"
+
+    state = result
 ''',
-        'success_message': f"Store node test passed: {{len(state['storage_info'])}} items stored"
+        'success_message': f"Review node test passed: {{state['review_summary'].get('score', 'N/A')}}"
     },
     'publish': {
         'config_class': 'PublishConfig',

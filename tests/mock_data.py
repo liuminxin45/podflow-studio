@@ -16,6 +16,8 @@ def create_base_state() -> Dict[str, Any]:
         "runtime_config": {},
         "logs": [],
         "errors": [],
+        "fetch_contents": [],
+        "manual_contents": [],
         "raw_contents": [],
         "cleaned_contents": [],
         "researched_contents": [],
@@ -197,6 +199,23 @@ def create_state_for_node(node_name: str) -> Dict[str, Any]:
     
     if node_name == "fetch":
         return state
+
+    if node_name == "manual":
+        return state
+
+    if node_name == "merge":
+        state["fetch_contents"] = create_mock_raw_contents()[:2]
+        state["manual_contents"] = [
+            {
+                "title": "Manual insight on AI policy",
+                "content": "A manual note discussing policy implications of AI deployment.",
+                "url": "",
+                "published": "",
+                "source": "manual_input",
+                "type": "manual",
+            }
+        ]
+        return state
     
     if node_name == "preprocess":
         state["raw_contents"] = create_mock_raw_contents()
@@ -215,10 +234,6 @@ def create_state_for_node(node_name: str) -> Dict[str, Any]:
         state["selected_materials"] = create_mock_materials()
         return state
     
-    if node_name == "stages":
-        state["script"] = create_mock_script()
-        return state
-    
     if node_name == "tts":
         state["stages"] = create_mock_stages()
         return state
@@ -231,11 +246,12 @@ def create_state_for_node(node_name: str) -> Dict[str, Any]:
         state["script"] = create_mock_script()
         state["final_audio_path"] = "out/episodes/test_ep_001.mp3"
         return state
-    
-    if node_name == "store":
+
+    if node_name == "review":
+        state["script"] = create_mock_script()
+        state["stages"] = create_mock_stages()
         state["final_audio_path"] = "out/episodes/test_ep_001.mp3"
         state["cover_path"] = "out/assets/test_ep_001_cover.jpg"
-        state["script"] = create_mock_script()
         return state
     
     if node_name == "publish":

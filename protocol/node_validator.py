@@ -48,21 +48,38 @@ def validate_node_output(node_name: str, state: Dict[str, Any], expected_outputs
     return True, ""
 
 
-# 定义每个节点的预期输出
+# 定义当前 6 阶段流程中每个节点的预期输出
 NODE_EXPECTED_OUTPUTS = {
-    'fetch': ['raw_contents'],
-    'manual': ['raw_contents'],
+    # discover
+    'fetch': ['fetch_contents'],
+    'manual': ['manual_contents'],
+    'merge': ['raw_contents'],
+    # organize
     'preprocess': ['cleaned_contents'],
+    # ideate
     'research': ['researched_contents'],
     'topic_selection': ['selected_topic', 'selected_materials'],
-    'script': ['script'],
-    'stages': ['stages'],
+    # write
+    'script': ['script', 'stages'],
+    # produce
     'tts': ['audio_segments'],
     'audio_postprocess': ['final_audio_path'],
     'assets': ['cover_path'],
-    'store': ['storage_info'],
-    'publish': ['publish_status']
+    # publish
+    'review': ['review_summary'],
+    'publish': ['publish_status'],
 }
+
+# 允许产出为空的节点（另一路素材可能有数据）
+ALLOW_EMPTY_NODES = {'fetch', 'manual'}
+
+
+def _is_empty_value(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, (list, dict, str)) and not value:
+        return True
+    return False
 
 
 def validate_node_execution(node_name: str, state: Dict[str, Any]) -> tuple[bool, str]:
@@ -86,6 +103,13 @@ def validate_node_execution(node_name: str, state: Dict[str, Any]) -> tuple[bool
     # 检查预期输出
     expected_outputs = NODE_EXPECTED_OUTPUTS.get(node_name, [])
     if expected_outputs:
-        return validate_node_output(node_name, state, expected_outputs)
+        is_valid, msg = validate_node_output(node_name, state, expected_outputs)
+        if not is_valid:
+            return False, msg
+
+        if node_name not in ALLOW_EMPTY_NODES:
+            empty_outputs = [k for k in expected_outputs if _is_empty_value(state.get(k))]
+            if empty_outputs:
+                return False, f"节点 {node_name} 的输出字段为空: {', '.join(empty_outputs)}"
     
     return True, ""

@@ -13,9 +13,18 @@ from typing import Dict, Tuple
 PROJECT_ROOT = Path(__file__).parent.parent
 
 NODES = [
-    'fetch', 'preprocess', 'research', 'topic_selection',
-    'script', 'stages', 'tts', 'audio_postprocess',
-    'assets', 'store', 'publish'
+    # discover
+    'fetch', 'manual', 'merge',
+    # organize
+    'preprocess',
+    # ideate
+    'research', 'topic_selection',
+    # write
+    'script',
+    # produce
+    'tts', 'audio_postprocess', 'assets',
+    # publish
+    'review', 'publish',
 ]
 
 

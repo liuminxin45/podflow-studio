@@ -29,6 +29,13 @@ import type {
 
 type Notice = { type: 'info' | 'success' | 'warning' | 'error'; text: string } | null
 
+type FetchRunLog = {
+  id: string
+  at: number
+  level: 'info' | 'success' | 'error'
+  text: string
+}
+
 interface Props {
   visible: boolean
   onClose: () => void
@@ -116,6 +123,16 @@ export default function DiscoverPanel({
   const [checkingUpdate, setCheckingUpdate] = useState(false)
   const [updatingDependency, setUpdatingDependency] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
+
+  const appendFetchLog = useCallback((level: FetchRunLog['level'], text: string) => {
+    const entry: FetchRunLog = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      at: Date.now(),
+      level,
+      text,
+    }
+    setFetchRunLogs(prev => [entry, ...prev].slice(0, 20))
+  }, [])
 
   useEffect(() => {
     if (!visible) return

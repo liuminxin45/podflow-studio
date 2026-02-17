@@ -112,7 +112,7 @@ export default function SegmentCard({
           <HolderOutlined style={{ color: 'var(--text-tertiary)', fontSize: 11 }} />
           <span style={{ fontSize: 15 }}>{cfg.icon}</span>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-            {cfg.label}
+            {segment.label || cfg.label}
           </span>
           <Tag bordered={false} style={{
             fontSize: 10, padding: '0 6px', lineHeight: '18px', borderRadius: 4,

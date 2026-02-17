@@ -23,9 +23,18 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
 NODES = [
-    'fetch', 'preprocess', 'research', 'topic_selection',
-    'script', 'stages', 'tts', 'audio_postprocess',
-    'assets', 'store', 'publish'
+    # discover
+    'fetch', 'manual', 'merge',
+    # organize
+    'preprocess',
+    # ideate
+    'research', 'topic_selection',
+    # write
+    'script',
+    # produce
+    'tts', 'audio_postprocess', 'assets',
+    # publish
+    'review', 'publish',
 ]
 
 def test_node(node_name: str) -> bool:
@@ -36,6 +45,8 @@ def test_node(node_name: str) -> bool:
         "runtime_config": {},
         "logs": [],
         "errors": [],
+        "fetch_contents": [],
+        "manual_contents": [],
         "raw_contents": [],
         "cleaned_contents": [],
         "researched_contents": [],
@@ -47,6 +58,7 @@ def test_node(node_name: str) -> bool:
         "final_audio_path": "",
         "audio_metadata": {},
         "cover_path": "",
+        "review_summary": {},
         "storage_info": {},
         "rss_path": "",
         "publish_status": {}

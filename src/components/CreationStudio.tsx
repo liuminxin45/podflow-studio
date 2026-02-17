@@ -42,6 +42,7 @@ interface StructureBlock {
 interface Props {
   visible: boolean
   onClose: () => void
+  onBackToOrganize?: () => void
   rawContents: MaterialItem[]
   selectedTopic?: { title?: string; description?: string }
   selectedMaterials?: MaterialItem[]
@@ -57,6 +58,7 @@ interface Props {
 export default function CreationStudio({
   visible,
   onClose,
+  onBackToOrganize,
   rawContents = [],
   selectedTopic,
   initialBlocks,
@@ -283,6 +285,17 @@ export default function CreationStudio({
           </Tag>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {onBackToOrganize && (
+            <Tooltip title="返回整理层">
+              <Button
+                icon={<LeftOutlined />}
+                onClick={onBackToOrganize}
+                style={{ borderRadius: 8, fontWeight: 500, fontSize: 12, height: 32 }}
+              >
+                返回整理
+              </Button>
+            </Tooltip>
+          )}
           <Tooltip title={`保存版本${savedVersions.length > 0 ? ` (${savedVersions.length})` : ''}`}>
             <Button
               type="text"

@@ -23,9 +23,10 @@ interface Props {
   nodeName: string
   workflow: any
   onClose: () => void
+  onNavigateNode?: (nodeName: string) => void
 }
 
-export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) {
+export default function NodeDetailPanel({ nodeName, workflow, onClose, onNavigateNode }: Props) {
   const execution = workflow?.nodeExecutions?.[nodeName]
   const state = workflow?.state || {}
   const [activeTab, setActiveTab] = useState('status')
@@ -205,6 +206,12 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
   }
 
   const isWaitingApproval = execution?.status === 'waiting_approval'
+  const orderedNodes = STAGES.flatMap(stage => stage.subNodes)
+  const currentNodeIndex = orderedNodes.indexOf(nodeName)
+  const prevNodeName = currentNodeIndex > 0 ? orderedNodes[currentNodeIndex - 1] : null
+  const nextNodeName = currentNodeIndex >= 0 && currentNodeIndex < orderedNodes.length - 1
+    ? orderedNodes[currentNodeIndex + 1]
+    : null
 
   // 获取节点的输入数据
   const getNodeInput = () => {

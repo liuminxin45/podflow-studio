@@ -6,6 +6,7 @@ import {
   CloseOutlined,
   CheckCircleOutlined,
   ArrowRightOutlined,
+  LeftOutlined,
   DeleteOutlined,
   HolderOutlined,
   MoreOutlined,
@@ -37,6 +38,7 @@ interface CandidateItem extends OrganizeItem {
 interface Props {
   visible: boolean
   onClose: () => void
+  onBackToDiscover?: () => void
   contents: ContentItem[]
   userTopic?: string
   initialCandidates?: CandidateItem[]
@@ -288,7 +290,7 @@ function CandidateCard({
         borderRadius: 10,
         border: '1px solid var(--border-color)',
         background: cfg.bgColor,
-        overflow: 'hidden',
+        overflow: 'visible',
         transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
         animation: 'organizeCandidateIn 0.3s ease-out',
         cursor: 'grab',
@@ -424,6 +426,7 @@ function CandidateCard({
 export default function OrganizePanel({
   visible,
   onClose,
+  onBackToDiscover,
   contents = [],
   userTopic = '',
   initialCandidates = [],
@@ -432,6 +435,19 @@ export default function OrganizePanel({
   onProceedToIdeate,
   onStateChange,
 }: Props) {
+  const mapToOrganizeItem = useCallback((item: ContentItem, index: number): OrganizeItem => {
+    const inferredSource = (item as any)._source_channel === 'manual'
+      || item.source === 'manual_input'
+      || item.type === 'manual'
+      ? 'manual'
+      : 'auto'
+    return {
+      ...item,
+      _id: index,
+      _source_channel: inferredSource,
+    }
+  }, [])
+
   // View mode
   const [mode, setMode] = useState<ViewMode>(initialMode)
 
@@ -480,7 +496,7 @@ export default function OrganizePanel({
   const candidateIdSet = useMemo(() => new Set(candidates.map(c => c._id)), [candidates])
 
   const poolItems: OrganizeItem[] = useMemo(() => {
-    let items = contents.map((c, i) => ({ ...c, _id: i, _source_channel: 'auto' as const }))
+    let items = contents.map((c, i) => mapToOrganizeItem(c, i))
 
     // Exclude already-selected candidates
     items = items.filter(it => !candidateIdSet.has(it._id))
@@ -506,14 +522,14 @@ export default function OrganizePanel({
     }
 
     return items
-  }, [contents, candidateIdSet, ignoredIds, mode, search, activeCategory])
+  }, [contents, mapToOrganizeItem, candidateIdSet, ignoredIds, mode, search, activeCategory])
 
   // Ignored items for collapsed section
   const ignoredItems = useMemo(() => {
     return contents
-      .map((c, i) => ({ ...c, _id: i, _source_channel: 'auto' as const }))
+      .map((c, i) => mapToOrganizeItem(c, i))
       .filter(it => ignoredIds.has(it._id))
-  }, [contents, ignoredIds])
+  }, [contents, mapToOrganizeItem, ignoredIds])
 
   // ── AI Analysis ────────────────────────────────────────
   useEffect(() => {
@@ -522,7 +538,7 @@ export default function OrganizePanel({
       setAiResult(null)
       return
     }
-    const allItems = contents.map((c, i) => ({ ...c, _id: i, _source_channel: 'auto' as const }))
+    const allItems = contents.map((c, i) => mapToOrganizeItem(c, i))
     const result = runFullAnalysis(allItems, userTopic)
     setAiResult(result)
     // Initialize cluster expanded state
@@ -535,7 +551,7 @@ export default function OrganizePanel({
       }
       return next
     })
-  }, [aiAssistants.clustering, aiAssistants.priority, aiAssistants.duplicates, contents, userTopic])
+  }, [aiAssistants.clustering, aiAssistants.priority, aiAssistants.duplicates, contents, userTopic, mapToOrganizeItem])
 
   // Clustered pool items (when topic clustering is on)
   const clusteredPoolItems = useMemo(() => {
@@ -589,6 +605,33 @@ export default function OrganizePanel({
   const importantCount = candidates.filter(c => c._priority === 'important').length
   const backupCount = candidates.filter(c => c._priority === 'backup').length
 
+  const duplicateStats = useMemo(() => {
+    if (!aiAssistants.duplicates || !aiResult) {
+      return { duplicateCount: 0, noiseCount: 0, total: 0, actionableIds: [] as number[] }
+    }
+    const poolIdSet = new Set(poolItems.map(it => it._id))
+    let duplicateCount = 0
+    let noiseCount = 0
+    const actionableIds: number[] = []
+
+    aiResult.hints.forEach((hint, id) => {
+      if (!poolIdSet.has(id)) return
+      const isDuplicate = hint.duplicateOf !== undefined
+      const isNoise = Boolean(hint.isLowDensity)
+      if (!isDuplicate && !isNoise) return
+      if (isDuplicate) duplicateCount++
+      if (isNoise) noiseCount++
+      actionableIds.push(id)
+    })
+
+    return {
+      duplicateCount,
+      noiseCount,
+      total: actionableIds.length,
+      actionableIds,
+    }
+  }, [aiAssistants.duplicates, aiResult, poolItems])
+
   // ── Actions ────────────────────────────────────────────
 
   const selectItem = useCallback((item: OrganizeItem) => {
@@ -630,7 +673,7 @@ export default function OrganizePanel({
 
   const batchSelect = useCallback(() => {
     const items = contents
-      .map((c, i) => ({ ...c, _id: i, _source_channel: 'auto' as const }))
+      .map((c, i) => mapToOrganizeItem(c, i))
       .filter(it => checkedIds.has(it._id) && !candidateIdSet.has(it._id) && !ignoredIds.has(it._id))
 
     setCandidates(prev => [
@@ -643,7 +686,7 @@ export default function OrganizePanel({
     ])
     setCheckedIds(new Set())
     message.success({ content: `已选入 ${items.length} 条`, duration: 1.5, style: { marginTop: 60 } })
-  }, [checkedIds, candidateIdSet, ignoredIds, contents])
+  }, [checkedIds, candidateIdSet, ignoredIds, contents, mapToOrganizeItem])
 
   const batchIgnore = useCallback(() => {
     setIgnoredIds(prev => {
@@ -653,6 +696,24 @@ export default function OrganizePanel({
     })
     setCheckedIds(new Set())
   }, [checkedIds])
+
+  const applyDuplicateCleanup = useCallback(() => {
+    if (duplicateStats.total === 0) {
+      message.info({ content: '当前没有可精简条目', duration: 1.5, style: { marginTop: 60 } })
+      return
+    }
+    setIgnoredIds(prev => {
+      const next = new Set(prev)
+      duplicateStats.actionableIds.forEach(id => next.add(id))
+      return next
+    })
+    setCheckedIds(new Set())
+    message.success({
+      content: `已精简 ${duplicateStats.total} 条（重复 ${duplicateStats.duplicateCount}，低密度 ${duplicateStats.noiseCount}）`,
+      duration: 2,
+      style: { marginTop: 60 },
+    })
+  }, [duplicateStats])
 
   // Drag & drop reorder
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -730,6 +791,17 @@ export default function OrganizePanel({
 
         {/* Right: mode switch + close */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {onBackToDiscover && (
+            <Tooltip title="返回发现层">
+              <Button
+                icon={<LeftOutlined />}
+                onClick={onBackToDiscover}
+                style={{ borderRadius: 8, fontWeight: 500, fontSize: 12, height: 30 }}
+              >
+                返回发现
+              </Button>
+            </Tooltip>
+          )}
           {/* Mode switcher */}
           <div style={{ display: 'flex', background: 'var(--bg-tertiary)', borderRadius: 6, padding: 2 }}>
             {([
@@ -904,17 +976,25 @@ export default function OrganizePanel({
                 </div>
               )
             })}
-            {aiAssistants.duplicates && aiResult && (() => {
-              const dupCount = [...aiResult.hints.values()].filter(h => h.duplicateOf !== undefined).length
-              const noiseCount = [...aiResult.hints.values()].filter(h => h.isLowDensity).length
-              const total = dupCount + noiseCount
-              if (total === 0) return null
-              return (
+            {aiAssistants.duplicates && duplicateStats.total > 0 && (
+              <>
                 <span style={{ fontSize: 10, color: 'var(--text-tertiary)', marginLeft: 2 }}>
-                  \u53d1\u73b0 {total} \u6761\u53ef\u7cbe\u7b80
+                  发现 {duplicateStats.total} 条可精简
                 </span>
-              )
-            })()}
+                <Button
+                  size="small"
+                  onClick={applyDuplicateCleanup}
+                  style={{
+                    height: 20,
+                    borderRadius: 5,
+                    fontSize: 10,
+                    padding: '0 8px',
+                  }}
+                >
+                  一键精简
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Pool list */}

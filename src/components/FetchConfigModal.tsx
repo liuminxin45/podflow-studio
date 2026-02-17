@@ -685,7 +685,7 @@ export default function FetchConfigModal({
             ghost
             loading={runningOnce}
             onClick={handleRunOnce}
-            disabled={!onRunOnce}
+            disabled={!onRunOnce || !!radarState?.running}
             style={{ fontSize: 11, height: 28 }}
           >
             立即采集

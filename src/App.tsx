@@ -25,6 +25,51 @@ import type {
 
 const { Header, Content } = Layout
 const { Title } = Typography
+const APP_SNAPSHOT_KEY = 'app.workflow.snapshot.v1'
+
+type AppSnapshot = {
+  workflow: Workflow | null
+  selectedNode: string | null
+  studioVisible: boolean
+  discoverVisible: boolean
+  organizeVisible: boolean
+  writingVisible: boolean
+  soundStudioVisible: boolean
+  publishVisible: boolean
+  discoverCandidates: ContentItem[]
+  organizeCandidates: ContentItem[]
+  writingSeed: {
+    title?: string
+    description?: string
+    initialScript?: { title?: string; dialogue?: Array<{ speaker: string; text: string }> }
+  } | null
+  productionSeed: {
+    title: string
+    description: string
+    globalTone: string
+    segments: Array<{ id: string; type: string; label: string; content: string; estimatedSeconds: number }>
+  } | null
+}
+
+function loadAppSnapshot(): Partial<AppSnapshot> {
+  try {
+    if (typeof window === 'undefined') return {}
+    const raw = window.localStorage.getItem(APP_SNAPSHOT_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+function saveAppSnapshot(snapshot: AppSnapshot) {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(APP_SNAPSHOT_KEY, JSON.stringify(snapshot))
+  } catch {
+    // ignore localStorage errors
+  }
+}
 
 type UiNotice = {
   type: 'success' | 'warning' | 'error' | 'info'

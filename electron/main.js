@@ -36,6 +36,24 @@ if (ENABLE_FAKE_MEDIA) {
   app.commandLine.appendSwitch('use-fake-ui-for-media-stream')
 }
 
+function getCleanSpawnEnv(extra = {}) {
+  const env = { ...process.env }
+  const proxyKeys = [
+    'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY',
+    'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy',
+  ]
+  for (const key of proxyKeys) {
+    delete env[key]
+  }
+  return {
+    ...env,
+    PYTHONIOENCODING: 'utf-8',
+    NO_PROXY: '*',
+    no_proxy: '*',
+    ...extra,
+  }
+}
+
 let mainWindow = null
 let configManager = null
 
@@ -320,7 +338,7 @@ function runPythonNode(nodeName, state, timeoutMs = 600000) {  // 增加到10分
   return new Promise((resolve, reject) => {
     const proc = spawn(PYTHON_PATH, ['-m', `nodes.${nodeName}`], {
       cwd: path.join(__dirname, '..'),
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      env: getCleanSpawnEnv(),
       shell: SPAWN_SHELL
     })
 
@@ -923,7 +941,7 @@ ipcMain.handle('node:getSchema', async (event, nodeName) => {
       nodeName
     ], {
       cwd: path.join(__dirname, '..'),
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      env: getCleanSpawnEnv(),
       shell: SPAWN_SHELL
     })
 
@@ -959,7 +977,7 @@ ipcMain.handle('node:getAllSchemas', async (event) => {
       path.join(__dirname, '..', 'scripts', 'extract_node_schemas.py')
     ], {
       cwd: path.join(__dirname, '..'),
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      env: getCleanSpawnEnv(),
       shell: SPAWN_SHELL
     })
 
@@ -1081,7 +1099,7 @@ function startTrendRadarDaemon(intervalMin = 30) {
     '--interval', String(intervalMin)
   ], {
     cwd: projectRoot,
-    env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+    env: getCleanSpawnEnv(),
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: false,
     shell: SPAWN_SHELL
@@ -1231,7 +1249,7 @@ ipcMain.handle('fetch:getSources', async (event) => {
       path.join(__dirname, '..', 'scripts', 'get_fetch_sources.py')
     ], {
       cwd: path.join(__dirname, '..'),
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      env: getCleanSpawnEnv(),
       shell: SPAWN_SHELL
     })
 
