@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { Input, Tag, Button, Empty, Badge, Tooltip, Dropdown } from 'antd'
-import type { ContentCreationType, ContentItem } from '../types/workflow'
+import type { ContentCreationType } from '../types/workflow'
+import type { EnhancedMaterial, StructureBlock, StructureBlockType } from '../types/ideation'
 import { CONTENT_TYPE_META } from '../constants/contentCreation'
+import IdeationPanel from './IdeationPanel'
 import {
   SearchOutlined,
   PlusOutlined,
@@ -29,18 +31,6 @@ const { TextArea } = Input
 // ============================================================
 // Types
 // ============================================================
-
-type MaterialItem = ContentItem & { _source_channel?: 'auto' | 'manual' }
-
-type StructureBlockType = 'opening' | 'mainline' | 'discussion' | 'background' | 'news_item' | 'closing' | 'custom'
-
-interface StructureBlock {
-  id: string
-  type: StructureBlockType
-  title: string
-  materials: MaterialItem[]
-  notes: string
-}
 
 type BlockTemplate = {
   type: StructureBlockType
@@ -86,7 +76,7 @@ interface Props {
   visible: boolean
   onClose: () => void
   onBackToOrganize?: () => void
-  rawContents: MaterialItem[]
+  rawContents: EnhancedMaterial[]
   selectedTopic?: { title?: string; description?: string }
   selectedMaterials?: MaterialItem[]
   initialBlocks?: StructureBlock[]
@@ -148,6 +138,10 @@ export default function CreationStudio({
     onStateChange?.(structure)
   }, [visible, topicTitle, topicDesc, blocks])
 
+  // LLM Ideation state
+  const [ideationPanelVisible, setIdeationPanelVisible] = useState(false)
+  const [isLlmGenerated, setIsLlmGenerated] = useState(false)
+
   // Filter materials
   const filteredMaterials = useMemo(() => {
     let items = rawContents
@@ -178,7 +172,7 @@ export default function CreationStudio({
   }, [])
 
   // Add material to block
-  const addToBlock = useCallback((material: MaterialItem, blockId: string) => {
+  const addToBlock = useCallback((material: EnhancedMaterial, blockId: string) => {
     if (isLocked) return
     setBlocks(prev => prev.map(b => {
       if (b.id === blockId) {
@@ -254,6 +248,23 @@ export default function CreationStudio({
     const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
     setSavedVersions(prev => [{ time: timeStr, blockCount: blocks.filter(b => b.materials.length > 0 || b.notes).length, materialCount }, ...prev])
   }, [blocks])
+
+  // Apply LLM result
+  const handleApplyLLMResult = useCallback((llmBlocks: StructureBlock[], topic: { title: string; description: string }) => {
+    const convertedBlocks = llmBlocks.map(b => ({
+      id: b.id,
+      type: b.type,
+      title: b.title,
+      materials: b.materials,
+      notes: b.notes || (b.llm_suggestions?.key_points?.join('\n') || ''),
+    }))
+    
+    setBlocks(convertedBlocks)
+    setTopicTitle(topic.title)
+    setTopicDesc(topic.description)
+    setIsLlmGenerated(true)
+    setIdeationPanelVisible(false)
+  }, [])
 
   // Handle confirm
   const handleConfirm = () => {
@@ -356,6 +367,22 @@ export default function CreationStudio({
               </Button>
             </Tooltip>
           )}
+          <Tooltip title="智能构思助手">
+            <Button
+              type={isLlmGenerated ? 'primary' : 'default'}
+              icon={<RobotOutlined />}
+              onClick={() => setIdeationPanelVisible(true)}
+              style={{ 
+                borderRadius: 8, 
+                fontWeight: 500, 
+                fontSize: 12, 
+                height: 32,
+                ...(isLlmGenerated ? { background: '#8b5cf6', borderColor: '#8b5cf6' } : {})
+              }}
+            >
+              {isLlmGenerated ? 'AI已生成' : 'AI构思'}
+            </Button>
+          </Tooltip>
           <Tooltip title={`保存版本${savedVersions.length > 0 ? ` (${savedVersions.length})` : ''}`}>
             <Button
               type="text"
@@ -1020,6 +1047,18 @@ export default function CreationStudio({
           </div>
         </div>
       </div>
+
+      {/* LLM Ideation Panel */}
+      <IdeationPanel
+        materials={rawContents.map(m => ({
+          ...m,
+          _source_channel: (m as any)._source_channel,
+        })) as EnhancedMaterial[]}
+        contentType={contentType}
+        visible={ideationPanelVisible}
+        onApply={handleApplyLLMResult}
+        onClose={() => setIdeationPanelVisible(false)}
+      />
     </div>
   )
 }
