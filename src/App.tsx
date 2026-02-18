@@ -164,6 +164,9 @@ declare global {
       trendradarOpenReport: (reportPath: string) => Promise<{ success: boolean; error?: string }>
       onTrendradarLog: (callback: (data: string) => void) => void
       onTrendradarStatus: (callback: (data: any) => void) => void
+      produceGenerate: (payload: Record<string, any>) => Promise<any>
+      onProduceProgress: (callback: (data: any) => void) => void
+      removeProduceProgressListeners: () => void
     }
   }
 }

@@ -4,6 +4,7 @@ import json
 import urllib.request
 from pathlib import Path
 from typing import Dict, Any
+import requests
 from nodes.tts.config import TTSConfig
 
 
@@ -18,7 +19,14 @@ def run(state: Dict[str, Any], config: TTSConfig = None) -> Dict[str, Any]:
     try:
         Path(config.output_dir).mkdir(parents=True, exist_ok=True)
         episode_id = state.get("episode_id", "unknown")
-        segments = asyncio.run(_synthesize_all(stages, config, episode_id))
+        if config.engine == "edge-tts":
+            segments = asyncio.run(_synthesize_all_edge(stages, config, episode_id))
+        elif config.engine == "doubao_tts":
+            segments = _synthesize_all_doubao(stages, config, episode_id)
+        elif config.engine == "voice_clone":
+            segments = _synthesize_all_remote(stages, config, episode_id)
+        else:
+            raise ValueError(f"Unsupported TTS engine: {config.engine}")
         state["audio_segments"] = segments
         logs.append(f"[TTSNode] Generated {len(segments)} audio segments")
     except Exception as e:

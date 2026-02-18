@@ -5,6 +5,7 @@ const { spawn } = require('child_process')
 const ConfigManager = require('./configManager')
 const { validateNodeOutput } = require('./nodeValidator')
 const { fetchModels, callLLM } = require('./llmService')
+const { PROVIDER_TO_ENGINE, buildTTSConfig, validateProviderConfig, buildStages } = require('./services/providerConfigBuilder')
 
 const PYTHON_PATH = process.platform === 'win32' ? 'python' : 'python3'
 const PROJECT_ROOT = path.join(__dirname, '..')
@@ -1072,6 +1073,85 @@ ipcMain.handle('radar:updateContents', async (event, contents) => {
   saveRadarCache()
   broadcastRadarUpdate()
   return radarState
+})
+
+ipcMain.handle('produce:generate', async (event, payload = {}) => {
+  const segments = Array.isArray(payload?.segments) ? payload.segments : []
+  if (segments.length === 0) {
+    throw new Error('没有可生成的稿件段落，请先完成写作内容。')
+  }
+
+  const episodeId = payload?.episodeId
+    || `ep_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '_')}`
+  const requestedProvider = payload?.voiceProvider || 'edge_tts'
+
+  const baseTtsConfig = (configManager && configManager.loadNodeConfig('tts')) || {}
+  const basePostConfig = (configManager && configManager.loadNodeConfig('audio_postprocess')) || {}
+
+  const runtimeTtsConfig = buildTTSConfig(payload, baseTtsConfig)
+  const validation = validateProviderConfig(requestedProvider, { ...runtimeTtsConfig, provider: payload?.providerConfig?.provider })
+
+  if (validation.errors.length > 0) {
+    throw new Error(validation.errors.join('; '))
+  }
+
+  const stages = buildStages(segments)
+  if (stages.length === 0) {
+    throw new Error('没有可生成的有效文案，请先补充段落内容。')
+  }
+
+  let state = {
+    episode_id: episodeId,
+    stages,
+    logs: [],
+    errors: [],
+    runtime_config: {
+      tts: runtimeTtsConfig,
+      audio_postprocess: basePostConfig,
+    },
+    audio_segments: [],
+    final_audio_path: '',
+    audio_metadata: {},
+  }
+
+  const sendProgress = (progress) => {
+    event.sender.send('produce:progress', {
+      episodeId,
+      ...progress,
+    })
+  }
+
+  try {
+    sendProgress({ stage: 'tts', status: 'running', progress: 25, detail: '正在生成语音片段...' })
+    state = await runPythonNode('tts', state, 600000)
+
+    sendProgress({ stage: 'audio_postprocess', status: 'running', progress: 70, detail: '正在合并与后处理音频...' })
+    state = await runPythonNode('audio_postprocess', state, 600000)
+
+    if (!state?.final_audio_path) {
+      const lastError = Array.isArray(state?.errors) && state.errors.length > 0
+        ? state.errors[state.errors.length - 1]?.message
+        : ''
+      throw new Error(lastError || '音频生成失败：未得到最终音频文件。')
+    }
+
+    sendProgress({ stage: 'done', status: 'completed', progress: 100, detail: '音频生成完成' })
+
+    return {
+      episodeId,
+      providerRequested: requestedProvider,
+      providerApplied: PROVIDER_TO_ENGINE[requestedProvider] || 'edge-tts',
+      warnings: validation.warnings,
+      audioSegments: state.audio_segments || [],
+      finalAudioPath: state.final_audio_path,
+      audioMetadata: state.audio_metadata || {},
+      logs: state.logs || [],
+      errors: state.errors || [],
+    }
+  } catch (error) {
+    sendProgress({ stage: 'failed', status: 'failed', progress: 100, detail: error?.message || '生成失败' })
+    throw error
+  }
 })
 
 ipcMain.handle('llm:fetchModels', async (event, { apiBase, apiKey }) => {
