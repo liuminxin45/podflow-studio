@@ -259,6 +259,7 @@ export default function CreationStudio({
       title: b.title,
       materials: b.materials,
       notes: b.notes || (b.llm_suggestions?.key_points?.join('\n') || ''),
+      llm_suggestions: b.llm_suggestions,
     }))
     
     setBlocks(convertedBlocks)
