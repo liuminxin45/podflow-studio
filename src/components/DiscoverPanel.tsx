@@ -339,6 +339,19 @@ export default function DiscoverPanel({
               自动选题
             </Button>
           </Tooltip>
+          <Button
+            type="primary"
+            icon={<ArrowRightOutlined />}
+            onClick={handleProceed}
+            disabled={totalCandidates === 0}
+            style={{
+              background: totalCandidates > 0 ? 'var(--accent-primary)' : undefined,
+              borderColor: totalCandidates > 0 ? 'var(--accent-primary)' : undefined,
+              borderRadius: 8, fontWeight: 600, fontSize: 13, height: 32,
+            }}
+          >
+            进入整理
+          </Button>
           <Tooltip title="返回">
             <Button icon={<ArrowLeftOutlined />} onClick={onClose} />
           </Tooltip>

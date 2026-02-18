@@ -401,7 +401,7 @@ export default function CreationStudio({
           </Tooltip>
           <Button
             type="primary"
-            icon={<CheckCircleOutlined />}
+            icon={<ArrowRightOutlined />}
             onClick={handleConfirm}
             style={{
               background: 'var(--accent-primary)',
@@ -411,7 +411,7 @@ export default function CreationStudio({
               fontSize: 13,
             }}
           >
-            确认结构，进入写作
+            进入写作
           </Button>
           <Tooltip title="返回工作流">
             <Button type="text" icon={<ArrowLeftOutlined />} onClick={onClose} style={{ color: 'var(--text-tertiary)' }} />

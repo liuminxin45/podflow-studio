@@ -972,6 +972,19 @@ export default function OrganizePanel({
             })}
           </div>
 
+          <Button
+            type="primary"
+            icon={<ArrowRightOutlined />}
+            onClick={handleProceed}
+            disabled={!canProceed}
+            style={{
+              background: canProceed ? 'var(--accent-primary)' : undefined,
+              borderColor: canProceed ? 'var(--accent-primary)' : undefined,
+              borderRadius: 8, fontWeight: 600, fontSize: 13, height: 32,
+            }}
+          >
+            进入构思
+          </Button>
           <Tooltip title="返回">
             <Button type="text" icon={<ArrowLeftOutlined />} onClick={onClose} style={{ color: 'var(--text-tertiary)' }} />
           </Tooltip>
@@ -1418,28 +1431,6 @@ export default function OrganizePanel({
           )}
         </div>
 
-        {/* Right: proceed */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {canProceed && (
-            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>选好了就往前走</span>
-          )}
-          <Button
-            type="primary"
-            size="large"
-            icon={<ArrowRightOutlined />}
-            onClick={handleProceed}
-            disabled={!canProceed}
-            className={canProceed && candidates.length >= suggestedMin ? 'organize-proceed-pulse' : ''}
-            style={{
-              background: canProceed ? 'var(--accent-primary)' : undefined,
-              borderColor: canProceed ? 'var(--accent-primary)' : undefined,
-              borderRadius: 10, fontWeight: 600, fontSize: 13, height: 36, paddingInline: 20,
-              transition: 'all 0.3s ease',
-            }}
-          >
-            进入构思
-          </Button>
-        </div>
       </div>
 
       {/* ==================== AI Organize Modals ==================== */}
