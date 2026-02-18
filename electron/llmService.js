@@ -27,10 +27,15 @@ async function fetchModels({ apiBase, apiKey }) {
   }
 }
 
-async function callLLM({ apiBase, apiKey, model, messages, temperature = 0.3, stream = false, eventSender = null }) {
+async function callLLM({ apiBase, apiKey, model, messages, temperature = 0.3, maxTokens, timeout, stream = false, eventSender = null }) {
   const url = `${apiBase.replace(/\/$/, '')}/chat/completions`
   const headers = buildHeaders(apiBase, apiKey)
   const body = { model, messages, temperature, stream }
+  if (typeof maxTokens === 'number') {
+    body.max_tokens = maxTokens
+  }
+
+  const requestTimeout = typeof timeout === 'number' ? timeout : STREAMING_TIMEOUT
 
   if (stream) {
     if (!eventSender) {
@@ -42,14 +47,14 @@ async function callLLM({ apiBase, apiKey, model, messages, temperature = 0.3, st
       method: 'POST',
       headers,
       body,
-      timeout: STREAMING_TIMEOUT,
+      timeout: requestTimeout,
       onChunk: (content) => eventSender.send('llm:stream:chunk', content),
       onEnd: () => eventSender.send('llm:stream:done'),
       onError: (error) => eventSender.send('llm:stream:error', error)
     })
   } else {
     try {
-      const response = await makeRequest({ url, method: 'POST', headers, body, timeout: STREAMING_TIMEOUT })
+      const response = await makeRequest({ url, method: 'POST', headers, body, timeout: requestTimeout })
       return response.body
     } catch (error) {
       throw new Error(`LLM call failed: ${error.message}`)

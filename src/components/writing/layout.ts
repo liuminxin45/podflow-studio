@@ -67,6 +67,7 @@ export function createSegment(id: string, type: SegmentType, label: string): Wri
     estimatedSeconds: SEGMENT_TYPE_CONFIG[type].defaultSeconds,
     status: 'draft',
     collapsed: false,
+    sourceReferences: [],
   }
 }
 
@@ -102,6 +103,19 @@ export function mapScriptToSegments(
         ...createSegment(section?.id || `seg_${idx + 1}`, segType, section?.label || SEGMENT_TYPE_CONFIG[segType].label),
         content: section?.text || '',
         status: (section?.text || '').length > 20 ? ('editing' as const) : ('draft' as const),
+        sourceReferences: Array.isArray(section?.source_refs)
+          ? section.source_refs
+              .map((ref) => ({
+                title: (ref?.title || '').trim(),
+                url: (ref?.url || '').trim() || undefined,
+                source: (ref?.source || '').trim() || undefined,
+                published: (ref?.published || '').trim() || undefined,
+              }))
+              .filter((ref) => ref.title)
+          : (section?.references || [])
+              .map((title) => (title || '').trim())
+              .filter(Boolean)
+              .map((title) => ({ title })),
       }
     })
     return { resolvedType, segments: normalizeDynamicLabels(fromSections, layout) }

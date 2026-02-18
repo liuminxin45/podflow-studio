@@ -29,6 +29,12 @@ interface SegmentCardProps {
   onStatusChange: (status: SegmentStatus) => void
   onCollapse: () => void
   onTextSelect: (text: string) => void
+  onSourceReferencesChange?: (refs: WritingSourceReference[]) => void
+  promptOverride?: string
+  onPromptOverrideChange?: (value: string) => void
+  onRegenerateAIDraft?: () => void
+  aiRegenerating?: boolean
+  aiGenerationStatus?: 'idle' | 'generating' | 'success' | 'error'
   onDragStart: () => void
   onDragOver: (e: React.DragEvent) => void
   onDrop: () => void
@@ -45,6 +51,12 @@ export default function SegmentCard({
   onStatusChange,
   onCollapse,
   onTextSelect,
+  onSourceReferencesChange,
+  promptOverride,
+  onPromptOverrideChange,
+  onRegenerateAIDraft,
+  aiRegenerating,
+  aiGenerationStatus = 'idle',
   onDragStart,
   onDragOver,
   onDrop,
@@ -82,6 +94,12 @@ export default function SegmentCard({
   }
 
   const currentToneLabel = SEGMENT_TONES.find(t => t.key === segment.tone)?.label || '跟随全局'
+  const sourceLines = (segment.sourceReferences || []).map((ref) => ref.title).filter(Boolean).join('\n')
+  const PROMPT_TEMPLATES: Array<{ key: string; label: string; value: string }> = [
+    { key: 'conversational', label: '更口语', value: '请改写为更口语、更自然的表达，像在和听众聊天。' },
+    { key: 'concise', label: '更短句', value: '请使用更短句和更快节奏，减少长句与重复修饰。' },
+    { key: 'data_driven', label: '更数据化', value: '请增加关键数据/事实锚点，保留来源语义，表达更客观。' },
+  ]
 
   return (
     <div
@@ -195,6 +213,80 @@ export default function SegmentCard({
               ))}
             </div>
           )}
+
+          {segment.type === 'news_item' && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                来源清单（每行一条）
+              </div>
+              <TextArea
+                value={sourceLines}
+                onChange={(e) => {
+                  const refs = e.target.value
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .filter(Boolean)
+                    .map((title) => ({ title }))
+                  onSourceReferencesChange?.(refs)
+                }}
+                placeholder="例如：新华社｜国家统计局月度数据发布"
+                autoSize={{ minRows: 1, maxRows: 4 }}
+                style={{
+                  fontSize: 11,
+                  borderRadius: 8,
+                  background: 'var(--bg-tertiary)',
+                  borderColor: 'var(--border-color)',
+                }}
+              />
+            </div>
+          )}
+
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>
+              段落 AI Prompt
+            </div>
+            <TextArea
+              value={promptOverride || ''}
+              onChange={(e) => onPromptOverrideChange?.(e.target.value)}
+              placeholder="可选：对当前段落追加风格、结构、事实要求..."
+              autoSize={{ minRows: 1, maxRows: 4 }}
+              style={{
+                fontSize: 11,
+                borderRadius: 8,
+                background: 'var(--bg-tertiary)',
+                borderColor: 'var(--border-color)',
+              }}
+            />
+            <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {PROMPT_TEMPLATES.map((tpl) => (
+                <Button
+                  key={tpl.key}
+                  size="small"
+                  onClick={() => onPromptOverrideChange?.(tpl.value)}
+                  style={{ borderRadius: 999, fontSize: 10, height: 22, padding: '0 10px' }}
+                >
+                  {tpl.label}
+                </Button>
+              ))}
+            </div>
+            <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <Button
+                size="small"
+                onClick={onRegenerateAIDraft}
+                loading={aiRegenerating}
+                disabled={!onRegenerateAIDraft}
+                style={{ borderRadius: 6, fontSize: 11 }}
+              >
+                重新生成本段
+              </Button>
+              <span style={{ fontSize: 10, color: aiGenerationStatus === 'error' ? 'var(--warning-color)' : 'var(--text-tertiary)' }}>
+                {aiGenerationStatus === 'generating' && 'AI 生成中...'}
+                {aiGenerationStatus === 'success' && '已更新'}
+                {aiGenerationStatus === 'error' && '生成失败'}
+                {aiGenerationStatus === 'idle' && '未生成'}
+              </span>
+            </div>
+          </div>
 
           {/* Bottom toolbar */}
           <div style={{

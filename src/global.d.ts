@@ -6,6 +6,8 @@ interface LLMCallParams {
   model: string
   messages: Array<{ role: string; content: string }>
   temperature?: number
+  maxTokens?: number
+  timeout?: number
 }
 
 interface LLMResponse {

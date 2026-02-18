@@ -99,6 +99,14 @@ export default function CreationStudio({
   onStateChange,
   onConfirm,
 }: Props) {
+  const cloneBlocks = useCallback((input: StructureBlock[]): StructureBlock[] => (
+    input.map((block) => ({
+      ...block,
+      materials: Array.isArray(block.materials) ? [...block.materials] : [],
+      llm_suggestions: block.llm_suggestions ? { ...block.llm_suggestions } : undefined,
+    }))
+  ), [])
+
   const [contentType, setContentType] = useState<ContentCreationType>('story')
 
   // Left panel state
@@ -143,6 +151,34 @@ export default function CreationStudio({
   const [ideationPanelVisible, setIdeationPanelVisible] = useState(false)
   const [ideationHistoryVisible, setIdeationHistoryVisible] = useState(false)
   const [isLlmGenerated, setIsLlmGenerated] = useState(false)
+  const draftByTypeRef = useRef<Record<ContentCreationType, {
+    blocks: StructureBlock[]
+    topicTitle: string
+    topicDesc: string
+    isLlmGenerated: boolean
+  }>>({
+    story: {
+      blocks: createBlocksByContentType('story'),
+      topicTitle: selectedTopic?.title || '',
+      topicDesc: selectedTopic?.description || '',
+      isLlmGenerated: false,
+    },
+    news_brief: {
+      blocks: createBlocksByContentType('news_brief'),
+      topicTitle: selectedTopic?.title || '',
+      topicDesc: selectedTopic?.description || '',
+      isLlmGenerated: false,
+    },
+  })
+
+  useEffect(() => {
+    draftByTypeRef.current[contentType] = {
+      blocks: cloneBlocks(blocks),
+      topicTitle,
+      topicDesc,
+      isLlmGenerated,
+    }
+  }, [contentType, blocks, topicTitle, topicDesc, isLlmGenerated, cloneBlocks])
 
   // Filter materials
   const filteredMaterials = useMemo(() => {
@@ -187,9 +223,26 @@ export default function CreationStudio({
   }, [isLocked])
 
   const applyContentPreset = useCallback((nextType: ContentCreationType) => {
+    draftByTypeRef.current[contentType] = {
+      blocks: cloneBlocks(blocks),
+      topicTitle,
+      topicDesc,
+      isLlmGenerated,
+    }
+
+    const nextDraft = draftByTypeRef.current[nextType] || {
+      blocks: createBlocksByContentType(nextType),
+      topicTitle: selectedTopic?.title || '',
+      topicDesc: selectedTopic?.description || '',
+      isLlmGenerated: false,
+    }
+
     setContentType(nextType)
-    setBlocks(createBlocksByContentType(nextType))
-  }, [])
+    setBlocks(cloneBlocks(nextDraft.blocks))
+    setTopicTitle(nextDraft.topicTitle)
+    setTopicDesc(nextDraft.topicDesc)
+    setIsLlmGenerated(nextDraft.isLlmGenerated)
+  }, [contentType, blocks, topicTitle, topicDesc, isLlmGenerated, selectedTopic?.title, selectedTopic?.description, cloneBlocks])
 
   const addNewsItemBlock = useCallback(() => {
     if (isLocked) return
@@ -252,7 +305,11 @@ export default function CreationStudio({
   }, [blocks])
 
   // Apply LLM result
-  const handleApplyLLMResult = useCallback((llmBlocks: StructureBlock[], topic: { title: string; description: string }) => {
+  const handleApplyLLMResult = useCallback((
+    llmBlocks: StructureBlock[],
+    topic: { title: string; description: string },
+    draftType?: ContentCreationType,
+  ) => {
     const convertedBlocks = llmBlocks.map(b => ({
       id: b.id,
       type: b.type,
@@ -261,13 +318,23 @@ export default function CreationStudio({
       notes: b.notes || (b.llm_suggestions?.key_points?.join('\n') || ''),
       llm_suggestions: b.llm_suggestions,
     }))
+
+    const targetType = draftType || contentType
+
+    draftByTypeRef.current[targetType] = {
+      blocks: cloneBlocks(convertedBlocks),
+      topicTitle: topic.title,
+      topicDesc: topic.description,
+      isLlmGenerated: true,
+    }
     
+    setContentType(targetType)
     setBlocks(convertedBlocks)
     setTopicTitle(topic.title)
     setTopicDesc(topic.description)
     setIsLlmGenerated(true)
     setIdeationPanelVisible(false)
-  }, [])
+  }, [contentType, cloneBlocks])
 
   // Handle confirm
   const handleConfirm = () => {
@@ -1073,7 +1140,8 @@ export default function CreationStudio({
         onClose={() => setIdeationHistoryVisible(false)}
         onSelect={(record) => {
           if (record.output) {
-            handleApplyLLMResult(record.output.blocks, record.output.topic)
+            const recordType = (record.output.content_type || record.input.config.content_type || 'story') as ContentCreationType
+            handleApplyLLMResult(record.output.blocks, record.output.topic, recordType)
           }
         }}
       />

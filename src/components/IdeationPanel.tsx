@@ -15,7 +15,7 @@ interface IdeationPanelProps {
   materials: EnhancedMaterial[]
   contentType: ContentCreationType
   visible: boolean
-  onApply: (blocks: StructureBlock[], topic: { title: string; description: string }) => void
+  onApply: (blocks: StructureBlock[], topic: { title: string; description: string }, contentType: ContentCreationType) => void
   onClose: () => void
 }
 
@@ -33,7 +33,6 @@ export default function IdeationPanel({
     workingDraft,
     generateLLMVersion,
     regenerateBlock,
-    updateConfig,
     error,
     warnings,
     streamLogs,
@@ -56,14 +55,13 @@ export default function IdeationPanel({
   }, [contentType, materials.length, config.news_max_count])
 
   const handleGenerate = async () => {
-    updateConfig({ content_type: contentType })
-    await generateLLMVersion()
+    await generateLLMVersion({ content_type: contentType, auto_detect_type: false })
   }
 
   const handleApply = () => {
     if (!workingDraft) return
     
-    onApply(workingDraft.blocks, workingDraft.topic)
+    onApply(workingDraft.blocks, workingDraft.topic, (workingDraft.content_type || contentType) as ContentCreationType)
     message.success('已应用LLM构思结果')
     onClose()
   }

@@ -60,7 +60,13 @@ describe('Writing layout helpers', () => {
       content_type: 'news_brief',
       sections: [
         { id: 'o', type: 'opening', label: '自定义开头', text: '大家好，欢迎收听。' },
-        { id: 'n2', type: 'news_item', label: '任意标签A', text: '第一条新闻内容，包含更多细节与影响分析，确保长度超过阈值进入编辑状态。' },
+        {
+          id: 'n2',
+          type: 'news_item',
+          label: '任意标签A',
+          text: '第一条新闻内容，包含更多细节与影响分析，确保长度超过阈值进入编辑状态。',
+          source_refs: [{ title: '新华社：宏观数据快讯' }],
+        },
         { id: 'n8', type: 'news_item', label: '任意标签B', text: '第二条新闻内容，包含背景、关键数据与后续变化，确保长度超过阈值进入编辑状态。' },
         { id: 'c', type: 'closing', label: '自定义结尾', text: '以上就是今天的全部内容。' },
       ],
@@ -71,6 +77,7 @@ describe('Writing layout helpers', () => {
     expect(mapped.resolvedType).toBe('news_brief')
     expect(mapped.segments.filter((s) => s.type === 'news_item').map((s) => s.label)).toEqual(['新闻一', '新闻二'])
     expect(mapped.segments.find((s) => s.id === 'n2')?.status).toBe('editing')
+    expect(mapped.segments.find((s) => s.id === 'n2')?.sourceReferences?.[0]?.title).toBe('新华社：宏观数据快讯')
   })
 
   it('falls back to dialogue hydration when sections are absent', () => {

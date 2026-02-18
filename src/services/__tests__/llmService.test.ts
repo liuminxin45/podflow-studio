@@ -6,6 +6,7 @@ import { LLM_DEFAULTS } from '../../constants/llm'
 describe('LLMService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    llmService.clearCache()
     global.fetch = vi.fn()
     ;(global.window as any) = { electronAPI: null }
   })
@@ -51,13 +52,16 @@ describe('LLMService', () => {
         messages: [{ role: 'user', content: 'Hi' }],
       })
 
-      expect(mockElectronAPI.llmCall).toHaveBeenCalledWith({
-        apiBase: 'https://api.openai.com/v1',
-        apiKey: 'test-key',
-        model: 'gpt-4',
-        messages: [{ role: 'user', content: 'Hi' }],
-        temperature: LLM_DEFAULTS.TEMPERATURE,
-      })
+      expect(mockElectronAPI.llmCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiBase: 'https://api.openai.com/v1',
+          apiKey: 'test-key',
+          model: 'gpt-4',
+          messages: [{ role: 'user', content: 'Hi' }],
+          temperature: LLM_DEFAULTS.TEMPERATURE,
+          timeout: LLM_DEFAULTS.TIMEOUT,
+        })
+      )
       expect(result.choices[0].message.content).toBe('Hello')
     })
 

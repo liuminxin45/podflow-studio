@@ -28,7 +28,7 @@ interface UseIdeationReturn {
   workingDraft: IdeationResult | null
   
   // 操作
-  generateLLMVersion: () => Promise<void>
+  generateLLMVersion: (overrides?: Partial<IdeationConfig>) => Promise<void>
   regenerateBlock: (blockId: string, userFeedback?: string) => Promise<void>
   adoptLLMVersion: () => void
   adoptManualVersion: () => void
@@ -72,7 +72,9 @@ export function useIdeation({ materials, onComplete }: UseIdeationOptions): UseI
     ideationService.isLLMAvailable().then(setLlmAvailable)
   }, [])
 
-  const generateLLMVersion = useCallback(async () => {
+  const generateLLMVersion = useCallback(async (overrides?: Partial<IdeationConfig>) => {
+    const mergedConfig: IdeationConfig = { ...config, ...(overrides || {}) }
+
     if (!llmAvailable) {
       setError('LLM不可用，请在Settings中配置')
       return
@@ -90,7 +92,7 @@ export function useIdeation({ materials, onComplete }: UseIdeationOptions): UseI
         ideation_challenge: ideationConfigManager.getIdeationChallenge(),
       }
 
-      const response = await ideationService.generateIdeation(context, config, (log: string) => {
+      const response = await ideationService.generateIdeation(context, mergedConfig, (log: string) => {
         setStreamLogs(prev => [...prev, log])
       })
 
@@ -101,7 +103,7 @@ export function useIdeation({ materials, onComplete }: UseIdeationOptions): UseI
         // 保存失败记录
         ideationHistoryService.save(
           context,
-          config,
+          mergedConfig,
           null,
           false,
           response.error?.message
@@ -125,7 +127,7 @@ export function useIdeation({ materials, onComplete }: UseIdeationOptions): UseI
       if (response.result) {
         ideationHistoryService.save(
           context,
-          config,
+          mergedConfig,
           response.result,
           true,
           undefined,
@@ -147,7 +149,7 @@ export function useIdeation({ materials, onComplete }: UseIdeationOptions): UseI
         user_preferences: ideationConfigManager.getUserPreferences(),
         ideation_challenge: ideationConfigManager.getIdeationChallenge(),
       }
-      ideationHistoryService.save(context, config, null, false, errorMessage)
+      ideationHistoryService.save(context, mergedConfig, null, false, errorMessage)
     }
   }, [materials, config, llmAvailable, onComplete])
 

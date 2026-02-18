@@ -15,14 +15,11 @@ import {
 } from './llm/utils'
 
 class LLMService {
-  private useElectronProxy = false
   private cache: LRUCache
   private rateLimiter: TokenBucketRateLimiter
   private metricsCollector: MetricsCollector
 
   constructor() {
-    this.useElectronProxy = typeof window !== 'undefined' && !!(window as any).electronAPI?.llmCall
-    
     this.cache = new LRUCache(
       LLM_DEFAULTS.CACHE_MAX_SIZE,
       LLM_DEFAULTS.CACHE_TTL
@@ -61,8 +58,8 @@ class LLMService {
     const startTime = Date.now()
 
     try {
-      const response = this.useElectronProxy
-        ? await this.callViaElectron({ apiBase, apiKey, model, messages, temperature, timeout })
+      const response = this.shouldUseElectronLLMCall()
+        ? await this.callViaElectron({ apiBase, apiKey, model, messages, temperature, maxTokens, timeout })
         : await this.callViaFetch({ apiBase, apiKey, model, messages, temperature, maxTokens, timeout })
 
       const duration = Date.now() - startTime
@@ -81,7 +78,7 @@ class LLMService {
     validateCredentials(apiBase, apiKey)
 
     try {
-      if (this.useElectronProxy) {
+      if (this.shouldUseElectronModelFetch()) {
         const data = await (window as any).electronAPI.llmFetchModels({ apiBase, apiKey })
         return extractModelIds(data)
       }
@@ -185,6 +182,14 @@ class LLMService {
     this.metricsCollector.reset()
   }
 
+  private shouldUseElectronLLMCall(): boolean {
+    return typeof window !== 'undefined' && !!(window as any).electronAPI?.llmCall
+  }
+
+  private shouldUseElectronModelFetch(): boolean {
+    return typeof window !== 'undefined' && !!(window as any).electronAPI?.llmFetchModels
+  }
+
   private async callViaElectron(options: LLMCallOptions): Promise<LLMResponse> {
     const data = await (window as any).electronAPI.llmCall({
       apiBase: normalizeUrl(options.apiBase),
@@ -192,6 +197,8 @@ class LLMService {
       model: options.model,
       messages: options.messages,
       temperature: options.temperature,
+      maxTokens: options.maxTokens,
+      timeout: options.timeout,
     })
 
     if (!data.choices?.[0]?.message) {
