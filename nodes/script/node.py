@@ -2,8 +2,6 @@ import os
 import json
 import re
 from typing import Dict, Any
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
 from nodes.script.config import ScriptConfig
 
 
@@ -53,6 +51,9 @@ def run(state: Dict[str, Any], config: ScriptConfig = None) -> Dict[str, Any]:
 
 
 def _generate_script(topic: Dict, materials: list, config: ScriptConfig) -> Dict[str, Any]:
+    from langchain_openai import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
+
     api_key = config.api_key or os.environ.get("OPENAI_API_KEY", "")
     api_base = config.api_base or os.environ.get("OPENAI_API_BASE", None)
 

@@ -8,7 +8,17 @@ export default defineConfig({
     strictPort: true
   },
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom'],
+          antd: ['antd', '@ant-design/icons'],
+          reactflow: ['reactflow'],
+        },
+      },
+    },
   },
   base: './'
 })

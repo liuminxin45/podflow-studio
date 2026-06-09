@@ -35,6 +35,7 @@ Thumbs.db
 .env.*.local
 
 # Test and debug files
+.codex-run/
 tests/debug/
 *.test.json
 script_schema*.json

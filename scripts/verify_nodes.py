@@ -9,8 +9,18 @@ Validates output structure and error handling.
 import sys
 import json
 import subprocess
+import os
 from pathlib import Path
 from typing import Dict, Any
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 NODES = [
     'fetch', 'preprocess', 'research', 'topic_selection',
@@ -41,14 +51,25 @@ def test_node(node_name: str) -> bool:
         "rss_path": "",
         "publish_status": {}
     }
+    if node_name == "fetch":
+        test_state["runtime_config"]["fetch"] = {"enabled_sources": ["ai_news_daily"]}
     
     try:
+        env = {
+            **os.environ,
+            "PYTHONPATH": str(PROJECT_ROOT),
+            "PYTHONIOENCODING": "utf-8",
+        }
         proc = subprocess.run(
             [sys.executable, '-m', f'nodes.{node_name}'],
             input=json.dumps(test_state),
             capture_output=True,
             text=True,
-            timeout=10
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+            cwd=PROJECT_ROOT,
+            env=env,
         )
         
         if proc.returncode != 0:

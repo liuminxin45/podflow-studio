@@ -8,6 +8,15 @@ Verifies that all node configs properly inherit from NodeConfigBase and support 
 import sys
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 def test_config_import(node_name: str, config_class: str) -> bool:
     """Test that a config can be imported and instantiated."""
     try:
