@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { Input, Tag, Button, Empty, Badge, Tooltip, Dropdown } from 'antd'
 import type { ContentItem } from '../types/workflow'
 import {
@@ -44,6 +44,8 @@ interface Props {
   rawContents: MaterialItem[]
   selectedTopic?: { title?: string; description?: string }
   selectedMaterials?: MaterialItem[]
+  initialBlocks?: StructureBlock[]
+  onStateChange?: (structure: { topic: any; materials: MaterialItem[]; blocks: StructureBlock[] }) => void
   onConfirm?: (structure: { topic: any; materials: MaterialItem[]; blocks: StructureBlock[] }) => void
 }
 
@@ -56,6 +58,8 @@ export default function CreationStudio({
   onClose,
   rawContents = [],
   selectedTopic,
+  initialBlocks,
+  onStateChange,
   onConfirm,
 }: Props) {
   // Left panel state
@@ -76,6 +80,29 @@ export default function CreationStudio({
   // Right panel state
   const [activeInsightTab, setActiveInsightTab] = useState<'topics' | 'context' | 'questions' | 'mood' | 'rhythm'>('topics')
   const [savedVersions, setSavedVersions] = useState<Array<{ time: string; blockCount: number; materialCount: number }>>([])
+  const lastSyncedStateRef = useRef('')
+
+  useEffect(() => {
+    if (!visible) return
+    if (initialBlocks?.length) {
+      setBlocks(initialBlocks)
+    }
+    setTopicTitle(selectedTopic?.title || '')
+    setTopicDesc(selectedTopic?.description || '')
+  }, [visible])
+
+  useEffect(() => {
+    if (!visible) return
+    const structure = {
+      topic: { title: topicTitle, description: topicDesc },
+      materials: blocks.flatMap(b => b.materials),
+      blocks,
+    }
+    const serialized = JSON.stringify(structure)
+    if (serialized === lastSyncedStateRef.current) return
+    lastSyncedStateRef.current = serialized
+    onStateChange?.(structure)
+  }, [visible, topicTitle, topicDesc, blocks])
 
   // Filter materials
   const filteredMaterials = useMemo(() => {
@@ -164,7 +191,6 @@ export default function CreationStudio({
       materials: allMaterials,
       blocks,
     })
-    onClose()
   }
 
   if (!visible) return null
@@ -224,7 +250,10 @@ export default function CreationStudio({
   return (
     <div style={{
       position: 'fixed',
-      inset: 0,
+      top: 52,
+      right: 0,
+      bottom: 0,
+      left: 148,
       zIndex: 1000,
       background: 'var(--bg-primary)',
       display: 'flex',

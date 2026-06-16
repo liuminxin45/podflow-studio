@@ -45,7 +45,7 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
     const script = approvalData.data.script
     
     if (!script) {
-      return <Text type="secondary">Script data unavailable</Text>
+      return <Text type="secondary">脚本数据不可用</Text>
     }
 
     return (
@@ -59,11 +59,11 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
             borderRadius: 6,
             border: '1px solid var(--border-color)'
           }}>
-            <Text strong style={{ color: 'var(--text-primary)' }}>Script Metadata</Text>
+            <Text strong style={{ color: 'var(--text-primary)' }}>脚本元数据</Text>
             <div style={{ marginTop: 8, display: 'grid', gap: '4px' }}>
-              {script.metadata.title && <div><Text type="secondary">Title: </Text><Text style={{ color: 'var(--text-primary)' }}>{script.metadata.title}</Text></div>}
-              {script.metadata.duration && <div><Text type="secondary">Duration: </Text><Text style={{ color: 'var(--text-primary)' }}>{script.metadata.duration} min</Text></div>}
-              {script.metadata.hosts && <div><Text type="secondary">Hosts: </Text><Text style={{ color: 'var(--text-primary)' }}>{script.metadata.hosts.join(', ')}</Text></div>}
+              {script.metadata.title && <div><Text type="secondary">标题：</Text><Text style={{ color: 'var(--text-primary)' }}>{script.metadata.title}</Text></div>}
+              {script.metadata.duration && <div><Text type="secondary">时长：</Text><Text style={{ color: 'var(--text-primary)' }}>{script.metadata.duration} 分钟</Text></div>}
+              {script.metadata.hosts && <div><Text type="secondary">主持人：</Text><Text style={{ color: 'var(--text-primary)' }}>{script.metadata.hosts.join(', ')}</Text></div>}
             </div>
           </div>
         )}
@@ -98,7 +98,7 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
       <div style={{ marginBottom: 16 }}>
         {selected_topic && (
           <div style={{ marginBottom: 16 }}>
-            <Text strong style={{ color: 'var(--text-primary)' }}>Selected Topic:</Text>
+            <Text strong style={{ color: 'var(--text-primary)' }}>已选主题：</Text>
             <div style={{ 
               marginTop: 8, 
               padding: 12, 
@@ -106,7 +106,7 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
               borderRadius: 6,
               border: '1px solid var(--info-color)'
             }}>
-              <div><Text strong style={{ color: 'var(--text-primary)' }}>{selected_topic.title || 'Untitled'}</Text></div>
+              <div><Text strong style={{ color: 'var(--text-primary)' }}>{selected_topic.title || '未命名'}</Text></div>
               {selected_topic.description && (
                 <div style={{ marginTop: 4 }}>
                   <Text type="secondary">{selected_topic.description}</Text>
@@ -118,7 +118,7 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
 
         {selected_materials && selected_materials.length > 0 && (
           <div>
-            <Text strong style={{ color: 'var(--text-primary)' }}>Selected Materials ({selected_materials.length}):</Text>
+            <Text strong style={{ color: 'var(--text-primary)' }}>已选素材（{selected_materials.length}）：</Text>
             <div style={{ marginTop: 8, maxHeight: 200, overflow: 'auto', paddingRight: 4 }}>
               {selected_materials.slice(0, 5).map((material: any, index: number) => (
                 <div 
@@ -132,7 +132,7 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
                     fontSize: 12
                   }}
                 >
-                  <Text strong style={{ color: 'var(--text-primary)' }}>{material.title || `Material ${index + 1}`}</Text>
+                  <Text strong style={{ color: 'var(--text-primary)' }}>{material.title || `素材 ${index + 1}`}</Text>
                   {material.content && (
                     <div style={{ marginTop: 4 }}>
                       <Text type="secondary" style={{ fontSize: 11 }}>
@@ -144,7 +144,7 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
               ))}
               {selected_materials.length > 5 && (
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  And {selected_materials.length - 5} more materials...
+                  还有 {selected_materials.length - 5} 条素材未显示…
                 </Text>
               )}
             </div>
@@ -159,7 +159,7 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
       title={
         <Space>
           <FileTextOutlined style={{ color: 'var(--accent-primary)' }} />
-          <span style={{ fontSize: 18 }}>Approval Request</span>
+          <span style={{ fontSize: 18 }}>审批请求</span>
         </Space>
       }
       open={visible}
@@ -189,15 +189,14 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
     >
       <div style={{ marginBottom: 20 }}>
         <Paragraph style={{ color: 'var(--text-primary)' }}>
-          The AI has completed a step that requires your approval. Please review the content below. 
-          Approve to continue or reject to stop the workflow.
+          智能助手已完成一个需要你确认的步骤。请检查下面的内容，通过后继续工作流，拒绝后停止工作流。
         </Paragraph>
       </div>
 
       {renderTopicAndMaterials()}
       
       <Divider orientation="left" style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}>
-        Generated Content
+        生成内容
       </Divider>
       
       {renderScriptContent()}
@@ -213,7 +212,7 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
             onClick={handleReject}
             loading={loading}
           >
-            Reject
+            拒绝
           </Button>
           <Button
             size="large"
@@ -227,7 +226,7 @@ export default function ApprovalModal({ visible, approvalData, onApprove, onReje
               boxShadow: 'var(--shadow-sm)'
             }}
           >
-            Approve & Continue
+            通过并继续
           </Button>
         </Space>
       </div>

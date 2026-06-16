@@ -376,7 +376,7 @@ export default function WritingLayer({
     selectionRange?: { start: number; end: number },
   ): Promise<AISuggestion> => {
     if (!window.electronAPI?.loadAllConfigs) {
-      throw new Error('当前环境没有 Electron 配置接口，无法调用真实 AI 建议')
+      throw new Error('当前环境没有 Electron 配置接口，无法调用真实智能建议')
     }
     const configs = await window.electronAPI.loadAllConfigs()
     const cfg = configs.script || configs.research || configs.topic_selection || {}
@@ -418,7 +418,7 @@ export default function WritingLayer({
     })
 
     if (!response.ok) {
-      throw new Error(`AI 请求失败：HTTP ${response.status}`)
+      throw new Error(`智能请求失败：HTTP ${response.status}`)
     }
 
     const data = await response.json()
@@ -439,7 +439,7 @@ export default function WritingLayer({
       intensity: aiIntensity,
       originalText: text,
       suggestedText: String(parsed.suggestedText || text),
-      reason: String(parsed.reason || '已根据当前角色生成真实 AI 建议'),
+      reason: String(parsed.reason || '已根据当前角色生成真实智能建议'),
       status: 'pending',
       timestamp: Date.now(),
       selectionRange,
@@ -466,7 +466,7 @@ export default function WritingLayer({
         )
         setSuggestions(prev => [...newSuggestions, ...prev])
         message.info({
-          content: `${AI_AGENTS_MAP[role]} 已对全文 ${newSuggestions.length} 个段落生成真实 AI 建议`,
+          content: `${AI_AGENTS_MAP[role]} 已对全文 ${newSuggestions.length} 个段落生成真实智能建议`,
           duration: 2,
           style: { marginTop: 60 },
         })
@@ -483,7 +483,7 @@ export default function WritingLayer({
       const suggestion = await requestAISuggestion(role, activeSegmentId, targetText, collaborationScope, selectionRange)
       setSuggestions(prev => [suggestion, ...prev])
       message.info({
-        content: `${AI_AGENTS_MAP[role]} 已生成真实 AI 建议`,
+        content: `${AI_AGENTS_MAP[role]} 已生成真实智能建议`,
         duration: 1.5,
         style: { marginTop: 60 },
       })
@@ -542,11 +542,10 @@ export default function WritingLayer({
   const handleProceed = useCallback(async () => {
     try {
       await onProceedToProduction?.(buildWorkflowPatch())
-      onClose()
     } catch (error: any) {
       message.error({ content: `进入制作失败：${error?.message || String(error)}`, duration: 2, style: { marginTop: 60 } })
     }
-  }, [buildWorkflowPatch, onProceedToProduction, onClose])
+  }, [buildWorkflowPatch, onProceedToProduction])
 
   if (!visible) return null
 
@@ -556,7 +555,7 @@ export default function WritingLayer({
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
+      position: 'fixed', top: 52, right: 0, bottom: 0, left: 148, zIndex: 1000,
       background: 'var(--bg-primary)',
       display: 'flex', flexDirection: 'column',
       animation: 'slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -661,7 +660,7 @@ export default function WritingLayer({
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* Undo button */}
           {undoStack.length > 0 && (
-            <Tooltip title="撤销上次 AI 修改">
+            <Tooltip title="撤销上次智能修改">
               <Button
                 type="text"
                 icon={<UndoOutlined />}
@@ -850,7 +849,7 @@ export default function WritingLayer({
             </div>
           </div>
 
-          {/* AI Stats Summary */}
+          {/* 智能建议统计 */}
           <div style={{
             padding: '8px 16px',
             borderTop: '1px solid var(--border-color)',
@@ -885,21 +884,6 @@ export default function WritingLayer({
                 <div style={{ fontSize: 40, marginBottom: 12 }}>✍️</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
                   多智能体协作编辑空间
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.8, maxWidth: 460, margin: '0 auto' }}>
-                  这是你的专业编辑室，不是生成器。
-                  <br />
-                  系统搭好了节目骨架，你可以从任意一段开始写作。
-                  <br />
-                  右侧面板有五位 AI 协作角色待命——
-                  <br />
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                    ✨ 润色官 · 🎭 风格师 · 🧠 逻辑师 · ✂️ 裁剪师 · 🎯 开场结尾官
-                  </span>
-                  <br />
-                  <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>
-                    它们只提建议，所有修改需你手动确认。表达权始终在你。
-                  </span>
                 </div>
               </div>
             )}
@@ -957,7 +941,7 @@ export default function WritingLayer({
           </div>
         </div>
 
-        {/* ===== RIGHT: AI Agent Panel ===== */}
+        {/* ===== RIGHT: 智能协作面板 ===== */}
         <AgentPanel
           activeSegment={activeSegment}
           suggestions={suggestions}

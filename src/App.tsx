@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Layout, Button, Space, Typography, message, ConfigProvider, theme } from 'antd'
-import { PlayCircleOutlined, SettingOutlined } from '@ant-design/icons'
-import WorkflowCanvas, { STAGES } from './components/WorkflowCanvas'
-import NodeDetailPanel from './components/NodeDetailPanel'
-import LogPanel from './components/LogPanel'
+import { Layout, Button, Space, Typography, ConfigProvider, theme, Modal, Tooltip } from 'antd'
+import { CloseOutlined, FolderOpenOutlined, SaveOutlined, SettingOutlined } from '@ant-design/icons'
 import ApprovalModal from './components/ApprovalModal'
 import CreationStudio from './components/CreationStudio'
 import DiscoverPanel from './components/DiscoverPanel'
@@ -12,16 +9,36 @@ import WritingLayer from './components/writing'
 import SoundStudio from './components/SoundStudio'
 import PublishLayer from './components/PublishLayer'
 import SettingsPage from './components/SettingsPage'
-import type { Workflow, WorkflowCreateResult, ContentItem } from './types/workflow'
+import WorkflowSidebar from './components/WorkflowSidebar'
+import EpisodeManager from './components/EpisodeManager'
+import { STAGES } from './components/workflowStages'
+import type { Workflow, WorkflowCreateResult, WorkflowSummary, ContentItem } from './types/workflow'
 
-const { Header, Content, Footer } = Layout
+const { Header, Content } = Layout
 const { Title } = Typography
+
+type UiNotice = {
+  type: 'success' | 'warning' | 'error' | 'info'
+  text: string
+}
 
 declare global {
   interface Window {
     electronAPI: {
       createWorkflow: (config: Record<string, any>) => Promise<WorkflowCreateResult>
       getWorkflow: (id: string) => Promise<Workflow | null>
+      listWorkflows: () => Promise<WorkflowSummary[]>
+      openWorkflow: (id: string) => Promise<Workflow>
+      saveWorkflow: (id: string) => Promise<Workflow>
+      closeWorkflow: (id: string) => Promise<{ success: boolean }>
+      updateWorkflowMeta: (
+        id: string,
+        meta: { title: string; description: string; previewPath: string }
+      ) => Promise<Workflow>
+      duplicateWorkflow: (id: string) => Promise<Workflow>
+      deleteWorkflow: (id: string) => Promise<{ success: boolean }>
+      exportWorkflow: (id: string) => Promise<{ success: boolean; canceled?: boolean; path?: string }>
+      importWorkflow: () => Promise<{ success: boolean; canceled?: boolean; workflow?: Workflow; summary?: WorkflowSummary }>
       approveNode: (id: string, node: string, approved: boolean, output?: any) => Promise<{ status: string }>
       updateWorkflowState: (id: string, patch: Record<string, any>) => Promise<Workflow>
       runWorkflowNodes: (id: string, nodeNames: string[]) => Promise<Workflow>
@@ -34,7 +51,7 @@ declare global {
       }) => Promise<{ success: boolean; path: string; size: number; mimeType: string; durationSeconds: number }>
       openPath: (targetPath: string) => Promise<{ success: boolean; error?: string }>
       showItemInFolder: (targetPath: string) => Promise<{ success: boolean; error?: string }>
-      onWorkflowUpdate: (callback: (data: Workflow) => void) => void
+      onWorkflowUpdate: (callback: (data: Workflow | null) => void) => void
       onNeedApproval: (callback: (data: any) => void) => void
       onRadarUpdate: (callback: (data: {
         enabled: boolean
@@ -78,10 +95,11 @@ declare global {
 
 function App() {
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
-  const [selectedNode, setSelectedNode] = useState<string | null>(null)
+  const [workflowSummaries, setWorkflowSummaries] = useState<WorkflowSummary[]>([])
+  const [homePage, setHomePage] = useState<'blank' | 'episodes'>('episodes')
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [approvalVisible, setApprovalVisible] = useState(false)
   const [approvalData, setApprovalData] = useState<any>(null)
-  const [logPanelCollapsed, setLogPanelCollapsed] = useState(false)
   const [studioVisible, setStudioVisible] = useState(false)
   const [studioAutoOpened, setStudioAutoOpened] = useState(false)
   const [discoverVisible, setDiscoverVisible] = useState(false)
@@ -103,6 +121,61 @@ function App() {
     running: boolean
     contents: ContentItem[]
   } | null>(null)
+  const hasElectronBackend = Boolean(window.electronAPI?.getFetchSources)
+
+  const showNotice = (type: UiNotice['type'], text: string) => {
+    const prefix = type === 'error' ? '错误' : type === 'warning' ? '警告' : '提示'
+    console[type === 'error' ? 'error' : type === 'warning' ? 'warn' : 'log'](`[${prefix}] ${text}`)
+  }
+
+  const saveActiveWorkflow = async () => {
+    if (!workflow) return null
+    if (!window.electronAPI?.saveWorkflow) {
+      showNotice('warning', '当前浏览器预览没有 Electron 后端，无法保存节目')
+      return null
+    }
+    const saved = await window.electronAPI.saveWorkflow(workflow.id)
+    setWorkflow(saved)
+    setHasUnsavedChanges(false)
+    await loadWorkflowSummaries()
+    showNotice('success', '节目已保存')
+    return saved
+  }
+
+  const confirmSaveBeforeReplace = async () => {
+    if (!workflow || !hasUnsavedChanges) return true
+    return new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: '保存当前节目？',
+        content: '当前节目有未保存更改。保存后再继续，或选择不保存并丢弃这些更改。',
+        okText: '保存',
+        cancelText: '不保存',
+        centered: true,
+        async onOk() {
+          try {
+            await saveActiveWorkflow()
+            resolve(true)
+          } catch (error: any) {
+            showNotice('error', `保存失败：${error.message}`)
+            resolve(false)
+          }
+        },
+        onCancel() {
+          resolve(true)
+        },
+      })
+    })
+  }
+
+  const loadWorkflowSummaries = async () => {
+    if (!window.electronAPI?.listWorkflows) return
+    try {
+      const summaries = await window.electronAPI.listWorkflows()
+      setWorkflowSummaries(summaries)
+    } catch (error) {
+      console.error('Failed to load workflows:', error)
+    }
+  }
 
   // Close all full-screen panels (mutual exclusivity)
   const closeAllPanels = () => {
@@ -115,12 +188,42 @@ function App() {
     setSettingsVisible(false)
   }
 
+  const openStage = (stageId: string) => {
+    closeAllPanels()
+    setHomePage('blank')
+    if (stageId === 'ideate') {
+      setStudioVisible(true)
+    } else if (stageId === 'discover') {
+      setDiscoverVisible(true)
+    } else if (stageId === 'organize') {
+      setOrganizeVisible(true)
+    } else if (stageId === 'write') {
+      setWritingVisible(true)
+    } else if (stageId === 'produce') {
+      setSoundStudioVisible(true)
+    } else if (stageId === 'publish') {
+      setPublishVisible(true)
+    }
+  }
+
+  const openEpisodeManager = () => {
+    closeAllPanels()
+    setHomePage('episodes')
+    void loadWorkflowSummaries()
+  }
+
+  const returnToEpisodeManager = () => {
+    closeAllPanels()
+    setHomePage('episodes')
+    void loadWorkflowSummaries()
+  }
+
   // Load fetch sources and config
   useEffect(() => {
     if (!window.electronAPI?.getFetchSources) {
-      message.warning('当前浏览器预览没有 Electron 后端，部分执行能力不可用')
       return
     }
+    void loadWorkflowSummaries()
     window.electronAPI.getFetchSources()
       .then(sources => setFetchSources(sources))
       .catch(e => console.error('Failed to load fetch sources:', e))
@@ -144,6 +247,9 @@ function App() {
     if (!window.electronAPI?.onWorkflowUpdate) return
     window.electronAPI.onWorkflowUpdate((data) => {
       setWorkflow(data)
+      void loadWorkflowSummaries()
+
+      if (!data) return
 
       // Auto-open creation studio when organize completes and ideate begins
       if (!studioAutoOpened && data?.nodeExecutions) {
@@ -158,7 +264,7 @@ function App() {
                  data.nodeExecutions?.[n]?.status === 'completed'
           )
           if (organizeComplete && ideateStarted) {
-            setStudioVisible(true)
+            openStage('ideate')
             setStudioAutoOpened(true)
           }
         }
@@ -172,31 +278,44 @@ function App() {
     })
   }, [])
 
+  useEffect(() => {
+    setStudioAutoOpened(false)
+    setDiscoverCandidates(workflow?.state?.selected_materials || workflow?.state?.raw_contents || [])
+    setOrganizeCandidates(workflow?.state?.organize_ui?.candidates || workflow?.state?.cleaned_contents || [])
+  }, [workflow?.id])
+
   const handleStart = async () => {
     try {
       if (!window.electronAPI?.createWorkflow) {
-        message.warning('当前浏览器预览没有 Electron 后端，无法创建 episode')
+        showNotice('warning', '当前浏览器预览没有 Electron 后端，无法创建节目')
         return
       }
+      const canContinue = await confirmSaveBeforeReplace()
+      if (!canContinue) return
       const result = await window.electronAPI.createWorkflow({ autoRun: false })
       const created = await window.electronAPI.getWorkflow(result.workflowId)
       if (created) setWorkflow(created)
-      message.success(`已创建 Episode: ${result.episodeId}`)
+      setHasUnsavedChanges(true)
+      await loadWorkflowSummaries()
+      showNotice('success', `已创建节目：${result.episodeId}`)
+      openStage('discover')
     } catch (e: any) {
-      message.error(`Failed: ${e.message}`)
+      showNotice('error', `创建失败：${e.message}`)
     }
   }
 
   const ensureWorkflow = async () => {
     if (workflow) return workflow
     if (!window.electronAPI?.createWorkflow) {
-      message.warning('当前浏览器预览没有 Electron 后端，部分执行能力不可用')
+      showNotice('warning', '当前浏览器预览没有 Electron 后端，部分执行能力不可用')
       return null
     }
     const result = await window.electronAPI.createWorkflow({ autoRun: false })
     const created = await window.electronAPI.getWorkflow(result.workflowId)
     if (created) {
       setWorkflow(created)
+      setHasUnsavedChanges(true)
+      await loadWorkflowSummaries()
       return created
     }
     return null
@@ -207,6 +326,8 @@ function App() {
     if (!active) return null
     const updated = await window.electronAPI.updateWorkflowState(active.id, patch)
     setWorkflow(updated)
+    setHasUnsavedChanges(true)
+    void loadWorkflowSummaries()
     return updated
   }
 
@@ -215,7 +336,150 @@ function App() {
     if (!active) return null
     const updated = await window.electronAPI.runWorkflowNodes(active.id, nodeNames)
     setWorkflow(updated)
+    setHasUnsavedChanges(true)
+    void loadWorkflowSummaries()
     return updated
+  }
+
+  const handleOpenWorkflow = async (workflowId: string) => {
+    if (!window.electronAPI?.openWorkflow) {
+      showNotice('warning', '当前浏览器预览没有 Electron 后端，无法打开节目')
+      return
+    }
+    try {
+      if (workflow?.id === workflowId) {
+        openStage('discover')
+        return
+      }
+      if (workflow?.id !== workflowId) {
+        const canContinue = await confirmSaveBeforeReplace()
+        if (!canContinue) return
+      }
+      const opened = await window.electronAPI.openWorkflow(workflowId)
+      setWorkflow(opened)
+      setHasUnsavedChanges(false)
+      closeAllPanels()
+      await loadWorkflowSummaries()
+      showNotice('success', '已打开节目')
+      openStage('discover')
+    } catch (e: any) {
+      showNotice('error', `打开失败：${e.message}`)
+    }
+  }
+
+  const handleCloseWorkflow = async () => {
+    if (!workflow) return
+    const canContinue = await confirmSaveBeforeReplace()
+    if (!canContinue) return
+    if (window.electronAPI?.closeWorkflow) {
+      await window.electronAPI.closeWorkflow(workflow.id)
+    }
+    setWorkflow(null)
+    setHasUnsavedChanges(false)
+    closeAllPanels()
+    setHomePage('episodes')
+    await loadWorkflowSummaries()
+  }
+
+  const handleDeleteWorkflow = async (workflowId: string) => {
+    if (!window.electronAPI?.deleteWorkflow) {
+      showNotice('warning', '当前浏览器预览没有 Electron 后端，无法删除节目')
+      return
+    }
+    try {
+      if (workflow?.id === workflowId) {
+        const canContinue = await confirmSaveBeforeReplace()
+        if (!canContinue) return
+      }
+      await window.electronAPI.deleteWorkflow(workflowId)
+      if (workflow?.id === workflowId) {
+        setWorkflow(null)
+        setHasUnsavedChanges(false)
+        closeAllPanels()
+        setHomePage('episodes')
+      }
+      await loadWorkflowSummaries()
+      showNotice('success', '节目已删除')
+    } catch (e: any) {
+      showNotice('error', `删除失败：${e.message}`)
+    }
+  }
+
+  const handleImportWorkflow = async () => {
+    if (!window.electronAPI?.importWorkflow) {
+      showNotice('warning', '当前浏览器预览没有 Electron 后端，无法导入节目')
+      return
+    }
+    try {
+      const canContinue = await confirmSaveBeforeReplace()
+      if (!canContinue) return
+      const result = await window.electronAPI.importWorkflow()
+      if (result.canceled) return
+      if (result.workflow) {
+        setWorkflow(result.workflow)
+        setHasUnsavedChanges(true)
+      }
+      closeAllPanels()
+      await loadWorkflowSummaries()
+      showNotice('success', '节目已导入')
+      openStage('discover')
+    } catch (e: any) {
+      showNotice('error', `导入失败：${e.message}`)
+    }
+  }
+
+  const handleExportWorkflow = async (workflowId: string) => {
+    if (!window.electronAPI?.exportWorkflow) {
+      showNotice('warning', '当前浏览器预览没有 Electron 后端，无法导出节目')
+      return
+    }
+    try {
+      const result = await window.electronAPI.exportWorkflow(workflowId)
+      if (result.canceled) return
+      showNotice('success', `节目已导出：${result.path}`)
+    } catch (e: any) {
+      showNotice('error', `导出失败：${e.message}`)
+    }
+  }
+
+  const handleEditWorkflow = async (
+    workflowId: string,
+    patch: { title: string; description: string; previewPath: string }
+  ) => {
+    if (!window.electronAPI?.updateWorkflowMeta) {
+      showNotice('warning', '当前浏览器预览没有 Electron 后端，无法编辑节目')
+      return
+    }
+    try {
+      const updated = await window.electronAPI.updateWorkflowMeta(workflowId, patch)
+      if (workflow?.id === workflowId) {
+        setWorkflow(updated)
+        setHasUnsavedChanges(true)
+      }
+      await loadWorkflowSummaries()
+      showNotice('success', workflow?.id === workflowId ? '节目信息已更新，记得保存节目' : '节目信息已保存')
+    } catch (e: any) {
+      showNotice('error', `保存失败：${e.message}`)
+    }
+  }
+
+  const handleDuplicateWorkflow = async (workflowId: string) => {
+    if (!window.electronAPI?.duplicateWorkflow) {
+      showNotice('warning', '当前浏览器预览没有 Electron 后端，无法复制节目')
+      return
+    }
+    try {
+      const canContinue = await confirmSaveBeforeReplace()
+      if (!canContinue) return
+      const copied = await window.electronAPI.duplicateWorkflow(workflowId)
+      setWorkflow(copied)
+      setHasUnsavedChanges(true)
+      await loadWorkflowSummaries()
+      showNotice('success', '节目已复制，当前副本尚未保存')
+      openStage('discover')
+    } catch (e: any) {
+      showNotice('error', `复制失败：${e.message}`)
+    }
   }
 
   const handleApprove = async () => {
@@ -224,9 +488,10 @@ function App() {
       await window.electronAPI.approveNode(approvalData.workflowId, approvalData.nodeName, true)
       setApprovalVisible(false)
       setApprovalData(null)
-      message.success('已批准，工作流继续执行')
+      setHasUnsavedChanges(true)
+      showNotice('success', '已批准，工作流继续执行')
     } catch (e: any) {
-      message.error(`批准失败: ${e.message}`)
+      showNotice('error', `批准失败：${e.message}`)
     }
   }
 
@@ -236,13 +501,22 @@ function App() {
       await window.electronAPI.approveNode(approvalData.workflowId, approvalData.nodeName, false)
       setApprovalVisible(false)
       setApprovalData(null)
-      message.warning('已拒绝，工作流已停止')
+      setHasUnsavedChanges(true)
+      showNotice('warning', '已拒绝，工作流已停止')
     } catch (e: any) {
-      message.error(`拒绝失败: ${e.message}`)
+      showNotice('error', `拒绝失败：${e.message}`)
     }
   }
 
-  const logPanelHeight = logPanelCollapsed ? '40px' : '200px'
+  const activeStageId =
+    discoverVisible ? 'discover' :
+    organizeVisible ? 'organize' :
+    studioVisible ? 'ideate' :
+    writingVisible ? 'write' :
+    soundStudioVisible ? 'produce' :
+    publishVisible ? 'publish' :
+    null
+  const showWorkflowSidebar = Boolean(workflow && activeStageId)
 
   return (
     <ConfigProvider
@@ -278,32 +552,71 @@ function App() {
             </Title>
           </div>
           <Space size="small">
-            <Button 
-              type="primary" 
-              icon={<PlayCircleOutlined />}
-              onClick={handleStart}
-              style={{ 
-                background: 'var(--accent-primary)',
-                borderColor: 'var(--accent-primary)',
-                boxShadow: 'var(--shadow-sm)',
-                height: '32px',
-                fontSize: '13px'
-              }}
-            >
-              Create New Episode
-            </Button>
-            <Button 
-              icon={<SettingOutlined />} 
-              onClick={() => { closeAllPanels(); setSettingsVisible(true) }}
-              style={{ 
-                background: 'transparent', 
-                borderColor: 'var(--border-color)',
-                color: 'var(--text-secondary)',
-                height: '32px'
-              }}
-            >
-              Settings
-            </Button>
+            {workflow && (
+              <>
+                <Tooltip title={hasUnsavedChanges ? '保存节目' : '节目已保存'}>
+                  <Button
+                    icon={<SaveOutlined />}
+                    onClick={saveActiveWorkflow}
+                    disabled={!hasUnsavedChanges}
+                    aria-label="保存节目"
+                    style={{
+                      background: hasUnsavedChanges ? 'var(--accent-light)' : 'transparent',
+                      borderColor: hasUnsavedChanges ? 'var(--accent-primary)' : 'var(--border-color)',
+                      color: hasUnsavedChanges ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      height: '32px',
+                      width: '32px',
+                      padding: 0,
+                    }}
+                  />
+                </Tooltip>
+                <Tooltip title="关闭节目">
+                  <Button
+                    icon={<CloseOutlined />}
+                    onClick={handleCloseWorkflow}
+                    aria-label="关闭节目"
+                    style={{
+                      background: 'transparent',
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-secondary)',
+                      height: '32px',
+                      width: '32px',
+                      padding: 0,
+                    }}
+                  />
+                </Tooltip>
+              </>
+            )}
+            <Tooltip title="节目管理">
+              <Button
+                icon={<FolderOpenOutlined />}
+                onClick={openEpisodeManager}
+                aria-label="节目管理"
+                style={{
+                  background: homePage === 'episodes' ? 'var(--accent-light)' : 'transparent',
+                  borderColor: homePage === 'episodes' ? 'var(--accent-primary)' : 'var(--border-color)',
+                  color: homePage === 'episodes' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  height: '32px',
+                  width: '32px',
+                  padding: 0,
+                }}
+              />
+            </Tooltip>
+            <Tooltip title="设置">
+              <Button
+                icon={<SettingOutlined />}
+                onClick={() => { closeAllPanels(); setHomePage('blank'); setSettingsVisible(true) }}
+                aria-label="设置"
+                style={{
+                  background: 'transparent',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-secondary)',
+                  height: '32px',
+                  width: '32px',
+                  padding: 0,
+                }}
+              />
+            </Tooltip>
           </Space>
         </Header>
 
@@ -311,69 +624,43 @@ function App() {
           <Content style={{ 
             position: 'relative', 
             overflow: 'hidden', 
-            height: `calc(100vh - 52px - ${logPanelHeight})`,
+            height: 'calc(100vh - 52px)',
             display: 'flex',
             flexDirection: 'row',
             transition: 'height 0.3s ease'
           }}>
-            <div style={{ flex: 1, position: 'relative', height: '100%' }}>
-              <WorkflowCanvas 
-                workflow={workflow} 
-                onNodeClick={setSelectedNode}
-                onStageClick={(stageId) => {
-                  closeAllPanels()
-                  if (stageId === 'ideate') {
-                    setStudioVisible(true)
-                  } else if (stageId === 'discover') {
-                    setDiscoverVisible(true)
-                  } else if (stageId === 'organize') {
-                    setOrganizeVisible(true)
-                  } else if (stageId === 'write') {
-                    setWritingVisible(true)
-                  } else if (stageId === 'produce') {
-                    setSoundStudioVisible(true)
-                  } else if (stageId === 'publish') {
-                    setPublishVisible(true)
-                  }
-                }}
+            {showWorkflowSidebar && (
+              <WorkflowSidebar
+                workflow={workflow}
+                activeStageId={activeStageId}
+                onStageClick={openStage}
               />
-            </div>
-            
-            {selectedNode && (
-              <div style={{ 
-                width: '500px', 
-                height: '100%', 
-                borderLeft: '1px solid var(--border-color)',
-                background: 'var(--bg-secondary)',
-                boxShadow: 'var(--shadow-lg)',
-                zIndex: 20,
-                animation: 'slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-              }}>
-                <NodeDetailPanel 
-                  nodeName={selectedNode} 
-                  workflow={workflow}
-                  onClose={() => setSelectedNode(null)}
-                />
-              </div>
             )}
+            <main style={{
+              flex: 1,
+              minWidth: 0,
+              height: '100%',
+              overflow: 'auto',
+              background: 'var(--bg-primary)',
+              padding: homePage === 'episodes' ? '28px 32px' : 0,
+            }}>
+              {homePage === 'episodes' && (
+                <EpisodeManager
+                  episodes={workflowSummaries}
+                  activeWorkflowId={workflow?.id}
+                  activeWorkflowDirty={hasUnsavedChanges}
+                  hasElectronBackend={hasElectronBackend}
+                  onCreate={handleStart}
+                  onOpen={handleOpenWorkflow}
+                  onDelete={handleDeleteWorkflow}
+                  onDuplicate={handleDuplicateWorkflow}
+                  onImport={handleImportWorkflow}
+                  onExport={handleExportWorkflow}
+                  onEdit={handleEditWorkflow}
+                />
+              )}
+            </main>
           </Content>
-
-          <Footer style={{ 
-            height: logPanelHeight, 
-            padding: 0, 
-            background: 'var(--bg-secondary)',
-            borderTop: '1px solid var(--border-color)',
-            zIndex: 10,
-            transition: 'height 0.3s ease',
-            overflow: 'hidden',
-            boxShadow: '0 -2px 10px rgba(0,0,0,0.02)'
-          }}>
-            <LogPanel 
-              workflow={workflow} 
-              collapsed={logPanelCollapsed}
-              onToggle={() => setLogPanelCollapsed(!logPanelCollapsed)}
-            />
-          </Footer>
         </Layout>
 
         <ApprovalModal
@@ -384,15 +671,29 @@ function App() {
         />
 
         <DiscoverPanel
+          key={`discover-${workflow?.id || 'none'}`}
           visible={discoverVisible}
-          onClose={() => setDiscoverVisible(false)}
+          onClose={returnToEpisodeManager}
           fetchContents={(radarState?.enabled || radarState?.contents?.length)
             ? (radarState?.contents || [])
             : (workflow?.state?.fetch_contents || [])}
           manualContents={workflow?.state?.manual_contents || []}
+          initialCandidateItems={(workflow?.state?.selected_materials || []) as any}
+          initialSavedToInbox={(workflow?.state?.discover_ui?.savedToInbox || []) as any}
+          initialInboxStatuses={(workflow?.state?.discover_ui?.inboxStatuses || []) as any}
           fetchSources={fetchSources}
           fetchConfig={fetchConfig}
           radarState={radarState}
+          onStateChange={(state) => {
+            void updateWorkflowPatch({
+              discover_ui: {
+                candidateItems: state.candidateItems,
+                savedToInbox: state.savedToInbox,
+                inboxStatuses: state.inboxStatuses,
+              },
+              selected_materials: state.candidates,
+            })
+          }}
           onRadarRunOnce={async (values) => {
             return await window.electronAPI.radarRunOnce(values)
           }}
@@ -427,12 +728,22 @@ function App() {
         />
 
         <OrganizePanel
+          key={`organize-${workflow?.id || 'none'}`}
           visible={organizeVisible}
-          onClose={() => setOrganizeVisible(false)}
+          onClose={returnToEpisodeManager}
           contents={discoverCandidates.length > 0
             ? discoverCandidates
             : (workflow?.state?.raw_contents || workflow?.state?.fetch_contents || [])}
           userTopic={(fetchConfig?.topic as string) || ''}
+          initialCandidates={(workflow?.state?.organize_ui?.candidates || workflow?.state?.cleaned_contents || []) as any}
+          initialIgnoredIds={(workflow?.state?.organize_ui?.ignoredIds || []) as any}
+          initialMode={(workflow?.state?.organize_ui?.mode || 'quick') as any}
+          onStateChange={(state) => {
+            void updateWorkflowPatch({
+              organize_ui: state,
+              cleaned_contents: state.candidates,
+            })
+          }}
           onProceedToIdeate={(candidates) => {
             setOrganizeCandidates(candidates)
             void updateWorkflowPatch({
@@ -445,12 +756,24 @@ function App() {
         />
 
         <CreationStudio
+          key={`creation-${workflow?.id || 'none'}`}
           visible={studioVisible}
-          onClose={() => setStudioVisible(false)}
+          onClose={returnToEpisodeManager}
           rawContents={organizeCandidates.length > 0
             ? organizeCandidates
             : (workflow?.state?.raw_contents || [])}
           selectedTopic={workflow?.state?.selected_topic}
+          initialBlocks={(workflow?.state?.episode_brief?.blocks || []) as any}
+          onStateChange={(structure) => {
+            void updateWorkflowPatch({
+              selected_topic: {
+                title: structure?.topic?.title || workflow?.state?.selected_topic?.title || '',
+                description: structure?.topic?.description || workflow?.state?.selected_topic?.description || '',
+              },
+              selected_materials: structure?.materials || workflow?.state?.selected_materials || [],
+              episode_brief: structure,
+            })
+          }}
           onConfirm={(structure) => {
             void updateWorkflowPatch({
               selected_topic: {
@@ -466,8 +789,9 @@ function App() {
         />
 
         <WritingLayer
+          key={`writing-${workflow?.id || 'none'}`}
           visible={writingVisible}
-          onClose={() => setWritingVisible(false)}
+          onClose={returnToEpisodeManager}
           workflow={workflow}
           episodeTitle={workflow?.state?.selected_topic?.title || ''}
           episodeDesc={workflow?.state?.selected_topic?.description || ''}
@@ -482,8 +806,9 @@ function App() {
         />
 
         <SoundStudio
+          key={`sound-${workflow?.id || 'none'}`}
           visible={soundStudioVisible}
-          onClose={() => setSoundStudioVisible(false)}
+          onClose={returnToEpisodeManager}
           workflow={workflow}
           episodeTitle={workflow?.state?.selected_topic?.title || ''}
           onSaveRecording={async (payload) => {
@@ -512,8 +837,9 @@ function App() {
           }}
         />
         <PublishLayer
+          key={`publish-${workflow?.id || 'none'}`}
           visible={publishVisible}
-          onClose={() => setPublishVisible(false)}
+          onClose={returnToEpisodeManager}
           workflow={workflow}
           episodeTitle={workflow?.state?.selected_topic?.title || ''}
           episodeDesc={workflow?.state?.selected_topic?.description || ''}
@@ -530,6 +856,7 @@ function App() {
 
         <SettingsPage
           visible={settingsVisible}
+          workflow={workflow}
           onClose={() => setSettingsVisible(false)}
         />
       </Layout>

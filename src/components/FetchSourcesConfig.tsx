@@ -57,7 +57,7 @@ export default function FetchSourcesConfig({ value = [], onChange }: Props) {
   if (loading) {
     return (
       <div style={{ padding: 24, textAlign: 'center' }}>
-        <Spin tip="Loading sources..." />
+        <Spin tip="正在加载信息源…" />
       </div>
     )
   }
@@ -65,7 +65,7 @@ export default function FetchSourcesConfig({ value = [], onChange }: Props) {
   if (error) {
     return (
       <Alert
-        message="Failed to load sources"
+        message="信息源加载失败"
         description={error}
         type="error"
         showIcon
@@ -77,8 +77,8 @@ export default function FetchSourcesConfig({ value = [], onChange }: Props) {
   if (sources.length === 0) {
     return (
       <Alert
-        message="No sources available"
-        description="Please add source files in nodes/fetch/sources/ directory"
+        message="暂无可用信息源"
+        description="请在 nodes/fetch/sources/ 目录中添加信息源文件"
         type="warning"
         showIcon
         style={{ margin: 16 }}
@@ -88,7 +88,7 @@ export default function FetchSourcesConfig({ value = [], onChange }: Props) {
 
   return (
     <div style={{ padding: '8px 0' }}>
-      <Text strong style={{ color: 'var(--text-primary)' }}>Select sources to enable:</Text>
+      <Text strong style={{ color: 'var(--text-primary)' }}>选择要启用的信息源：</Text>
       <Divider style={{ margin: '12px 0', borderColor: 'var(--border-color)' }} />
       
       <Space direction="vertical" style={{ width: '100%' }} size="middle">
@@ -127,7 +127,7 @@ export default function FetchSourcesConfig({ value = [], onChange }: Props) {
       <Divider style={{ margin: '16px 0', borderColor: 'var(--border-color)' }} />
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          {selectedSources.length} sources selected
+          已选择 {selectedSources.length} 个信息源
         </Text>
       </div>
     </div>

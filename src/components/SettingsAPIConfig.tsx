@@ -24,8 +24,9 @@ import type {
   NodeOverrideMode,
   TextMode,
   CostQualityBalance,
+  AudioProvider,
 } from '../types/settings'
-import { fetchModelsWithCache } from '../utils/modelFetcher'
+import { fetchModels } from '../utils/modelFetcher'
 
 // ============================================================
 // Props
@@ -56,14 +57,19 @@ const STAGE_META: Record<StageId, { label: string; icon: string; desc: string; d
   organize: { label: '整理层', icon: '📋', desc: '素材整理与分类', defaultCap: 'text' },
   ideate: { label: '构思层', icon: '💡', desc: '选题与结构构思', defaultCap: 'reasoning' },
   write: { label: '写作层', icon: '✍️', desc: '内容撰写与润色', defaultCap: 'text' },
-  produce: { label: '声音制作层', icon: '🎙️', desc: 'AI 语音生成', defaultCap: 'audio' },
+  produce: { label: '声音制作层', icon: '🎙️', desc: '智能语音生成', defaultCap: 'audio' },
   publish: { label: '发布层', icon: '🚀', desc: '合规检查与发布', defaultCap: 'compliance' },
 }
 
 const GLOBAL_CAPS: { key: 'text' | 'search' | 'audio'; label: string; icon: React.ReactNode; desc: string }[] = [
   { key: 'text', label: '文本与推理能力', icon: <FileTextOutlined />, desc: '支持文本理解、深度推理、合规审查等' },
   { key: 'search', label: '信息获取能力', icon: <SearchOutlined />, desc: '支持新闻搜索、数据抓取、实时查询' },
-  { key: 'audio', label: '音频生成能力', icon: <SoundOutlined />, desc: '支持 AI 语音合成、音色选择' },
+  { key: 'audio', label: '音频生成能力', icon: <SoundOutlined />, desc: '支持智能语音合成、音色选择' },
+]
+
+const AUDIO_PROVIDER_OPTIONS: Array<{ key: AudioProvider; label: string; desc: string }> = [
+  { key: 'edge-tts', label: 'Edge TTS', desc: '本地调用 edge-tts，无需 API Key' },
+  { key: 'openai-compatible', label: 'OpenAI 兼容语音', desc: '调用 /audio/speech，使用 /models 测试连接' },
 ]
 
 // ============================================================
@@ -258,7 +264,7 @@ function NodeOverrideCard({ stageId, settings, updateSettings }: {
       if (!nodeConfig.apiBase || !nodeConfig.apiKey) {
         throw new Error('请先填写 API Base 与 API Key')
       }
-      await fetchModelsWithCache(nodeConfig.apiBase, nodeConfig.apiKey)
+      await fetchModels(nodeConfig.apiBase, nodeConfig.apiKey)
       success = true
     } catch {
       success = false
@@ -287,7 +293,7 @@ function NodeOverrideCard({ stageId, settings, updateSettings }: {
     }
     setModelLoading(prev => ({ ...prev, [modelKey]: true }))
     try {
-      const models = await fetchModelsWithCache(nodeConfig.apiBase, nodeConfig.apiKey)
+      const models = await fetchModels(nodeConfig.apiBase, nodeConfig.apiKey)
       setModelOptions(prev => ({ ...prev, [modelKey]: models }))
       message.success(`已获取 ${models.length} 个模型`)
     } catch (error: any) {
@@ -621,17 +627,22 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
     const statusKey = `${capKey}ConnectionStatus` as const
     const apiBase = settings.apiConfig.global[`${capKey}ApiBase` as const]
     const apiKey = settings.apiConfig.global[`${capKey}ApiKey` as const]
+    const audioProvider = settings.apiConfig.global.audioProvider
     updateSettings('apiConfig', c => ({
       ...c,
       global: { ...c.global, [statusKey]: 'testing' as const },
     }))
     let success = false
     try {
+      if (capKey === 'audio' && audioProvider === 'edge-tts') {
+        success = true
+      } else {
       if (!apiBase || !apiKey) {
         throw new Error('请先填写 API Base 与 API Key')
       }
-      await fetchModelsWithCache(apiBase, apiKey)
+      await fetchModels(apiBase, apiKey)
       success = true
+      }
     } catch {
       success = false
     }
@@ -658,7 +669,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
     }
     setModelLoading(prev => ({ ...prev, [modelKey]: true }))
     try {
-      const models = await fetchModelsWithCache(apiBase, apiKey)
+      const models = await fetchModels(apiBase, apiKey)
       setModelOptions(prev => ({ ...prev, [modelKey]: models }))
       message.success(`已获取 ${models.length} 个模型`)
     } catch (error: any) {
@@ -674,10 +685,10 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <span style={{ fontSize: 16, color: 'var(--accent-primary)' }}><ThunderboltOutlined /></span>
-          <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>AI 能力与接口配置</span>
+          <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>智能能力与接口配置</span>
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-tertiary)', paddingLeft: 24 }}>
-          配置系统各环节使用的 AI 能力来源，支持全局设置与节点级独立配置
+          配置系统各环节使用的智能能力来源，支持全局设置与节点级独立配置
         </div>
       </div>
 
@@ -712,6 +723,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
             const apiBase = settings.apiConfig.global[apiBaseKey] as string
             const apiModel = settings.apiConfig.global[apiModelKey] as string
             const status = settings.apiConfig.global[statusKey] as APIConnectionStatus
+            const audioProvider = settings.apiConfig.global.audioProvider
             const modelKey = `global-${cap.key}`
 
             return (
@@ -746,6 +758,41 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
                     }))
                   }}
                 />
+
+                {cap.key === 'audio' && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                      音频生成方式
+                    </div>
+                    <select
+                      value={audioProvider}
+                      onChange={e => updateSettings('apiConfig', c => ({
+                        ...c,
+                        global: {
+                          ...c.global,
+                          audioProvider: e.target.value as AudioProvider,
+                          audioConnectionStatus: 'untested',
+                        },
+                      }))}
+                      style={{
+                        width: '100%',
+                        height: 34,
+                        borderRadius: 8,
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-secondary)',
+                        color: 'var(--text-primary)',
+                        padding: '0 10px',
+                        fontSize: 12,
+                      }}
+                    >
+                      {AUDIO_PROVIDER_OPTIONS.map(provider => (
+                        <option key={provider.key} value={provider.key}>
+                          {provider.label}：{provider.desc}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div style={{ marginTop: 10 }}>
                   <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
@@ -798,7 +845,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
                   </div>
                 </div>
 
-                {isSet && (
+                {(isSet || (cap.key === 'audio' && audioProvider === 'edge-tts')) && (
                   <div style={{ marginTop: 8 }}>
                     <Button
                       size="small"
@@ -862,7 +909,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
           节点级能力配置
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 16 }}>
-          为各创作环节单独设置 AI 能力来源。默认跟随全局配置，可按需自定义。
+          为各创作环节单独设置智能能力来源。默认跟随全局配置，可按需自定义。
         </div>
 
         {(Object.keys(STAGE_META) as StageId[]).map(stageId => (

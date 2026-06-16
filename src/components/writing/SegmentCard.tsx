@@ -16,6 +16,7 @@ import {
 } from './types'
 
 const { TextArea } = Input
+const STATUS_OPTIONS: SegmentStatus[] = ['draft', 'editing', 'polished']
 
 interface SegmentCardProps {
   segment: WritingSegment
@@ -85,10 +86,12 @@ export default function SegmentCard({
       className="writing-segment-card"
       style={{
         marginBottom: 12,
+        position: 'relative',
+        zIndex: showToneMenu ? 20 : 1,
         borderRadius: 12,
         border: `1.5px solid ${isActive ? cfg.color : 'var(--border-color)'}`,
         background: 'var(--bg-secondary)',
-        overflow: 'hidden',
+        overflow: showToneMenu ? 'visible' : 'hidden',
         transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
         boxShadow: isActive ? `0 0 0 3px ${cfg.color}12, var(--shadow-md)` : 'var(--shadow-sm)',
         animation: 'writingCardIn 0.3s ease-out',
@@ -143,7 +146,7 @@ export default function SegmentCard({
             placeholder={
               segment.type === 'opening' ? '在这里写下开场白…\n\n可以用一个问题引起好奇，或直接抛出话题。' :
               segment.type === 'closing' ? '总结核心观点，留下回味…\n\n可以给听众一个思考的问题或行动建议。' :
-              '在这里写下你的想法…\n\n选中文本可调用AI协作角色进行局部优化。'
+              '在这里写下你的想法…\n\n选中文本可调用智能协作角色进行局部优化。'
             }
             autoSize={{ minRows: 4, maxRows: 16 }}
             style={{
@@ -197,7 +200,7 @@ export default function SegmentCard({
             {/* Left: tone selector + status */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {/* Tone selector */}
-              <div ref={toneRef} style={{ position: 'relative' }}>
+              <div ref={toneRef} style={{ position: 'relative', zIndex: showToneMenu ? 30 : 1 }}>
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowToneMenu(!showToneMenu) }}
                   className="writing-tone-btn"
@@ -221,7 +224,7 @@ export default function SegmentCard({
                 </button>
                 {showToneMenu && (
                   <div style={{
-                    position: 'absolute', left: 0, top: 30, zIndex: 100,
+                    position: 'absolute', left: 0, top: 30, zIndex: 40,
                     background: 'var(--bg-secondary)', borderRadius: 10,
                     border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-lg)',
                     padding: 4, minWidth: 140,
@@ -252,17 +255,14 @@ export default function SegmentCard({
                 )}
               </div>
 
-              {/* Status toggle */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  const order: SegmentStatus[] = ['draft', 'editing', 'polished']
-                  const idx = order.indexOf(segment.status)
-                  onStatusChange(order[(idx + 1) % order.length])
-                }}
+              {/* Status selector */}
+              <select
+                value={segment.status}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => onStatusChange(e.target.value as SegmentStatus)}
                 style={{
                   background: statusCfg.bg,
-                  border: 'none',
+                  border: `1px solid ${statusCfg.color}33`,
                   borderRadius: 6,
                   padding: '3px 8px',
                   fontSize: 10,
@@ -270,10 +270,15 @@ export default function SegmentCard({
                   cursor: 'pointer',
                   fontWeight: 500,
                   transition: 'all 0.15s ease',
+                  outline: 'none',
                 }}
               >
-                点击切换状态
-              </button>
+                {STATUS_OPTIONS.map(status => (
+                  <option key={status} value={status}>
+                    {STATUS_CONFIG[status].label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Right: char count */}

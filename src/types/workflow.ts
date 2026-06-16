@@ -24,6 +24,10 @@ export interface PodcastState {
   rss_path: string
   publish_status: Record<string, any>
   subtitle_path: string
+  discover_ui?: Record<string, any>
+  organize_ui?: Record<string, any>
+  episode_brief?: Record<string, any>
+  writing_meta?: Record<string, any>
 }
 
 export interface ContentItem {
@@ -110,4 +114,17 @@ export interface Workflow {
 export interface WorkflowCreateResult {
   workflowId: string
   episodeId: string
+}
+
+export interface WorkflowSummary {
+  id: string
+  episodeId: string
+  title: string
+  description?: string
+  status: Workflow['status']
+  createdAt: string
+  updatedAt?: string
+  previewPath?: string
+  isCurrent?: boolean
+  isSaved?: boolean
 }

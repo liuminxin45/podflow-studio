@@ -75,33 +75,7 @@ type PersistedDiscoverCandidates = {
   inboxStatuses?: Array<[number, CardStatus]>
 }
 
-function loadPersistedDiscoverCandidates(): PersistedDiscoverCandidates {
-  try {
-    if (typeof window === 'undefined') return {}
-    const raw = window.localStorage.getItem(DISCOVER_CANDIDATES_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw)
-    return {
-      candidateItems: Array.isArray(parsed?.candidateItems) ? parsed.candidateItems : [],
-      savedToInbox: Array.isArray(parsed?.savedToInbox) ? parsed.savedToInbox : [],
-      inboxStatuses: Array.isArray(parsed?.inboxStatuses) ? parsed.inboxStatuses : [],
-    }
-  } catch {
-    return {}
-  }
-}
-
-function savePersistedDiscoverCandidates(data: PersistedDiscoverCandidates) {
-  try {
-    if (typeof window === 'undefined') return
-    window.localStorage.setItem(DISCOVER_CANDIDATES_KEY, JSON.stringify(data))
-  } catch {
-    // ignore localStorage failures
-  }
-}
-
 const DISCOVER_PREFS_KEY = 'discover.panel.prefs.v1'
-const DISCOVER_CANDIDATES_KEY = 'discover.panel.candidates.v1'
 
 function loadDiscoverPrefs(): Partial<DiscoverPrefs> {
   try {
@@ -156,7 +130,11 @@ interface Props {
   onClose: () => void
   fetchContents: ContentItem[]
   manualContents: ContentItem[]
+  initialCandidateItems?: EnrichedItem[]
+  initialSavedToInbox?: EnrichedItem[]
+  initialInboxStatuses?: Array<[number, CardStatus]>
   onProceedToOrganize?: (candidates: EnrichedItem[]) => void
+  onStateChange?: (state: PersistedDiscoverCandidates & { candidates: EnrichedItem[] }) => void
   fetchSources?: Array<{ id: string; name: string; description: string }>
   fetchConfig?: Record<string, any>
   onFetchConfigSave?: (config: Record<string, any>) => Promise<void>
@@ -809,7 +787,11 @@ export default function DiscoverPanel({
   onClose,
   fetchContents = [],
   manualContents = [],
+  initialCandidateItems = [],
+  initialSavedToInbox = [],
+  initialInboxStatuses = [],
   onProceedToOrganize,
+  onStateChange,
   fetchSources = [],
   fetchConfig = {},
   onFetchConfigSave,
@@ -819,7 +801,11 @@ export default function DiscoverPanel({
   onUpdateContents,
 }: Props) {
   const initialPrefs = loadDiscoverPrefs()
-  const initialCandidateState = loadPersistedDiscoverCandidates()
+  const initialCandidateState: PersistedDiscoverCandidates = {
+    candidateItems: initialCandidateItems,
+    savedToInbox: initialSavedToInbox,
+    inboxStatuses: initialInboxStatuses,
+  }
 
   // Config modal
   const [fetchModalVisible, setFetchModalVisible] = useState(false)
@@ -904,15 +890,6 @@ export default function DiscoverPanel({
     saveDiscoverPrefs({ sensitivity, freshness, viewMode, llmAutoTagEnabled, smartRankMode })
   }, [sensitivity, freshness, viewMode, llmAutoTagEnabled, smartRankMode])
 
-  // Persist candidate/inbox state locally so it survives refresh/crashes.
-  useEffect(() => {
-    savePersistedDiscoverCandidates({
-      candidateItems,
-      savedToInbox,
-      inboxStatuses: Array.from(inboxStatuses.entries()),
-    })
-  }, [candidateItems, savedToInbox, inboxStatuses])
-
   // ── Auto-tag: ONLY when toggle is ON + LLM config ready ───
   useEffect(() => {
     if (!visible || !llmAutoTagEnabled || !llmConfigReady || fetchContentsRef.current.length === 0) return
@@ -976,7 +953,7 @@ export default function DiscoverPanel({
     abortControllerRef.current = null
     setClassifyProgress(prev =>
       prev.status === 'running'
-        ? { ...prev, status: 'stopped', detail: '已暂停（关闭了AI标签）' }
+        ? { ...prev, status: 'stopped', detail: '已暂停（关闭了智能标签）' }
         : prev,
     )
   }, [visible, llmAutoTagEnabled])
@@ -1260,6 +1237,41 @@ export default function DiscoverPanel({
     return [...manual, ...savedToInbox]
   }, [manualContents, savedToInbox])
 
+  useEffect(() => {
+    if (!visible) return
+    const candidates: EnrichedItem[] = []
+    const seen = new Set<string>()
+    for (const item of candidateItems) {
+      const key = getContentIdentity(item)
+      if (!seen.has(key)) {
+        seen.add(key)
+        candidates.push(item)
+      }
+    }
+    for (const item of fetchContents) {
+      const key = getContentIdentity(item)
+      if (candidateSet.has(key) && !seen.has(key)) {
+        seen.add(key)
+        candidates.push({ ...item, _source_channel: 'auto' })
+      }
+    }
+    inboxStatuses.forEach((status, idx) => {
+      if (status === 'candidate' && allInbox[idx]) {
+        const key = getContentIdentity(allInbox[idx])
+        if (!seen.has(key)) {
+          seen.add(key)
+          candidates.push(allInbox[idx])
+        }
+      }
+    })
+    onStateChange?.({
+      candidateItems,
+      savedToInbox,
+      inboxStatuses: Array.from(inboxStatuses.entries()),
+      candidates,
+    })
+  }, [visible, candidateItems, savedToInbox, inboxStatuses, candidateSet, fetchContents, allInbox])
+
   // ── Counts ────────────────────────────────────────────────
   const radarCandidateCount = candidateSet.size
   const inboxCandidateCount = Array.from(inboxStatuses.values()).filter(s => s === 'candidate').length
@@ -1356,8 +1368,7 @@ export default function DiscoverPanel({
       }
     })
     onProceedToOrganize?.(candidates)
-    onClose()
-  }, [candidateItems, candidateSet, inboxStatuses, fetchContents, allInbox, onProceedToOrganize, onClose])
+  }, [candidateItems, candidateSet, inboxStatuses, fetchContents, allInbox, onProceedToOrganize])
 
   const handleAddHighlightsToCandidates = useCallback(() => {
     if (todayHighlights.length === 0) return
@@ -1404,7 +1415,7 @@ export default function DiscoverPanel({
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
+      position: 'fixed', top: 52, right: 0, bottom: 0, left: 148, zIndex: 1000,
       background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column',
     }}>
 
@@ -1602,8 +1613,8 @@ export default function DiscoverPanel({
             {/* LLM Auto-Tag Toggle */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <Tooltip title={llmAutoTagEnabled
-                ? `AI自动标签已开启${llmConfig ? ` (${llmConfig.model})` : ' (无LLM配置)'}`
-                : '开启后，新采集的新闻将自动用AI分类打标签'
+                ? `智能标签已开启${llmConfig ? `（${llmConfig.model}）` : '（无大模型配置）'}`
+                : '开启后，新采集的新闻将自动用大模型分类打标签'
               }>
                 <div
                   onClick={() => {
@@ -1631,7 +1642,7 @@ export default function DiscoverPanel({
                     fontSize: 10, fontWeight: llmAutoTagEnabled ? 600 : 400, whiteSpace: 'nowrap',
                     color: llmAutoTagEnabled ? 'var(--accent-primary)' : 'var(--text-tertiary)',
                   }}>
-                    AI标签
+                    智能标签
                   </span>
                   {llmAutoTagEnabled && classifyProgress.status === 'running' && (
                     <LoadingOutlined style={{ fontSize: 9, color: 'var(--accent-primary)' }} />
@@ -1854,7 +1865,7 @@ export default function DiscoverPanel({
                     {untaggedCount} 条新闻未分类
                   </span>
                   <span style={{ color: 'var(--text-tertiary)' }}>
-                    开启「AI标签」后自动分类
+                    开启“智能标签”后自动分类
                   </span>
                   <span
                     onClick={() => { setLlmAutoTagEnabled(true); setRetryTrigger(n => n + 1) }}
@@ -1870,7 +1881,7 @@ export default function DiscoverPanel({
                 <>
                   <RobotOutlined style={{ fontSize: 11, color: '#10b981' }} />
                   <span style={{ color: '#10b981', fontWeight: 500 }}>
-                    AI分类完成
+                    智能分类完成
                   </span>
                   <span style={{ color: 'var(--text-tertiary)' }}>
                     {classifyProgress.tagged} 条已分类
@@ -1893,7 +1904,7 @@ export default function DiscoverPanel({
                   )}
                   {classifyProgress.untagged === 0 && (
                     <span style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', fontSize: 10 }}>
-                      纯AI · {llmConfig?.model || ''}
+                      纯大模型 · {llmConfig?.model || ''}
                     </span>
                   )}
                 </>
@@ -2082,7 +2093,7 @@ export default function DiscoverPanel({
                         }}>
                           <RobotOutlined style={{ fontSize: 11, color: 'var(--text-tertiary)' }} />
                           <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginRight: 4 }}>
-                            纯AI分类
+                            纯大模型分类
                           </span>
                           {groups.map(g => (
                             <Tag

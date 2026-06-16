@@ -26,6 +26,7 @@ import type { Workflow } from '../types/workflow'
 // ============================================================
 
 type StudioMode = 'ai' | 'recording'
+type AudioProvider = 'edge-tts' | 'openai-compatible'
 type VoiceStyle = 'natural' | 'steady' | 'deep' | 'relaxed' | 'warm' | 'energetic'
 type EmotionLevel = 'subtle' | 'moderate' | 'expressive'
 type SpeedLevel = 'slower' | 'normal' | 'faster'
@@ -116,6 +117,29 @@ const VOICE_STYLES: Array<{ key: VoiceStyle; label: string; desc: string; icon: 
   { key: 'energetic', label: '活力', desc: '充满激情，富有感染力', icon: '⚡' },
 ]
 
+const AUDIO_PROVIDERS: Array<{ key: AudioProvider; label: string; desc: string }> = [
+  { key: 'edge-tts', label: 'Edge TTS', desc: '本地调用 edge-tts，无需 API Key' },
+  { key: 'openai-compatible', label: 'OpenAI 兼容语音', desc: '调用 /audio/speech，需配置 API Key、Base 和模型' },
+]
+
+const VOICE_TO_EDGE_VOICE: Record<VoiceStyle, string> = {
+  natural: 'zh-CN-XiaoxiaoNeural',
+  steady: 'zh-CN-YunjianNeural',
+  deep: 'zh-CN-YunxiNeural',
+  relaxed: 'zh-CN-XiaoxiaoNeural',
+  warm: 'zh-CN-XiaoxiaoNeural',
+  energetic: 'zh-CN-XiaoyiNeural',
+}
+
+const VOICE_TO_OPENAI_VOICE: Record<VoiceStyle, string> = {
+  natural: 'alloy',
+  steady: 'onyx',
+  deep: 'onyx',
+  relaxed: 'nova',
+  warm: 'shimmer',
+  energetic: 'echo',
+}
+
 const EMOTION_LEVELS: Array<{ key: EmotionLevel; label: string; desc: string }> = [
   { key: 'subtle', label: '克制', desc: '平稳内敛' },
   { key: 'moderate', label: '适中', desc: '自然流露' },
@@ -180,14 +204,6 @@ const SEGMENT_BGM_OPTIONS: Array<{ key: string; label: string; icon: string }> =
   { key: 'warm', label: '温暖', icon: '🌅' },
   { key: 'reflective', label: '沉思', icon: '💭' },
   { key: 'none', label: '纯人声', icon: '🔇' },
-]
-
-const DEMO_SEGMENTS: ScriptSegment[] = [
-  { id: 'seg_opening', label: '开场', icon: '🎬', color: '#f59e0b', content: '欢迎来到本期节目，今天我们来聊一个很多人都在关注的话题…', estimatedSeconds: 90 },
-  { id: 'seg_main1', label: '主线一', icon: '📌', color: '#2563eb', content: '首先，让我们从最核心的问题说起…', estimatedSeconds: 180 },
-  { id: 'seg_main2', label: '主线二', icon: '📌', color: '#8b5cf6', content: '接下来，我想从另一个角度来看这件事…', estimatedSeconds: 180 },
-  { id: 'seg_discuss', label: '延伸讨论', icon: '💬', color: '#06b6d4', content: '说到这里，其实还有一个很值得思考的点…', estimatedSeconds: 150 },
-  { id: 'seg_closing', label: '结尾', icon: '🎤', color: '#10b981', content: '好了，今天就聊到这里。希望这期节目能给你一些新的思考…', estimatedSeconds: 60 },
 ]
 
 function formatTime(seconds: number): string {
@@ -834,6 +850,8 @@ export default function SoundStudio({
   const [mode, setMode] = useState<StudioMode>('ai')
 
   // AI voice settings
+  const [audioProvider, setAudioProvider] = useState<AudioProvider>('edge-tts')
+  const [ttsNodeConfig, setTtsNodeConfig] = useState<Record<string, any>>({})
   const [voiceStyle, setVoiceStyle] = useState<VoiceStyle>('natural')
   const [emotionLevel, setEmotionLevel] = useState<EmotionLevel>('moderate')
   const [speedLevel, setSpeedLevel] = useState<SpeedLevel>('normal')
@@ -858,7 +876,7 @@ export default function SoundStudio({
 
   const segments = useMemo<ScriptSegment[]>(() => {
     const stages = workflow?.state?.stages || []
-    if (!stages.length) return DEMO_SEGMENTS
+    if (!stages.length) return []
     return stages.map((stage: any, index: number) => ({
       id: String(stage.id || `seg_${index + 1}`),
       label: String(stage.label || `第 ${index + 1} 段`),
@@ -893,22 +911,50 @@ export default function SoundStudio({
   const totalDuration = useMemo(() => segments.reduce((sum, s) => sum + s.estimatedSeconds, 0), [segments])
   const activeSegment = segments.find(s => s.id === activeSegmentId)
   const finalAudioPath = workflow?.state?.final_audio_path || ''
+  const isDemoScript = !workflow?.state?.stages?.length
 
   // Recording counts
   const recordedCount = Object.values(recordings).filter(r => r.status === 'recorded').length
 
   useEffect(() => {
+    if (!visible || !window.electronAPI?.loadNodeConfig) return
+    window.electronAPI.loadNodeConfig('tts')
+      .then(config => {
+        if (!config) return
+        setTtsNodeConfig(config)
+        const engine = config.engine === 'openai-compatible' ? 'openai-compatible' : 'edge-tts'
+        setAudioProvider(engine)
+      })
+      .catch(error => {
+        console.error('Failed to load tts config:', error)
+      })
+  }, [visible])
+
+  useEffect(() => {
+    const savedRecordings = workflow?.state?.recording_segments || []
+    const savedBySegment = new Map(savedRecordings.map((item: any) => [String(item.segmentId), item]))
     setRecordings(prev => {
       const next: Record<string, RecordingSegment> = {}
       for (const seg of segments) {
-        next[seg.id] = prev[seg.id] || { segmentId: seg.id, status: 'empty', durationSeconds: 0, waveformData: [] }
+        const saved = savedBySegment.get(seg.id)
+        next[seg.id] = saved
+          ? {
+              segmentId: seg.id,
+              status: 'recorded',
+              durationSeconds: Number(saved.durationSeconds || 0),
+              waveformData: [],
+              path: saved.path,
+              mimeType: saved.mimeType,
+              size: saved.size,
+            }
+          : prev[seg.id] || { segmentId: seg.id, status: 'empty', durationSeconds: 0, waveformData: [] }
       }
       return next
     })
     if (!segments.some(seg => seg.id === activeSegmentId)) {
       setActiveSegmentId(segments[0]?.id || 'seg_opening')
     }
-  }, [segments, activeSegmentId])
+  }, [segments, activeSegmentId, workflow?.state?.episode_id, workflow?.state?.recording_segments])
 
   // ── Playback simulation ────────────────────────────────
   const togglePlay = useCallback(() => {
@@ -1090,13 +1136,69 @@ export default function SoundStudio({
     }, 2000)
   }, [recordings, onOpenPath])
 
+  const buildTTSConfig = useCallback(() => {
+    const rateBySpeed: Record<SpeedLevel, string> = {
+      slower: '-10%',
+      normal: '+0%',
+      faster: '+10%',
+    }
+    const base = {
+      ...ttsNodeConfig,
+      engine: audioProvider,
+      rate: rateBySpeed[speedLevel],
+      volume: '+0%',
+    }
+
+    if (audioProvider === 'edge-tts') {
+      const voice = VOICE_TO_EDGE_VOICE[voiceStyle]
+      return {
+        ...base,
+        default_voice: voice,
+        voice_mapping: {
+          'Host A': voice,
+          'Host B': voice,
+        },
+      }
+    }
+
+    const apiKey = String(ttsNodeConfig.api_key || '').trim()
+    const apiBase = String(ttsNodeConfig.api_base || '').trim()
+    const model = String(ttsNodeConfig.model || ttsNodeConfig.apiModel || ttsNodeConfig.api_model || '').trim()
+    if (!apiKey || !apiBase || !model) {
+      throw new Error('OpenAI 兼容语音未配置完整：请在设置页填写语音生成的 API Key、API Base 和模型')
+    }
+    return {
+      ...base,
+      api_key: apiKey,
+      api_base: apiBase,
+      model,
+      default_voice: VOICE_TO_OPENAI_VOICE[voiceStyle],
+      voice_mapping: {
+        'Host A': VOICE_TO_OPENAI_VOICE[voiceStyle],
+        'Host B': VOICE_TO_OPENAI_VOICE[voiceStyle],
+      },
+      output_format: 'mp3',
+    }
+  }, [audioProvider, speedLevel, ttsNodeConfig, voiceStyle])
+
+  const saveTTSConfig = useCallback(async (config: Record<string, any>) => {
+    if (!window.electronAPI?.saveNodeConfig) {
+      throw new Error('当前环境没有节点配置保存接口，无法配置音频生成方式')
+    }
+    const result = await window.electronAPI.saveNodeConfig('tts', config)
+    if (!result?.success) {
+      throw new Error(result?.error || '保存音频生成配置失败')
+    }
+    setTtsNodeConfig(config)
+  }, [])
+
   // ── Generate final audio ───────────────────────────────
   const handleGenerate = useCallback(async () => {
     if (!onRunNodes) {
       message.error({ content: '当前环境没有节点执行接口', duration: 2, style: { marginTop: 60 } })
       return
     }
-    if (!segments.some(s => s.content.trim())) {
+    if (isDemoScript || !segments.some(s => s.content.trim())) {
       message.warning({ content: '请先在写作页保存脚本分段', duration: 2, style: { marginTop: 60 } })
       return
     }
@@ -1126,6 +1228,18 @@ export default function SoundStudio({
         setGenerationProgress(45)
         await onRunNodes(['audio_postprocess', 'assets', 'review'])
       } else {
+        const nextConfig = buildTTSConfig()
+        await saveTTSConfig(nextConfig)
+        await onUpdateWorkflow?.({
+          audio_generation: {
+            provider: audioProvider,
+            voiceStyle,
+            speedLevel,
+            emotionLevel,
+            pauseStyle,
+            updatedAt: new Date().toISOString(),
+          },
+        })
         setGenerationProgress(35)
         await onRunNodes(['tts', 'audio_postprocess', 'assets', 'review'])
       }
@@ -1137,7 +1251,7 @@ export default function SoundStudio({
     } finally {
       setIsGenerating(false)
     }
-  }, [onRunNodes, onUpdateWorkflow, segments, mode, recordings])
+  }, [audioProvider, buildTTSConfig, emotionLevel, isDemoScript, mode, onRunNodes, onUpdateWorkflow, pauseStyle, recordings, saveTTSConfig, segments, speedLevel, voiceStyle])
 
   // ── Editing actions ──────────────────────────────────────
   const performEdit = useCallback((action: EditActionType, desc: string) => {
@@ -1222,7 +1336,7 @@ export default function SoundStudio({
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
+      position: 'fixed', top: 52, right: 0, bottom: 0, left: 148, zIndex: 1000,
       background: 'var(--bg-primary)',
       display: 'flex', flexDirection: 'column',
       animation: 'slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -1257,8 +1371,33 @@ export default function SoundStudio({
           </div>
         </div>
 
-        {/* Center: Mode Switch */}
-        <ModeSwitch mode={mode} onChange={handleModeChange} />
+        {/* Center: Mode Switch + audio provider */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <ModeSwitch mode={mode} onChange={handleModeChange} />
+          {mode === 'ai' && (
+            <Tooltip title={AUDIO_PROVIDERS.find(p => p.key === audioProvider)?.desc}>
+              <select
+                value={audioProvider}
+                onChange={e => setAudioProvider(e.target.value as AudioProvider)}
+                style={{
+                  height: 32,
+                  borderRadius: 8,
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  fontSize: 12,
+                  padding: '0 10px',
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {AUDIO_PROVIDERS.map(provider => (
+                  <option key={provider.key} value={provider.key}>{provider.label}</option>
+                ))}
+              </select>
+            </Tooltip>
+          )}
+        </div>
 
         {/* Right: actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

@@ -3,6 +3,15 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electronAPI', {
   createWorkflow: (config) => ipcRenderer.invoke('workflow:create', config),
   getWorkflow: (workflowId) => ipcRenderer.invoke('workflow:get', workflowId),
+  listWorkflows: () => ipcRenderer.invoke('workflow:list'),
+  openWorkflow: (workflowId) => ipcRenderer.invoke('workflow:open', workflowId),
+  saveWorkflow: (workflowId) => ipcRenderer.invoke('workflow:save', workflowId),
+  closeWorkflow: (workflowId) => ipcRenderer.invoke('workflow:close', workflowId),
+  updateWorkflowMeta: (workflowId, meta) => ipcRenderer.invoke('workflow:updateMeta', workflowId, meta),
+  duplicateWorkflow: (workflowId) => ipcRenderer.invoke('workflow:duplicate', workflowId),
+  deleteWorkflow: (workflowId) => ipcRenderer.invoke('workflow:delete', workflowId),
+  exportWorkflow: (workflowId) => ipcRenderer.invoke('workflow:export', workflowId),
+  importWorkflow: () => ipcRenderer.invoke('workflow:import'),
   approveNode: (workflowId, nodeName, approved, modifiedOutput) => 
     ipcRenderer.invoke('workflow:approve', workflowId, nodeName, approved, modifiedOutput),
   updateWorkflowState: (workflowId, patch) => ipcRenderer.invoke('workflow:updateState', workflowId, patch),

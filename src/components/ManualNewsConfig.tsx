@@ -51,20 +51,20 @@ export default function ManualNewsConfig({ value = [], onChange }: Props) {
   return (
     <div style={{ padding: '8px 0' }}>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text strong style={{ color: 'var(--text-primary)' }}>Manual News List</Text>
+        <Text strong style={{ color: 'var(--text-primary)' }}>手动新闻列表</Text>
         <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={handleAdd}
           size="small"
         >
-          Add News
+          添加新闻
         </Button>
       </div>
 
       {newsItems.length === 0 && (
         <Card style={{ textAlign: 'center', background: 'var(--bg-elevated)', borderColor: 'var(--border-color)' }}>
-          <Text type="secondary">No news items yet. Click "Add News" to start.</Text>
+          <Text type="secondary">暂无新闻条目。点击“添加新闻”开始录入。</Text>
         </Card>
       )}
 
@@ -75,7 +75,7 @@ export default function ManualNewsConfig({ value = [], onChange }: Props) {
             size="small"
             title={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text strong style={{ color: 'var(--text-primary)' }}>News Item {index + 1}</Text>
+                <Text strong style={{ color: 'var(--text-primary)' }}>新闻条目 {index + 1}</Text>
                 <Button
                   type="text"
                   danger
@@ -83,7 +83,7 @@ export default function ManualNewsConfig({ value = [], onChange }: Props) {
                   icon={<DeleteOutlined />}
                   onClick={() => handleRemove(index)}
                 >
-                  Remove
+                  删除
                 </Button>
               </div>
             }
@@ -98,28 +98,28 @@ export default function ManualNewsConfig({ value = [], onChange }: Props) {
           >
             <Space direction="vertical" style={{ width: '100%' }} size="small">
               <div>
-                <Text type="secondary" style={{ fontSize: 12 }}>Title *</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>标题 *</Text>
                 <Input
                   value={item.title}
                   onChange={(e) => handleChange(index, 'title', e.target.value)}
-                  placeholder="Enter news title"
+                  placeholder="输入新闻标题"
                   style={{ marginTop: 4, background: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                 />
               </div>
 
               <div>
-                <Text type="secondary" style={{ fontSize: 12 }}>Content *</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>正文 *</Text>
                 <TextArea
                   value={item.content}
                   onChange={(e) => handleChange(index, 'content', e.target.value)}
-                  placeholder="Enter news content"
+                  placeholder="输入新闻正文"
                   rows={4}
                   style={{ marginTop: 4, background: 'var(--bg-primary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
                 />
               </div>
 
               <div>
-                <Text type="secondary" style={{ fontSize: 12 }}>URL (Optional)</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>URL（可选）</Text>
                 <Input
                   value={item.url}
                   onChange={(e) => handleChange(index, 'url', e.target.value)}
@@ -137,7 +137,7 @@ export default function ManualNewsConfig({ value = [], onChange }: Props) {
           <Divider style={{ margin: '16px 0', borderColor: 'var(--border-color)' }} />
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Total: {newsItems.length} items
+              共 {newsItems.length} 条
             </Text>
           </div>
         </>

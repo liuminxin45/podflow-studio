@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { spawn } = require('child_process')
@@ -26,6 +26,7 @@ let configManager = null
 
 // Python workflow state
 let currentWorkflow = null
+const WORKFLOW_DIR = path.join(__dirname, '..', 'out', 'workflows')
 
 // TrendRadar daemon process
 let trendradarDaemon = null
@@ -47,7 +48,7 @@ let radarState = { ...DEFAULT_RADAR_STATE }
 let radarTimer = null
 
 function broadcastWorkflowUpdate() {
-  if (mainWindow && currentWorkflow) {
+  if (mainWindow) {
     mainWindow.webContents.send('workflow:update', currentWorkflow)
   }
 }
@@ -99,8 +100,143 @@ function createInitialState(episodeId, runtimeConfig) {
     storage_info: {},
     rss_path: '',
     publish_status: {},
-    subtitle_path: ''
+    subtitle_path: '',
+    discover_ui: {},
+    organize_ui: {},
+    episode_brief: {},
+    writing_meta: {}
   }
+}
+
+function ensureWorkflowDir() {
+  fs.mkdirSync(WORKFLOW_DIR, { recursive: true })
+}
+
+function workflowFilePath(workflowId) {
+  return path.join(WORKFLOW_DIR, `${sanitizePathPart(workflowId)}.json`)
+}
+
+function normalizeWorkflow(workflow) {
+  if (!workflow || typeof workflow !== 'object') {
+    throw new Error('Invalid workflow file')
+  }
+  const state = workflow.state || createInitialState(workflow.state?.episode_id, {})
+  state.runtime_config = state.runtime_config || {}
+  state.logs = state.logs || []
+  state.errors = state.errors || []
+  state.fetch_contents = state.fetch_contents || []
+  state.manual_contents = state.manual_contents || []
+  state.raw_contents = state.raw_contents || []
+  state.cleaned_contents = state.cleaned_contents || []
+  state.researched_contents = state.researched_contents || []
+  state.selected_topic = state.selected_topic || {}
+  state.selected_materials = state.selected_materials || []
+  state.script = state.script || {}
+  state.stages = state.stages || []
+  state.audio_segments = state.audio_segments || []
+  state.recording_segments = state.recording_segments || []
+  state.audio_metadata = state.audio_metadata || {}
+  state.intro_outro_paths = state.intro_outro_paths || {}
+  state.review_summary = state.review_summary || {}
+  state.storage_info = state.storage_info || {}
+  state.publish_status = state.publish_status || {}
+  state.discover_ui = state.discover_ui || {}
+  state.organize_ui = state.organize_ui || {}
+  state.episode_brief = state.episode_brief || {}
+  state.writing_meta = state.writing_meta || {}
+  state.episode_id = state.episode_id || `ep_${workflow.id || Date.now()}`
+  state.created_at = state.created_at || new Date().toISOString()
+
+  return {
+    id: String(workflow.id || Date.now()),
+    state,
+    status: workflow.status || 'draft',
+    currentNode: workflow.currentNode || null,
+    nodeExecutions: workflow.nodeExecutions || {},
+    approvals: workflow.approvals || {}
+  }
+}
+
+function saveWorkflow(workflow) {
+  if (!workflow?.id) return
+  ensureWorkflowDir()
+  fs.writeFileSync(workflowFilePath(workflow.id), JSON.stringify(normalizeWorkflow(workflow), null, 2), 'utf8')
+}
+
+function loadWorkflow(workflowId) {
+  const filePath = workflowFilePath(workflowId)
+  if (!fs.existsSync(filePath)) return null
+  return normalizeWorkflow(JSON.parse(fs.readFileSync(filePath, 'utf8')))
+}
+
+function getWorkflowTitle(workflow) {
+  return workflow?.state?.selected_topic?.title ||
+    workflow?.state?.script?.title ||
+    workflow?.state?.episode_title ||
+    '未命名节目'
+}
+
+function getWorkflowDescription(workflow) {
+  return workflow?.state?.selected_topic?.description ||
+    workflow?.state?.script?.description ||
+    workflow?.state?.episode_description ||
+    ''
+}
+
+function createWorkflowSummary(workflow) {
+  const normalized = normalizeWorkflow(workflow)
+  const filePath = workflowFilePath(normalized.id)
+  const isSaved = fs.existsSync(filePath)
+  let updatedAt = normalized.state.created_at
+  try {
+    if (isSaved) {
+      updatedAt = fs.statSync(filePath).mtime.toISOString()
+    }
+  } catch {}
+
+  return {
+    id: normalized.id,
+    episodeId: normalized.state.episode_id,
+    title: getWorkflowTitle(normalized),
+    description: getWorkflowDescription(normalized),
+    status: normalized.status,
+    createdAt: normalized.state.created_at,
+    updatedAt,
+    previewPath: normalized.state.cover_path || '',
+    isCurrent: currentWorkflow?.id === normalized.id,
+    isSaved
+  }
+}
+
+function listSavedWorkflows() {
+  ensureWorkflowDir()
+  const workflows = fs.readdirSync(WORKFLOW_DIR)
+    .filter(name => name.endsWith('.json'))
+    .map(name => {
+      try {
+        const workflow = normalizeWorkflow(JSON.parse(fs.readFileSync(path.join(WORKFLOW_DIR, name), 'utf8')))
+        if (currentWorkflow?.id === workflow.id) {
+          return createWorkflowSummary(currentWorkflow)
+        }
+        return createWorkflowSummary(workflow)
+      } catch (error) {
+        console.warn(`[Workflow] Failed to read ${name}:`, error.message)
+        return null
+      }
+    })
+    .filter(Boolean)
+
+  if (currentWorkflow && !workflows.some(item => item.id === currentWorkflow.id)) {
+    workflows.push(createWorkflowSummary(currentWorkflow))
+  }
+
+  return workflows.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
+}
+
+function loadLatestWorkflow() {
+  const workflows = listSavedWorkflows()
+  if (workflows.length === 0) return null
+  return loadWorkflow(workflows[0].id)
 }
 
 function createWindow() {
@@ -117,10 +253,16 @@ function createWindow() {
   // Load React app
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173')
-    mainWindow.webContents.openDevTools()
+    if (process.env.OPEN_DEVTOOLS === '1') {
+      mainWindow.webContents.openDevTools()
+    }
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
+
+  mainWindow.webContents.once('did-finish-load', () => {
+    broadcastWorkflowUpdate()
+  })
 
   if (process.env.CDP_ACCEPTANCE === '1') {
     mainWindow.webContents.once('did-finish-load', () => {
@@ -373,6 +515,10 @@ function stopRadarService() {
 }
 
 // IPC handlers
+ipcMain.handle('workflow:list', async () => {
+  return listSavedWorkflows()
+})
+
 ipcMain.handle('workflow:create', async (event, config) => {
   if (currentWorkflow && currentWorkflow.status === 'running') {
     throw new Error('A workflow is already running. Please wait for it to complete.')
@@ -403,7 +549,156 @@ ipcMain.handle('workflow:create', async (event, config) => {
 })
 
 ipcMain.handle('workflow:get', async (event, workflowId) => {
+  if (!workflowId) return currentWorkflow
+  if (currentWorkflow?.id === workflowId) return currentWorkflow
+  return loadWorkflow(workflowId)
+})
+
+ipcMain.handle('workflow:open', async (event, workflowId) => {
+  const workflow = loadWorkflow(workflowId)
+  if (!workflow) {
+    throw new Error('Workflow not found')
+  }
+  currentWorkflow = workflow
+  broadcastWorkflowUpdate()
   return currentWorkflow
+})
+
+ipcMain.handle('workflow:save', async (event, workflowId) => {
+  const workflow = currentWorkflow?.id === workflowId ? currentWorkflow : loadWorkflow(workflowId)
+  if (!workflow) {
+    throw new Error('Workflow not found')
+  }
+  workflow.state.logs = workflow.state.logs || []
+  workflow.state.logs.push(`[Electron] 节目已保存 ${new Date().toISOString()}`)
+  if (currentWorkflow?.id === workflow.id) {
+    currentWorkflow = workflow
+  }
+  saveWorkflow(workflow)
+  broadcastWorkflowUpdate()
+  return currentWorkflow?.id === workflow.id ? currentWorkflow : workflow
+})
+
+ipcMain.handle('workflow:close', async (event, workflowId) => {
+  if (currentWorkflow?.id === workflowId) {
+    currentWorkflow = null
+    broadcastWorkflowUpdate()
+  }
+  return { success: true }
+})
+
+ipcMain.handle('workflow:updateMeta', async (event, workflowId, meta) => {
+  const workflow = currentWorkflow?.id === workflowId ? currentWorkflow : loadWorkflow(workflowId)
+  if (!workflow) {
+    throw new Error('Workflow not found')
+  }
+
+  workflow.state.selected_topic = workflow.state.selected_topic || {}
+  workflow.state.script = workflow.state.script || {}
+  if (typeof meta?.title === 'string') {
+    workflow.state.selected_topic.title = meta.title
+    workflow.state.script.title = meta.title
+  }
+  if (typeof meta?.description === 'string') {
+    workflow.state.selected_topic.description = meta.description
+    workflow.state.script.description = meta.description
+  }
+  if (typeof meta?.previewPath === 'string') {
+    workflow.state.cover_path = meta.previewPath
+  }
+  workflow.state.logs = workflow.state.logs || []
+  workflow.state.logs.push(`[Electron] 节目信息已更新 ${new Date().toISOString()}`)
+
+  if (currentWorkflow?.id === workflow.id) {
+    currentWorkflow = workflow
+    broadcastWorkflowUpdate()
+  } else {
+    saveWorkflow(workflow)
+  }
+
+  return workflow
+})
+
+ipcMain.handle('workflow:duplicate', async (event, workflowId) => {
+  const source = currentWorkflow?.id === workflowId ? currentWorkflow : loadWorkflow(workflowId)
+  if (!source) {
+    throw new Error('Workflow not found')
+  }
+
+  const copied = normalizeWorkflow(JSON.parse(JSON.stringify(source)))
+  copied.id = Date.now().toString()
+  copied.state.episode_id = `ep_${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '_')}`
+  copied.state.created_at = new Date().toISOString()
+  copied.state.selected_topic = copied.state.selected_topic || {}
+  copied.state.script = copied.state.script || {}
+  const originalTitle = getWorkflowTitle(source)
+  copied.state.selected_topic.title = `${originalTitle} 副本`
+  copied.state.script.title = copied.state.selected_topic.title
+  copied.state.logs = copied.state.logs || []
+  copied.state.logs.push(`[Electron] 从 ${source.id} 复制 ${new Date().toISOString()}`)
+  currentWorkflow = copied
+  broadcastWorkflowUpdate()
+  return currentWorkflow
+})
+
+ipcMain.handle('workflow:delete', async (event, workflowId) => {
+  if (currentWorkflow?.id === workflowId && currentWorkflow.status === 'running') {
+    throw new Error('运行中的节目不能删除')
+  }
+
+  const filePath = workflowFilePath(workflowId)
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath)
+  }
+  if (currentWorkflow?.id === workflowId) {
+    currentWorkflow = null
+    broadcastWorkflowUpdate()
+  }
+  return { success: true }
+})
+
+ipcMain.handle('workflow:export', async (event, workflowId) => {
+  const workflow = currentWorkflow?.id === workflowId ? currentWorkflow : loadWorkflow(workflowId)
+  if (!workflow) {
+    throw new Error('Workflow not found')
+  }
+
+  const defaultName = `${sanitizePathPart(getWorkflowTitle(workflow), workflow.state.episode_id || workflow.id)}.json`
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: '导出节目',
+    defaultPath: defaultName,
+    filters: [{ name: 'Auto-Podcast 节目', extensions: ['json'] }]
+  })
+  if (result.canceled || !result.filePath) {
+    return { success: false, canceled: true }
+  }
+  fs.writeFileSync(result.filePath, JSON.stringify(normalizeWorkflow(workflow), null, 2), 'utf8')
+  return { success: true, path: result.filePath }
+})
+
+ipcMain.handle('workflow:import', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '导入节目',
+    properties: ['openFile'],
+    filters: [{ name: 'Auto-Podcast 节目', extensions: ['json'] }]
+  })
+  if (result.canceled || !result.filePaths?.[0]) {
+    return { success: false, canceled: true }
+  }
+
+  const raw = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'))
+  const imported = normalizeWorkflow(raw.workflow || raw)
+  let workflowId = sanitizePathPart(imported.id || Date.now())
+  while (fs.existsSync(workflowFilePath(workflowId))) {
+    workflowId = `${sanitizePathPart(imported.id || 'imported')}_${Date.now()}`
+  }
+  imported.id = workflowId
+  imported.state.episode_id = imported.state.episode_id || `ep_imported_${Date.now()}`
+  imported.state.logs = imported.state.logs || []
+  imported.state.logs.push(`[Electron] 从 ${result.filePaths[0]} 导入 ${new Date().toISOString()}`)
+  currentWorkflow = imported
+  broadcastWorkflowUpdate()
+  return { success: true, workflow: currentWorkflow, summary: createWorkflowSummary(currentWorkflow) }
 })
 
 ipcMain.handle('workflow:approve', async (event, workflowId, nodeName, approved, modifiedOutput) => {
@@ -898,6 +1193,7 @@ async function runWorkflow(workflowId, resumeFrom = null, onlyNodes = null) {
 
 app.whenReady().then(() => {
   configManager = new ConfigManager()
+  currentWorkflow = null
   createWindow()
 
   radarState = loadRadarCache()

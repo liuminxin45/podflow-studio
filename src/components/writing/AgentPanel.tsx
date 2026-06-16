@@ -81,7 +81,7 @@ export default function AgentPanel({
         alignItems: 'center',
         paddingTop: 12,
       }}>
-        <Tooltip title="展开 AI 协作面板" placement="left">
+        <Tooltip title="展开智能协作面板" placement="left">
           <Button
             type="text"
             size="small"
@@ -123,7 +123,7 @@ export default function AgentPanel({
         justifyContent: 'space-between',
       }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-          🤖 AI 协作面板
+          智能协作面板
         </span>
         <Tooltip title="隐藏面板">
           <Button
@@ -142,10 +142,10 @@ export default function AgentPanel({
         borderBottom: '1px solid var(--border-light)',
         background: 'var(--bg-primary)',
       }}>
-        {/* AI Intensity */}
+        {/* 智能强度 */}
         <div style={{ marginBottom: 10 }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-            AI 强度
+            智能强度
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
             {AI_INTENSITY_CONFIG.map(cfg => {
@@ -470,7 +470,7 @@ export default function AgentPanel({
         lineHeight: 1.5,
         textAlign: 'center',
       }}>
-        AI 协作空间 · 所有建议需人工确认 · 表达权在你
+        智能协作空间 · 所有建议需人工确认 · 表达权在你
       </div>
     </div>
   )

@@ -106,6 +106,13 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
       waiting_approval: <ClockCircleOutlined />,
       pending: <ClockCircleOutlined />
     }
+    const labels: Record<string, string> = {
+      completed: '已完成',
+      running: '运行中',
+      failed: '失败',
+      waiting_approval: '待确认',
+      pending: '待开始'
+    }
     
     return (
       <Tag 
@@ -119,7 +126,7 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
           fontWeight: 500
         }}
       >
-        {status ? status.toUpperCase() : 'UNKNOWN'}
+        {status ? (labels[status] || status) : '未知'}
       </Tag>
     )
   }
@@ -132,31 +139,31 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
     try {
       const result = await window.electronAPI.saveNodeConfig(nodeName, values)
       if (result.success) {
-        message.success('Configuration saved successfully')
+        message.success('配置已保存')
         setConfig(values)
       } else {
-        message.error(`Save failed: ${result.error}`)
+        message.error(`保存失败：${result.error}`)
       }
     } catch (e: any) {
-      message.error(`Save failed: ${e.message}`)
+      message.error(`保存失败：${e.message}`)
     }
   }
 
   const handleApprove = async () => {
     try {
       await window.electronAPI.approveNode(workflow.id, nodeName, true)
-      message.success('Node approved, workflow continuing')
+      message.success('节点已通过，工作流继续执行')
     } catch (e: any) {
-      message.error(`Approval failed: ${e.message}`)
+      message.error(`审批失败：${e.message}`)
     }
   }
 
   const handleReject = async () => {
     try {
       await window.electronAPI.approveNode(workflow.id, nodeName, false)
-      message.warning('Node rejected, workflow stopped')
+      message.warning('节点已拒绝，工作流已停止')
     } catch (e: any) {
-      message.error(`Rejection failed: ${e.message}`)
+      message.error(`拒绝失败：${e.message}`)
     }
   }
 
@@ -177,23 +184,23 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
         timestamp: new Date().toISOString()
       }
 
-      const formattedInfo = `# ${nodeName} Node Info\n\n` +
-        `## Basic Info\n` +
-        `- Node: ${nodeName}\n` +
-        `- Status: ${execution?.status || 'Pending'}\n` +
-        `- Duration: ${execution?.duration ? execution.duration.toFixed(2) + 's' : '-'}\n` +
-        `- Timestamp: ${nodeInfo.timestamp}\n\n` +
-        `## Configuration\n\`\`\`json\n${JSON.stringify(config, null, 2)}\n\`\`\`\n\n` +
-        `## Input Data\n\`\`\`json\n${JSON.stringify(nodeInfo.input, null, 2)}\n\`\`\`\n\n` +
-        `## Output Data\n\`\`\`json\n${JSON.stringify(nodeInfo.output, null, 2)}\n\`\`\`\n\n` +
-        `## Logs\n\`\`\`\n${nodeInfo.logs.join('\n')}\n\`\`\`\n\n` +
-        (execution?.error ? `## Error Info\n\`\`\`\n${execution.error}\n\`\`\`\n\n` : '') +
-        (nodeInfo.errors.length > 0 ? `## Error List\n\`\`\`json\n${JSON.stringify(nodeInfo.errors, null, 2)}\n\`\`\`\n` : '')
+      const formattedInfo = `# ${nodeName} 节点信息\n\n` +
+        `## 基础信息\n` +
+        `- 节点：${nodeName}\n` +
+        `- 状态：${execution?.status || '待开始'}\n` +
+        `- 时长：${execution?.duration ? execution.duration.toFixed(2) + 's' : '-'}\n` +
+        `- 时间：${nodeInfo.timestamp}\n\n` +
+        `## 配置\n\`\`\`json\n${JSON.stringify(config, null, 2)}\n\`\`\`\n\n` +
+        `## 输入数据\n\`\`\`json\n${JSON.stringify(nodeInfo.input, null, 2)}\n\`\`\`\n\n` +
+        `## 输出数据\n\`\`\`json\n${JSON.stringify(nodeInfo.output, null, 2)}\n\`\`\`\n\n` +
+        `## 日志\n\`\`\`\n${nodeInfo.logs.join('\n')}\n\`\`\`\n\n` +
+        (execution?.error ? `## 错误信息\n\`\`\`\n${execution.error}\n\`\`\`\n\n` : '') +
+        (nodeInfo.errors.length > 0 ? `## 错误列表\n\`\`\`json\n${JSON.stringify(nodeInfo.errors, null, 2)}\n\`\`\`\n` : '')
 
       await navigator.clipboard.writeText(formattedInfo)
-      message.success('Node info copied to clipboard')
+      message.success('节点信息已复制到剪贴板')
     } catch (e: any) {
-      message.error(`Copy failed: ${e.message}`)
+      message.error(`复制失败：${e.message}`)
     }
   }
 
@@ -271,7 +278,7 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
         }}>
           <div style={{ textAlign: 'center' }}>
             <CodeOutlined style={{ fontSize: 48, marginBottom: 16, opacity: 0.1 }} />
-            <div>{title === 'Input' ? 'No input data available' : 'No output data produced'}</div>
+            <div>{title === '输入' ? '暂无输入数据' : '暂无输出数据'}</div>
           </div>
         </div>
       )
@@ -327,7 +334,7 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
       key: 'status',
       label: (
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <DashboardOutlined /> Status
+          <DashboardOutlined /> 状态
         </span>
       ),
       children: (
@@ -347,14 +354,14 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
                 <Row gutter={24}>
                   <Col span={12}>
                      <Statistic 
-                        title={<span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Status</span>}
+                        title={<span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>状态</span>}
                         value={execution.status} 
                         formatter={() => getStatusTag(execution.status)}
                       />
                   </Col>
                   <Col span={12}>
                     <Statistic 
-                      title={<span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Duration</span>}
+                      title={<span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>时长</span>}
                       value={execution.duration ? execution.duration.toFixed(2) : 0} 
                       precision={2}
                       suffix="s"
@@ -374,10 +381,10 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
                 }}>
                   <Title level={5} style={{ color: 'var(--warning-color)', marginTop: 0 }}>
                     <SettingOutlined spin style={{ marginRight: 8 }} />
-                    Awaiting Approval
+                    等待审批
                   </Title>
                   <Paragraph style={{ color: 'var(--text-primary)', maxWidth: 400, margin: '0 auto 20px', fontSize: 13 }}>
-                    This node requires manual approval to proceed. Please review the outputs and logs.
+                    当前节点需要人工审批才能继续。请检查输出和日志。
                   </Paragraph>
                   <Space size="middle">
                     <Button 
@@ -391,7 +398,7 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
                         minWidth: 100
                       }}
                     >
-                      Approve
+                      通过
                     </Button>
                     <Button 
                       danger 
@@ -400,7 +407,7 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
                       onClick={handleReject}
                       style={{ minWidth: 100 }}
                     >
-                      Reject
+                      拒绝
                     </Button>
                   </Space>
                 </div>
@@ -413,7 +420,7 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
                   border: '1px solid var(--error-color)', 
                   borderRadius: 8 
                 }}>
-                  <Title level={5} style={{ color: 'var(--error-color)', marginTop: 0 }}>Execution Error</Title>
+                  <Title level={5} style={{ color: 'var(--error-color)', marginTop: 0 }}>执行错误</Title>
                   <Paragraph style={{ 
                     fontFamily: "'JetBrains Mono', 'Fira Code', monospace", 
                     fontSize: 12,
@@ -436,7 +443,7 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
             }}>
               <div style={{ textAlign: 'center' }}>
                 <ClockCircleOutlined style={{ fontSize: 40, marginBottom: 12, opacity: 0.2 }} />
-                <div>Node has not been executed yet</div>
+                <div>节点尚未执行</div>
               </div>
             </div>
           )}
@@ -447,7 +454,7 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
       key: 'config',
       label: (
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <SettingOutlined /> Config
+          <SettingOutlined /> 配置
         </span>
       ),
       children: configLoaded ? (
@@ -613,7 +620,7 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
         )
       ) : (
         <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Text type="secondary"><ReloadOutlined spin /> Loading configuration...</Text>
+          <Text type="secondary"><ReloadOutlined spin /> 正在加载配置…</Text>
         </div>
       )
     },
@@ -621,7 +628,7 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
       key: 'logs',
       label: (
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <FileTextOutlined /> Logs
+          <FileTextOutlined /> 日志
         </span>
       ),
       children: (
@@ -641,7 +648,7 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
                 <div key={i} style={{ 
                   padding: '4px 0',
                   borderBottom: '1px solid var(--border-color)',
-                  color: log.includes('Error') ? 'var(--error-color)' : 'var(--text-secondary)'
+                  color: log.includes('Error') || log.includes('错误') ? 'var(--error-color)' : 'var(--text-secondary)'
                 }}>{log}</div>
               ))
           ) : (
@@ -652,7 +659,7 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
               justifyContent: 'center',
               color: 'var(--text-tertiary)',
             }}>
-              No specific logs for this node
+              当前节点暂无专属日志
             </div>
           )}
         </div>
@@ -662,19 +669,19 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
       key: 'input',
       label: (
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <InfoCircleOutlined /> Input
+          <InfoCircleOutlined /> 输入
         </span>
       ),
-      children: <div style={{ height: '100%', overflow: 'auto' }}>{renderJsonData(getNodeInput(), 'Input')}</div>
+      children: <div style={{ height: '100%', overflow: 'auto' }}>{renderJsonData(getNodeInput(), '输入')}</div>
     },
     {
       key: 'output',
       label: (
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <CheckOutlined /> Output
+          <CheckOutlined /> 输出
         </span>
       ),
-      children: <div style={{ height: '100%', overflow: 'auto' }}>{renderJsonData(getNodeOutput(), 'Output')}</div>
+      children: <div style={{ height: '100%', overflow: 'auto' }}>{renderJsonData(getNodeOutput(), '输出')}</div>
     }
   ]
 
@@ -698,10 +705,10 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
       }}>
         <Space size="small">
           <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>{nodeName}</span>
-          <Tag bordered={false} style={{ color: 'var(--text-secondary)', background: 'var(--bg-tertiary)' }}>NODE</Tag>
+          <Tag bordered={false} style={{ color: 'var(--text-secondary)', background: 'var(--bg-tertiary)' }}>节点</Tag>
         </Space>
         <Space>
-          <Tooltip title="Copy node information">
+          <Tooltip title="复制节点信息">
             <Button 
               type="text"
               icon={<CopyOutlined />}
@@ -709,7 +716,7 @@ export default function NodeDetailPanel({ nodeName, workflow, onClose }: Props) 
               style={{ color: 'var(--text-secondary)' }}
             />
           </Tooltip>
-          <Tooltip title="Close panel">
+          <Tooltip title="关闭面板">
             <Button 
               type="text"
               icon={<CloseOutlined />}

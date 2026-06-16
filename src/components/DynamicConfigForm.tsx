@@ -177,7 +177,7 @@ export default function DynamicConfigForm({ nodeName, initialValues, onChange, o
         inputComponent = (
           <Input.TextArea 
             rows={3} 
-            placeholder="Enter JSON array, e.g., [1, 2, 3]"
+            placeholder="输入 JSON 数组，例如 [1, 2, 3]"
           />
         )
         colSpan = 24
@@ -187,7 +187,7 @@ export default function DynamicConfigForm({ nodeName, initialValues, onChange, o
         inputComponent = (
           <Input.TextArea 
             rows={4} 
-            placeholder="Enter JSON object, e.g., {&quot;key&quot;: &quot;value&quot;}"
+            placeholder="输入 JSON 对象，例如 {&quot;key&quot;: &quot;value&quot;}"
           />
         )
         colSpan = 24
@@ -213,20 +213,20 @@ export default function DynamicConfigForm({ nodeName, initialValues, onChange, o
   }
 
   if (loading) {
-    return <div style={{ padding: 16, textAlign: 'center' }}>Loading configuration schema...</div>
+    return <div style={{ padding: 16, textAlign: 'center' }}>正在加载配置结构…</div>
   }
 
   if (error) {
     return (
       <div style={{ padding: 16, color: 'var(--error-color)' }}>
-        <p>Failed to load configuration schema:</p>
+        <p>配置结构加载失败：</p>
         <p style={{ fontSize: 12, fontFamily: 'monospace' }}>{error}</p>
       </div>
     )
   }
 
   if (!schema || !schema.fields) {
-    return <div style={{ padding: 16 }}>No configuration available for this node.</div>
+    return <div style={{ padding: 16 }}>当前节点没有可配置项。</div>
   }
 
   return (
@@ -245,7 +245,7 @@ export default function DynamicConfigForm({ nodeName, initialValues, onChange, o
             title={
               <Space>
                 <SettingOutlined style={{ color: 'var(--accent-primary)' }} />
-                <span>LLM Configuration</span>
+                <span>大模型配置</span>
               </Space>
             }
             style={{ 

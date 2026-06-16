@@ -78,6 +78,7 @@ export interface SystemConfig {
 export type NodeCapabilityType = 'search' | 'text' | 'reasoning' | 'compliance' | 'audio'
 export type NodeOverrideMode = 'global' | 'custom'
 export type APIConnectionStatus = 'untested' | 'testing' | 'connected' | 'failed'
+export type AudioProvider = 'edge-tts' | 'openai-compatible'
 
 export interface NodeAPIConfig {
   overrideMode: NodeOverrideMode
@@ -110,6 +111,7 @@ export interface GlobalAPIConfig {
   audioApiKeyMasked: string
   audioApiBase: string
   audioApiModel: string
+  audioProvider: AudioProvider
   audioConnectionStatus: APIConnectionStatus
 }
 
@@ -138,6 +140,7 @@ export type SettingsSection =
   | 'api-config'
   | 'analytics'
   | 'growth'
+  | 'logs'
 
 export const DEFAULT_NODE_API_CONFIG: NodeAPIConfig = {
   overrideMode: 'global',
@@ -204,7 +207,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
       audioApiKeySet: false,
       audioApiKeyMasked: '',
       audioApiBase: 'https://api.openai.com/v1',
-      audioApiModel: '',
+      audioApiModel: 'tts-1',
+      audioProvider: 'edge-tts',
       audioConnectionStatus: 'untested',
     },
     nodeOverrides: {

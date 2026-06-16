@@ -413,8 +413,8 @@ export default function SettingsAnalytics() {
         </div>
       </AnalyticsSection>
 
-      {/* ======== Section 4: AI Suggestions ======== */}
-      <AnalyticsSection title="AI 优化建议" icon={<StarOutlined />}>
+      {/* ======== Section 4: 智能建议 ======== */}
+      <AnalyticsSection title="智能优化建议" icon={<StarOutlined />}>
         <div style={{
           marginBottom: 12,
           fontSize: 11,

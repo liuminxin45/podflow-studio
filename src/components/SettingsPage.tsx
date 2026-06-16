@@ -16,10 +16,13 @@ import {
   ApiOutlined,
   LineChartOutlined,
   TrophyOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons'
 import SettingsAPIConfig from './SettingsAPIConfig'
 import SettingsAnalytics from './SettingsAnalytics'
 import SettingsGrowth from './SettingsGrowth'
+import LogPanel from './LogPanel'
+import type { Workflow } from '../types/workflow'
 import type {
   AppSettings,
   SettingsSection,
@@ -49,6 +52,7 @@ import { VOICE_OPTIONS, PLATFORM_OPTIONS } from '../constants'
 
 interface Props {
   visible: boolean
+  workflow: Workflow | null
   onClose: () => void
 }
 
@@ -63,7 +67,7 @@ const CAPABILITY_TO_GLOBAL_PREFIX: Record<NodeCapabilityType, 'text' | 'search' 
 const DEFAULT_MODEL_BY_PREFIX: Record<'text' | 'search' | 'audio', string> = {
   text: 'gpt-4o-mini',
   search: 'gpt-4o-mini',
-  audio: 'edge-tts',
+  audio: 'tts-1',
 }
 
 const VOICE_TO_EDGE_VOICE: Record<string, string> = {
@@ -107,6 +111,8 @@ function buildNodeConfigs(settings: AppSettings): Record<string, Record<string, 
   }
   const searchMax = settings.capability.search.resultRange[1]
   const ttsVoice = VOICE_TO_EDGE_VOICE[settings.capability.audio.defaultVoice] || VOICE_TO_EDGE_VOICE['warm-male']
+  const audioProvider = settings.apiConfig.global.audioProvider || 'edge-tts'
+  const audioConfig = resolveApiSettings(settings, 'produce')
 
   return {
     app_settings: settings,
@@ -144,12 +150,16 @@ function buildNodeConfigs(settings: AppSettings): Record<string, Record<string, 
       max_segment_duration: settings.creatorPreferences.durationPreference === 'long' ? 180 : 120,
     },
     tts: {
-      engine: 'edge-tts',
-      default_voice: ttsVoice,
+      engine: audioProvider,
+      api_key: audioProvider === 'openai-compatible' ? audioConfig.api_key : '',
+      api_base: audioProvider === 'openai-compatible' ? audioConfig.api_base : 'https://api.openai.com/v1',
+      model: audioProvider === 'openai-compatible' ? audioConfig.llm_model : 'tts-1',
+      default_voice: audioProvider === 'openai-compatible' ? 'alloy' : ttsVoice,
       voice_mapping: {
-        'Host A': ttsVoice,
-        'Host B': ttsVoice,
+        'Host A': audioProvider === 'openai-compatible' ? 'alloy' : ttsVoice,
+        'Host B': audioProvider === 'openai-compatible' ? 'alloy' : ttsVoice,
       },
+      output_format: 'mp3',
       rate: settings.capability.audio.quality === 'standard' ? '+0%' : '-5%',
       volume: '+0%',
     },
@@ -173,18 +183,41 @@ function buildNodeConfigs(settings: AppSettings): Record<string, Record<string, 
   }
 }
 
+function mergeSettings(saved: Partial<AppSettings> | null | undefined): AppSettings {
+  const defaults = structuredClone(DEFAULT_SETTINGS)
+  if (!saved) return defaults
+  return {
+    ...defaults,
+    ...saved,
+    capability: { ...defaults.capability, ...saved.capability },
+    nodeBehavior: { ...defaults.nodeBehavior, ...saved.nodeBehavior },
+    creatorPreferences: { ...defaults.creatorPreferences, ...saved.creatorPreferences },
+    system: { ...defaults.system, ...saved.system },
+    apiConfig: {
+      ...defaults.apiConfig,
+      ...saved.apiConfig,
+      global: { ...defaults.apiConfig.global, ...saved.apiConfig?.global },
+      nodeOverrides: {
+        ...defaults.apiConfig.nodeOverrides,
+        ...saved.apiConfig?.nodeOverrides,
+      },
+    },
+  }
+}
+
 // ============================================================
 // Navigation Items
 // ============================================================
 
 const NAV_ITEMS: { key: SettingsSection; icon: React.ReactNode; label: string; desc: string; dividerBefore?: boolean }[] = [
   { key: 'capability', icon: <ThunderboltOutlined />, label: '能力配置', desc: '配置系统核心能力' },
-  { key: 'node-behavior', icon: <RobotOutlined />, label: '智能行为', desc: '调节 AI 协作方式' },
+  { key: 'node-behavior', icon: <RobotOutlined />, label: '智能行为', desc: '调节智能协作方式' },
   { key: 'creator-preferences', icon: <UserOutlined />, label: '创作偏好', desc: '你的风格与倾向' },
-  { key: 'api-config', icon: <ApiOutlined />, label: 'AI 能力接口', desc: '密钥与节点级配置', dividerBefore: true },
+  { key: 'api-config', icon: <ApiOutlined />, label: '智能能力接口', desc: '密钥与节点级配置', dividerBefore: true },
   { key: 'system', icon: <SettingOutlined />, label: '系统与发布', desc: '发布与数据管理' },
   { key: 'analytics', icon: <LineChartOutlined />, label: '数据与表现', desc: '收听数据与洞察', dividerBefore: true },
   { key: 'growth', icon: <TrophyOutlined />, label: '创作者成长', desc: '风格分析与建议' },
+  { key: 'logs', icon: <FileTextOutlined />, label: '执行日志', desc: '查看日志与错误', dividerBefore: true },
 ]
 
 // ============================================================
@@ -369,7 +402,7 @@ function ComingSoonBlock({ title, desc, icon }: { title: string; desc: string; i
 // Main Component
 // ============================================================
 
-export default function SettingsPage({ visible, onClose }: Props) {
+export default function SettingsPage({ visible, workflow, onClose }: Props) {
   const [activeSection, setActiveSection] = useState<SettingsSection>('capability')
   const [settings, setSettings] = useState<AppSettings>(() => structuredClone(DEFAULT_SETTINGS))
   const [hasChanges, setHasChanges] = useState(false)
@@ -381,6 +414,13 @@ export default function SettingsPage({ visible, onClose }: Props) {
     if (visible) {
       setSaveSuccess(false)
       setHasChanges(false)
+      if (window.electronAPI?.loadNodeConfig) {
+        window.electronAPI.loadNodeConfig('app_settings')
+          .then(config => {
+            if (config) setSettings(mergeSettings(config as Partial<AppSettings>))
+          })
+          .catch(error => console.error('Failed to load app settings:', error))
+      }
     }
   }, [visible])
 
@@ -532,7 +572,7 @@ export default function SettingsPage({ visible, onClose }: Props) {
         </div>
 
         <div>
-          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 10 }}>效率 vs 质量</div>
+          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 10 }}>效率与质量</div>
           <div style={{ display: 'flex', gap: 10 }}>
             {([
               { key: 'cost' as CostQualityBalance, icon: '🚀', title: '效率优先', desc: '更快完成，节省资源' },
@@ -595,7 +635,7 @@ export default function SettingsPage({ visible, onClose }: Props) {
         <ComingSoonBlock
           icon={<AudioOutlined />}
           title="语音克隆"
-          desc="上传你的声音样本，生成专属于你的 AI 音色"
+          desc="上传你的声音样本，生成专属于你的智能音色"
         />
 
         {/* Coming soon: Multi-voice */}
@@ -659,11 +699,11 @@ export default function SettingsPage({ visible, onClose }: Props) {
       <SectionHeader
         icon={<RobotOutlined />}
         title="智能行为"
-        desc="调节 AI 在创作过程中的介入方式与深度"
+        desc="调节智能助手在创作过程中的介入方式与深度"
       />
 
-      {/* 1. AI Assist Level */}
-      <SubsectionBlock title="全局智能介入强度" desc="控制 AI 在各环节的主动程度与分析深度">
+      {/* 1. 智能介入强度 */}
+      <SubsectionBlock title="全局智能介入强度" desc="控制智能助手在各环节的主动程度与分析深度">
         <div style={{ display: 'flex', gap: 10 }}>
           {([
             {
@@ -707,9 +747,9 @@ export default function SettingsPage({ visible, onClose }: Props) {
           lineHeight: 1.6,
         }}>
           <BulbOutlined style={{ color: 'var(--accent-primary)', marginRight: 6 }} />
-          {settings.nodeBehavior.assistLevel === 'light' && '轻辅助模式下，AI 会减少主动提示，给你更多独立思考空间。适合经验丰富的创作者。'}
+          {settings.nodeBehavior.assistLevel === 'light' && '轻辅助模式下，智能助手会减少主动提示，给你更多独立思考空间。适合经验丰富的创作者。'}
           {settings.nodeBehavior.assistLevel === 'standard' && '标准协作模式会在关键节点提供建议，同时保持你的创作主导权。适合大多数场景。'}
-          {settings.nodeBehavior.assistLevel === 'deep' && '深度协作模式下，AI 会主动提供多维度分析和更详细的建议。适合探索性创作。'}
+          {settings.nodeBehavior.assistLevel === 'deep' && '深度协作模式下，智能助手会主动提供多维度分析和更详细的建议。适合探索性创作。'}
         </div>
       </SubsectionBlock>
 
@@ -721,7 +761,7 @@ export default function SettingsPage({ visible, onClose }: Props) {
               key: 'smart' as PublishFlowMode,
               icon: '🚀',
               title: '智能发布',
-              desc: '经过 AI 助手优化后发布',
+              desc: '经过智能助手优化后发布',
             },
             {
               key: 'quick' as PublishFlowMode,
@@ -749,7 +789,7 @@ export default function SettingsPage({ visible, onClose }: Props) {
       </SubsectionBlock>
 
       {/* 3. Ideation Challenge */}
-      <SubsectionBlock title="构思层挑战强度" desc="决定 AI 在构思阶段如何挑战你的想法">
+      <SubsectionBlock title="构思层挑战强度" desc="决定智能助手在构思阶段如何挑战你的想法">
         <div style={{ display: 'flex', gap: 10 }}>
           {([
             {
@@ -790,7 +830,7 @@ export default function SettingsPage({ visible, onClose }: Props) {
           color: 'var(--text-secondary)',
           lineHeight: 1.6,
         }}>
-          {settings.nodeBehavior.ideationChallenge === 'normal' && '💡 普通模式适合快速产出，AI 会顺着你的思路补充细节。'}
+          {settings.nodeBehavior.ideationChallenge === 'normal' && '💡 普通模式适合快速产出，智能助手会顺着你的思路补充细节。'}
           {settings.nodeBehavior.ideationChallenge === 'critical' && '🔍 批判模式会帮你发现论点漏洞，让内容更经得起推敲。'}
           {settings.nodeBehavior.ideationChallenge === 'reverse' && '🔄 反向挑战会提出完全相反的观点，帮你打磨更有深度的内容。慎用！'}
         </div>
@@ -964,6 +1004,25 @@ export default function SettingsPage({ visible, onClose }: Props) {
     </div>
   )
 
+  const renderLogs = () => (
+    <div style={{ animation: 'settingsContentIn 0.3s ease' }}>
+      <SectionHeader
+        icon={<FileTextOutlined />}
+        title="执行日志"
+        desc="查看当前节目的执行日志与错误信息"
+      />
+      <div style={{
+        height: 520,
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-color)',
+        borderRadius: 12,
+        overflow: 'hidden',
+      }}>
+        <LogPanel workflow={workflow} collapsed={false} showToggle={false} />
+      </div>
+    </div>
+  )
+
   // ============================================================
   // Render: Content Router
   // ============================================================
@@ -976,6 +1035,7 @@ export default function SettingsPage({ visible, onClose }: Props) {
       case 'api-config': return <SettingsAPIConfig settings={settings} updateSettings={updateSettings} />
       case 'analytics': return <SettingsAnalytics />
       case 'growth': return <SettingsGrowth />
+      case 'logs': return renderLogs()
       default: return renderCapability()
     }
   }
@@ -986,7 +1046,10 @@ export default function SettingsPage({ visible, onClose }: Props) {
   return (
     <div style={{
       position: 'fixed',
-      inset: 0,
+      top: 52,
+      right: 0,
+      bottom: 0,
+      left: 148,
       zIndex: 1000,
       background: 'var(--bg-primary)',
       display: 'flex',

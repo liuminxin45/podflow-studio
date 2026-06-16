@@ -20,7 +20,7 @@ export default function LLMConfigFields() {
     const apiKey = form.getFieldValue('api_key')?.trim()
 
     if (!apiBase || !apiKey) {
-      message.warning('Please fill in API Base and API Key first')
+      message.warning('请先填写 API Base 和 API Key')
       return
     }
 
@@ -28,9 +28,9 @@ export default function LLMConfigFields() {
     try {
       const models = await fetchModels(apiBase, apiKey)
       setAvailableModels(models)
-      message.success(`Successfully fetched ${models.length} models`)
+      message.success(`已获取 ${models.length} 个模型`)
     } catch (e: any) {
-      message.error(`Failed to fetch models: ${e.message}`)
+      message.error(`获取模型失败：${e.message}`)
       setAvailableModels([])
     } finally {
       setLoadingModels(false)
@@ -44,7 +44,7 @@ export default function LLMConfigFields() {
     const llmModel = form.getFieldValue('llm_model')?.trim()
 
     if (!apiBase || !apiKey || !llmModel) {
-      message.warning('Please fill in complete LLM config (API Base, API Key, LLM Model)')
+      message.warning('请填写完整的大模型配置（API Base、API Key、模型）')
       return
     }
 
@@ -66,13 +66,13 @@ export default function LLMConfigFields() {
       })
 
       if (response.ok) {
-        message.success('✅ LLM Connection Successful')
+        message.success('大模型连接成功')
       } else {
         const errorData = await response.json().catch(() => ({}))
-        message.error(`❌ Connection Failed: ${response.status} ${errorData.error?.message || response.statusText}`)
+        message.error(`连接失败：${response.status} ${errorData.error?.message || response.statusText}`)
       }
     } catch (e: any) {
-      message.error(`❌ Connection Test Failed: ${e.message}`)
+      message.error(`连接测试失败：${e.message}`)
     } finally {
       setTestingConnection(false)
     }
@@ -83,14 +83,14 @@ export default function LLMConfigFields() {
       <Form.Item
         name="api_base"
         label="API Base"
-        tooltip="API Base URL, e.g., https://api.openai.com/v1"
+        tooltip="API Base 地址，例如 https://api.openai.com/v1"
       >
         <Input placeholder="https://api.openai.com/v1" />
       </Form.Item>
 
       <Form.Item
         label="API Key"
-        tooltip="API Key (leave empty to use OPENAI_API_KEY env var)"
+        tooltip="API Key，留空时使用 OPENAI_API_KEY 环境变量"
         style={{ marginBottom: 0 }}
       >
         <Form.Item
@@ -105,22 +105,22 @@ export default function LLMConfigFields() {
           loading={loadingModels}
           style={{ marginLeft: 8, width: '102px' }}
         >
-          Fetch
+          获取
         </Button>
       </Form.Item>
 
       <Form.Item
         name="llm_model"
-        label="LLM Model"
-        tooltip="Select or enter model name. Click 'Fetch' to get available models."
+        label="大模型"
+        tooltip="选择或输入模型名称。点击“获取”读取可用模型。"
       >
         <AutoComplete
           options={availableModels.map(model => ({ value: model, label: model }))}
-          placeholder={availableModels.length > 0 ? 'Select or enter model name' : 'Fetch models or enter manually'}
+          placeholder={availableModels.length > 0 ? '选择或输入模型名称' : '获取模型或手动输入'}
           filterOption={(inputValue, option) =>
             option?.value.toLowerCase().includes(inputValue.toLowerCase()) || false
           }
-          notFoundContent="No matching models"
+          notFoundContent="没有匹配模型"
         />
       </Form.Item>
 
@@ -133,7 +133,7 @@ export default function LLMConfigFields() {
           block
           style={{ borderColor: 'var(--success-color)', color: 'var(--success-color)' }}
         >
-          Test LLM Connection
+          测试大模型连接
         </Button>
       </Form.Item>
     </>

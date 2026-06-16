@@ -38,7 +38,11 @@ interface Props {
   onClose: () => void
   contents: ContentItem[]
   userTopic?: string
+  initialCandidates?: CandidateItem[]
+  initialIgnoredIds?: number[]
+  initialMode?: ViewMode
   onProceedToIdeate?: (candidates: CandidateItem[]) => void
+  onStateChange?: (state: { candidates: CandidateItem[]; ignoredIds: number[]; mode: ViewMode }) => void
 }
 
 
@@ -421,16 +425,20 @@ export default function OrganizePanel({
   onClose,
   contents = [],
   userTopic = '',
+  initialCandidates = [],
+  initialIgnoredIds = [],
+  initialMode = 'quick',
   onProceedToIdeate,
+  onStateChange,
 }: Props) {
   // View mode
-  const [mode, setMode] = useState<ViewMode>('quick')
+  const [mode, setMode] = useState<ViewMode>(initialMode)
 
   // Ignored set
-  const [ignoredIds, setIgnoredIds] = useState<Set<number>>(new Set())
+  const [ignoredIds, setIgnoredIds] = useState<Set<number>>(new Set(initialIgnoredIds))
 
   // Candidates
-  const [candidates, setCandidates] = useState<CandidateItem[]>([])
+  const [candidates, setCandidates] = useState<CandidateItem[]>(initialCandidates)
 
   // Detailed mode extras
   const [search, setSearch] = useState('')
@@ -566,6 +574,15 @@ export default function OrganizePanel({
     })
   }, [candidates])
 
+  useEffect(() => {
+    if (!visible) return
+    onStateChange?.({
+      candidates: sortedCandidates,
+      ignoredIds: Array.from(ignoredIds),
+      mode,
+    })
+  }, [visible, sortedCandidates, ignoredIds, mode])
+
   // Stats
   const primaryCount = candidates.filter(c => c._priority === 'primary').length
   const importantCount = candidates.filter(c => c._priority === 'important').length
@@ -660,8 +677,7 @@ export default function OrganizePanel({
 
   const handleProceed = useCallback(() => {
     onProceedToIdeate?.(sortedCandidates)
-    onClose()
-  }, [sortedCandidates, onProceedToIdeate, onClose])
+  }, [sortedCandidates, onProceedToIdeate])
 
   // ── Ignored collapsed section ──────────────────────────
   const [ignoredExpanded, setIgnoredExpanded] = useState(false)
@@ -673,7 +689,7 @@ export default function OrganizePanel({
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
+      position: 'fixed', top: 52, right: 0, bottom: 0, left: 148, zIndex: 1000,
       background: 'var(--bg-primary)', display: 'flex', flexDirection: 'column',
       animation: 'slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
     }}>
@@ -853,14 +869,14 @@ export default function OrganizePanel({
             </div>
           )}
 
-          {/* AI Assistants Toggle Bar */}
+          {/* 智能辅助开关 */}
           <div style={{
             padding: '5px 16px', borderBottom: '1px solid var(--border-light)',
             display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
             background: 'var(--bg-secondary)',
           }}>
             <ExperimentOutlined style={{ fontSize: 11, color: 'var(--text-tertiary)' }} />
-            <span style={{ fontSize: 10, color: 'var(--text-tertiary)', marginRight: 2 }}>AI 辅助</span>
+            <span style={{ fontSize: 10, color: 'var(--text-tertiary)', marginRight: 2 }}>智能辅助</span>
             {([
               { key: 'clustering' as const, label: '\u4e3b\u9898\u5206\u7ec4', icon: '\u{1f3f7}' },
               { key: 'priority' as const, label: '\u4f18\u5148\u63d0\u793a', icon: '\u25c6' },

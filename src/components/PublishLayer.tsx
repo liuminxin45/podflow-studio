@@ -738,7 +738,7 @@ export default function PublishLayer({
               fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7,
               marginBottom: 20,
             }}>
-              AI 编辑团队帮你优化标题、分析传播策略、检查风险。
+              智能编辑团队帮你优化标题、分析传播策略、检查风险。
               <br />每一步都可以跳过，最终决定权在你。
             </div>
 
@@ -1213,7 +1213,7 @@ export default function PublishLayer({
   // ============================================================
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
+      position: 'fixed', top: 52, right: 0, bottom: 0, left: 148, zIndex: 1000,
       background: 'var(--bg-primary)',
       display: 'flex', flexDirection: 'column',
       animation: 'slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1)',

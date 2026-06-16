@@ -729,7 +729,7 @@ export default function ManualConfigModal({ visible, onClose, initialConfig, onS
                 标签
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {['AI', '大模型', '开源', '融资', '政策', '产品', '观点', '行业'].map(tag => {
+                {['智能', '大模型', '开源', '融资', '政策', '产品', '观点', '行业'].map(tag => {
                   const isActive = item.tags.includes(tag)
                   return (
                     <div

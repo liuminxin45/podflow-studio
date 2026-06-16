@@ -13,50 +13,15 @@ import ReactFlow, {
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import type { Workflow } from '../types/workflow'
+import {
+  STAGES,
+  getStageDuration,
+  getStageStatus,
+  getStatusColor,
+  getStatusIcon,
+} from './workflowStages'
 
-// ============================================================
-// Stage definitions — creator-first workflow
-// ============================================================
-
-export interface StageDefinition {
-  id: string
-  label: string
-  subtitle: string
-  icon: string
-  subNodes: string[]
-  color: string
-}
-
-export const STAGES: StageDefinition[] = [
-  { id: 'discover', label: '发现', subtitle: '世界在发生什么', icon: '🔭', subNodes: ['fetch', 'manual', 'merge'], color: '#3b82f6' },
-  { id: 'organize', label: '整理', subtitle: '去噪、筛选、归类', icon: '�', subNodes: ['preprocess'], color: '#06b6d4' },
-  { id: 'ideate',   label: '构思', subtitle: '决定讲什么、怎么讲', icon: '💡', subNodes: ['research', 'topic_selection'], color: '#8b5cf6' },
-  { id: 'write',    label: '写作', subtitle: '把想法变成对话', icon: '✍️', subNodes: ['script'], color: '#f59e0b' },
-  { id: 'produce',  label: '制作', subtitle: '让文字变成声音', icon: '🎧', subNodes: ['tts', 'audio_postprocess', 'assets'], color: '#10b981' },
-  { id: 'publish',  label: '发布', subtitle: '检查并发给世界', icon: '🚀', subNodes: ['review', 'publish'], color: '#ef4444' },
-]
-
-// ============================================================
-// Stage status computation
-// ============================================================
-
-function getStageStatus(stage: StageDefinition, workflow: Workflow | null): string {
-  if (!workflow) return 'pending'
-  const statuses = stage.subNodes.map(n => workflow.nodeExecutions?.[n]?.status || 'pending')
-  if (statuses.some(s => s === 'failed')) return 'failed'
-  if (statuses.some(s => s === 'waiting_approval')) return 'waiting_approval'
-  if (statuses.some(s => s === 'running')) return 'running'
-  if (statuses.every(s => s === 'completed')) return 'completed'
-  if (statuses.some(s => s === 'completed')) return 'running' // partially done
-  return 'pending'
-}
-
-function getStageDuration(stage: StageDefinition, workflow: Workflow | null): number {
-  if (!workflow) return 0
-  return stage.subNodes.reduce((sum, n) => {
-    return sum + (workflow.nodeExecutions?.[n]?.duration || 0)
-  }, 0)
-}
+export { STAGES }
 
 // ============================================================
 // Visual style
@@ -87,26 +52,6 @@ function getStageStyle(status: string, stageColor: string) {
       return { ...baseStyle, border: '1.5px solid var(--warning-color)', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.15)' }
     default:
       return { ...baseStyle, border: '1.5px solid var(--border-color)' }
-  }
-}
-
-function getStatusIcon(status: string): string {
-  switch (status) {
-    case 'completed': return '✓'
-    case 'running': return '⚡'
-    case 'failed': return '✕'
-    case 'waiting_approval': return '⏸'
-    default: return '○'
-  }
-}
-
-function getStatusColor(status: string, stageColor: string): string {
-  switch (status) {
-    case 'completed': return 'var(--success-color)'
-    case 'running': return stageColor
-    case 'failed': return 'var(--error-color)'
-    case 'waiting_approval': return 'var(--warning-color)'
-    default: return 'var(--text-tertiary)'
   }
 }
 
