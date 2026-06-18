@@ -37,6 +37,8 @@ Thumbs.db
 # Test and debug files
 .codex-run/
 tests/debug/
+tmp/
+docs/acceptance/acceptance-run.*.log
 *.test.json
 script_schema*.json
 fetch_stderr.log

@@ -1,0 +1,23 @@
+id: "plugin-package"
+title: "Plugin Package Gate"
+purpose: "Require final shared .plugin build/package evidence for any frontend, native, JS, or integrated plugin change."
+source_of_truth:
+  - ".specify/memory/repository-map.md Project Path Categories"
+  - "inspect-plugin-build-plan facts"
+  - "validate-plugin-package facts"
+required_when:
+  - "frontend, native, JS, or integrated plugin source changes affect delivery"
+minimal_context:
+  - "Plugin id, package command root, expected .plugin artifact path."
+steps:
+  - "Use inspect-plugin-build-plan before broad build-script searching."
+  - "Run the shared plugin package/build command."
+  - "Run validate-plugin-package against the produced .plugin artifact."
+evidence:
+  - "Package command and result."
+  - "Final .plugin path, size, and hash."
+blockers:
+  - "No deterministic plugin package command can be identified."
+  - "Final .plugin package is missing or invalid."
+context_to_avoid:
+  - "Treating dist/, export/, plugin-out/, or runtime replacement as final plugin delivery evidence."

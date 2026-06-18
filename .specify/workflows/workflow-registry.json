@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "workflows": {
+    "speckit": {
+      "name": "Spec Kit AI Delivery Workflow",
+      "version": "2.0.0",
+      "description": "Runs a minimal AI coding loop by default and upgrades to heavier Spec Kit stages only when risk or missing evidence requires it.",
+      "source": "bundled",
+      "installed_at": "2026-06-18T08:16:34.099426+00:00",
+      "updated_at": "2026-06-18T08:16:34.099439+00:00"
+    }
+  }
+}

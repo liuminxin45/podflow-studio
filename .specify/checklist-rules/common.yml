@@ -1,0 +1,44 @@
+version: 1
+id: common
+description: Common requirement-checklist generation contract for all Spec Kit task types.
+principles:
+  - Keep the checklist structure stable: preserve template sections and CHK identifiers unless a rule pack explicitly adds a focused item.
+  - Keep generation evidence-driven: every pass, fail, or N/A judgment should be traceable to spec.md, intake.md, feature.json, constitution.md, or a named project file.
+  - Prefer precise, reviewable checks over generic quality advice.
+  - Keep LLM latitude in notes and task-specific additions, but do not let the model remove mandatory safety, compatibility, validation, or workflow checks.
+  - Mark irrelevant areas as N/A with a short reason instead of deleting them.
+  - Treat delivery_profile as a workflow-weight decision: micro-fix is allowed only when the change is small, internal, evidenced, locally verifiable, and free of status/permission/API/identity/cross-layer risk.
+  - Human review should not ask developers to confirm AI-owned technical judgments such as root cause correctness, test sufficiency, or fallback/code quality.
+  - Search plans must be bounded to affected repositories and known directories; whole-workspace scans are not the default.
+  - UI parity and host-embedded frontend work must not rely on static design files alone when layout ownership is uncertain. Require dynamic states / dynamic-state coverage, runtime DOM / computed style / box metrics, host-level validation, and bounded UI runtime investigation after the first failed layout patch.
+  - UI parity, screenshot alignment, and 0px-level visual repair must include a UI element traversal inventory before implementation: baseline anchors, affected elements, dynamic states, expected geometry/style values, current runtime evidence, deltas, and batch patch strategy.
+  - Frontend/native plugin changes must target repository source files. Installed runtime plugin directories and built artifacts are validation/deployment outputs, not durable fix locations.
+  - Spec Kit stage handoffs must follow the central Stage Continuation Contract in ai/workflows/task-routing.md; do not duplicate or weaken that gate list in generated checklists.
+  - Host-embedded frontend source edits require source edit -> frontend build -> direct runtime replacement -> real host CDP verification. Native plugin edits require source edit -> .plugin build evidence.
+  - host CDP validation must record /json/list page targets and selected target id/title/url/webSocketDebuggerUrl; Plugin Workbench, base-win.html, devtools:// DevTools pages, blank pages, and unrelated targets are wrong-target evidence for product UI.
+  - Qt-to-frontend UI parity work should use `.specify/memory/qt-source-behavior-map.md` or `ai/knowledge/qt-source-behavior-map.md` before broad workspace search, and stale/missing map rows must become bounded source evidence in the active feature.
+required_sources:
+  - specs/<feature>/spec.md
+  - .specify/feature.json
+  - .specify/memory/constitution.md
+optional_sources:
+  - specs/<feature>/intake.md
+  - specs/<feature>/plan.md
+  - nearby project files named by spec.md
+status_policy:
+  checked:
+    meaning: The spec contains enough evidence to satisfy this check.
+    required_note: Summarize the evidence in one sentence.
+  unchecked:
+    meaning: The spec is missing required evidence or has an unresolved gap.
+    required_note: State what is missing and where it should be clarified.
+  na:
+    meaning: The check does not apply to this capability.
+    required_note: State why it does not apply.
+quality_gates:
+  - No unreplaced template placeholders such as "[CAPABILITY NAME]", "[DATE]", "TBD", or "TODO".
+  - No duplicate CHK identifiers.
+  - Every N/A line includes a reason.
+  - Every unchecked line includes a reason or follow-up.
+  - The checklist links to the active spec.md.
+  - Human-facing summaries separate required human decisions from AI-owned technical review.

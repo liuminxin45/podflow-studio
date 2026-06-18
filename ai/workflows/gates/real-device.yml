@@ -1,0 +1,28 @@
+id: "real-device"
+title: "Real Device Runtime Gate"
+purpose: "Keep SDK/Biz/device behavior validation AI-owned until a real external blocker is proven."
+source_of_truth:
+  - "CoreRuntime runtime/service source"
+  - "SdkConsumer consumer tests or virtual/real device smoke"
+  - "Latest SDK/Biz logs"
+required_when:
+  - "risk_flags includes real-device"
+  - "connection, acquisition, permission, status, SDK/Biz, or runtime state behavior changes"
+minimal_context:
+  - "Changed operation and expected runtime state."
+  - "Device availability or explicit unavailability evidence."
+steps:
+  - "Run available unit, facade, SDK, virtual-device, host, or real-device smoke before human acceptance."
+  - "Inspect process liveness, refreshed runtime/UI state, and latest SDK/Biz logs."
+  - "If the smoke fails or symptom persists, collect fresh facts and rerun the source/build/runtime loop."
+  - "Skip only when device, host, permission, or automation target is unavailable after evidence-backed probing."
+evidence:
+  - "Command or interaction path."
+  - "Latest relevant SDK/Biz log facts."
+  - "Observed refreshed state or explicit blocker."
+blockers:
+  - "Required device or permission is unavailable."
+  - "Automation target cannot be reached after recovery."
+  - "Logs lack required facts and diagnostic rerun is impossible."
+context_to_avoid:
+  - "Human manual acceptance as a substitute for runnable technical validation."

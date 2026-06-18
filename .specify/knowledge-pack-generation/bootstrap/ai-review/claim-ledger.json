@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "generated_by": "bootstrap-knowledge",
+  "status": "needs_ai_review",
+  "draft_knowledge": ".specify/knowledge-bootstrap/draft/ai/knowledge",
+  "claims": [
+    {
+      "id": "repo-auto-podcast",
+      "target": "repositories/auto-podcast.md",
+      "status": "needs_ai_review",
+      "confidence": "low",
+      "source_refs": [
+        ".specify/knowledge-bootstrap/facts.json",
+        ".specify/knowledge-bootstrap/inventory.md"
+      ],
+      "ai_task": "Confirm repository role, commands, public contracts, runtime notes, and validation support from targeted source reads."
+    }
+  ]
+}

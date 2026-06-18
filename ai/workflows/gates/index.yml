@@ -1,0 +1,61 @@
+schema_version: "1.0"
+purpose: "Deterministic, load-on-demand workflow gate packs for Spec Kit stages."
+policy:
+  default_context: false
+  max_selected_gates: 6
+  selection_rule: "Match stage, affected repositories, risk flags, capability tags, and AI Context Contract terms; read only selected gate packs."
+  forbidden:
+    - "Do not load every gate pack by default."
+    - "Do not duplicate gate details inside command templates."
+    - "Do not treat selected gate packs as product source truth; code and scripts remain the detailed fact sources."
+
+gates:
+  host-cdp:
+    path: "host-cdp.yml"
+    stages: ["implement", "validation"]
+    affected_repositories: ["HostApplication", "FrontendPlugin"]
+    risk_flags: ["host-embedded-ui", "ui-parity", "real-device"]
+    capability_tags: ["frontend", "ui-behavior", "validation", "cdp"]
+    terms: ["cdp", "electron", "host", "screenshot", "dom", "computed", "box metrics"]
+  frontend-runtime-sync:
+    path: "frontend-runtime-sync.yml"
+    stages: ["implement", "validation"]
+    affected_repositories: ["FrontendPlugin", "HostApplication"]
+    risk_flags: ["host-embedded-ui", "ui-parity"]
+    capability_tags: ["frontend", "runtime", "plugin", "build"]
+    terms: ["frontend", "runtime", "sync", "dist", "plugin"]
+  plugin-package:
+    path: "plugin-package.yml"
+    stages: ["implement", "validation", "commit", "complete-branch"]
+    affected_repositories: ["FrontendPlugin", "NativePlugin", "JsPlugin", "HostApplication", "PluginCommon"]
+    risk_flags: ["host-embedded-ui", "ui-parity", "bridge-api", "cross-repo"]
+    capability_tags: ["frontend", "native", "js", "plugin", "build", "package"]
+    terms: [".plugin", "plugin package", "build-builtin-plugins", "plugin-out", "package"]
+  native-bridge:
+    path: "native-bridge.yml"
+    stages: ["plan", "implement", "validation"]
+    affected_repositories: ["NativePlugin", "PluginCommon", "CoreRuntime"]
+    risk_flags: ["bridge-api", "public-api", "cross-repo"]
+    capability_tags: ["biz-bridge", "native", "rpc", "proto"]
+    terms: ["native", "bridge", "napi", "proto", "rpc", "bundle"]
+  qt-parity:
+    path: "qt-parity.yml"
+    stages: ["plan", "implement"]
+    affected_repositories: ["FrontendPlugin", "PlatformLibs", "CoreRuntime"]
+    risk_flags: ["ui-parity"]
+    capability_tags: ["migration", "qt", "dialog", "ui-behavior"]
+    terms: ["qt", "parity", "migration", "source behavior", "dialog"]
+  ui-baseline:
+    path: "ui-baseline.yml"
+    stages: ["clarify", "plan", "implement", "validation"]
+    affected_repositories: ["FrontendPlugin", "HostApplication", "PlatformLibs"]
+    risk_flags: ["ui-parity", "host-embedded-ui"]
+    capability_tags: ["ui", "ux", "visual", "copy", "parity"]
+    terms: ["quality-vision", "baseline", "screenshot", "design", "qt ui", "qss"]
+  real-device:
+    path: "real-device.yml"
+    stages: ["plan", "implement", "validation"]
+    affected_repositories: ["CoreRuntime", "SdkConsumer", "NativePlugin"]
+    risk_flags: ["real-device", "cross-repo", "public-api"]
+    capability_tags: ["device", "sdk", "connection", "acquisition", "permission"]
+    terms: ["device", "camera", "connection", "acquisition", "permission", "status"]

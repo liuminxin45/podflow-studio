@@ -1,0 +1,23 @@
+version: 1
+id: tooling
+applies_when:
+  capability_tags:
+    - tooling
+    - cli
+    - scripts
+    - docs
+focus:
+  - Identify command names, arguments, default output paths, and generated artifacts.
+  - Keep generated output deterministic enough for review and automation.
+  - Cover error handling for missing inputs, unknown options, stale generated files, and partial outputs.
+  - Avoid runtime/device/UI smoke requirements unless the tool actually touches those layers.
+recommended_checks:
+  - id: CHK007
+    required: true
+    prompt: CLI/script/document input-output contracts are identified.
+  - id: CHK010M
+    required: true
+    prompt: Generated artifacts and ignored paths are identified so they do not pollute source diffs.
+  - id: CHK015
+    required: true
+    prompt: Validation includes a static or command-level smoke test for the tool.

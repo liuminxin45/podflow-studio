@@ -1,0 +1,36 @@
+id: "host-cdp"
+title: "HostApplication Host CDP Gate"
+purpose: "Validate host-embedded UI through the real Electron host, not an unrelated target or standalone preview."
+source_of_truth:
+  - ".specify/memory/repository-map.md HostApplication Electron / CDP Defaults"
+  - "ensure-host-cdp facts"
+  - "inspect-host-cdp-target facts or /json/list target inventory"
+required_when:
+  - "risk_flags includes host-embedded-ui, ui-parity, or real-device"
+  - "the change depends on real host rendering, routing, runtime state, or event dispatch"
+minimal_context:
+  - "Host root and CDP port from repository-map."
+  - "Selected target id/title/url/webSocketDebuggerUrl."
+  - "Changed route/component and core interactions."
+  - "Key screenshot checkpoint names, such as baseline, after-action, confirm-dialog, hover-state, or final-fixed-state."
+steps:
+  - "Run ensure-host-cdp before declaring CDP blocked."
+  - "Recover verified HostApplication/Electron/node debug owners under <host-app-root> when safe; unknown owners are blockers."
+  - "Inspect /json/list and record every page target."
+  - "Select app-home, app-main-window, or frontend/static/index.html for product UI."
+  - "Reject Plugin Workbench, base-win.html, devtools://, blank, and unrelated targets for product UI."
+  - "Capture DOM/computed style/box metrics/screenshots/interactions matching the changed behavior."
+  - "Save key-path screenshots with capture-cdp-screenshot under FEATURE_DIR/cdp-screenshots/; capture baseline/reproduced and final validated states for UI-visible behavior, plus intermediate dialog/error/hover/scroll states only when they decide acceptance."
+  - "Do not dump every minor click; screenshot checkpoints should explain the business path a human will review."
+  - "At the end of CDP validation, report the screenshot directory to the human."
+evidence:
+  - "ensure-host-cdp result or equivalent probe."
+  - "Full target inventory and selected target."
+  - "Screenshot directory FEATURE_DIR/cdp-screenshots/ plus screenshots-index.md."
+  - "Screenshot path plus DOM/style/box or interaction facts for each key checkpoint."
+blockers:
+  - "No valid host target after recovery ladder."
+  - "Only wrong targets are available."
+  - "Required route returns chrome-error://chromewebdata/ or HTTP 502 after recovery."
+context_to_avoid:
+  - "Broad HostApplication source search before the host facts above are exhausted."

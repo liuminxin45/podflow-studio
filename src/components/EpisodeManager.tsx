@@ -67,11 +67,6 @@ function formatDate(value?: string) {
   })
 }
 
-function fileUrl(filePath?: string) {
-  if (!filePath) return ''
-  return `file:///${filePath.replace(/\\/g, '/')}`
-}
-
 export default function EpisodeManager({
   episodes,
   activeWorkflowId,
@@ -91,12 +86,41 @@ export default function EpisodeManager({
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editPreviewPath, setEditPreviewPath] = useState('')
+  const [previewSources, setPreviewSources] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (activeWorkflowId) {
       setSelectedEpisodeId(activeWorkflowId)
     }
   }, [activeWorkflowId])
+
+  useEffect(() => {
+    let disposed = false
+
+    async function loadPreviewSources() {
+      const entries = await Promise.all(episodes.map(async episode => {
+        const previewPath = episode.previewPath || ''
+        if (!previewPath) return [episode.id, ''] as const
+        if (/^(https?:|data:|blob:)/i.test(previewPath)) {
+          return [episode.id, previewPath] as const
+        }
+        if (!window.electronAPI?.readImageAsDataUrl) {
+          return [episode.id, ''] as const
+        }
+        const result = await window.electronAPI.readImageAsDataUrl(previewPath)
+        return [episode.id, result.success && result.dataUrl ? result.dataUrl : ''] as const
+      }))
+
+      if (!disposed) {
+        setPreviewSources(Object.fromEntries(entries))
+      }
+    }
+
+    void loadPreviewSources()
+    return () => {
+      disposed = true
+    }
+  }, [episodes])
 
   const openEdit = (episode: WorkflowSummary) => {
     setEditing(episode)
@@ -153,7 +177,7 @@ export default function EpisodeManager({
             const active = episode.id === activeWorkflowId || episode.isCurrent
             const selected = episode.id === selectedEpisodeId
             const hovered = episode.id === hoveredEpisodeId
-            const previewSrc = fileUrl(episode.previewPath)
+            const previewSrc = previewSources[episode.id] || ''
             return (
               <div
                 key={episode.id}

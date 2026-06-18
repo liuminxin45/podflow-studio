@@ -1,0 +1,36 @@
+schema_version: "1.1"
+purpose: "Workspace-specific generated knowledge index. Review before promotion."
+policy:
+  default_context: false
+  no_full_text_search_required: true
+  repository_map_authority: ".specify/memory/repository-map.md"
+  selection_rule: "Match affected repositories, risk flags, capability tags, stage, and explicit task terms; read only the smallest useful guide set."
+  max_selected_guides: 3
+  default_authority: "generated"
+  authority_levels: [generated, reviewed, authoritative]
+
+workspace:
+  overview:
+    guide: "workspace/overview.md"
+    authority: "generated"
+    confidence: "medium"
+    tags: ["workspace", "overview", "bootstrap"]
+
+repositories:
+  auto-podcast:
+    guide: "repositories/auto-podcast.md"
+    authority: "generated"
+    confidence: "low"
+    tags: ["repository", "bootstrap"]
+
+build:
+  command-matrix:
+    guide: "build/command-matrix.yml"
+    authority: "generated"
+    confidence: "low"
+    tags: ["build", "test", "command"]
+  validation-capabilities:
+    guide: "build/validation-capabilities.yml"
+    authority: "generated"
+    confidence: "low"
+    tags: ["validation", "test", "api", "e2e"]

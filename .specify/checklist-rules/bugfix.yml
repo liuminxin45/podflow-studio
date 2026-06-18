@@ -1,0 +1,27 @@
+version: 1
+id: bugfix
+applies_when:
+  task_type: bugfix
+focus:
+  - Capture actual behavior, expected behavior, repro path, and affected layer.
+  - Tie the regression test to the failure mode.
+  - Record root-cause evidence when already known, but do not invent one during specify.
+  - Before implementation, require Root Cause Evidence covering Symptom, Call Path, Evidence, Excluded Alternatives, Counterexample, Blast Radius, Validation Mapping, and Confidence.
+  - Block plans that use a known gap to pass the exact behavior changed by the fix.
+  - Block unguarded fallback/status/permission changes that may affect real devices when the defect is virtual/simulated.
+recommended_checks:
+  - id: CHK012
+    required: true
+    prompt: The spec contains actual behavior, expected behavior, reproduction path, and regression expectation.
+  - id: CHK004
+    required: true
+    prompt: The expected fix is expressed as observable behavior rather than implementation guesses.
+  - id: CHK016
+    required: true
+    prompt: The regression validation is named or the absence is recorded as a gap.
+  - id: CHK017
+    required: true
+    prompt: Bugfix planning includes Root Cause Evidence before product-code implementation, or routes to blocked-investigation.
+  - id: CHK018
+    required: true
+    prompt: The proposed fix does not pre-write an unproven patch and covers counterexamples, blast radius, and core-path known gaps.

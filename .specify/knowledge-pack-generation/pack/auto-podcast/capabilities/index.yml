@@ -1,0 +1,33 @@
+schema_version: "1.0"
+pack_id: "auto-podcast"
+version: "0.1.0"
+progressive_disclosure: true
+default_context: false
+auto_run_scripts: false
+layers:
+  knowledge:
+    present: true
+    path: "ai/knowledge"
+  skills:
+    present: false
+    path: "skills"
+  tools:
+    present: false
+    path: "tools"
+  scripts:
+    present: false
+    path: "scripts"
+  commands:
+    present: false
+    path: "commands"
+  prompts:
+    present: false
+    path: "prompts"
+  resources:
+    present: false
+    path: "resources"
+  templates:
+    present: false
+    path: "templates"
+repack:
+  mode: "none"

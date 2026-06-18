@@ -1,0 +1,338 @@
+{
+  "tool": "compare-knowledge-pack-equivalence",
+  "status": "ok",
+  "facts": {
+    "source_knowledge_dir": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\ai-synthesis\\ai\\knowledge",
+    "pack_root": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\pack\\auto-podcast",
+    "pack_id": "auto-podcast",
+    "spec_kit_root": "E:\\Neo\\spec-kit",
+    "work_root": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48",
+    "reference_workspace": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\reference",
+    "candidate_workspace": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate",
+    "use_spec_kit_init": false,
+    "scenario_file": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\pack\\auto-podcast\\evaluation\\scenarios.json",
+    "scenario_count": 1,
+    "scores": {
+      "index_parity_percent": 100.0,
+      "indexed_guide_parity_percent": 100.0,
+      "routing_parity_percent": 100.0,
+      "validation_percent": 100.0,
+      "alias_percent": 100.0,
+      "overall_percent": 100.0,
+      "threshold_percent": 95.0
+    },
+    "index": {
+      "source_entry_count": 6,
+      "candidate_entry_count": 6,
+      "missing_entries": [],
+      "extra_entries": []
+    },
+    "guides": {
+      "matching": [
+        "ai/knowledge/build/command-matrix.yml",
+        "ai/knowledge/build/validation-capabilities.yml",
+        "ai/knowledge/domains/dynamic-config.md",
+        "ai/knowledge/domains/workflow-runtime.md",
+        "ai/knowledge/repositories/auto-podcast.md",
+        "ai/knowledge/workspace/overview.md"
+      ],
+      "different": [],
+      "extra_unindexed_candidate_files": [
+        "_schema/knowledge-guide.md",
+        "build-and-package-notes.md",
+        "build/validation-matrix.yml",
+        "compatibility-notes.md",
+        "domain-glossary.md",
+        "domains/architecture-boundaries.md",
+        "domains/electron-host-cdp.md",
+        "domains/interface-contracts.md",
+        "domains/native-plugin-bridge.md",
+        "domains/runtime-investigation.md",
+        "legacy-decisions.md",
+        "module-map.md",
+        "project-overview.md",
+        "qt-source-behavior-map.md",
+        "repositories/README.md",
+        "workspace/architecture-map.md",
+        "workspace/cross-repo-routing.md",
+        "workspace/human-clarification-patterns.md"
+      ]
+    },
+    "routing": [
+      {
+        "name": "auto-podcast-generated-routing",
+        "stage": "plan",
+        "matches": true,
+        "source_selected": [
+          "ai/knowledge/build/validation-capabilities.yml",
+          "ai/knowledge/repositories/auto-podcast.md",
+          "ai/knowledge/workspace/overview.md"
+        ],
+        "candidate_selected": [
+          "ai/knowledge/build/validation-capabilities.yml",
+          "ai/knowledge/repositories/auto-podcast.md",
+          "ai/knowledge/workspace/overview.md"
+        ]
+      }
+    ],
+    "validation": {
+      "pack": {
+        "tool": "validate-knowledge-pack",
+        "status": "ok",
+        "facts": {
+          "pack_root": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\pack\\auto-podcast",
+          "pack_id": "auto-podcast",
+          "version": "0.1.0",
+          "kind": "capability-pack",
+          "manifest": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\pack\\auto-podcast\\pack.yml",
+          "compose_strategy": "overlay-active-knowledge",
+          "index": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\pack\\auto-podcast\\ai\\knowledge\\index.yml",
+          "guide_count": 6,
+          "missing_guides": [],
+          "absolute_path_offenders": [],
+          "oversized_guides": [],
+          "invalid_authorities": [],
+          "tool_aliases": {},
+          "evaluation_scenario_count": 1,
+          "capability_index": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\pack\\auto-podcast\\capabilities\\index.yml",
+          "capability_layers": {
+            "skills": {
+              "present": false,
+              "file_count": 0
+            },
+            "tools": {
+              "present": false,
+              "file_count": 0
+            },
+            "scripts": {
+              "present": false,
+              "file_count": 0
+            },
+            "commands": {
+              "present": false,
+              "file_count": 0
+            },
+            "prompts": {
+              "present": false,
+              "file_count": 0
+            },
+            "resources": {
+              "present": false,
+              "file_count": 0
+            },
+            "templates": {
+              "present": false,
+              "file_count": 0
+            }
+          },
+          "script_hashes": []
+        },
+        "blockers": [],
+        "unknowns": [],
+        "hints": []
+      },
+      "source_knowledge": {
+        "tool": "validate-knowledge-index",
+        "status": "ok",
+        "facts": {
+          "index": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\reference\\ai\\knowledge\\index.yml",
+          "guide_count": 6,
+          "missing_guides": [],
+          "absolute_path_offenders": [],
+          "oversized_guides": [],
+          "unknown_repositories": [],
+          "invalid_authorities": [],
+          "generated_guides": [
+            "workspace.overview: workspace/overview.md",
+            "repositories.auto-podcast: repositories/auto-podcast.md",
+            "domains.workflow-runtime: domains/workflow-runtime.md",
+            "domains.dynamic-config: domains/dynamic-config.md",
+            "build.command-matrix: build/command-matrix.yml",
+            "build.validation-capabilities: build/validation-capabilities.yml"
+          ],
+          "max_selected_guides": 3
+        },
+        "blockers": [],
+        "unknowns": [],
+        "hints": []
+      },
+      "candidate_knowledge": {
+        "tool": "validate-knowledge-index",
+        "status": "ok",
+        "facts": {
+          "index": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate\\ai\\knowledge\\index.yml",
+          "guide_count": 6,
+          "missing_guides": [],
+          "absolute_path_offenders": [],
+          "oversized_guides": [],
+          "unknown_repositories": [],
+          "invalid_authorities": [],
+          "generated_guides": [
+            "workspace.overview: workspace/overview.md",
+            "repositories.auto-podcast: repositories/auto-podcast.md",
+            "domains.workflow-runtime: domains/workflow-runtime.md",
+            "domains.dynamic-config: domains/dynamic-config.md",
+            "build.command-matrix: build/command-matrix.yml",
+            "build.validation-capabilities: build/validation-capabilities.yml"
+          ],
+          "max_selected_guides": 3
+        },
+        "blockers": [],
+        "unknowns": [],
+        "hints": []
+      },
+      "candidate_generated_context": null
+    },
+    "aliases": {
+      "mappings": {},
+      "leakage_files": []
+    },
+    "apply": {
+      "tool": "apply-knowledge-pack",
+      "status": "ok",
+      "facts": {
+        "repo_root": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate",
+        "pack_id": "auto-podcast",
+        "install": {
+          "tool": "install-knowledge-pack",
+          "status": "ok",
+          "facts": {
+            "repo_root": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate",
+            "pack_id": "auto-podcast",
+            "version": "0.1.0",
+            "installed_path": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate\\.specify\\knowledge\\packs\\auto-podcast",
+            "base_knowledge": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate\\.specify\\knowledge\\base\\ai\\knowledge",
+            "validation": {
+              "tool": "validate-knowledge-pack",
+              "status": "ok",
+              "facts": {
+                "pack_root": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\pack\\auto-podcast",
+                "pack_id": "auto-podcast",
+                "version": "0.1.0",
+                "kind": "capability-pack",
+                "manifest": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\pack\\auto-podcast\\pack.yml",
+                "compose_strategy": "overlay-active-knowledge",
+                "index": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\pack\\auto-podcast\\ai\\knowledge\\index.yml",
+                "guide_count": 6,
+                "missing_guides": [],
+                "absolute_path_offenders": [],
+                "oversized_guides": [],
+                "invalid_authorities": [],
+                "tool_aliases": {},
+                "evaluation_scenario_count": 1,
+                "capability_index": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\pack\\auto-podcast\\capabilities\\index.yml",
+                "capability_layers": {
+                  "skills": {
+                    "present": false,
+                    "file_count": 0
+                  },
+                  "tools": {
+                    "present": false,
+                    "file_count": 0
+                  },
+                  "scripts": {
+                    "present": false,
+                    "file_count": 0
+                  },
+                  "commands": {
+                    "present": false,
+                    "file_count": 0
+                  },
+                  "prompts": {
+                    "present": false,
+                    "file_count": 0
+                  },
+                  "resources": {
+                    "present": false,
+                    "file_count": 0
+                  },
+                  "templates": {
+                    "present": false,
+                    "file_count": 0
+                  }
+                },
+                "script_hashes": []
+              },
+              "blockers": [],
+              "unknowns": [],
+              "hints": []
+            }
+          },
+          "blockers": [],
+          "unknowns": [],
+          "hints": [
+            "Run apply-knowledge-pack.ps1 to materialize installed pack knowledge into ai/knowledge."
+          ]
+        },
+        "profiles_applied": [],
+        "compose": {
+          "tool": "compose-knowledge-packs",
+          "status": "ok",
+          "facts": {
+            "repo_root": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate",
+            "materialized_knowledge_dir": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate\\ai\\knowledge",
+            "staging_dir": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate\\.specify\\knowledge\\materialized\\ai\\knowledge",
+            "capability_materialized_dir": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate\\.specify\\capabilities\\materialized",
+            "backup_dir": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate\\.specify\\knowledge\\backups\\20260618-162124\\ai\\knowledge",
+            "lock": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate\\.specify\\knowledge\\lock.yml",
+            "capability_lock": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate\\.specify\\capabilities\\lock.yml",
+            "applied_packs": [
+              {
+                "id": "auto-podcast",
+                "version": "0.1.0",
+                "compose_strategy": "overlay-active-knowledge",
+                "installed_path": ".specify/knowledge/packs/auto-podcast"
+              }
+            ],
+            "capability_layers_applied": [],
+            "removed_published_capabilities": [],
+            "published_capabilities": [],
+            "base_knowledge_included": true,
+            "aliases_applied": {},
+            "alias_changed_files": []
+          },
+          "blockers": [],
+          "unknowns": [],
+          "hints": []
+        },
+        "validation": {
+          "tool": "validate-knowledge-index",
+          "status": "ok",
+          "facts": {
+            "index": "C:\\Users\\leoiu\\AppData\\Local\\Temp\\speckit-knowledge-equivalence-94a70b6afe064efc976d0d41650b8b48\\candidate\\ai\\knowledge\\index.yml",
+            "guide_count": 6,
+            "missing_guides": [],
+            "absolute_path_offenders": [],
+            "oversized_guides": [],
+            "unknown_repositories": [],
+            "invalid_authorities": [],
+            "generated_guides": [
+              "workspace.overview: workspace/overview.md",
+              "repositories.auto-podcast: repositories/auto-podcast.md",
+              "domains.workflow-runtime: domains/workflow-runtime.md",
+              "domains.dynamic-config: domains/dynamic-config.md",
+              "build.command-matrix: build/command-matrix.yml",
+              "build.validation-capabilities: build/validation-capabilities.yml"
+            ],
+            "max_selected_guides": 3
+          },
+          "blockers": [],
+          "unknowns": [],
+          "hints": []
+        }
+      },
+      "blockers": [],
+      "unknowns": [],
+      "hints": [
+        "Knowledge pack is active in ai/knowledge and will be selected by the existing select-knowledge tool."
+      ]
+    },
+    "report": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\equivalence\\equivalence-report.json",
+    "summary": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\equivalence\\equivalence-summary.md",
+    "report_root": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\equivalence",
+    "work_root_removed": true
+  },
+  "blockers": [],
+  "unknowns": [],
+  "hints": []
+}

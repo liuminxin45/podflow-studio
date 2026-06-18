@@ -89,6 +89,84 @@ npm run dev
 - `npm run dev:react`：启动 Vite 前端，默认地址为 `http://localhost:5173`。
 - `npm run dev:electron`：等待 Vite 就绪后启动 Electron 桌面应用。
 
+### CDP AI 调试与自验收
+
+默认 `npm start` 不开启外部 CDP 调试端口。需要让 AI 或 Chrome DevTools 接入真实 Electron 页面时，使用：
+
+```bash
+npm run dev:cdp
+```
+
+该命令会启动 Vite 和 Electron，并让 Electron 在 `http://127.0.0.1:9222` 暴露 Chrome DevTools Protocol。它同时开启 fake media，便于调试录音链路：
+
+```text
+CDP_DEBUG=1
+CDP_PORT=9222
+CDP_FAKE_MEDIA=1
+```
+
+如果只想启动 Electron 侧 CDP，需要先保证 Vite 已运行，再执行：
+
+```bash
+npm run dev:electron:cdp
+```
+
+项目还提供内置 CDP AI 自验收入口：
+
+```bash
+npm run acceptance:cdp
+```
+
+该命令会先检查 `http://localhost:5173` 是否已有 Vite 服务：如果已有则复用，如果没有则自动启动 Vite。随后它会启动真实 Electron 应用，通过 `electron/acceptanceRunner.js` 接入 `webContents.debugger`，自动创建节目、写入脚本、模拟录音、运行音频处理和发布节点，并生成：
+
+```text
+docs/acceptance/CDP_ACCEPTANCE_REPORT.md
+docs/acceptance/screenshots/<timestamp>/
+```
+
+常用环境变量：
+
+| 变量 | 作用 |
+| --- | --- |
+| `CDP_DEBUG=1` | 开启外部 CDP 调试端口。 |
+| `CDP_PORT=9222` | 指定 CDP 端口，默认 `9222`。 |
+| `CDP_HOST=127.0.0.1` | 指定 CDP 监听地址，默认仅本机。 |
+| `CDP_FAKE_MEDIA=1` | 使用 fake microphone 和自动授权，适合录音链路验收。 |
+| `CDP_ACCEPTANCE=1` | 启动后自动运行内置 CDP 自验收。 |
+| `CDP_ACCEPTANCE_QUIT=0` | 自验收结束后不自动退出 Electron。 |
+
+## AI 项目知识包
+
+仓库已挂载面向 AI 协作的项目知识包，用于让后续开发任务能快速理解架构边界、工作流状态、Electron/CDP 调试路径和常见工程约束。
+
+主要入口：
+
+| 路径 | 作用 |
+| --- | --- |
+| `AGENTS.md` | 仓库级 AI 协作入口，说明默认上下文和任务路由。 |
+| `ai/knowledge/` | 已挂载的项目知识库，包含项目概览、模块图、接口约束、CDP 调试、动态配置和工作流运行时说明。 |
+| `ai/rules/` | AI 编码规则、架构约束和工程原则。 |
+| `ai/workflows/` | 任务路由和验收门禁配置，例如 `host-cdp`、`frontend-runtime-sync`。 |
+| `.specify/` | spec-kit 工作区配置、模板、脚本、知识包生成记录和可复用能力。 |
+| `.agents/` | 当前仓库内可直接调用的 spec-kit 技能入口。 |
+
+知识包的当前挂载结果位于：
+
+```text
+ai/knowledge/index.yml
+.specify/knowledge/materialized/ai/knowledge/index.yml
+.specify/knowledge/packs/auto-podcast/knowledge-pack.yml
+```
+
+需要检查知识索引或重新验证知识包时，可以使用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .specify/scripts/powershell/validate-knowledge-index.ps1
+powershell -ExecutionPolicy Bypass -File .specify/scripts/powershell/validate-knowledge-pack.ps1
+```
+
+其中 `ai/knowledge/` 是给日常 AI 任务读取的“已挂载视图”，`.specify/knowledge/` 保留生成、备份、质量评估和包化记录。
+
 ### 构建
 
 ```bash
@@ -206,6 +284,9 @@ TrendRadar 位于 `engine/trendradar`，作为外部热点引擎存在。Auto-Po
 npm start                 # 启动开发模式和 Electron
 npm run dev:react         # 只启动 Vite 前端
 npm run dev:electron      # 只启动 Electron，需 Vite 已就绪
+npm run dev:cdp           # 启动 Vite + Electron，并开启 CDP 调试端口
+npm run dev:electron:cdp  # 只启动带 CDP 调试端口的 Electron
+npm run acceptance:cdp    # 启动真实 Electron 并执行 CDP AI 自验收
 npm run build             # 构建前端
 npm run build:electron    # 打包桌面应用
 npm run verify            # 验证配置和节点

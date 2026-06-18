@@ -51,6 +51,14 @@ declare global {
       }) => Promise<{ success: boolean; path: string; size: number; mimeType: string; durationSeconds: number }>
       openPath: (targetPath: string) => Promise<{ success: boolean; error?: string }>
       showItemInFolder: (targetPath: string) => Promise<{ success: boolean; error?: string }>
+      readImageAsDataUrl: (targetPath: string) => Promise<{
+        success: boolean
+        error?: string
+        path?: string
+        size?: number
+        mimeType?: string
+        dataUrl?: string
+      }>
       onWorkflowUpdate: (callback: (data: Workflow | null) => void) => void
       onNeedApproval: (callback: (data: any) => void) => void
       onRadarUpdate: (callback: (data: {

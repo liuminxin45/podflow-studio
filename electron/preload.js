@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveRecording: (payload) => ipcRenderer.invoke('recording:save', payload),
   openPath: (targetPath) => ipcRenderer.invoke('file:openPath', targetPath),
   showItemInFolder: (targetPath) => ipcRenderer.invoke('file:showItemInFolder', targetPath),
+  readImageAsDataUrl: (targetPath) => ipcRenderer.invoke('file:readImageAsDataUrl', targetPath),
   onWorkflowUpdate: (callback) => ipcRenderer.on('workflow:update', (_, data) => callback(data)),
   onNeedApproval: (callback) => ipcRenderer.on('workflow:needApproval', (_, data) => callback(data)),
   onRadarUpdate: (callback) => ipcRenderer.on('radar:update', (_, data) => callback(data)),

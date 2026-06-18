@@ -1,0 +1,47 @@
+{
+  "tool": "collect-knowledge-bootstrap-facts",
+  "status": "ok",
+  "facts": {
+    "repo_root": "E:\\Neo\\auto-podcast",
+    "workspace_file": "E:\\Neo\\auto-podcast\\.specify\\workspace.yml",
+    "repository_count": 1,
+    "repositories": [
+      {
+        "name": "auto-podcast",
+        "path": ".",
+        "required": true,
+        "exists": true,
+        "markers": [
+          {
+            "marker": "package.json",
+            "kind": "node"
+          },
+          {
+            "marker": "pyproject.toml",
+            "kind": "python"
+          },
+          {
+            "marker": "README.md",
+            "kind": "readme"
+          },
+          {
+            "marker": "tests",
+            "kind": "tests"
+          }
+        ],
+        "candidate_commands": [
+          "npm install",
+          "npm test",
+          "npm run build",
+          "python -m pytest"
+        ]
+      }
+    ]
+  },
+  "blockers": [],
+  "unknowns": [],
+  "hints": [
+    "These facts are deterministic inventory, not final knowledge.",
+    "Use AI review plus source evidence before promoting generated guides."
+  ]
+}

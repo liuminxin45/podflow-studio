@@ -1,0 +1,19 @@
+version: 1
+id: new-feature
+applies_when:
+  task_type: new-feature
+focus:
+  - Explain why the work is not a direct Qt migration or bug fix.
+  - Identify the acceptance signal that proves the new capability exists.
+  - Cover new user-facing, CLI, script, document, or internal-tool contracts.
+  - Record compatibility and rollback expectations when existing workflows may be affected.
+recommended_checks:
+  - id: CHK013
+    required: true
+    prompt: The spec explains why this is a new feature and names a concrete acceptance signal.
+  - id: CHK007
+    required: true
+    prompt: The spec identifies changed public, script, CLI, data, or document contracts, or marks each as N/A.
+  - id: CHK015
+    required: true
+    prompt: The spec describes validation that can prove the capability without depending on implementation narration.

@@ -1,0 +1,19 @@
+param(
+    [string]$RepoRoot = (Get-Location).Path,
+    [string]$FeatureDir = "",
+    [string]$Stage = "",
+    [string]$DeliveryProfile = "",
+    [string]$WorkflowState = "",
+    [string]$CandidatesPath = "",
+    [switch]$Json
+)
+
+& "$PSScriptRoot/automation-common.ps1" `
+    -Tool "select-knowledge" `
+    -RepoRoot $RepoRoot `
+    -FeatureDir $FeatureDir `
+    -Stage $Stage `
+    -DeliveryProfile $DeliveryProfile `
+    -WorkflowState $WorkflowState `
+    -CandidatesPath $CandidatesPath `
+    -Json:$Json

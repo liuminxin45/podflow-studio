@@ -1,0 +1,376 @@
+schema_version: "2.0"
+name: "speckit-ai-coding-manifest"
+policy:
+  current_implementation_precedence: true
+  conflict_resolution: "keep-current-implemented-behavior"
+  automation_contract: "facts / blockers / unknowns / hints"
+  semantic_routing_owner: "LLM"
+  context_policy: "default-minimal, load-on-demand"
+  knowledge_routing: "deterministic-index, no-full-text-search"
+  gate_routing: "deterministic-gate-packs, no-command-manuals"
+
+artifact_sets:
+  default:
+    - "spec.md"
+  specify:
+    - "spec.md"
+    - "workflow-state.json"
+  plan:
+    - "spec.md"
+    - "plan.md"
+    - "workflow-state.json"
+  tasks:
+    - "spec.md"
+    - "plan.md"
+    - "tasks.md"
+    - "workflow-state.json"
+  analyze:
+    - "spec.md"
+    - "plan.md"
+    - "workflow-state.json"
+  checklist:
+    - "spec.md"
+    - "plan.md"
+    - "workflow-state.json"
+  implement:
+    - "spec.md"
+    - "plan.md"
+    - "workflow-state.json"
+  full-sdd-implement:
+    - "spec.md"
+    - "plan.md"
+    - "tasks.md"
+    - "analysis.md"
+    - "checklists/implementation-readiness.md"
+    - "workflow-state.json"
+  validation:
+    - "validation.md"
+    - "acceptance.md"
+  validation-only:
+    - "validation.md"
+  commit:
+    - "spec.md"
+    - "plan.md"
+    - "validation.md"
+    - "acceptance.md"
+    - "workflow-state.json"
+    - "workflow-record.md"
+    - "improvement-candidates.md"
+  full-sdd-commit:
+    - "spec.md"
+    - "plan.md"
+    - "tasks.md"
+    - "validation.md"
+    - "acceptance.md"
+    - "workflow-state.json"
+    - "workflow-record.md"
+    - "improvement-candidates.md"
+  retrospective:
+    - "acceptance.md"
+    - "workflow-record.md"
+    - "improvement-candidates.md"
+
+artifact_sections:
+  spec.md:
+    - "L1 Artifact Contract"
+    - "人类审核摘要"
+    - "能力概览"
+    - "能力场景"
+    - "功能需求"
+    - "验证预期"
+  plan.md:
+    - "L2 Artifact Contract"
+    - "人类审核摘要"
+    - "Root Cause Evidence"
+    - "技术上下文"
+    - "AI Context Contract"
+    - "影响模块与边界"
+    - "Quality Vision Link"
+    - "测试用例计划"
+    - "Acceptance Rubric Link"
+    - "Implementation Slices"
+    - "验证计划"
+    - "AI Self-Acceptance Contract"
+  quality-vision.md:
+    - "Scope"
+    - "UI Baseline"
+    - "Design Intent"
+  acceptance-rubric.md:
+    - "Scoring Policy"
+    - "Rubric Items"
+    - "Judge Summary"
+  tasks.md:
+    - "L3 Artifact Contract"
+    - "人类审核摘要"
+    - "Implementation Slices"
+  workflow-state.json:
+    - "attempts"
+    - "validations"
+    - "fact_layer"
+    - "acceptance"
+  validation.md:
+    - "Validation Matrix"
+    - "Result Interpretation"
+    - "Validation Context Contract"
+    - "Evidence Links"
+  evidence.md:
+    - "Evidence Index"
+    - "Commands"
+    - "Runtime Facts"
+  analysis.md:
+    - "人类审核摘要"
+    - "Specification Analysis Report"
+    - "Traceability Summary"
+    - "Suggested Next Action"
+  checklists/implementation-readiness.md:
+    - "人类审核摘要"
+    - "生成策略"
+    - "验证"
+
+stage_gates:
+  implement:
+    full-sdd:
+      required_prior_stages:
+        - "tasks"
+        - "analyze"
+        - "checklist"
+      required_artifacts:
+        - "tasks.md"
+        - "analysis.md"
+        - "checklists/implementation-readiness.md"
+    high-risk:
+      risk_levels:
+        - "high"
+        - "blocked"
+      risk_flags:
+        - "ui-parity"
+        - "host-embedded-ui"
+        - "cross-repo-validation"
+        - "public-api"
+        - "real-device"
+      required_prior_stages:
+        - "analyze"
+        - "checklist"
+      required_artifacts:
+        - "analysis.md"
+        - "checklists/implementation-readiness.md"
+
+read_strategies:
+  skills:
+    first_pass:
+      - "ai/workflows/skill-routing.yml"
+    expand_to_full_file_when:
+      - "a stage/profile/capability route selects an internal skill"
+      - "a selected skill path is needed for stage continuation"
+      - "a capability such as fact-layer, test-plan, quality-vision, acceptance-rubric, ai-self-acceptance, commit-message, repository-map, or code-simplifier is required"
+  gates:
+    first_pass:
+      - "ai/workflows/gates/index.yml"
+      - "select-gates facts.selected"
+    expand_to_full_file_when:
+      - "a selected gate pack path is returned by select-gates"
+      - "the active plan AI Context Contract names a gate pack"
+      - "a validation or implementation blocker depends on the gate evidence contract"
+  knowledge:
+    first_pass:
+      - "ai/knowledge/index.yml"
+      - "select-knowledge facts.selected"
+    expand_to_full_file_when:
+      - "a selected guide path is returned by select-knowledge"
+      - "repository-map is not enough for repository, domain, build, or validation context"
+      - "the active stage explicitly requires a validation or command matrix"
+  analyze:
+    first_pass:
+      - "artifact_sections.spec.md"
+      - "artifact_sections.plan.md"
+      - "artifact_sections.tasks.md when tasks.md exists"
+      - ".specify/feature.json routing fields"
+      - "workflow-state.json attempts/validations/fact_layer"
+    expand_to_full_file_when:
+      - "a required section is missing"
+      - "a traceability link references unstated behavior"
+      - "a blocker depends on exact surrounding prose"
+      - "a contract, UI inventory, or validation mapping is ambiguous"
+  checklist:
+    first_pass:
+      - "artifact_sections.spec.md"
+      - "artifact_sections.plan.md"
+      - "artifact_sections.tasks.md when tasks.md exists"
+      - ".specify/feature.json routing fields"
+      - "checklist-rules matching task_type"
+    expand_to_full_file_when:
+      - "a checklist item cannot be answered from required sections"
+      - "runtime evidence, contracts, or data-model artifacts are explicitly listed"
+      - "an N/A judgment needs exact owner-approved wording"
+
+layers:
+  - id: "Foundation"
+    lifecycle: "long-term"
+    responsibility:
+      - "Provide the minimum stable context: entry rules, workspace map, repository ownership, and routing."
+      - "Avoid loading broad knowledge or design-history documents by default."
+    source_assets:
+      - "templates/agents-template.md"
+      - "templates/workspace-template.yml"
+      - "templates/repository-map-template.md"
+      - "templates/pitfalls-template.md"
+      - "templates/ai/workflows/task-routing.md"
+      - "templates/ai/workflows/skill-routing.yml"
+      - "templates/ai/rules/ai-coding-rules.md"
+      - "TEAM-README.md"
+      - "workflows/speckit/workflow.yml"
+    generated_assets:
+      - "AGENTS.md"
+      - ".specify/workspace.yml"
+      - ".specify/memory/repository-map.md"
+      - ".specify/memory/pitfalls.md"
+      - ".specify/feature.json"
+      - "ai/workflows/task-routing.md"
+      - "ai/workflows/skill-routing.yml"
+    protected_current_behavior:
+      - "Repository map remains the source of truth for repo roles."
+      - "Long-term fact/rule edits require explicit human approval."
+
+  - id: "WorkItem"
+    lifecycle: "per-feature"
+    responsibility:
+      - "Hold only the active task intent, plan, executable slices, and progress."
+      - "Keep standard-bugfix compact by allowing plan.md slices instead of mandatory tasks.md."
+    source_assets:
+      - "templates/spec-template.md"
+      - "templates/plan-template.md"
+      - "templates/quality-vision-template.md"
+      - "templates/acceptance-rubric-template.md"
+      - "templates/tasks-template.md"
+      - "templates/workflow-state-template.json"
+      - "templates/commands/intake.md"
+      - "templates/commands/specify.md"
+      - "templates/commands/clarify.md"
+      - "templates/commands/plan.md"
+      - "templates/commands/test-plan.md"
+      - "templates/commands/quality-vision.md"
+      - "templates/commands/acceptance-rubric.md"
+      - "templates/commands/tasks.md"
+      - "templates/commands/analyze.md"
+      - "templates/commands/checklist.md"
+      - "templates/commands/implement.md"
+      - "templates/commands/ai-self-acceptance.md"
+      - "templates/commands/bounded-investigation.md"
+      - "scripts/powershell/select-gates.ps1"
+      - "scripts/powershell/validate-context-budget.ps1"
+      - "scripts/powershell/validate-fact-layer-gate.ps1"
+      - "scripts/powershell/validate-implementation-slices.ps1"
+      - "scripts/powershell/inspect-source-artifact-consistency.ps1"
+      - "scripts/powershell/validate-generated-context.ps1"
+    generated_assets:
+      - "specs/<feature>/spec.md"
+      - "specs/<feature>/plan.md"
+      - "specs/<feature>/quality-vision.md"
+      - "specs/<feature>/acceptance-rubric.md"
+      - "specs/<feature>/tasks.md"
+      - "specs/<feature>/progress.md"
+      - "specs/<feature>/workflow-state.json"
+      - "specs/<feature>/investigation.md"
+    protected_current_behavior:
+      - "Plugin code changes must modify repository source files, not only runtime/build artifacts."
+      - "Full-sdd keeps tasks.md; standard-bugfix may skip it when plan.md has complete slices."
+
+  - id: "Knowledge"
+    lifecycle: "long-term, load-on-demand"
+    responsibility:
+      - "Expose compact team knowledge from Codex routing assets without entering default context."
+      - "Expose compact workflow gate packs selected by stage/risk/tag instead of long command manuals."
+      - "Select guides through ai/knowledge/index.yml or select-knowledge by affected repositories, risk flags, capability tags, and stage."
+      - "Select gate packs through ai/workflows/gates/index.yml or select-gates by affected repositories, risk flags, capability tags, and stage."
+      - "Avoid full-text/BM25 search and avoid loading the whole knowledge tree."
+    source_assets:
+      - "templates/ai/workflows/gates/index.yml"
+      - "templates/ai/workflows/gates/*"
+      - "templates/ai/knowledge/index.yml"
+      - "templates/ai/knowledge/workspace/*"
+      - "templates/ai/knowledge/repositories/*"
+      - "templates/ai/knowledge/domains/*"
+      - "templates/ai/knowledge/build/*"
+      - "templates/commands/knowledge-bootstrap.md"
+      - "templates/commands/knowledge-pack.md"
+      - "templates/commands/knowledge-pack-generate.md"
+      - "scripts/powershell/select-knowledge.ps1"
+      - "scripts/powershell/select-capability.ps1"
+      - "scripts/powershell/select-gates.ps1"
+      - "scripts/powershell/validate-knowledge-index.ps1"
+      - "scripts/powershell/bootstrap-knowledge.ps1"
+      - "scripts/powershell/*knowledge-pack*.ps1"
+    generated_assets:
+      - "ai/workflows/gates/index.yml"
+      - "ai/workflows/gates/*"
+      - "ai/knowledge/index.yml"
+      - "ai/knowledge/workspace/*"
+      - "ai/knowledge/repositories/*"
+      - "ai/knowledge/domains/*"
+      - "ai/knowledge/build/*"
+    protected_current_behavior:
+      - "Repository-map remains authoritative for repository roles and paths."
+      - "Gate packs are workflow evidence maps; code and scripts remain detailed fact sources."
+      - "Knowledge guides are optional context, not workflow stage artifacts."
+      - "validate-knowledge-index guards missing guides and machine-specific paths."
+
+  - id: "Capabilities"
+    lifecycle: "long-term"
+    responsibility:
+      - "Provide executable skills and optional MCP/tool policy."
+      - "Keep capability docs out of default context unless a tool is actually used."
+    source_assets:
+      - "templates/subskills/*/SKILL.md"
+      - "templates/ai/tools/tool-registry.md"
+      - "templates/ai/tools/mcp-servers.md"
+      - "templates/ai/tools/mcp-usage-policy.md"
+      - "templates/ai/tools/mcp-permissions.md"
+      - "scripts/powershell/configure-mcp-agents.ps1"
+    generated_assets:
+      - ".agents/skills/speckit-specify/SKILL.md"
+      - ".agents/spec-kit/skills/*"
+      - "ai/tools/tool-registry.md"
+      - "ai/tools/mcp-servers.md"
+      - "ai/tools/mcp-usage-policy.md"
+      - "ai/tools/mcp-permissions.md"
+    protected_current_behavior:
+      - "Codex MCP configuration remains optional."
+      - "Write/destructive external tool actions require explicit human confirmation."
+
+  - id: "Evidence"
+    lifecycle: "mixed"
+    responsibility:
+      - "Hold validation, acceptance, runtime facts, and delivery evidence."
+      - "Use fact-pack/evidence only when the task needs them; use retrospective during delivery closure."
+      - "Keep no-push, no-merge-commit branch completion behavior."
+    source_assets:
+      - "templates/fact-pack-template.md"
+      - "templates/ai/templates/validation-template.md"
+      - "templates/ai/templates/evidence-template.md"
+      - "templates/commands/fact-layer.md"
+      - "templates/commands/validation.md"
+      - "templates/commands/acceptance.md"
+      - "templates/commands/simplify.md"
+      - "templates/commands/test-hardening.md"
+      - "templates/commands/retrospective.md"
+      - "templates/commands/promote-lessons.md"
+      - "templates/commands/commit.md"
+      - "templates/commands/complete-branch.md"
+      - "scripts/powershell/collect-fact-layer.ps1"
+      - "scripts/powershell/suggest-validation.ps1"
+      - "scripts/powershell/inspect-commit-scope.ps1"
+      - "scripts/powershell/complete-spec-branches.ps1"
+      - "scripts/powershell/parse-promotion-candidates.ps1"
+    generated_assets:
+      - "specs/<feature>/validation.md"
+      - "specs/<feature>/acceptance.md"
+      - "specs/<feature>/acceptance-checklist.md"
+      - "specs/<feature>/fact-pack.md"
+      - "specs/<feature>/evidence.md"
+      - "specs/<feature>/workflow-record.md"
+      - "specs/<feature>/improvement-candidates.md"
+      - "specs/<feature>/promotion-report.md"
+    protected_current_behavior:
+      - "Default closure is validation.md plus acceptance.md."
+      - "fact-pack.md and evidence.md are optional runtime/tool-heavy evidence."
+      - "complete-branch uses cherry-pick, not merge commits; spec branches are kept by default."

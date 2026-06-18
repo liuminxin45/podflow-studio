@@ -1,0 +1,34 @@
+id: "native-bridge"
+title: "Native Bridge And RPC Proto Gate"
+purpose: "Keep native plugin, Biz bridge, RPC proto, and frontend-visible fields consistent."
+source_of_truth:
+  - "NativePlugin source and export output"
+  - "PluginCommon native export helpers"
+  - "sync-native-runtime-artifacts facts"
+  - "validate-rpc-proto-bundle facts"
+required_when:
+  - "native addon, ServiceBridge, NAPI/JSON/RPC, proto, or bridge fields change"
+minimal_context:
+  - "Native plugin source root, export output, runtime plugin directory."
+  - "Changed message names and required fields."
+steps:
+  - "Build/export native source before runtime validation."
+  - "Use sync-native-runtime-artifacts only with an explicit runtime plugin directory."
+  - "Keep .node under runtime native/ and keep .proto/native-exports.json in the plugin root."
+  - "Reject duplicate native/*.proto unless the stale copy is removed."
+  - "Restart HostApplication after native runtime sync."
+  - "Run validate-rpc-proto-bundle for frontend-visible bridge/proto changes."
+  - "Build the final .plugin artifact through the shared plugin package flow."
+  - "Run validate-plugin-package for the produced .plugin artifact."
+evidence:
+  - "Build/export command and artifact path."
+  - "SHA256 parity from sync-native-runtime-artifacts."
+  - "RPC bundle messages/fields from validate-rpc-proto-bundle."
+  - "Final .plugin path, size, and hash."
+blockers:
+  - "Native build/export failed."
+  - "Duplicate proto files exist under runtime native/."
+  - "RPC bundle keeps a message but drops required fields."
+  - "Final .plugin package is missing or invalid."
+context_to_avoid:
+  - "Patching installed native runtime as the durable fix."

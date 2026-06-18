@@ -1,0 +1,31 @@
+id: "qt-parity"
+title: "Qt Source Behavior Parity Gate"
+purpose: "Ground frontend migration behavior in Qt source and runtime facts instead of screenshots or labels alone."
+source_of_truth:
+  - ".specify/memory/qt-source-behavior-map.md when present"
+  - "ai/knowledge/qt-source-behavior-map.md"
+  - "Bounded Qt source evidence recorded in the active feature"
+required_when:
+  - "risk_flags includes ui-parity"
+  - "task_type is migration and behavior or visible UI is being ported from Qt"
+minimal_context:
+  - "Qt UI source path/function."
+  - "Target frontend component."
+  - "Native/Biz/SDK execution path when behavior crosses layers."
+steps:
+  - "Read the Qt behavior map before broad source search."
+  - "Treat the map as preloaded team knowledge only when it has concrete rows; placeholders are not behavior evidence."
+  - "Record new facts first in the active feature artifact such as fact-pack.md, plan.md Source Behavior Execution Map, or workflow-record.md."
+  - "Record visible/enabled/order/state rules from Qt source, not labels alone."
+  - "For cross-layer behavior, write a Source Behavior Execution Map."
+  - "Promote stable rows into .specify/memory or ai/knowledge only through retrospective/promote-lessons with explicit human approval."
+  - "Return to plan or fact-layer when source behavior, DTO/state field, or runtime proof is missing."
+evidence:
+  - "Qt source reference."
+  - "Frontend target selector/component."
+  - "Runtime fact that proves parity."
+blockers:
+  - "Qt source row is missing or stale."
+  - "Behavior depends on device state but no state bit/DTO/API fact is named."
+context_to_avoid:
+  - "Broad workspace search before checking the behavior map."

@@ -1,0 +1,35 @@
+schema_version: "1.0"
+id: "auto-podcast"
+title: "auto-podcast"
+version: "0.1.0"
+kind: "capability-pack"
+description: "Portable Spec Kit capability pack. Install and compose knowledge, skills, tools, scripts, prompts, resources, and profiles into a workspace-local capability layer."
+provides:
+  knowledge: true
+  skills: false
+  tools: false
+  scripts: false
+  commands: false
+  prompts: false
+  resources: false
+  templates: false
+  workspace_profile: false
+  repository_map_profile: false
+  command_aliases: false
+  evaluation_scenarios: true
+activation:
+  mode: "overlay"
+  progressive_disclosure: true
+  auto_run_scripts: false
+  skills: "namespaced"
+  tools: "namespaced-overlay"
+  scripts: "namespaced-bin"
+authority:
+  default: "generated"
+  source_refs_required: false
+ancestry:
+  repack_mode: "none"
+  base_packs: []
+compose:
+  strategy: "overlay-active-knowledge"
+  apply_tool_aliases: true

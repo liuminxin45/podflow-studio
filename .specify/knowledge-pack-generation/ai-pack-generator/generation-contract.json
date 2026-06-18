@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0",
+  "mode": "ai-assisted-pack-generation",
+  "status": "ai_synthesis_provided",
+  "target_pack_id": "auto-podcast",
+  "repo_root": ".",
+  "bootstrap": {
+    "output_dir": ".specify\\knowledge-pack-generation\\bootstrap",
+    "facts": ".specify\\knowledge-pack-generation\\bootstrap\\facts.json",
+    "inventory": ".specify\\knowledge-pack-generation\\bootstrap\\inventory.md",
+    "review_brief": ".specify\\knowledge-pack-generation\\bootstrap\\ai-review\\review-brief.md",
+    "source_read_plan": ".specify\\knowledge-pack-generation\\bootstrap\\ai-review\\source-read-plan.md",
+    "claim_ledger": ".specify\\knowledge-pack-generation\\bootstrap\\ai-review\\claim-ledger.json"
+  },
+  "ai_synthesis_workspace": {
+    "knowledge_dir": ".specify\\knowledge-pack-generation\\ai-synthesis\\ai\\knowledge",
+    "source_knowledge_dir": ".specify\\knowledge-pack-generation\\ai-synthesis\\ai\\knowledge",
+    "pack_output_dir": ".specify\\knowledge-pack-generation\\pack\\auto-podcast"
+  },
+  "repository_candidates": [
+    "auto-podcast"
+  ],
+  "ai_responsibilities": [
+    "perform targeted source reads from the bootstrap source-read plan",
+    "turn deterministic inventory into layered knowledge guides",
+    "separate workspace, repository, build, validation, and domain facts",
+    "remove noisy or duplicated facts that do not help task routing",
+    "preserve source_refs for every durable project claim",
+    "keep unknown ownership, runtime behavior, and validation support explicit",
+    "close the quality loop by fixing source coverage and claim verification gaps"
+  ],
+  "guardrails": [
+    "do not full-text scan the whole workspace by default",
+    "do not store machine-specific absolute paths in long-term knowledge",
+    "do not raise authority above generated without human approval",
+    "do not infer repository ownership when repository-map exists"
+  ],
+  "rerun_after_ai": {
+    "script": "scripts/powershell/generate-knowledge-pack.ps1",
+    "required_args": [
+      "-RepoRoot",
+      ".",
+      "-PackId",
+      "auto-podcast",
+      "-ReviewedKnowledgeDir",
+      ".specify\\knowledge-pack-generation\\ai-synthesis\\ai\\knowledge",
+      "-MinimumQualityScore",
+      "70",
+      "-Json"
+    ]
+  }
+}

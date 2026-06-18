@@ -1,0 +1,89 @@
+schema_version: "1.0"
+purpose: "Minimal map from Spec Kit routing decisions to internal Codex skills."
+policy:
+  default_context: false
+  native_discovery_root: ".agents/skills"
+  exposed_entry_skill: ".agents/skills/speckit-specify/SKILL.md"
+  internal_skill_root: ".agents/spec-kit/skills"
+  load_only_selected_skill: true
+  selection_rule: "Use task-routing.md for profile/stage choice, then read only the matching internal skill."
+  forbidden:
+    - "Do not pre-load the internal skill directory."
+    - "Do not duplicate gate-pack, knowledge-guide, or command details in this map."
+    - "Do not treat this map as source truth for product behavior."
+
+stage_skills:
+  intake: "speckit-intake"
+  specify: "speckit-specify"
+  clarify: "speckit-clarify"
+  plan: "speckit-plan"
+  tasks: "speckit-tasks"
+  analyze: "speckit-analyze"
+  checklist: "speckit-checklist"
+  implement: "speckit-implement"
+  validation: "speckit-validation"
+  acceptance: "speckit-acceptance"
+  simplify: "speckit-simplify"
+  test-hardening: "speckit-test-hardening"
+  retrospective: "speckit-retrospective"
+  promote-lessons: "speckit-promote-lessons"
+  commit: "speckit-commit"
+  complete-branch: "speckit-complete-branch"
+
+profile_skills:
+  micro-fix: "speckit-micro-fix"
+  blocked-investigation: "speckit-bounded-investigation"
+  validation-only: "speckit-validation"
+
+capability_skills:
+  fact-layer:
+    skill: "speckit-fact-layer"
+    when:
+      - "repeated same-class failure or unchanged symptom"
+      - "runtime DOM, console, computed style, box metrics, SDK log, or Biz log evidence is needed"
+  repository-map:
+    skill: "speckit-repository-map"
+    when:
+      - "repository role, path, capability ownership, or path category facts are needed"
+  knowledge-bootstrap:
+    skill: "speckit-knowledge-bootstrap"
+    when:
+      - "workspace needs an initial or replaceable ai/knowledge base"
+      - "user asks to generate, initialize, refresh, or decouple project knowledge"
+      - "user asks to export, install, apply, mount, or compose a knowledge pack"
+  knowledge-pack-generator:
+    skill: "speckit-knowledge-pack-generator"
+    when:
+      - "user asks to generate a portable knowledge pack for an arbitrary project"
+      - "user asks for an automated AI pack generator"
+      - "project knowledge must be extracted, synthesized, and packaged through AI"
+  commit-message:
+    skill: "commit-message"
+    when:
+      - "commit message generation or validation is required"
+  code-simplifier:
+    skill: "code-simplifier"
+    when:
+      - "behavior-preserving cleanup is requested after accepted functionality"
+  test-plan:
+    skill: "speckit-test-plan"
+    when:
+      - "clarify or plan must draft API, E2E, interface, regression, fixture, or smoke test-case plans"
+      - "test-case choices need human review before implementation"
+  quality-vision:
+    skill: "speckit-quality-vision"
+    when:
+      - "clarify or plan needs UI/UX quality tier, design intent, baseline screenshot, Qt source, or owner-approved N/A"
+  acceptance-rubric:
+    skill: "speckit-acceptance-rubric"
+    when:
+      - "plan must convert requirements, test plan, and quality vision into self-contained acceptance rubrics"
+  ai-self-acceptance:
+    skill: "speckit-ai-self-acceptance"
+    when:
+      - "AI has changed code and believes a slice or implementation is complete"
+      - "AI acceptance PASS is required before human acceptance"
+
+load_paths:
+  stage_or_profile: ".agents/spec-kit/skills/<skill>/SKILL.md"
+  capability: ".agents/spec-kit/skills/<skill>/SKILL.md"

@@ -1,0 +1,22 @@
+version: 1
+id: migration
+applies_when:
+  task_type: migration
+focus:
+  - Preserve source behavior references and migration parity expectations.
+  - Require source behavior coverage for UI interaction or operation availability.
+  - Distinguish keep, change, and gap decisions.
+  - Keep compatibility and downstream validation explicit.
+recommended_checks:
+  - id: CHK011
+    required: true
+    prompt: The spec names the migration source behavior or records an owner-approved N/A.
+  - id: CHK008C
+    required_if: ui_interaction_or_operation_availability
+    prompt: Qt source behavior coverage includes object type, state, action order, visible/enabled rules, handler, and target contract source.
+  - id: CHK008D
+    required_if: qt_to_frontend_crosses_ui_biz_sdk_or_real_device_state
+    prompt: The plan includes a Source Behavior Execution Map with Qt UI source, native/Biz/SDK execution path, runtime state bit or DTO field, and validation fact.
+  - id: CHK018
+    required: true
+    prompt: Unavailable real-device or downstream validation is recorded as a known gap.

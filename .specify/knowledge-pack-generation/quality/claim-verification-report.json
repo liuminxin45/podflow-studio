@@ -1,0 +1,128 @@
+{
+  "schema_version": "1.0",
+  "claim_ledger": ".specify/knowledge-pack-generation/bootstrap/ai-review/claim-ledger.json",
+  "claim_candidate_count": 71,
+  "covered_claim_count": 71,
+  "claim_verification_percent": 100.0,
+  "guides": [
+    {
+      "guide": "ai/knowledge/workspace/overview.md",
+      "candidate_count": 8,
+      "covered_count": 8,
+      "coverage_status": "covered_by_guide_source_refs",
+      "claims": [
+        "Workspace root is a single repository named `auto-podcast`.",
+        "Primary product is Auto-Podcast Studio, an Electron desktop AI workbench for podcast production.",
+        "Main stack combines Electron, React, TypeScript, Vite, Ant Design, React Flow, Zustand, and Python workflow nodes.",
+        "Python package metadata is in `pyproject.toml`; desktop and frontend commands are in `package.json`.",
+        "The repository map is the routing authority; do not treat `src`, `electron`, `nodes`, or `engine` as separate repositories.",
+        "Source edits should be routed by layer: `src/` for frontend, `electron/` for desktop shell and IPC, `nodes/` for workflow logic, `protocol/` for shared state/config contracts.",
+        "Runtime outputs under `out/`, build outputs under `dist/`, local caches, and generated Spec Kit outputs are not durable source.",
+        "Sensitive model/API settings should be handled through app settings, local config, or environment variables rather than committed files."
+      ]
+    },
+    {
+      "guide": "ai/knowledge/repositories/auto-podcast.md",
+      "candidate_count": 12,
+      "covered_count": 12,
+      "coverage_status": "covered_by_guide_source_refs",
+      "claims": [
+        "`auto-podcast` is a single repository, not a multi-repo workspace.",
+        "Product capability covers podcast discovery, material cleanup, research/topic selection, script writing, TTS/audio production, review, and publishing.",
+        "`src/` owns the React/Vite authoring interface, workflow canvas, settings pages, workbench components, mocks, constants, and frontend types.",
+        "`electron/` owns the desktop process, preload bridge, workflow persistence, IPC handlers, Python process orchestration, config storage, TrendRadar daemon control, and acceptance runner.",
+        "`nodes/<node-name>/` owns each Python workflow step and should expose `config.py`, `node.py`, and `__main__.py`.",
+        "`protocol/` owns shared Python contracts including `PodcastState`, node runner/validator support, and config base classes.",
+        "`engine/bridge.py` adapts TrendRadar data; `engine/trendradar` should be treated as synced external source unless the task explicitly targets that engine.",
+        "`scripts/` owns automation such as node verification, config validation, schema extraction, integration tests, build checks, and TrendRadar sync.",
+        "`docs/ARCHITECTURE.md` records the node independence principle: nodes communicate through shared state rather than importing each other.",
+        "For feature work, pick the affected layer first from the repository map, then read focused files in that layer.",
+        "For workflow behavior changes, inspect the affected node, `protocol/state.py`, and Electron orchestration together.",
+        "For UI/config changes, inspect frontend components, Electron IPC/preload APIs, and Python config schema extraction together."
+      ]
+    },
+    {
+      "guide": "ai/knowledge/domains/workflow-runtime.md",
+      "candidate_count": 9,
+      "covered_count": 9,
+      "coverage_status": "covered_by_guide_source_refs",
+      "claims": [
+        "Workflow execution is a desktop-mediated pipeline: frontend requests go through Electron IPC, and Electron launches Python nodes.",
+        "Electron runs Python nodes with `python -m nodes.<node_name>` and passes the full workflow state over stdin/stdout JSON.",
+        "Frontend APIs are exposed through `electron/preload.js`; durable IPC surface includes `workflow:*`, `node:getSchema`, `config:*`, `radar:*`, and `trendradar:*`.",
+        "`PodcastState` is the shared Python state contract and includes content, topic, script, stages, audio, publish, runtime_config, logs, and errors.",
+        "Node implementations should append logs to `state[\"logs\"]` and append structured errors to `state[\"errors\"]` instead of crashing the pipeline.",
+        "Node-to-node coupling should stay through state fields; avoid importing another node's implementation from a node.",
+        "The six creator stages are discovery,整理/preprocess,构思/research-topic,写作/script,制作/audio, and发布/publish.",
+        "Workflow acceptance or UI smoke should prefer Electron/Vite runtime evidence when practical because the frontend and Electron shell both participate in behavior.",
+        "Runtime and output folders such as `out/episodes`, `out/assets`, `out/rss`, and user-data node configs are generated state, not source."
+      ]
+    },
+    {
+      "guide": "ai/knowledge/domains/dynamic-config.md",
+      "candidate_count": 9,
+      "covered_count": 9,
+      "coverage_status": "covered_by_guide_source_refs",
+      "claims": [
+        "Node configuration is designed to be schema-driven from Python config classes into the frontend UI.",
+        "Node config classes should inherit `protocol.config_base.NodeConfigBase` and use Pydantic fields for defaults, descriptions, and validation.",
+        "`LLMConfigMixin` centralizes common LLM fields such as model, API key/base, temperature, retries, and timeout.",
+        "`scripts/extract_node_schemas.py` is the source-side extraction path for turning node config classes into UI-consumable schema.",
+        "Electron exposes config schema access through `node:getSchema` and `node:getAllSchemas`.",
+        "Electron exposes persistent node config operations through `config:save`, `config:load`, `config:loadAll`, `config:delete`, and `config:resetAll`.",
+        "`electron/preload.js` is the browser-safe bridge for schema and config IPC APIs.",
+        "Add or change config fields in the Python node config first, then verify schema extraction and frontend rendering.",
+        "Fields containing secrets should remain local/user-configured and should not be committed into repository examples except as placeholders."
+      ]
+    },
+    {
+      "guide": "ai/knowledge/build/command-matrix.yml",
+      "candidate_count": 20,
+      "covered_count": 20,
+      "coverage_status": "covered_by_guide_source_refs",
+      "claims": [
+        "package.json",
+        "pyproject.toml",
+        "README.md",
+        "scripts/verify_nodes.py",
+        "scripts/test_all_nodes.py",
+        "command: \"npm install\"",
+        "command: \"npm start\"",
+        "command: \"npm run dev:react\"",
+        "command: \"npm run dev:electron\"",
+        "command: \"npm run build\"",
+        "command: \"npm run build:electron\"",
+        "command: \"npm run verify\"",
+        "command: \"npm run verify:nodes\"",
+        "command: \"npm run verify:config\"",
+        "command: \"npm run test\"",
+        "command: \"npm run test:nodes\"",
+        "command: \"npm run test:integration\"",
+        "\"Use package scripts before inventing ad hoc commands.\"",
+        "\"Python package install is editable via pyproject.toml and package postinstall.\"",
+        "\"Electron runtime validation may require Vite to be ready before launching Electron.\""
+      ]
+    },
+    {
+      "guide": "ai/knowledge/build/validation-capabilities.yml",
+      "candidate_count": 13,
+      "covered_count": 13,
+      "coverage_status": "covered_by_guide_source_refs",
+      "claims": [
+        "package.json",
+        "scripts/verify_nodes.py",
+        "scripts/test_all_nodes.py",
+        "scripts/integration_test.py",
+        "electron/acceptanceRunner.js",
+        "docs/acceptance/CDP_ACCEPTANCE_REPORT.md",
+        "\"For Python node logic, run node-specific tests or npm run test:nodes before broader integration.\"",
+        "\"For protocol or shared state changes, include node verification and integration tests.\"",
+        "\"For frontend-only changes, run npm run build and use Electron/Vite smoke when behavior is user-visible.\"",
+        "\"For Electron IPC/workflow changes, validate preload/main IPC plus runtime workflow smoke when practical.\"",
+        "\"For dynamic config changes, validate config extraction and frontend schema rendering.\"",
+        "\"E2E/UI acceptance depends on Electron runtime availability.\"",
+        "\"Generated output, screenshots, and acceptance logs are evidence, not source fixes.\""
+      ]
+    }
+  ]
+}

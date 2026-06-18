@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "workflow_model": {
+    "manifest": ".specify/templates/layer-manifest.yml",
+    "active_buckets": ["WorkItem", "Evidence"],
+    "feature_directory": "",
+    "spec_branch": "",
+    "delivery_profile": ""
+  },
+  "attempts": [
+    {
+      "id": "",
+      "area": "",
+      "target": "",
+      "result": "unknown",
+      "symptom_changed": null,
+      "fact_layer_after_failure": false,
+      "notes": ""
+    }
+  ],
+  "validations": [
+    {
+      "command": "",
+      "result": "unknown",
+      "evidence": "",
+      "sufficient_by_llm": null
+    }
+  ],
+  "fact_layer": {
+    "status": "missing",
+    "fact_pack": "",
+    "latest_sdk_log": "",
+    "latest_biz_log": "",
+    "devtools_target": ""
+  },
+  "acceptance": {
+    "status": "pending",
+    "evidence": ""
+  },
+  "retrospective": {
+    "status": "pending",
+    "workflow_record": "",
+    "improvement_candidates": "",
+    "language": "Chinese-first, preserving technical identifiers"
+  },
+  "promotion": {
+    "status": "pending",
+    "approved_candidates": [],
+    "pending_candidates": [],
+    "rejected_candidates": []
+  }
+}

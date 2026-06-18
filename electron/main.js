@@ -9,11 +9,15 @@ const { validateNodeOutput } = require('./nodeValidator')
 // shell:true is required on Windows so that .bat shims (e.g. pyenv-win) are resolved.
 const PYTHON_PATH = process.platform === 'win32' ? 'python' : 'python3'
 const SPAWN_SHELL = process.platform === 'win32'
-const CDP_ACCEPTANCE_PORT = process.env.CDP_ACCEPTANCE_PORT
+const CDP_DEBUG_ENABLED = process.env.CDP_DEBUG === '1' || process.env.CDP_ACCEPTANCE === '1'
+const CDP_PORT = process.env.CDP_PORT || process.env.CDP_ACCEPTANCE_PORT || (CDP_DEBUG_ENABLED ? '9222' : '')
+const CDP_HOST = process.env.CDP_HOST || '127.0.0.1'
 const ENABLE_FAKE_MEDIA = process.env.CDP_ACCEPTANCE === '1' || process.env.CDP_FAKE_MEDIA === '1'
 
-if (CDP_ACCEPTANCE_PORT) {
-  app.commandLine.appendSwitch('remote-debugging-port', String(CDP_ACCEPTANCE_PORT))
+if (CDP_PORT) {
+  app.commandLine.appendSwitch('remote-debugging-port', String(CDP_PORT))
+  app.commandLine.appendSwitch('remote-debugging-address', String(CDP_HOST))
+  console.log(`[CDP] Remote debugging enabled at http://${CDP_HOST}:${CDP_PORT}`)
 }
 
 if (ENABLE_FAKE_MEDIA) {
@@ -114,6 +118,22 @@ function ensureWorkflowDir() {
 
 function workflowFilePath(workflowId) {
   return path.join(WORKFLOW_DIR, `${sanitizePathPart(workflowId)}.json`)
+}
+
+function resolveProjectPath(targetPath) {
+  if (!targetPath) return ''
+  return path.isAbsolute(targetPath)
+    ? targetPath
+    : path.join(__dirname, '..', targetPath)
+}
+
+function imageMimeType(filePath) {
+  const ext = path.extname(filePath).toLowerCase()
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
+  if (ext === '.webp') return 'image/webp'
+  if (ext === '.gif') return 'image/gif'
+  if (ext === '.svg') return 'image/svg+xml'
+  return 'image/png'
 }
 
 function normalizeWorkflow(workflow) {
@@ -791,6 +811,29 @@ ipcMain.handle('file:showItemInFolder', async (event, targetPath) => {
   }
   shell.showItemInFolder(targetPath)
   return { success: true }
+})
+
+ipcMain.handle('file:readImageAsDataUrl', async (event, targetPath) => {
+  const filePath = resolveProjectPath(targetPath)
+  if (!filePath || !fs.existsSync(filePath)) {
+    return { success: false, error: 'Path does not exist' }
+  }
+  const stat = fs.statSync(filePath)
+  if (!stat.isFile()) {
+    return { success: false, error: 'Path is not a file' }
+  }
+  if (stat.size > 10 * 1024 * 1024) {
+    return { success: false, error: 'Image is larger than 10MB' }
+  }
+  const mimeType = imageMimeType(filePath)
+  const data = fs.readFileSync(filePath).toString('base64')
+  return {
+    success: true,
+    path: filePath,
+    size: stat.size,
+    mimeType,
+    dataUrl: `data:${mimeType};base64,${data}`
+  }
 })
 
 ipcMain.handle('node:getSchema', async (event, nodeName) => {

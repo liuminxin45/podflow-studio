@@ -1,0 +1,19 @@
+[
+  {
+    "name": "auto-podcast-generated-routing",
+    "stage": "plan",
+    "affected_repositories": [
+      "auto-podcast"
+    ],
+    "risk_flags": [
+      "generated-knowledge"
+    ],
+    "capability_tags": [
+      "node",
+      "python",
+      "readme",
+      "tests"
+    ],
+    "request_summary": "route generated knowledge for auto-podcast"
+  }
+]

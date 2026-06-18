@@ -1,0 +1,322 @@
+{
+  "schema_version": "1.0",
+  "repo_root": ".",
+  "knowledge_dir": ".specify/knowledge-pack-generation/ai-synthesis/ai/knowledge",
+  "bootstrap_facts": ".specify/knowledge-pack-generation/bootstrap/facts.json",
+  "guides": [
+    {
+      "category": "workspace",
+      "key": "overview",
+      "guide": "ai/knowledge/workspace/overview.md",
+      "path": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\ai-synthesis\\ai\\knowledge\\workspace\\overview.md",
+      "exists": true,
+      "has_frontmatter": true,
+      "authority": "generated",
+      "confidence": "medium",
+      "source_ref_count": 4,
+      "resolved_source_ref_count": 4,
+      "unresolved_source_refs": [],
+      "claim_candidate_count": 8,
+      "covered_claim_count": 8
+    },
+    {
+      "category": "repositories",
+      "key": "auto-podcast",
+      "guide": "ai/knowledge/repositories/auto-podcast.md",
+      "path": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\ai-synthesis\\ai\\knowledge\\repositories\\auto-podcast.md",
+      "exists": true,
+      "has_frontmatter": true,
+      "authority": "generated",
+      "confidence": "medium",
+      "source_ref_count": 5,
+      "resolved_source_ref_count": 5,
+      "unresolved_source_refs": [],
+      "claim_candidate_count": 12,
+      "covered_claim_count": 12
+    },
+    {
+      "category": "domains",
+      "key": "workflow-runtime",
+      "guide": "ai/knowledge/domains/workflow-runtime.md",
+      "path": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\ai-synthesis\\ai\\knowledge\\domains\\workflow-runtime.md",
+      "exists": true,
+      "has_frontmatter": true,
+      "authority": "generated",
+      "confidence": "medium",
+      "source_ref_count": 5,
+      "resolved_source_ref_count": 5,
+      "unresolved_source_refs": [],
+      "claim_candidate_count": 9,
+      "covered_claim_count": 9
+    },
+    {
+      "category": "domains",
+      "key": "dynamic-config",
+      "guide": "ai/knowledge/domains/dynamic-config.md",
+      "path": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\ai-synthesis\\ai\\knowledge\\domains\\dynamic-config.md",
+      "exists": true,
+      "has_frontmatter": true,
+      "authority": "generated",
+      "confidence": "medium",
+      "source_ref_count": 5,
+      "resolved_source_ref_count": 5,
+      "unresolved_source_refs": [],
+      "claim_candidate_count": 9,
+      "covered_claim_count": 9
+    },
+    {
+      "category": "build",
+      "key": "command-matrix",
+      "guide": "ai/knowledge/build/command-matrix.yml",
+      "path": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\ai-synthesis\\ai\\knowledge\\build\\command-matrix.yml",
+      "exists": true,
+      "has_frontmatter": false,
+      "authority": "generated",
+      "confidence": "medium",
+      "source_ref_count": 5,
+      "resolved_source_ref_count": 5,
+      "unresolved_source_refs": [],
+      "claim_candidate_count": 20,
+      "covered_claim_count": 20
+    },
+    {
+      "category": "build",
+      "key": "validation-capabilities",
+      "guide": "ai/knowledge/build/validation-capabilities.yml",
+      "path": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\ai-synthesis\\ai\\knowledge\\build\\validation-capabilities.yml",
+      "exists": true,
+      "has_frontmatter": false,
+      "authority": "generated",
+      "confidence": "medium",
+      "source_ref_count": 6,
+      "resolved_source_ref_count": 6,
+      "unresolved_source_refs": [],
+      "claim_candidate_count": 13,
+      "covered_claim_count": 13
+    }
+  ],
+  "source_refs": [
+    {
+      "ref": ".specify/memory/repository-map.md",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\.specify\\memory\\repository-map.md",
+      "machine_specific": false,
+      "guide": "ai/knowledge/workspace/overview.md"
+    },
+    {
+      "ref": "README.md",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\README.md",
+      "machine_specific": false,
+      "guide": "ai/knowledge/workspace/overview.md"
+    },
+    {
+      "ref": "package.json",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\package.json",
+      "machine_specific": false,
+      "guide": "ai/knowledge/workspace/overview.md"
+    },
+    {
+      "ref": "pyproject.toml",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\pyproject.toml",
+      "machine_specific": false,
+      "guide": "ai/knowledge/workspace/overview.md"
+    },
+    {
+      "ref": ".specify/memory/repository-map.md",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\.specify\\memory\\repository-map.md",
+      "machine_specific": false,
+      "guide": "ai/knowledge/repositories/auto-podcast.md"
+    },
+    {
+      "ref": "README.md",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\README.md",
+      "machine_specific": false,
+      "guide": "ai/knowledge/repositories/auto-podcast.md"
+    },
+    {
+      "ref": "docs/ARCHITECTURE.md",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\docs\\ARCHITECTURE.md",
+      "machine_specific": false,
+      "guide": "ai/knowledge/repositories/auto-podcast.md"
+    },
+    {
+      "ref": "package.json",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\package.json",
+      "machine_specific": false,
+      "guide": "ai/knowledge/repositories/auto-podcast.md"
+    },
+    {
+      "ref": "protocol/state.py",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\protocol\\state.py",
+      "machine_specific": false,
+      "guide": "ai/knowledge/repositories/auto-podcast.md"
+    },
+    {
+      "ref": "README.md",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\README.md",
+      "machine_specific": false,
+      "guide": "ai/knowledge/domains/workflow-runtime.md"
+    },
+    {
+      "ref": "electron/main.js",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\electron\\main.js",
+      "machine_specific": false,
+      "guide": "ai/knowledge/domains/workflow-runtime.md"
+    },
+    {
+      "ref": "electron/preload.js",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\electron\\preload.js",
+      "machine_specific": false,
+      "guide": "ai/knowledge/domains/workflow-runtime.md"
+    },
+    {
+      "ref": "protocol/state.py",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\protocol\\state.py",
+      "machine_specific": false,
+      "guide": "ai/knowledge/domains/workflow-runtime.md"
+    },
+    {
+      "ref": "docs/ARCHITECTURE.md",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\docs\\ARCHITECTURE.md",
+      "machine_specific": false,
+      "guide": "ai/knowledge/domains/workflow-runtime.md"
+    },
+    {
+      "ref": "README_DYNAMIC_CONFIG.md",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\README_DYNAMIC_CONFIG.md",
+      "machine_specific": false,
+      "guide": "ai/knowledge/domains/dynamic-config.md"
+    },
+    {
+      "ref": "protocol/config_base.py",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\protocol\\config_base.py",
+      "machine_specific": false,
+      "guide": "ai/knowledge/domains/dynamic-config.md"
+    },
+    {
+      "ref": "scripts/extract_node_schemas.py",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\scripts\\extract_node_schemas.py",
+      "machine_specific": false,
+      "guide": "ai/knowledge/domains/dynamic-config.md"
+    },
+    {
+      "ref": "electron/main.js",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\electron\\main.js",
+      "machine_specific": false,
+      "guide": "ai/knowledge/domains/dynamic-config.md"
+    },
+    {
+      "ref": "electron/preload.js",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\electron\\preload.js",
+      "machine_specific": false,
+      "guide": "ai/knowledge/domains/dynamic-config.md"
+    },
+    {
+      "ref": "package.json",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\package.json",
+      "machine_specific": false,
+      "guide": "ai/knowledge/build/command-matrix.yml"
+    },
+    {
+      "ref": "pyproject.toml",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\pyproject.toml",
+      "machine_specific": false,
+      "guide": "ai/knowledge/build/command-matrix.yml"
+    },
+    {
+      "ref": "README.md",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\README.md",
+      "machine_specific": false,
+      "guide": "ai/knowledge/build/command-matrix.yml"
+    },
+    {
+      "ref": "scripts/verify_nodes.py",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\scripts\\verify_nodes.py",
+      "machine_specific": false,
+      "guide": "ai/knowledge/build/command-matrix.yml"
+    },
+    {
+      "ref": "scripts/test_all_nodes.py",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\scripts\\test_all_nodes.py",
+      "machine_specific": false,
+      "guide": "ai/knowledge/build/command-matrix.yml"
+    },
+    {
+      "ref": "package.json",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\package.json",
+      "machine_specific": false,
+      "guide": "ai/knowledge/build/validation-capabilities.yml"
+    },
+    {
+      "ref": "scripts/verify_nodes.py",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\scripts\\verify_nodes.py",
+      "machine_specific": false,
+      "guide": "ai/knowledge/build/validation-capabilities.yml"
+    },
+    {
+      "ref": "scripts/test_all_nodes.py",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\scripts\\test_all_nodes.py",
+      "machine_specific": false,
+      "guide": "ai/knowledge/build/validation-capabilities.yml"
+    },
+    {
+      "ref": "scripts/integration_test.py",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\scripts\\integration_test.py",
+      "machine_specific": false,
+      "guide": "ai/knowledge/build/validation-capabilities.yml"
+    },
+    {
+      "ref": "electron/acceptanceRunner.js",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\electron\\acceptanceRunner.js",
+      "machine_specific": false,
+      "guide": "ai/knowledge/build/validation-capabilities.yml"
+    },
+    {
+      "ref": "docs/acceptance/CDP_ACCEPTANCE_REPORT.md",
+      "status": "resolved",
+      "resolved_path": "E:\\Neo\\auto-podcast\\docs\\acceptance\\CDP_ACCEPTANCE_REPORT.md",
+      "machine_specific": false,
+      "guide": "ai/knowledge/build/validation-capabilities.yml"
+    }
+  ],
+  "repositories": [
+    {
+      "name": "auto-podcast",
+      "path": ".",
+      "expected_guide": "ai/knowledge/repositories/auto-podcast.md",
+      "guide_exists": true,
+      "source_ref_count": 5,
+      "covered": true
+    }
+  ],
+  "unresolved_refs": [],
+  "machine_specific_refs": []
+}

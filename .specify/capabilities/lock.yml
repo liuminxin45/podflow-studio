@@ -1,0 +1,10 @@
+schema_version: "1.0"
+generated_by: "compose-knowledge-packs"
+materialized: ".specify/capabilities/materialized"
+auto_run_scripts: false
+packs:
+  - id: "auto-podcast"
+    version: "0.1.0"
+    installed_path: ".specify/knowledge/packs/auto-podcast"
+published:
+  []

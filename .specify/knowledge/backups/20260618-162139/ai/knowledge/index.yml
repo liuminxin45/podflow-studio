@@ -1,0 +1,101 @@
+schema_version: "1.1"
+purpose: >
+  Deterministic, low-context knowledge routing for Spec Kit workspaces. This
+  index ships as an open-source skeleton: it preserves the knowledge framework
+  while keeping project, team, and product facts out of templates. Populate
+  repository and domain entries with the knowledge-bootstrap workflow.
+
+policy:
+  default_context: false
+  no_full_text_search_required: true
+  repository_map_authority: ".specify/memory/repository-map.md"
+  selection_rule: "Match affected repositories, risk flags, capability tags, stage, and explicit task terms; read only the smallest useful guide set."
+  max_selected_guides: 3
+  default_authority: "generated"
+  authority_levels: [generated, reviewed, authoritative]
+  forbidden:
+    - "Do not override repository ownership from repository-map.md."
+    - "Do not store machine-specific absolute paths."
+    - "Do not load every knowledge file by default."
+    - "Do not promote generated knowledge without source or human review."
+
+workspace:
+  overview:
+    guide: "workspace/overview.md"
+    authority: "generated"
+    confidence: "low"
+    tags: ["workspace", "structure", "repo-map"]
+    load_when:
+      - "Need a compact workspace overview after reading repository-map.md."
+  architecture-map:
+    guide: "workspace/architecture-map.md"
+    authority: "generated"
+    confidence: "low"
+    tags: ["architecture", "layers", "ownership"]
+    load_when:
+      - "Need cross-layer architecture before planning a multi-repository change."
+  cross-repo-routing:
+    guide: "workspace/cross-repo-routing.md"
+    authority: "generated"
+    confidence: "low"
+    tags: ["routing", "cross-repo", "ownership"]
+    load_when:
+      - "Need cross-repository routing or dependency context."
+  human-clarification-patterns:
+    guide: "workspace/human-clarification-patterns.md"
+    authority: "generated"
+    confidence: "low"
+    tags: ["clarification", "human-review", "decision"]
+    load_when:
+      - "Clarify/test-plan/quality choices require human review before continuing."
+
+repositories:
+  # Repository entries are intentionally empty in the default template.
+  # Run the knowledge-bootstrap command in a real workspace to create drafts
+  # whose keys match .specify/workspace.yml repository names.
+
+domains:
+  architecture-boundaries:
+    guide: "domains/architecture-boundaries.md"
+    authority: "generated"
+    confidence: "low"
+    tags: ["architecture", "boundary", "ownership"]
+    load_when:
+      - "Task needs generic boundary guidance before workspace-specific guides exist."
+  runtime-investigation:
+    guide: "domains/runtime-investigation.md"
+    authority: "generated"
+    confidence: "low"
+    tags: ["runtime", "debug", "logs", "evidence"]
+    load_when:
+      - "Task needs runtime/debug evidence guidance before workspace-specific guides exist."
+  interface-contracts:
+    guide: "domains/interface-contracts.md"
+    authority: "generated"
+    confidence: "low"
+    tags: ["api", "contract", "compatibility"]
+    load_when:
+      - "Task touches interface contracts or compatibility rules."
+
+build:
+  command-matrix:
+    guide: "build/command-matrix.yml"
+    authority: "generated"
+    confidence: "low"
+    tags: ["build", "package", "test", "command"]
+    load_when:
+      - "Need candidate build commands for affected repositories."
+  validation-matrix:
+    guide: "build/validation-matrix.yml"
+    authority: "generated"
+    confidence: "low"
+    tags: ["validation", "test", "gates", "evidence"]
+    load_when:
+      - "Need candidate validation commands or smoke routes."
+  validation-capabilities:
+    guide: "build/validation-capabilities.yml"
+    authority: "generated"
+    confidence: "low"
+    tags: ["validation", "test", "api", "e2e", "capability-matrix"]
+    load_when:
+      - "Clarify or plan needs repository API/E2E support facts before source search."

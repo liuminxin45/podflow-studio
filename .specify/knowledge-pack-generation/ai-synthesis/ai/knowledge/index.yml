@@ -1,0 +1,48 @@
+schema_version: "1.1"
+purpose: "Generated Auto-Podcast Studio knowledge index for Spec Kit agents."
+policy:
+  default_context: false
+  no_full_text_search_required: true
+  repository_map_authority: ".specify/memory/repository-map.md"
+  selection_rule: "Match affected repository, layer tags, risk flags, stage, and explicit task terms; read only the smallest useful guide set."
+  max_selected_guides: 3
+  default_authority: "generated"
+  authority_levels: [generated, reviewed, authoritative]
+
+workspace:
+  overview:
+    guide: "workspace/overview.md"
+    authority: "generated"
+    confidence: "medium"
+    tags: ["workspace", "overview", "electron", "react", "python", "podcast"]
+
+repositories:
+  auto-podcast:
+    guide: "repositories/auto-podcast.md"
+    authority: "generated"
+    confidence: "medium"
+    tags: ["repository", "single-repo", "frontend", "electron", "python-nodes", "trendradar"]
+
+domains:
+  workflow-runtime:
+    guide: "domains/workflow-runtime.md"
+    authority: "generated"
+    confidence: "medium"
+    tags: ["workflow", "ipc", "python-node", "state", "runtime"]
+  dynamic-config:
+    guide: "domains/dynamic-config.md"
+    authority: "generated"
+    confidence: "medium"
+    tags: ["config", "schema", "pydantic", "electron-ipc", "settings"]
+
+build:
+  command-matrix:
+    guide: "build/command-matrix.yml"
+    authority: "generated"
+    confidence: "medium"
+    tags: ["build", "test", "command", "electron", "python"]
+  validation-capabilities:
+    guide: "build/validation-capabilities.yml"
+    authority: "generated"
+    confidence: "medium"
+    tags: ["validation", "test", "node", "integration", "ui-smoke"]

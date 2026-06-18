@@ -1,0 +1,26 @@
+schema_version: "1.0"
+gate: "ui-baseline"
+purpose: "Require concrete visual/design baselines before AI judges UI quality."
+default_context: false
+
+triggers:
+  stages: ["clarify", "plan", "implement", "validation"]
+  risk_flags: ["ui-parity", "host-embedded-ui"]
+  capability_tags: ["ui", "ux", "visual", "copy", "parity"]
+  terms: ["quality-vision", "baseline", "screenshot", "design", "qt ui", "qss"]
+
+required_artifacts:
+  - "quality-vision.md with quality tier and UI Baseline status"
+  - "baseline screenshot/design/Qt .ui/QSS/source or owner-approved N/A"
+  - "acceptance-rubric.md L3 UI criteria when visible behavior changed"
+
+evidence_rules:
+  - "Do not pass UI by taste alone; cite the baseline and comparison method."
+  - "For Qt parity, prefer Qt .ui/QSS/source plus runtime screenshot/CDP proof."
+  - "For host-embedded UI, use real host screenshots, DOM, computed style, and box metrics when feasible."
+  - "If no baseline exists and visual fidelity matters, route to clarify instead of implementation."
+
+failure_signals:
+  - "Missing baseline without owner-approved N/A"
+  - "Wrong target screenshot or isolated preview used as final host evidence"
+  - "Text overflow, overlap, clipping, wrong size, or layout shift against baseline"

@@ -1,0 +1,25 @@
+workspace:
+  root: "."
+  primary_repo: "auto-podcast"
+  default_base_branch: "main"
+
+branch_policy:
+  local_only: true
+  push_remote: false
+  same_branch_across_repos: false
+  require_clean_worktree: false
+  complete_by_cherry_picking_to_base: false
+  require_user_confirmation_before_cherry_pick: false
+  delete_local_spec_branch_after_cherry_pick: false
+  keep_local_spec_branch_after_cherry_pick: true
+  complete_by_merging_to_base: false
+  require_user_confirmation_before_merge: false
+  require_user_confirmation_before_commit: false
+  delete_local_spec_branch_after_merge: false
+  keep_local_spec_branch_after_merge: true
+
+repositories:
+  - name: "auto-podcast"
+    path: "."
+    role: "electron-react-python-podcast-workbench"
+    required: true

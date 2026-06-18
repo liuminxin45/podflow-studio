@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "status": "ok",
+  "total_score": 100.0,
+  "minimum_score": 70,
+  "component_scores": {
+    "index_integrity_percent": 100.0,
+    "indexed_guide_coverage_percent": 100.0,
+    "source_ref_coverage_percent": 100.0,
+    "source_ref_resolution_percent": 100.0,
+    "repository_coverage_percent": 100.0,
+    "claim_verification_percent": 100.0
+  },
+  "source_coverage_ledger": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\quality\\source-coverage-ledger.json",
+  "claim_verification_report": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\quality\\claim-verification-report.json",
+  "summary": "E:\\Neo\\auto-podcast\\.specify\\knowledge-pack-generation\\quality\\synthesis-quality-summary.md"
+}

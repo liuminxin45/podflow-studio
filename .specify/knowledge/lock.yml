@@ -1,0 +1,11 @@
+schema_version: "1.0"
+generated_by: "compose-knowledge-packs"
+materialized: "ai/knowledge"
+base: ".specify/knowledge/base/ai/knowledge"
+packs:
+  - id: "auto-podcast"
+    version: "0.1.0"
+    compose_strategy: "overlay-active-knowledge"
+    installed_path: ".specify/knowledge/packs/auto-podcast"
+aliases_applied:
+  {}

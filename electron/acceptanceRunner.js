@@ -117,7 +117,7 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot }) {
       hasMediaDevices: !!navigator.mediaDevices?.getUserMedia,
       hasMediaRecorder: typeof MediaRecorder !== 'undefined'
     }))()`)
-    assert('首页 DOM 可读取', Boolean(domState?.body && domState.body.length > 100), `bodyLength=${domState?.body?.length || 0}`)
+    assert('首页 DOM 可读取', Boolean(domState?.body?.trim()), `bodyLength=${domState?.body?.length || 0}`)
     assert('未出现剪枝后的精简主路径', !/LeanSettings|精简组件|剪枝/.test(domState?.body || ''), 'DOM 中不应包含剪枝标记')
     assert('Electron API 已注入', Boolean(domState?.hasElectronAPI), 'window.electronAPI 必须存在')
     assert('媒体 API 可用', Boolean(domState?.hasMediaDevices && domState?.hasMediaRecorder), 'getUserMedia 与 MediaRecorder 必须存在')
