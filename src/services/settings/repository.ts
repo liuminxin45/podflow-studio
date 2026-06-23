@@ -10,10 +10,53 @@ export class SettingsRepository {
       const stored = window.localStorage.getItem(SETTINGS_STORAGE_KEY)
       if (!stored) return structuredClone(DEFAULT_SETTINGS)
       const parsed = JSON.parse(stored)
+      const defaults = structuredClone(DEFAULT_SETTINGS)
       return {
+        ...defaults,
+        ...(parsed || {}),
+        capability: {
+          ...defaults.capability,
+          ...(parsed?.capability || {}),
+          search: {
+            ...defaults.capability.search,
+            ...(parsed?.capability?.search || {}),
+          },
+          text: {
+            ...defaults.capability.text,
+            ...(parsed?.capability?.text || {}),
+          },
+          audio: {
+            ...defaults.capability.audio,
+            ...(parsed?.capability?.audio || {}),
+          },
+          compliance: {
+            ...defaults.capability.compliance,
+            ...(parsed?.capability?.compliance || {}),
+          },
+        },
+        nodeBehavior: {
+          ...defaults.nodeBehavior,
+          ...(parsed?.nodeBehavior || {}),
+        },
+        creatorPreferences: {
+          ...defaults.creatorPreferences,
+          ...(parsed?.creatorPreferences || {}),
+        },
+        system: {
+          ...defaults.system,
+          ...(parsed?.system || {}),
+        },
         apiConfig: {
-          ...structuredClone(DEFAULT_SETTINGS.apiConfig),
+          ...defaults.apiConfig,
           ...(parsed?.apiConfig || {}),
+          global: {
+            ...defaults.apiConfig.global,
+            ...(parsed?.apiConfig?.global || {}),
+          },
+          nodeOverrides: {
+            ...defaults.apiConfig.nodeOverrides,
+            ...(parsed?.apiConfig?.nodeOverrides || {}),
+          },
         },
       }
     } catch (error) {

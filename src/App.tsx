@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Layout, Button, Space, Typography, ConfigProvider, theme, Modal, Tooltip } from 'antd'
 import { AudioOutlined, CloseOutlined, FolderOpenOutlined, SaveOutlined, SettingOutlined } from './icons/antdCompat'
 import ApprovalModal from './components/ApprovalModal'
@@ -25,58 +25,6 @@ import type {
 
 const { Header, Content } = Layout
 const { Title } = Typography
-const APP_SNAPSHOT_KEY = 'app.workflow.snapshot.v1'
-
-const SuspenseFallback = (
-  <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.9)', zIndex: 9999 }}>
-    <Spin size="large" tip="加载中..." />
-  </div>
-)
-
-type AppSnapshot = {
-  workflow: Workflow | null
-  selectedNode: string | null
-  studioVisible: boolean
-  discoverVisible: boolean
-  organizeVisible: boolean
-  writingVisible: boolean
-  soundStudioVisible: boolean
-  publishVisible: boolean
-  discoverCandidates: ContentItem[]
-  organizeCandidates: ContentItem[]
-  writingSeed: {
-    contentType?: ContentCreationType
-    title?: string
-    description?: string
-    initialScript?: Script
-  } | null
-  productionSeed: {
-    title: string
-    description: string
-    globalTone: string
-    segments: Array<{ id: string; type: string; label: string; content: string; estimatedSeconds: number }>
-  } | null
-}
-
-function loadAppSnapshot(): Partial<AppSnapshot> {
-  try {
-    if (typeof window === 'undefined') return {}
-    const raw = window.localStorage.getItem(APP_SNAPSHOT_KEY)
-    if (!raw) return {}
-    return JSON.parse(raw)
-  } catch {
-    return {}
-  }
-}
-
-function saveAppSnapshot(snapshot: AppSnapshot) {
-  try {
-    if (typeof window === 'undefined') return
-    window.localStorage.setItem(APP_SNAPSHOT_KEY, JSON.stringify(snapshot))
-  } catch {
-    // ignore localStorage errors
-  }
-}
 
 type UiNotice = {
   type: 'success' | 'warning' | 'error' | 'info'
@@ -185,7 +133,8 @@ function App() {
   const [approvalVisible, setApprovalVisible] = useState(false)
   const [approvalData, setApprovalData] = useState<any>(null)
   const [studioVisible, setStudioVisible] = useState(false)
-  const [studioAutoOpened, setStudioAutoOpened] = useState(false)
+  const studioAutoOpened = useRef(false)
+  const [isAutoExecute, setIsAutoExecute] = useState(false)
   const [discoverVisible, setDiscoverVisible] = useState(false)
   const [organizeVisible, setOrganizeVisible] = useState(false)
   const [discoverCandidates, setDiscoverCandidates] = useState<ContentItem[]>([])
@@ -348,9 +297,7 @@ function App() {
 
       // Check if this is auto-execute mode
       const isAuto = Boolean(data?.state?.runtime_config?.auto_execute)
-      if (isAuto !== isAutoExecute) {
-        setIsAutoExecute(isAuto)
-      }
+      setIsAutoExecute(isAuto)
 
       // Manual mode only: open CreationStudio when organize completes and ideate begins
       if (!isAuto && !studioAutoOpened.current && data?.nodeExecutions) {
@@ -366,7 +313,7 @@ function App() {
           )
           if (organizeComplete && ideateStarted) {
             openStage('ideate')
-            setStudioAutoOpened(true)
+            studioAutoOpened.current = true
           }
         }
       }
@@ -380,7 +327,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    setStudioAutoOpened(false)
+    studioAutoOpened.current = false
     setDiscoverCandidates(workflow?.state?.selected_materials || workflow?.state?.raw_contents || [])
     setOrganizeCandidates(workflow?.state?.organize_ui?.candidates || workflow?.state?.cleaned_contents || [])
   }, [workflow?.id])
@@ -861,6 +808,7 @@ function App() {
           initialCandidates={(workflow?.state?.organize_ui?.candidates || workflow?.state?.cleaned_contents || []) as any}
           initialIgnoredIds={(workflow?.state?.organize_ui?.ignoredIds || []) as any}
           initialMode={(workflow?.state?.organize_ui?.mode || 'quick') as any}
+          isAutoExecute={isAutoExecute}
           onStateChange={(state) => {
             void updateWorkflowPatch({
               organize_ui: state,
@@ -887,6 +835,7 @@ function App() {
             : (workflow?.state?.raw_contents || [])}
           selectedTopic={workflow?.state?.selected_topic}
           initialBlocks={(workflow?.state?.episode_brief?.blocks || []) as any}
+          isAutoExecute={isAutoExecute}
           onStateChange={(structure) => {
             void updateWorkflowPatch({
               selected_topic: {
@@ -908,9 +857,8 @@ function App() {
             })
             closeAllPanels()
               setWritingVisible(true)
-            }}
-          />
-        </Suspense>
+          }}
+        />
 
         <WritingLayer
           key={`writing-${workflow?.id || 'none'}`}
@@ -926,9 +874,8 @@ function App() {
             await updateWorkflowPatch(patch)
             closeAllPanels()
               setSoundStudioVisible(true)
-            }}
-          />
-        </Suspense>
+          }}
+        />
 
         <SoundStudio
           key={`sound-${workflow?.id || 'none'}`}

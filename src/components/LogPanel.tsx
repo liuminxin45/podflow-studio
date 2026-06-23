@@ -1,5 +1,16 @@
-import { Tabs, Badge, Empty, Button } from 'antd'
-import { FileTextOutlined, WarningOutlined, DownOutlined, UpOutlined } from '../icons/antdCompat'
+import { useEffect, useRef, useState } from 'react'
+import { Tabs, Badge, Empty, Button, Tag, message } from 'antd'
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
+  CopyOutlined,
+  DownOutlined,
+  FileTextOutlined,
+  SyncOutlined,
+  UpOutlined,
+  WarningOutlined,
+} from '../icons/antdCompat'
 
 interface Props {
   workflow: any
@@ -14,8 +25,7 @@ export default function LogPanel({ workflow, collapsed = false, onToggle, showTo
   const errors = state.errors || []
   const nodeExecutions = workflow?.nodeExecutions || {}
   const logContainerRef = useRef<HTMLDivElement>(null)
-  const [filterText, setFilterText] = useState('')
-  const [autoScroll, setAutoScroll] = useState(true)
+  const [autoScroll] = useState(true)
 
   useEffect(() => {
     if (autoScroll && logContainerRef.current) {
@@ -23,10 +33,6 @@ export default function LogPanel({ workflow, collapsed = false, onToggle, showTo
     }
   }, [logs.length, autoScroll])
 
-  const filteredLogs = filterText
-    ? logs.filter((log: string) => log.toLowerCase().includes(filterText.toLowerCase()))
-    : logs
-  
   const handleCopyLogs = () => {
     const logsText = logs.join('\n')
     navigator.clipboard.writeText(logsText).then(() => {

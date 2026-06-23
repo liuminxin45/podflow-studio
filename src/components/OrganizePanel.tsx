@@ -16,6 +16,8 @@ import {
   FilterOutlined,
   ExperimentOutlined,
   EditOutlined,
+  LoadingOutlined,
+  RobotOutlined,
 } from '../icons/antdCompat'
 import type { ContentItem } from '../types/workflow'
 import { runFullAnalysis, PRIORITY_HINT_CONFIG, type AIAnalysisResult, type ItemAIHints, type TopicCluster } from '../utils/contentAnalysis'
@@ -45,6 +47,7 @@ interface Props {
   initialCandidates?: CandidateItem[]
   initialIgnoredIds?: number[]
   initialMode?: ViewMode
+  isAutoExecute?: boolean
   onProceedToIdeate?: (candidates: CandidateItem[]) => void
   onStateChange?: (state: { candidates: CandidateItem[]; ignoredIds: number[]; mode: ViewMode }) => void
 }
@@ -433,6 +436,7 @@ export default function OrganizePanel({
   initialCandidates = [],
   initialIgnoredIds = [],
   initialMode = 'quick',
+  isAutoExecute = false,
   onProceedToIdeate,
   onStateChange,
 }: Props) {

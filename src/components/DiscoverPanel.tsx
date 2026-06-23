@@ -3,6 +3,7 @@ import { Button, Empty, Input, InputNumber, Select, Switch, Tooltip } from 'antd
 import {
   ArrowLeftOutlined,
   ArrowRightOutlined,
+  BulbOutlined,
   CheckCircleOutlined,
   CloseOutlined,
   DatabaseOutlined,
@@ -16,6 +17,7 @@ import {
   SyncOutlined,
   WarningOutlined,
 } from '../icons/antdCompat'
+import AutoTopicModal from './AutoTopicModal'
 import type { ContentItem } from '../types/workflow'
 import type {
   TrendRadarConfigView,
@@ -28,13 +30,6 @@ import type {
 } from '../types/trendradar'
 
 type Notice = { type: 'info' | 'success' | 'warning' | 'error'; text: string } | null
-
-type FetchRunLog = {
-  id: string
-  at: number
-  level: 'info' | 'success' | 'error'
-  text: string
-}
 
 interface Props {
   visible: boolean
@@ -54,20 +49,54 @@ interface Props {
 }
 
 const DEFAULT_CONFIG: TrendRadarConfigView = {
+  timezone: 'Asia/Shanghai',
+  show_version_update: true,
   platforms_enabled: true,
   rss_enabled: true,
   enabled_platforms: [],
   enabled_rss_feeds: [],
   max_items_per_source: 30,
   freshness_days: 3,
+  rss_freshness_enabled: true,
+  rss_request_interval: 1000,
+  rss_timeout: 15,
+  rss_proxy_enabled: false,
+  rss_proxy_url: '',
+  crawler_request_interval: 2000,
   filter_method: 'keyword',
+  filter_priority_sort_enabled: true,
   ai_available: false,
+  ai_api_key_set: false,
+  ai_provider_source: 'none',
   ai_model: '',
+  ai_api_base: '',
+  ai_timeout: 120,
+  ai_temperature: 1,
+  ai_max_tokens: 5000,
+  ai_num_retries: 1,
+  ai_fallback_models: [],
+  ai_filter_batch_size: 200,
+  ai_filter_batch_interval: 2,
+  ai_filter_min_score: 0.7,
+  ai_filter_reclassify_threshold: 0.6,
+  ai_interests_file: '',
+  ai_filter_prompt_file: 'prompt.txt',
+  ai_filter_extract_prompt_file: 'extract_prompt.txt',
+  ai_filter_update_tags_prompt_file: 'update_tags_prompt.txt',
   api_url: '',
   proxy_enabled: false,
   proxy_url: '',
   schedule_preset: 'morning_evening',
   report_mode: 'current',
+  report_display_mode: 'keyword',
+  sort_by_position_first: true,
+  rank_threshold: 30,
+  max_news_per_keyword: 3,
+  display_standalone_enabled: false,
+  standalone_platforms: [],
+  standalone_rss_feeds: [],
+  standalone_max_items: 5,
+  debug: false,
 }
 
 function identity(item: ContentItem): string {
@@ -91,6 +120,21 @@ function noticeStyle(type: NonNullable<Notice>['type']) {
   if (type === 'warning') return { background: 'var(--warning-bg)', color: 'var(--warning-color)', borderColor: '#ead9a4' }
   if (type === 'success') return { background: 'var(--success-bg)', color: 'var(--success-color)', borderColor: '#cadfca' }
   return { background: 'var(--info-bg)', color: 'var(--info-color)', borderColor: '#c6dfef' }
+}
+
+function aiProviderText(config: TrendRadarConfigView): string {
+  if (config.ai_provider_source === 'app') return 'Settings 中的发现/搜索模型'
+  if (config.ai_provider_source === 'env') return '环境变量 AI_MODEL / AI_API_KEY'
+  if (config.ai_provider_source === 'trendradar') return 'TrendRadar 默认 AI 配置'
+  return 'Settings 或 TrendRadar 环境配置'
+}
+
+function listToInput(value?: string[]): string {
+  return (value || []).join(', ')
+}
+
+function inputToList(value: string): string[] {
+  return value.split(',').map(part => part.trim()).filter(Boolean)
 }
 
 export default function DiscoverPanel({
@@ -123,16 +167,7 @@ export default function DiscoverPanel({
   const [checkingUpdate, setCheckingUpdate] = useState(false)
   const [updatingDependency, setUpdatingDependency] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
-
-  const appendFetchLog = useCallback((level: FetchRunLog['level'], text: string) => {
-    const entry: FetchRunLog = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      at: Date.now(),
-      level,
-      text,
-    }
-    setFetchRunLogs(prev => [entry, ...prev].slice(0, 20))
-  }, [])
+  const [autoTopicModalVisible, setAutoTopicModalVisible] = useState(false)
 
   useEffect(() => {
     if (!visible) return
@@ -371,6 +406,31 @@ export default function DiscoverPanel({
               />
             </label>
             <label className="discover-field">
+              <span>时区</span>
+              <Input
+                value={config.timezone || ''}
+                placeholder="Asia/Shanghai"
+                onChange={event => updateConfig({ timezone: event.target.value })}
+              />
+            </label>
+            <label className="discover-field">
+              <span>热榜间隔</span>
+              <InputNumber
+                min={0}
+                max={30000}
+                addonAfter="ms"
+                value={config.crawler_request_interval}
+                onChange={value => updateConfig({ crawler_request_interval: Number(value ?? 2000) })}
+              />
+            </label>
+            <label className="discover-switch-row">
+              <span>RSS 新鲜度过滤</span>
+              <Switch
+                checked={config.rss_freshness_enabled !== false}
+                onChange={checked => updateConfig({ rss_freshness_enabled: checked })}
+              />
+            </label>
+            <label className="discover-field">
               <span>RSS 新鲜度</span>
               <InputNumber
                 min={0}
@@ -381,21 +441,287 @@ export default function DiscoverPanel({
               />
             </label>
             <label className="discover-field">
+              <span>RSS 间隔</span>
+              <InputNumber
+                min={0}
+                max={30000}
+                addonAfter="ms"
+                value={config.rss_request_interval}
+                onChange={value => updateConfig({ rss_request_interval: Number(value ?? 1000) })}
+              />
+            </label>
+            <label className="discover-field">
+              <span>RSS 超时</span>
+              <InputNumber
+                min={1}
+                max={120}
+                addonAfter="秒"
+                value={config.rss_timeout}
+                onChange={value => updateConfig({ rss_timeout: Number(value ?? 15) })}
+              />
+            </label>
+            <label className="discover-switch-row">
+              <span>RSS 代理</span>
+              <Switch checked={!!config.rss_proxy_enabled} onChange={checked => updateConfig({ rss_proxy_enabled: checked })} />
+            </label>
+            {config.rss_proxy_enabled && (
+              <Input
+                value={config.rss_proxy_url || ''}
+                placeholder="http://127.0.0.1:10801"
+                onChange={event => updateConfig({ rss_proxy_url: event.target.value })}
+              />
+            )}
+            <label className="discover-field">
               <span>筛选方式</span>
               <Select
                 value={config.filter_method}
                 onChange={value => updateConfig({ filter_method: value })}
                 options={[
                   { value: 'keyword', label: '关键词' },
-                  { value: 'ai', label: config.ai_available ? 'AI 智能筛选' : 'AI 智能筛选（未配置）', disabled: !config.ai_available },
+                  { value: 'ai', label: 'AI 智能筛选' },
                 ]}
               />
             </label>
-            {!config.ai_available && (
-              <div className="discover-hint warning">
-                <WarningOutlined /> AI 筛选依赖 TrendRadar 的 AI API Key。未配置前只能使用关键词筛选。
+            {config.filter_method === 'ai' && (
+              <div className={`discover-hint ${config.ai_available ? 'info' : 'warning'}`}>
+                {config.ai_available ? <InfoCircleOutlined /> : <WarningOutlined />}
+                {config.ai_available
+                  ? `AI 筛选将使用 ${aiProviderText(config)}，并按 TrendRadar 6.10 的 ai_filter 配置执行。`
+                  : 'AI 筛选已可选择；运行时会优先读取 Settings 的发现/搜索模型，其次读取 AI_MODEL / AI_API_KEY 环境变量。'}
               </div>
             )}
+            {config.filter_method === 'ai' && (
+              <>
+                <label className="discover-field">
+                  <span>AI 模型</span>
+                  <Input
+                    value={config.ai_model || ''}
+                    placeholder="留空使用 Settings 或 TrendRadar 默认模型"
+                    onChange={event => updateConfig({ ai_model: event.target.value })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>AI API Base</span>
+                  <Input
+                    value={config.ai_api_base || ''}
+                    placeholder="留空使用 Settings 或 TrendRadar 默认接口"
+                    onChange={event => updateConfig({ ai_api_base: event.target.value })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>AI 超时</span>
+                  <InputNumber
+                    min={1}
+                    max={600}
+                    addonAfter="秒"
+                    value={config.ai_timeout}
+                    onChange={value => updateConfig({ ai_timeout: Number(value ?? 120) })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>温度</span>
+                  <InputNumber
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    value={config.ai_temperature}
+                    onChange={value => updateConfig({ ai_temperature: Number(value ?? 1) })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>最大 Tokens</span>
+                  <InputNumber
+                    min={0}
+                    max={64000}
+                    value={config.ai_max_tokens}
+                    onChange={value => updateConfig({ ai_max_tokens: Number(value ?? 5000) })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>重试次数</span>
+                  <InputNumber
+                    min={0}
+                    max={10}
+                    value={config.ai_num_retries}
+                    onChange={value => updateConfig({ ai_num_retries: Number(value ?? 1) })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>备用模型</span>
+                  <Input
+                    value={listToInput(config.ai_fallback_models)}
+                    placeholder="model-a, model-b"
+                    onChange={event => updateConfig({ ai_fallback_models: inputToList(event.target.value) })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>兴趣文件</span>
+                  <Input
+                    value={config.ai_interests_file || ''}
+                    placeholder="默认 ai_interests.txt；自定义文件放 config/custom/ai"
+                    onChange={event => updateConfig({ ai_interests_file: event.target.value })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>分类提示词</span>
+                  <Input
+                    value={config.ai_filter_prompt_file || ''}
+                    placeholder="prompt.txt"
+                    onChange={event => updateConfig({ ai_filter_prompt_file: event.target.value })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>标签提示词</span>
+                  <Input
+                    value={config.ai_filter_extract_prompt_file || ''}
+                    placeholder="extract_prompt.txt"
+                    onChange={event => updateConfig({ ai_filter_extract_prompt_file: event.target.value })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>更新提示词</span>
+                  <Input
+                    value={config.ai_filter_update_tags_prompt_file || ''}
+                    placeholder="update_tags_prompt.txt"
+                    onChange={event => updateConfig({ ai_filter_update_tags_prompt_file: event.target.value })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>最低分数</span>
+                  <InputNumber
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={config.ai_filter_min_score}
+                    onChange={value => updateConfig({ ai_filter_min_score: Number(value ?? 0.7) })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>重分类阈值</span>
+                  <InputNumber
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={config.ai_filter_reclassify_threshold}
+                    onChange={value => updateConfig({ ai_filter_reclassify_threshold: Number(value ?? 0.6) })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>AI 批大小</span>
+                  <InputNumber
+                    min={1}
+                    max={500}
+                    value={config.ai_filter_batch_size}
+                    onChange={value => updateConfig({ ai_filter_batch_size: Number(value || 200) })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>批间隔</span>
+                  <InputNumber
+                    min={0}
+                    max={60}
+                    addonAfter="秒"
+                    value={config.ai_filter_batch_interval}
+                    onChange={value => updateConfig({ ai_filter_batch_interval: Number(value ?? 2) })}
+                  />
+                </label>
+                <label className="discover-switch-row">
+                  <span>按兴趣顺序排序</span>
+                  <Switch
+                    checked={config.filter_priority_sort_enabled !== false}
+                    onChange={checked => updateConfig({ filter_priority_sort_enabled: checked })}
+                  />
+                </label>
+              </>
+            )}
+            <label className="discover-field">
+              <span>报告模式</span>
+              <Select
+                value={config.report_mode || 'current'}
+                onChange={value => updateConfig({ report_mode: value })}
+                options={[
+                  { value: 'current', label: '当前模式' },
+                  { value: 'daily', label: '日报模式' },
+                  { value: 'incremental', label: '增量模式' },
+                ]}
+              />
+            </label>
+            <label className="discover-field">
+              <span>展示分组</span>
+              <Select
+                value={config.report_display_mode || 'keyword'}
+                onChange={value => updateConfig({ report_display_mode: value })}
+                options={[
+                  { value: 'keyword', label: '按主题' },
+                  { value: 'platform', label: '按平台' },
+                ]}
+              />
+            </label>
+            <label className="discover-field">
+              <span>排名阈值</span>
+              <InputNumber
+                min={0}
+                max={100}
+                value={config.rank_threshold}
+                onChange={value => updateConfig({ rank_threshold: Number(value ?? 30) })}
+              />
+            </label>
+            <label className="discover-field">
+              <span>每主题上限</span>
+              <InputNumber
+                min={0}
+                max={100}
+                value={config.max_news_per_keyword}
+                onChange={value => updateConfig({ max_news_per_keyword: Number(value ?? 3) })}
+              />
+            </label>
+            <label className="discover-switch-row">
+              <span>优先来源位置</span>
+              <Switch
+                checked={config.sort_by_position_first !== false}
+                onChange={checked => updateConfig({ sort_by_position_first: checked })}
+              />
+            </label>
+            <label className="discover-switch-row">
+              <span>独立展示</span>
+              <Switch
+                checked={!!config.display_standalone_enabled}
+                onChange={checked => updateConfig({ display_standalone_enabled: checked })}
+              />
+            </label>
+            {config.display_standalone_enabled && (
+              <>
+                <label className="discover-field">
+                  <span>独立平台</span>
+                  <Input
+                    value={listToInput(config.standalone_platforms)}
+                    placeholder="douyin, bilibili"
+                    onChange={event => updateConfig({ standalone_platforms: inputToList(event.target.value) })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>独立 RSS</span>
+                  <Input
+                    value={listToInput(config.standalone_rss_feeds)}
+                    placeholder="tech_news"
+                    onChange={event => updateConfig({ standalone_rss_feeds: inputToList(event.target.value) })}
+                  />
+                </label>
+                <label className="discover-field">
+                  <span>独立条数</span>
+                  <InputNumber
+                    min={1}
+                    max={50}
+                    value={config.standalone_max_items}
+                    onChange={value => updateConfig({ standalone_max_items: Number(value ?? 5) })}
+                  />
+                </label>
+              </>
+            )}
+            <label className="discover-switch-row">
+              <span>调试日志</span>
+              <Switch checked={!!config.debug} onChange={checked => updateConfig({ debug: checked })} />
+            </label>
             <label className="discover-field">
               <span>NewsNow API</span>
               <Input
@@ -565,6 +891,17 @@ export default function DiscoverPanel({
           </div>
         </aside>
       </main>
+      <AutoTopicModal
+        visible={autoTopicModalVisible}
+        onClose={() => setAutoTopicModalVisible(false)}
+        fetchContents={currentItems}
+        llmConfig={null}
+        onRunFetch={handleRunOnce}
+        onComplete={(selected) => {
+          setSelectedKeys(new Set(selected.map(identity)))
+          setAutoTopicModalVisible(false)
+        }}
+      />
     </div>
   )
 }

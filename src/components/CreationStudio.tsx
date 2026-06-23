@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { Input, Tag, Button, Empty, Badge, Tooltip, Dropdown } from 'antd'
 import type { ContentCreationType } from '../types/workflow'
 import type { EnhancedMaterial, StructureBlock, StructureBlockType } from '../types/ideation'
@@ -25,6 +26,8 @@ import {
   CheckCircleOutlined,
   SaveOutlined,
   HistoryOutlined,
+  LeftOutlined,
+  RobotOutlined,
 } from '../icons/antdCompat'
 
 const { TextArea } = Input
@@ -37,6 +40,8 @@ type BlockTemplate = {
   type: StructureBlockType
   title: string
 }
+
+type MaterialItem = EnhancedMaterial
 
 const CONTENT_BLOCK_PRESETS: Record<ContentCreationType, BlockTemplate[]> = {
   story: [
@@ -81,8 +86,9 @@ interface Props {
   selectedTopic?: { title?: string; description?: string }
   selectedMaterials?: MaterialItem[]
   initialBlocks?: StructureBlock[]
-  onStateChange?: (structure: { topic: any; materials: MaterialItem[]; blocks: StructureBlock[] }) => void
-  onConfirm?: (structure: { topic: any; materials: MaterialItem[]; blocks: StructureBlock[] }) => void
+  isAutoExecute?: boolean
+  onStateChange?: (structure: { contentType?: ContentCreationType; topic: any; materials: MaterialItem[]; blocks: StructureBlock[] }) => void
+  onConfirm?: (structure: { contentType?: ContentCreationType; topic: any; materials: MaterialItem[]; blocks: StructureBlock[] }) => void
 }
 
 // ============================================================
@@ -96,6 +102,7 @@ export default function CreationStudio({
   rawContents = [],
   selectedTopic,
   initialBlocks,
+  isAutoExecute = false,
   onStateChange,
   onConfirm,
 }: Props) {

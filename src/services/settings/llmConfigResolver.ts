@@ -22,6 +22,11 @@ export interface AudioProviderConfig {
   doubaoEndpoint: string
 }
 
+function toRuntimeAudioProvider(provider: unknown): AudioProviderConfig['provider'] {
+  if (provider === 'doubao_tts' || provider === 'voice_clone') return provider
+  return 'openai_compatible'
+}
+
 export class LLMConfigResolver {
   getLLMConfig(nodeId: StageId): LLMConfig | null {
     const settings = settingsRepository.load()
@@ -88,9 +93,9 @@ export class LLMConfigResolver {
     }
 
     if (produceNode?.overrideMode === 'custom' && produceNode.apiKeySet && produceNode.apiKey) {
-      const provider = String(global.audioProvider || 'openai_compatible')
+      const provider = toRuntimeAudioProvider(global.audioProvider)
       return {
-        provider: (provider === 'doubao_tts' || provider === 'voice_clone') ? provider as any : 'openai_compatible',
+        provider,
         apiBase: String(produceNode.apiBase || fallback.apiBase).trim(),
         apiKey: String(produceNode.apiKey || '').trim(),
         model: String(produceNode.apiModel || '').trim(),
@@ -105,7 +110,7 @@ export class LLMConfigResolver {
 
     if (global.audioApiKeySet && global.audioApiKey) {
       return {
-        provider: global.audioProvider || 'openai_compatible',
+        provider: toRuntimeAudioProvider(global.audioProvider),
         apiBase: String(global.audioApiBase || fallback.apiBase).trim(),
         apiKey: String(global.audioApiKey || '').trim(),
         model: String(global.audioApiModel || '').trim(),
@@ -120,7 +125,7 @@ export class LLMConfigResolver {
 
     if (global.textApiKeySet && global.textApiKey) {
       return {
-        provider: global.audioProvider || 'openai_compatible',
+        provider: toRuntimeAudioProvider(global.audioProvider),
         apiBase: String(global.textApiBase || fallback.apiBase).trim(),
         apiKey: String(global.textApiKey || '').trim(),
         model: String(global.textApiModel || '').trim(),

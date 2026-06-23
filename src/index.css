@@ -436,6 +436,12 @@ pre {
   color: var(--warning-color);
 }
 
+.discover-hint.info {
+  border-color: #c6dfef;
+  background: var(--info-bg);
+  color: var(--info-color);
+}
+
 .discover-toolbar {
   position: sticky;
   top: 0;

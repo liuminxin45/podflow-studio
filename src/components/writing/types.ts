@@ -3,14 +3,21 @@
 // Types & Constants
 // ============================================================
 
-import type { Workflow } from '../../types/workflow'
+import type { Script, Workflow } from '../../types/workflow'
 
 // ── Core Types ──────────────────────────────────────────────
 
 export type GlobalTone = 'analytical' | 'deep_dive' | 'casual' | 'direct' | 'narrative'
 export type SegmentTone = 'default' | 'conversational' | 'sharp' | 'gentle' | 'concise'
-export type SegmentType = 'opening' | 'main_1' | 'main_2' | 'discussion' | 'closing'
+export type SegmentType = 'opening' | 'main_1' | 'main_2' | 'mainline' | 'discussion' | 'news_item' | 'closing' | 'custom'
 export type SegmentStatus = 'draft' | 'editing' | 'polished'
+
+export interface WritingSourceReference {
+  title: string
+  url?: string
+  source?: string
+  published?: string
+}
 
 export interface WritingSegment {
   id: string
@@ -21,6 +28,7 @@ export interface WritingSegment {
   estimatedSeconds: number
   status: SegmentStatus
   collapsed: boolean
+  sourceReferences?: WritingSourceReference[]
 }
 
 export interface Version {
@@ -78,7 +86,7 @@ export interface WritingLayerProps {
   workflow?: Workflow | null
   episodeTitle?: string
   episodeDesc?: string
-  initialScript?: { title?: string; dialogue?: Array<{ speaker: string; text: string }> }
+  initialScript?: Script
   onSaveDraft?: (patch: Record<string, any>) => Promise<void> | void
   onProceedToProduction?: (patch: Record<string, any>) => Promise<void> | void
 }
@@ -107,8 +115,11 @@ export const SEGMENT_TYPE_CONFIG: Record<SegmentType, { label: string; color: st
   opening: { label: '开场', color: '#956400', icon: '开', defaultSeconds: 90 },
   main_1: { label: '主线一', color: '#1f6c9f', icon: '一', defaultSeconds: 180 },
   main_2: { label: '主线二', color: '#62615d', icon: '二', defaultSeconds: 180 },
+  mainline: { label: '主线', color: '#1f6c9f', icon: '主', defaultSeconds: 180 },
   discussion: { label: '延伸讨论', color: '#346538', icon: '议', defaultSeconds: 150 },
+  news_item: { label: '新闻', color: '#1f6c9f', icon: '讯', defaultSeconds: 120 },
   closing: { label: '结尾', color: '#9f2f2d', icon: '收', defaultSeconds: 60 },
+  custom: { label: '自定义', color: '#62615d', icon: '段', defaultSeconds: 120 },
 }
 
 export const STATUS_CONFIG: Record<SegmentStatus, { label: string; color: string; bg: string }> = {

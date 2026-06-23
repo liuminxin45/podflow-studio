@@ -230,6 +230,7 @@ def _get_user_paths(user_data_dir: Optional[str] = None) -> Dict[str, Path]:
         "config": root / "config.json",
         "latest": root / "latest.json",
         "status": root / "status.json",
+        "ai_filter_cache": root / "ai_filter_cache.json",
         "reports": root / "reports",
         "backup": root / "backups",
     }
@@ -237,6 +238,108 @@ def _get_user_paths(user_data_dir: Optional[str] = None) -> Dict[str, Path]:
 
 def get_lock_info() -> Dict[str, Any]:
     return _read_json(LOCK_FILE, {})
+
+
+def _first_non_empty(*values: Any) -> Any:
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, str):
+            if value.strip():
+                return value.strip()
+            continue
+        return value
+    return ""
+
+
+def _coerce_int(value: Any, default: int, minimum: Optional[int] = None, maximum: Optional[int] = None) -> int:
+    try:
+        result = int(value)
+    except (TypeError, ValueError):
+        result = default
+    if minimum is not None:
+        result = max(minimum, result)
+    if maximum is not None:
+        result = min(maximum, result)
+    return result
+
+
+def _coerce_float(value: Any, default: float, minimum: Optional[float] = None, maximum: Optional[float] = None) -> float:
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        result = default
+    if minimum is not None:
+        result = max(minimum, result)
+    if maximum is not None:
+        result = min(maximum, result)
+    return result
+
+
+def _coerce_bool(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "off"}:
+            return False
+    if value is None:
+        return default
+    return bool(value)
+
+
+def _coerce_list(value: Any) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        return [part.strip() for part in value.split(",") if part.strip()]
+    return [str(value).strip()] if str(value).strip() else []
+
+
+def _ai_provider_source(ai_key: str, ai_model: str, source_ai_cfg: Dict[str, Any]) -> str:
+    explicit_source = os.environ.get("AUTO_PODCAST_TRENDRADAR_AI_SOURCE", "").strip()
+    if explicit_source:
+        return explicit_source
+    if os.environ.get("AI_API_KEY") or os.environ.get("AI_MODEL"):
+        return "env"
+    if ai_key or ai_model:
+        return "trendradar" if source_ai_cfg.get("api_key") or source_ai_cfg.get("model") else "app"
+    return "none"
+
+
+def _build_ai_runtime_config(config: Dict[str, Any], source_cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    source_cfg = source_cfg or _load_yaml(TRENDRADAR_ROOT / "config" / "config.yaml")
+    ai_cfg = source_cfg.get("ai", {})
+    return {
+        "MODEL": _first_non_empty(config.get("ai_model"), os.environ.get("AI_MODEL"), ai_cfg.get("model")),
+        "API_KEY": _first_non_empty(config.get("ai_api_key"), os.environ.get("AI_API_KEY"), ai_cfg.get("api_key")),
+        "API_BASE": _first_non_empty(config.get("ai_api_base"), os.environ.get("AI_API_BASE"), ai_cfg.get("api_base")),
+        "TIMEOUT": _coerce_int(config.get("ai_timeout"), ai_cfg.get("timeout", 120), minimum=1),
+        "TEMPERATURE": _coerce_float(config.get("ai_temperature"), ai_cfg.get("temperature", 1.0), minimum=0.0, maximum=2.0),
+        "MAX_TOKENS": _coerce_int(config.get("ai_max_tokens"), ai_cfg.get("max_tokens", 5000), minimum=0),
+        "NUM_RETRIES": _coerce_int(config.get("ai_num_retries"), ai_cfg.get("num_retries", 1), minimum=0),
+        "FALLBACK_MODELS": _coerce_list(config.get("ai_fallback_models") or ai_cfg.get("fallback_models", [])),
+        "EXTRA_PARAMS": config.get("ai_extra_params") or ai_cfg.get("extra_params", {}),
+    }
+
+
+def _build_ai_filter_runtime_config(config: Dict[str, Any], source_cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    source_cfg = source_cfg or _load_yaml(TRENDRADAR_ROOT / "config" / "config.yaml")
+    ai_filter = source_cfg.get("ai_filter", {})
+    return {
+        "BATCH_SIZE": _coerce_int(config.get("ai_filter_batch_size"), ai_filter.get("batch_size", 200), minimum=1, maximum=500),
+        "BATCH_INTERVAL": _coerce_float(config.get("ai_filter_batch_interval"), ai_filter.get("batch_interval", 2), minimum=0, maximum=60),
+        "INTERESTS_FILE": _first_non_empty(config.get("ai_interests_file"), ai_filter.get("interests_file")) or None,
+        "PROMPT_FILE": _first_non_empty(config.get("ai_filter_prompt_file"), ai_filter.get("prompt_file"), "prompt.txt"),
+        "EXTRACT_PROMPT_FILE": _first_non_empty(config.get("ai_filter_extract_prompt_file"), ai_filter.get("extract_prompt_file"), "extract_prompt.txt"),
+        "UPDATE_TAGS_PROMPT_FILE": _first_non_empty(config.get("ai_filter_update_tags_prompt_file"), ai_filter.get("update_tags_prompt_file"), "update_tags_prompt.txt"),
+        "RECLASSIFY_THRESHOLD": _coerce_float(config.get("ai_filter_reclassify_threshold"), ai_filter.get("reclassify_threshold", 0.6), minimum=0.0, maximum=1.0),
+        "MIN_SCORE": _coerce_float(config.get("ai_filter_min_score"), ai_filter.get("min_score", 0), minimum=0.0, maximum=1.0),
+    }
 
 
 def get_config_view(user_data_dir: Optional[str] = None) -> Dict[str, Any]:
@@ -247,7 +350,18 @@ def get_config_view(user_data_dir: Optional[str] = None) -> Dict[str, Any]:
     rss_cfg = source_cfg.get("rss", {})
     advanced = source_cfg.get("advanced", {})
     ai_cfg = source_cfg.get("ai", {})
+    ai_filter_cfg = source_cfg.get("ai_filter", {})
     filter_cfg = source_cfg.get("filter", {})
+    app_cfg = source_cfg.get("app", {})
+    schedule_cfg = source_cfg.get("schedule", {})
+    report_cfg = source_cfg.get("report", {})
+    display_cfg = source_cfg.get("display", {})
+    display_regions = display_cfg.get("regions", {})
+    standalone_cfg = display_cfg.get("standalone", {})
+    advanced_crawler = advanced.get("crawler", {})
+    advanced_rss = advanced.get("rss", {})
+    ai_runtime = _build_ai_runtime_config(user_cfg, source_cfg)
+    ai_filter_runtime = _build_ai_filter_runtime_config(user_cfg, source_cfg)
 
     platform_sources = [
         p for p in platforms_cfg.get("sources", []) if p.get("enabled", True)
@@ -257,26 +371,58 @@ def get_config_view(user_data_dir: Optional[str] = None) -> Dict[str, Any]:
     ]
 
     view = {
+        "timezone": app_cfg.get("timezone", "Asia/Shanghai"),
+        "show_version_update": app_cfg.get("show_version_update", True),
         "platforms_enabled": platforms_cfg.get("enabled", True),
         "rss_enabled": rss_cfg.get("enabled", True),
         "enabled_platforms": [p.get("id") for p in platform_sources if p.get("id")],
         "enabled_rss_feeds": [f.get("id") for f in rss_sources if f.get("id")],
         "max_items_per_source": 30,
         "freshness_days": rss_cfg.get("freshness_filter", {}).get("max_age_days", 3),
+        "rss_freshness_enabled": rss_cfg.get("freshness_filter", {}).get("enabled", True),
+        "rss_request_interval": advanced_rss.get("request_interval", 1000),
+        "rss_timeout": advanced_rss.get("timeout", 15),
+        "rss_proxy_enabled": advanced_rss.get("use_proxy", False),
+        "rss_proxy_url": advanced_rss.get("proxy_url", ""),
+        "crawler_request_interval": advanced_crawler.get("request_interval", 2000),
         "filter_method": filter_cfg.get("method", "keyword"),
-        "ai_available": bool(ai_cfg.get("api_key") or os.environ.get("AI_API_KEY")),
-        "ai_model": ai_cfg.get("model", ""),
+        "filter_priority_sort_enabled": filter_cfg.get("priority_sort_enabled", True),
+        "ai_available": bool(ai_runtime.get("MODEL")),
+        "ai_api_key_set": bool(ai_runtime.get("API_KEY")),
+        "ai_provider_source": _ai_provider_source(str(ai_runtime.get("API_KEY") or ""), str(ai_runtime.get("MODEL") or ""), ai_cfg),
+        "ai_model": ai_runtime.get("MODEL", ""),
+        "ai_api_base": ai_runtime.get("API_BASE", ""),
+        "ai_timeout": ai_runtime.get("TIMEOUT", 120),
+        "ai_temperature": ai_runtime.get("TEMPERATURE", 1.0),
+        "ai_max_tokens": ai_runtime.get("MAX_TOKENS", 5000),
+        "ai_num_retries": ai_runtime.get("NUM_RETRIES", 1),
+        "ai_fallback_models": ai_runtime.get("FALLBACK_MODELS", []),
+        "ai_filter_batch_size": ai_filter_runtime["BATCH_SIZE"],
+        "ai_filter_batch_interval": ai_filter_runtime["BATCH_INTERVAL"],
+        "ai_filter_min_score": ai_filter_runtime["MIN_SCORE"],
+        "ai_filter_reclassify_threshold": ai_filter_runtime["RECLASSIFY_THRESHOLD"],
+        "ai_interests_file": ai_filter_runtime.get("INTERESTS_FILE") or ai_filter_cfg.get("interests_file", "") or "",
+        "ai_filter_prompt_file": ai_filter_runtime.get("PROMPT_FILE", ""),
+        "ai_filter_extract_prompt_file": ai_filter_runtime.get("EXTRACT_PROMPT_FILE", ""),
+        "ai_filter_update_tags_prompt_file": ai_filter_runtime.get("UPDATE_TAGS_PROMPT_FILE", ""),
         "api_url": platforms_cfg.get("api_url", ""),
-        "proxy_enabled": advanced.get("crawler", {}).get("use_proxy", False),
-        "proxy_url": advanced.get("crawler", {}).get("default_proxy", ""),
-        "schedule_preset": source_cfg.get("schedule", {}).get("preset", "morning_evening"),
-        "report_mode": source_cfg.get("report", {}).get("mode", "current"),
+        "proxy_enabled": advanced_crawler.get("use_proxy", False),
+        "proxy_url": advanced_crawler.get("default_proxy", ""),
+        "schedule_preset": schedule_cfg.get("preset", "morning_evening"),
+        "report_mode": report_cfg.get("mode", "current"),
+        "report_display_mode": report_cfg.get("display_mode", "keyword"),
+        "sort_by_position_first": report_cfg.get("sort_by_position_first", True),
+        "rank_threshold": report_cfg.get("rank_threshold", 30),
+        "max_news_per_keyword": report_cfg.get("max_news_per_keyword", 3),
+        "display_standalone_enabled": display_regions.get("standalone", False),
+        "standalone_platforms": standalone_cfg.get("platforms", []),
+        "standalone_rss_feeds": standalone_cfg.get("rss_feeds", []),
+        "standalone_max_items": standalone_cfg.get("max_items", 5),
+        "debug": advanced.get("debug", False),
         "raw": user_cfg.get("raw", {}),
     }
-    view.update({k: v for k, v in user_cfg.items() if k != "raw"})
-    if view["filter_method"] == "ai" and not view["ai_available"]:
-        view["filter_method"] = "keyword"
-        view["ai_disabled_reason"] = "未配置 AI_API_KEY，已回退到关键词筛选"
+    derived_keys = {"ai_available", "ai_api_key_set", "ai_provider_source", "ai_disabled_reason"}
+    view.update({k: v for k, v in user_cfg.items() if k != "raw" and k not in derived_keys})
     return view
 
 
@@ -284,10 +430,15 @@ def save_config_view(config: Dict[str, Any], user_data_dir: Optional[str] = None
     paths = _get_user_paths(user_data_dir)
     current = get_config_view(user_data_dir)
     next_config = {**current, **(config or {})}
-    if next_config.get("filter_method") == "ai" and not next_config.get("ai_available"):
-        raise ValueError("AI 筛选需要先配置 TrendRadar AI API Key")
-    _write_json(paths["config"], next_config)
-    return next_config
+    derived_keys = {
+        "ai_available",
+        "ai_api_key_set",
+        "ai_provider_source",
+        "ai_disabled_reason",
+    }
+    persisted = {k: v for k, v in next_config.items() if k not in derived_keys}
+    _write_json(paths["config"], persisted)
+    return get_config_view(user_data_dir)
 
 
 def list_sources(user_data_dir: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -390,8 +541,15 @@ def _fetch_rss_items(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List
     fetcher_cfg = {
         **rss_cfg,
         **advanced_rss,
+        "request_interval": _coerce_int(config.get("rss_request_interval"), advanced_rss.get("request_interval", 1000), minimum=0),
+        "timeout": _coerce_int(config.get("rss_timeout"), advanced_rss.get("timeout", 15), minimum=1),
+        "use_proxy": _coerce_bool(config.get("rss_proxy_enabled"), advanced_rss.get("use_proxy", False)),
+        "proxy_url": _first_non_empty(config.get("rss_proxy_url"), advanced_rss.get("proxy_url")),
         "feeds": feeds,
-        "freshness_filter": {"enabled": True, "max_age_days": config.get("freshness_days", 3)},
+        "freshness_filter": {
+            "enabled": _coerce_bool(config.get("rss_freshness_enabled"), rss_cfg.get("freshness_filter", {}).get("enabled", True)),
+            "max_age_days": _coerce_int(config.get("freshness_days"), rss_cfg.get("freshness_filter", {}).get("max_age_days", 3), minimum=0),
+        },
     }
     try:
         old_stdout = sys.stdout
@@ -434,11 +592,242 @@ def _fetch_rss_items(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List
     return items, list(data.failed_ids or [])
 
 
-def _apply_light_filters(items: List[Dict[str, Any]], config: Dict[str, Any]) -> List[Dict[str, Any]]:
-    # TrendRadar owns the data source; this adapter only applies UI-facing source and count limits.
-    if config.get("filter_method") == "ai" and not config.get("ai_available"):
-        raise ValueError("AI 筛选需要先配置 TrendRadar AI API Key")
-    return sorted(
+def _load_cached_ai_tags(ai_filter: Any, interests_content: str, interests_file: str, user_data_dir: Optional[str]) -> List[Dict[str, Any]]:
+    paths = _get_user_paths(user_data_dir)
+    current_hash = ai_filter.compute_interests_hash(interests_content, interests_file)
+    cache = _read_json(paths["ai_filter_cache"], {})
+    cached_tags = cache.get("tags") if cache.get("interests_hash") == current_hash else None
+    if isinstance(cached_tags, list) and cached_tags:
+        return [
+            {
+                "id": idx,
+                "tag": str(tag.get("tag", "")).strip(),
+                "description": str(tag.get("description", "")).strip(),
+                "priority": _coerce_int(tag.get("priority"), idx, minimum=1),
+            }
+            for idx, tag in enumerate(cached_tags, 1)
+            if str(tag.get("tag", "")).strip()
+        ]
+
+    tags = ai_filter.extract_tags(interests_content)
+    normalized = [
+        {
+            "id": idx,
+            "tag": str(tag.get("tag", "")).strip(),
+            "description": str(tag.get("description", "")).strip(),
+            "priority": idx,
+        }
+        for idx, tag in enumerate(tags or [], 1)
+        if str(tag.get("tag", "")).strip()
+    ]
+    if normalized:
+        _write_json(paths["ai_filter_cache"], {
+            "interests_hash": current_hash,
+            "interests_file": interests_file,
+            "tags": normalized,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+    return normalized
+
+
+def _apply_ai_filter(items: List[Dict[str, Any]], config: Dict[str, Any], user_data_dir: Optional[str]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    if not items:
+        return [], {"enabled": True, "total_processed": 0, "total_matched": 0, "tags": []}
+
+    _ensure_trendradar_path()
+    try:
+        from trendradar.ai.filter import AIFilter
+    except Exception as exc:
+        raise ValueError(f"TrendRadar AI 筛选运行时不可用：{exc}") from exc
+
+    source_cfg = _load_yaml(TRENDRADAR_ROOT / "config" / "config.yaml")
+    ai_config = _build_ai_runtime_config(config, source_cfg)
+    if not ai_config.get("MODEL"):
+        raise ValueError("AI 筛选需要模型配置：请在 Settings 的发现/搜索能力中配置模型，或设置 AI_MODEL。")
+
+    filter_config = _build_ai_filter_runtime_config(config, source_cfg)
+    interests_file = filter_config.get("INTERESTS_FILE") or "ai_interests.txt"
+    debug = _coerce_bool(config.get("debug"), source_cfg.get("advanced", {}).get("debug", False))
+
+    old_stdout = sys.stdout
+    sys.stdout = sys.stderr
+    try:
+        ai_filter = AIFilter(ai_config, filter_config, lambda: datetime.now(timezone.utc), debug)
+        interests_content = ai_filter.load_interests_content(filter_config.get("INTERESTS_FILE"))
+        if not interests_content:
+            raise ValueError(f"AI 筛选兴趣描述文件不可用：{interests_file}")
+
+        tags = _load_cached_ai_tags(ai_filter, interests_content, interests_file, user_data_dir)
+        if not tags:
+            raise ValueError("AI 筛选未能提取兴趣标签，请检查 Settings 的模型配置和 TrendRadar ai_filter 提示词。")
+
+        title_payload: List[Dict[str, Any]] = []
+        id_to_item: Dict[int, Dict[str, Any]] = {}
+        for idx, item in enumerate(items, 1):
+            title = _normalize_text(item.get("title") or item.get("content") or "")
+            if not title:
+                continue
+            id_to_item[idx] = item
+            title_payload.append({
+                "id": idx,
+                "title": title,
+                "source": _normalize_text(item.get("source_name") or item.get("source") or ""),
+            })
+
+        batch_size = _coerce_int(filter_config.get("BATCH_SIZE"), 200, minimum=1, maximum=500)
+        batch_interval = _coerce_float(filter_config.get("BATCH_INTERVAL"), 0, minimum=0)
+        failed_batches = 0
+        all_results: List[Dict[str, Any]] = []
+        for start in range(0, len(title_payload), batch_size):
+            if start > 0 and batch_interval > 0:
+                import time
+                time.sleep(batch_interval)
+            batch = title_payload[start:start + batch_size]
+            batch_results = ai_filter.classify_batch(batch, tags, interests_content)
+            if batch_results is None:
+                failed_batches += 1
+                continue
+            all_results.extend(batch_results)
+    finally:
+        sys.stdout = old_stdout
+
+    min_score = _coerce_float(filter_config.get("MIN_SCORE"), 0, minimum=0.0, maximum=1.0)
+    tag_by_id = {tag["id"]: tag for tag in tags}
+    best_by_item: Dict[int, Dict[str, Any]] = {}
+    for result in all_results:
+        item_id = result.get("news_item_id")
+        tag_id = result.get("tag_id")
+        if item_id not in id_to_item or tag_id not in tag_by_id:
+            continue
+        score = _coerce_float(result.get("relevance_score"), 0.0, minimum=0.0, maximum=1.0)
+        if score < min_score:
+            continue
+        existing = best_by_item.get(item_id)
+        if not existing or score > existing["relevance_score"]:
+            best_by_item[item_id] = {"tag_id": tag_id, "relevance_score": score}
+
+    filtered: List[Dict[str, Any]] = []
+    tag_counts: Dict[int, int] = {}
+    for item_id, match in best_by_item.items():
+        tag = tag_by_id[match["tag_id"]]
+        score = match["relevance_score"]
+        tag_counts[tag["id"]] = tag_counts.get(tag["id"], 0) + 1
+        item = dict(id_to_item[item_id])
+        item["ai_filter_tag"] = tag["tag"]
+        item["ai_filter_score"] = score
+        item["_ai_filter_priority"] = tag.get("priority", 9999)
+        item["matched_reason"] = f"AI 筛选：{tag['tag']}（score {score:.2f}）"
+        item["score"] = max(_coerce_int(item.get("score"), 0), int(score * 100))
+        filtered.append(item)
+
+    if _coerce_bool(config.get("filter_priority_sort_enabled"), True):
+        filtered.sort(key=lambda item: (
+            item.get("_ai_filter_priority") or 9999,
+            -float(item.get("ai_filter_score") or 0),
+            item.get("rank") or 9999,
+        ))
+    else:
+        filtered.sort(key=lambda item: (
+            -float(item.get("ai_filter_score") or 0),
+            item.get("rank") or 9999,
+            item.get("source_name") or "",
+        ))
+    for item in filtered:
+        item.pop("_ai_filter_priority", None)
+
+    tag_summary = [
+        {"tag": tag["tag"], "count": tag_counts.get(tag["id"], 0)}
+        for tag in sorted(tags, key=lambda tag: tag.get("priority", 9999))
+        if tag_counts.get(tag["id"], 0) > 0
+    ]
+    return filtered, {
+        "enabled": True,
+        "total_processed": len(title_payload),
+        "total_matched": len(filtered),
+        "failed_batches": failed_batches,
+        "model": ai_config.get("MODEL", ""),
+        "interests_file": interests_file,
+        "tags": tag_summary,
+    }
+
+
+def _apply_report_limits(items: List[Dict[str, Any]], config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    max_per_topic = _coerce_int(config.get("max_news_per_keyword"), 0, minimum=0, maximum=100)
+    if max_per_topic <= 0:
+        return items
+    counts: Dict[str, int] = {}
+    limited: List[Dict[str, Any]] = []
+    has_ai_topics = any(item.get("ai_filter_tag") for item in items)
+    if not has_ai_topics:
+        return items
+    for item in items:
+        topic = str(item.get("ai_filter_tag") or "")
+        if not topic:
+            limited.append(item)
+            continue
+        current = counts.get(topic, 0)
+        if current >= max_per_topic:
+            continue
+        counts[topic] = current + 1
+        limited.append(item)
+    return limited
+
+
+def _append_standalone_items(
+    filtered_items: List[Dict[str, Any]],
+    all_items: List[Dict[str, Any]],
+    config: Dict[str, Any],
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    if not _coerce_bool(config.get("display_standalone_enabled"), False):
+        return filtered_items, {"enabled": False, "added": 0}
+
+    platform_ids = set(_coerce_list(config.get("standalone_platforms")))
+    rss_ids = set(_coerce_list(config.get("standalone_rss_feeds")))
+    max_items = _coerce_int(config.get("standalone_max_items"), 5, minimum=1, maximum=50)
+    if not platform_ids and not rss_ids:
+        return filtered_items, {"enabled": True, "added": 0}
+
+    existing_ids = {item.get("trendradar_id") for item in filtered_items if item.get("trendradar_id")}
+    additions: List[Dict[str, Any]] = []
+    sorted_candidates = sorted(
+        all_items,
+        key=lambda item: (
+            -(item.get("score") or 0),
+            item.get("rank") or 9999,
+            item.get("source_name") or "",
+        ),
+    )
+    for item in sorted_candidates:
+        item_id = item.get("trendradar_id")
+        if item_id in existing_ids:
+            continue
+        source_id = str(item.get("source_id") or "")
+        source_kind = item.get("source_kind")
+        if source_kind == "platform" and source_id not in platform_ids:
+            continue
+        if source_kind == "rss" and source_id not in rss_ids:
+            continue
+        next_item = dict(item)
+        next_item["standalone"] = True
+        next_item["matched_reason"] = f"独立展示：{next_item.get('source_name') or source_id}"
+        additions.append(next_item)
+        if item_id:
+            existing_ids.add(item_id)
+        if len(additions) >= max_items:
+            break
+
+    return filtered_items + additions, {
+        "enabled": True,
+        "added": len(additions),
+        "platforms": sorted(platform_ids),
+        "rss_feeds": sorted(rss_ids),
+        "max_items": max_items,
+    }
+
+
+def _apply_light_filters(items: List[Dict[str, Any]], config: Dict[str, Any], user_data_dir: Optional[str] = None) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    # TrendRadar owns the data source; this adapter applies UI-facing limits and v6.10 AI filtering.
+    sorted_items = sorted(
         items,
         key=lambda item: (
             -(item.get("score") or 0),
@@ -446,13 +835,25 @@ def _apply_light_filters(items: List[Dict[str, Any]], config: Dict[str, Any]) ->
             item.get("source_name") or "",
         ),
     )
+    if config.get("filter_method") == "ai":
+        filtered, meta = _apply_ai_filter(sorted_items, config, user_data_dir)
+        limited = _apply_report_limits(filtered, config)
+        if len(limited) != len(filtered):
+            meta = {**meta, "report_limited": len(filtered) - len(limited), "total_returned": len(limited)}
+        return limited, meta
+    return sorted(
+        items,
+        key=lambda item: (
+            -(item.get("score") or 0),
+            item.get("rank") or 9999,
+            item.get("source_name") or "",
+        ),
+    ), {"enabled": False, "method": "keyword"}
 
 
 def run_once(config_override: Optional[Dict[str, Any]] = None, user_data_dir: Optional[str] = None) -> Dict[str, Any]:
     config = get_config_view(user_data_dir)
     config.update(config_override or {})
-    if config.get("filter_method") == "ai" and not config.get("ai_available"):
-        raise ValueError("AI 筛选需要先配置 TrendRadar AI API Key")
 
     platform_items: List[Dict[str, Any]] = []
     failed_sources: List[str] = []
@@ -461,7 +862,7 @@ def run_once(config_override: Optional[Dict[str, Any]] = None, user_data_dir: Op
             platform_ids=config.get("enabled_platforms"),
             proxy_url=config.get("proxy_url") if config.get("proxy_enabled") else None,
             api_url=config.get("api_url") or None,
-            request_interval=100,
+            request_interval=_coerce_int(config.get("crawler_request_interval"), 2000, minimum=0),
         )
         platform_items = _normalize_platform_results(
             results,
@@ -472,9 +873,14 @@ def run_once(config_override: Optional[Dict[str, Any]] = None, user_data_dir: Op
 
     rss_items, rss_failed = _fetch_rss_items(config)
     failed_sources.extend(rss_failed)
-    items = _apply_light_filters(platform_items + rss_items, config)
+    all_items = platform_items + rss_items
+    items, filter_meta = _apply_light_filters(all_items, config, user_data_dir)
+    items, standalone_meta = _append_standalone_items(items, all_items, config)
     generated_at = datetime.now(timezone.utc).isoformat()
-    topics = get_topics_from_items(items)
+    if filter_meta.get("enabled") and filter_meta.get("tags"):
+        topics = [{"name": tag["tag"], "count": tag["count"]} for tag in filter_meta["tags"]]
+    else:
+        topics = get_topics_from_items(items)
     meta = {
         "generated_at": generated_at,
         "failed_sources": failed_sources,
@@ -482,9 +888,15 @@ def run_once(config_override: Optional[Dict[str, Any]] = None, user_data_dir: Op
         "rss_count": len(set(i.get("source_id") for i in rss_items)),
         "item_count": len(items),
         "topics": topics,
+        "ai_filter": filter_meta,
+        "standalone": standalone_meta,
         "config": {k: config.get(k) for k in [
-            "filter_method", "max_items_per_source", "freshness_days",
-            "enabled_platforms", "enabled_rss_feeds",
+            "filter_method", "max_items_per_source", "freshness_days", "rss_freshness_enabled",
+            "enabled_platforms", "enabled_rss_feeds", "crawler_request_interval",
+            "rss_request_interval", "rss_timeout", "ai_filter_min_score",
+            "ai_filter_batch_size", "ai_interests_file", "report_mode", "report_display_mode",
+            "max_news_per_keyword", "display_standalone_enabled", "standalone_platforms",
+            "standalone_rss_feeds", "standalone_max_items",
         ]},
     }
     result = {"success": True, "items": items, "fetch_contents": items, "meta": meta}

@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -23,6 +24,11 @@ ENGINE_DIR = ROOT_DIR / "engine"
 TRENDRADAR_DIR = ENGINE_DIR / "trendradar"
 LOCK_FILE = ENGINE_DIR / "trendradar.lock.json"
 VENV_DIR = ROOT_DIR / ".venv-trendradar"
+COMMAND_TIMEOUT_SECONDS = int(os.environ.get("TRENDRADAR_RUNTIME_TIMEOUT", "180"))
+PYPI_INDEX_URL = os.environ.get(
+    "TRENDRADAR_PYPI_INDEX_URL",
+    "https://pypi.tuna.tsinghua.edu.cn/simple",
+)
 
 REQUIRED_MODULES = {
     "feedparser": "feedparser",
@@ -55,9 +61,31 @@ def python_satisfies(requirement: str, version: str) -> bool:
     return parse_version_tuple(version) >= parse_version_tuple(match.group(1))
 
 
+def command_env() -> dict[str, str]:
+    env = os.environ.copy()
+    for key in (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "ALL_PROXY",
+        "all_proxy",
+    ):
+        env.pop(key, None)
+    env["NO_PROXY"] = "*"
+    env["no_proxy"] = "*"
+    return env
+
+
 def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
     print(f"[setup_trendradar_runtime] {' '.join(cmd)}")
-    result = subprocess.run(cmd, cwd=ROOT_DIR, text=True)
+    result = subprocess.run(
+        cmd,
+        cwd=ROOT_DIR,
+        env=command_env(),
+        text=True,
+        timeout=COMMAND_TIMEOUT_SECONDS,
+    )
     if check and result.returncode != 0:
         raise RuntimeError(f"command failed: {' '.join(cmd)}")
     return result
@@ -111,8 +139,31 @@ def ensure_with_uv(requirement: str) -> None:
     if requirement.startswith(">="):
         requested_python = requirement[2:].strip() or requested_python
 
-    run([uv, "venv", str(VENV_DIR), "--python", requested_python, "--python-preference", "managed"])
-    run([uv, "pip", "install", "--python", str(venv_python()), "-e", str(TRENDRADAR_DIR)])
+    run(
+        [
+            uv,
+            "venv",
+            str(VENV_DIR),
+            "--python",
+            requested_python,
+            "--python-preference",
+            "managed",
+            "--clear",
+        ]
+    )
+    run(
+        [
+            uv,
+            "pip",
+            "install",
+            "--default-index",
+            PYPI_INDEX_URL,
+            "--python",
+            str(venv_python()),
+            "-e",
+            str(TRENDRADAR_DIR),
+        ]
+    )
 
 
 def main() -> int:

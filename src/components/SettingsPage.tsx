@@ -117,6 +117,7 @@ function buildNodeConfigs(settings: AppSettings): Record<string, Record<string, 
   return {
     app_settings: settings,
     fetch: {
+      ...resolveApiSettings(settings, 'discover'),
       breadth: settings.capability.search.intensity === 'deep' ? 5 : settings.capability.search.intensity === 'light' ? 2 : 3,
       quality: settings.capability.text.balance === 'quality' ? 5 : settings.capability.text.balance === 'cost' ? 3 : 4,
       freshness: 4,

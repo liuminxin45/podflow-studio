@@ -3,6 +3,8 @@
 
 Default behavior is intentionally conservative: sync to the checked-in lock
 file. Use --update latest to move to upstream master after compatibility checks.
+Sync commands are bounded and run without inherited proxy settings so npm
+postinstall cannot hang on a long git pull through a local proxy.
 """
 
 import argparse
@@ -10,29 +12,89 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import urllib.request
 from pathlib import Path
 
 REPO_URL = "https://github.com/sansan0/TrendRadar.git"
+MIRROR_REPO_URL = "https://gitclone.com/github.com/sansan0/TrendRadar.git"
 ROOT_DIR = Path(__file__).resolve().parent.parent
 TARGET_DIR = ROOT_DIR / "engine" / "trendradar"
 LOCK_FILE = ROOT_DIR / "engine" / "trendradar.lock.json"
+COMMAND_TIMEOUT_SECONDS = int(os.environ.get("TRENDRADAR_SYNC_TIMEOUT", "45"))
 
 
-def run(cmd, cwd=None, check=False):
+def command_env():
+    env = os.environ.copy()
+    for key in (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "ALL_PROXY",
+        "all_proxy",
+    ):
+        env.pop(key, None)
+    env["NO_PROXY"] = "*"
+    env["no_proxy"] = "*"
+    return env
+
+
+def git_cmd(args):
+    return ["git", "-c", "http.proxy=", "-c", "https.proxy=", *args]
+
+
+def kill_process_tree(process):
+    if sys.platform.startswith("win"):
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return
+
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except Exception:
+        process.kill()
+
+
+def run(cmd, cwd=None, check=False, timeout=COMMAND_TIMEOUT_SECONDS):
     print(f"[sync_trendradar] {' '.join(cmd)}")
-    result = subprocess.run(cmd, cwd=cwd, text=True, capture_output=True)
-    if result.stdout:
-        print(result.stdout.strip())
-    if result.stderr:
-        print(result.stderr.strip(), file=sys.stderr)
-    if result.returncode != 0 and not check:
-        print(f"[sync_trendradar] WARNING: command exited with code {result.returncode}")
-    if check and result.returncode != 0:
+    try:
+        process = subprocess.Popen(
+            cmd,
+            cwd=cwd,
+            env=command_env(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform.startswith("win") else 0,
+            start_new_session=not sys.platform.startswith("win"),
+        )
+        stdout, stderr = process.communicate(timeout=timeout)
+        returncode = process.returncode
+    except subprocess.TimeoutExpired:
+        kill_process_tree(process)
+        stdout = ""
+        stderr = f"command timed out after {timeout}s"
+        returncode = 1
+    except FileNotFoundError:
+        stdout = ""
+        stderr = f"command not found: {cmd[0]}"
+        returncode = 127
+
+    if stdout:
+        print(stdout.strip())
+    if stderr:
+        print(stderr.strip(), file=sys.stderr)
+    if returncode != 0 and not check:
+        print(f"[sync_trendradar] WARNING: command exited with code {returncode}")
+    if check and returncode != 0:
         raise RuntimeError(f"command failed: {' '.join(cmd)}")
-    return result.returncode
+    return returncode
 
 
 def load_lock():
@@ -94,7 +156,7 @@ def clone_if_missing(target):
         return
     print(f"[sync_trendradar] Cloning {REPO_URL} into {target}")
     target.parent.mkdir(parents=True, exist_ok=True)
-    run(["git", "clone", REPO_URL, str(target)], check=True)
+    run(git_cmd(["clone", REPO_URL, str(target)]), check=True)
 
 
 def sync_to_ref(target, ref, dry_run=False, allow_dirty_if_at_ref=False):
@@ -106,8 +168,13 @@ def sync_to_ref(target, ref, dry_run=False, allow_dirty_if_at_ref=False):
     print(f"[sync_trendradar] Target ref: {ref}")
     if dry_run:
         return
-    run(["git", "fetch", "origin"], cwd=target, check=True)
-    run(["git", "checkout", ref], cwd=target, check=True)
+    if re.fullmatch(r"[0-9a-fA-F]{40}", ref):
+        run(git_cmd(["fetch", "--no-tags", "--depth=1", "origin", ref]), cwd=target, check=True)
+        run(git_cmd(["checkout", "-B", "master", ref]), cwd=target, check=True)
+        return
+
+    run(git_cmd(["fetch", "origin"]), cwd=target, check=True)
+    run(git_cmd(["checkout", ref]), cwd=target, check=True)
 
 
 def install_deps(target, dry_run=False):

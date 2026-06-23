@@ -6,7 +6,7 @@ import {
   DownOutlined,
   UpOutlined,
 } from '../../icons/antdCompat'
-import type { WritingSegment, SegmentTone, SegmentStatus } from './types'
+import type { WritingSegment, SegmentTone, SegmentStatus, WritingSourceReference } from './types'
 import {
   SEGMENT_TYPE_CONFIG,
   SEGMENT_TONES,
@@ -169,8 +169,7 @@ export default function SegmentCard({
             onChange={e => onContentChange(e.target.value)}
             onMouseUp={handleMouseUp}
             placeholder={
-              segment.type === 'opening' ? '在这里写下开场白…\n\n可以用一个问题引起好奇，或直接抛出话题。' :
-              segment.type === 'closing' ? '总结核心观点，留下回味…\n\n可以给听众一个思考的问题或行动建议。' :
+              PLACEHOLDER_BY_TYPE[segment.type] ||
               '在这里写下你的想法…\n\n选中文本可调用智能协作角色进行局部优化。'
             }
             autoSize={{ minRows: 4, maxRows: 16 }}

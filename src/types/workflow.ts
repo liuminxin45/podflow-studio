@@ -57,6 +57,17 @@ export interface ContentItem {
     reason: string
     fromLLM: boolean
   }
+  _ai_organize?: {
+    status?: 'selected' | 'rejected' | 'noise' | 'duplicate'
+    reason?: string
+    confidence?: number
+    duplicate_of?: number | string
+    cluster_id?: string
+    cluster_name?: string
+    tags?: string[]
+    score?: number
+    priority?: 'high' | 'medium' | 'low'
+  }
 }
 
 export interface Topic {
@@ -65,9 +76,33 @@ export interface Topic {
   keywords?: string[]
 }
 
+export type ContentCreationType = 'story' | 'news_brief'
+
+export function isContentCreationType(value: unknown): value is ContentCreationType {
+  return value === 'story' || value === 'news_brief'
+}
+
+export interface ScriptSourceReference {
+  title?: string
+  url?: string
+  source?: string
+  published?: string
+}
+
+export interface ScriptSection {
+  id?: string
+  type: 'opening' | 'mainline' | 'discussion' | 'news_item' | 'closing' | 'custom'
+  label?: string
+  text?: string
+  source_refs?: ScriptSourceReference[]
+  references?: string[]
+}
+
 export interface Script {
   title?: string
   description?: string
+  content_type?: ContentCreationType
+  sections?: ScriptSection[]
   dialogue?: DialogueLine[]
 }
 

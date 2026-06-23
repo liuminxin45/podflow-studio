@@ -53,6 +53,82 @@ function getCleanSpawnEnv(extra = {}) {
   }
 }
 
+function pickLLMConfig(source, sourceName) {
+  if (!source || typeof source !== 'object') return null
+  const apiKey = String(source.ai_api_key || source.api_key || source.apiKey || '').trim()
+  const apiBase = String(source.ai_api_base || source.api_base || source.apiBase || '').trim()
+  const model = String(source.ai_model || source.llm_model || source.model || source.apiModel || '').trim()
+  if (!apiKey && !apiBase && !model) return null
+  return { apiKey, apiBase, model, source: sourceName }
+}
+
+function resolveStageLLMConfig(appSettings, stageId) {
+  const apiConfig = appSettings?.apiConfig
+  if (!apiConfig) return null
+  const override = apiConfig.nodeOverrides?.[stageId]
+  if (override?.overrideMode === 'custom') {
+    const custom = pickLLMConfig({
+      apiKey: override.apiKey,
+      apiBase: override.apiBase,
+      apiModel: override.apiModel,
+    }, 'app')
+    if (custom?.apiKey || custom?.model) return custom
+  }
+
+  const capabilityType = override?.capabilityType || 'search'
+  const prefix = capabilityType === 'audio' ? 'audio' : capabilityType === 'search' ? 'search' : 'text'
+  const global = apiConfig.global || {}
+  const globalConfig = pickLLMConfig({
+    apiKey: global[`${prefix}ApiKey`],
+    apiBase: global[`${prefix}ApiBase`],
+    apiModel: global[`${prefix}ApiModel`],
+  }, 'app')
+  if (globalConfig?.apiKey || globalConfig?.model) return globalConfig
+
+  if (prefix !== 'text') {
+    return pickLLMConfig({
+      apiKey: global.textApiKey,
+      apiBase: global.textApiBase,
+      apiModel: global.textApiModel,
+    }, 'app')
+  }
+  return null
+}
+
+function normalizeLiteLLMModel(model, apiBase) {
+  const value = String(model || '').trim()
+  if (!value || value.includes('/')) return value
+  const base = String(apiBase || '').toLowerCase()
+  if (base && !base.includes('api.openai.com')) return `openai/${value}`
+  return value
+}
+
+function resolveTrendRadarLLMConfig(payload = {}) {
+  const payloadConfig = payload?.config && typeof payload.config === 'object' ? payload.config : payload
+  const explicit = pickLLMConfig(payloadConfig, 'app') || {}
+  const fetchConfig = configManager ? pickLLMConfig(configManager.loadNodeConfig('fetch'), 'app') : null
+  const appSettings = configManager ? configManager.loadNodeConfig('app_settings') : null
+  const stageConfig = resolveStageLLMConfig(appSettings, 'discover')
+  const fallbackTextConfig = resolveStageLLMConfig(appSettings, 'write')
+
+  const sourceConfig = fetchConfig || stageConfig || fallbackTextConfig || {}
+  const apiKey = explicit.apiKey || sourceConfig.apiKey || ''
+  const apiBase = explicit.apiBase || sourceConfig.apiBase || ''
+  const model = normalizeLiteLLMModel(explicit.model || sourceConfig.model || '', apiBase)
+  const source = apiKey || apiBase || model ? 'app' : 'none'
+  return { apiKey, apiBase, model, source }
+}
+
+function getTrendRadarCliEnv(userDataDir, payload = {}) {
+  const aiConfig = resolveTrendRadarLLMConfig(payload)
+  const extra = { AUTO_PODCAST_USER_DATA: userDataDir }
+  if (aiConfig.apiKey) extra.AI_API_KEY = aiConfig.apiKey
+  if (aiConfig.apiBase) extra.AI_API_BASE = aiConfig.apiBase
+  if (aiConfig.model) extra.AI_MODEL = aiConfig.model
+  if (aiConfig.source) extra.AUTO_PODCAST_TRENDRADAR_AI_SOURCE = aiConfig.source
+  return getCleanSpawnEnv(extra)
+}
+
 let mainWindow = null
 let configManager = null
 let currentWorkflow = null
@@ -393,6 +469,7 @@ function runPythonNode(nodeName, state, timeoutMs = 600000) {
 function runTrendRadarCli(action, payload = {}, timeoutMs = 300000) {
   return new Promise((resolve, reject) => {
     const userDataDir = app.getPath('userData')
+    const env = getTrendRadarCliEnv(userDataDir, payload)
     const proc = spawn(TRENDRADAR_PYTHON_PATH, [
       path.join(__dirname, '..', 'scripts', 'trendradar_cli.py'),
       action,
@@ -400,7 +477,7 @@ function runTrendRadarCli(action, payload = {}, timeoutMs = 300000) {
       userDataDir
     ], {
       cwd: path.join(__dirname, '..'),
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8', AUTO_PODCAST_USER_DATA: userDataDir },
+      env,
       shell: SPAWN_SHELL
     })
 
@@ -456,6 +533,11 @@ function getRadarCachePath() {
 }
 
 // ── Radar Service (extracted) ─────────────────────────────────────
+const sharedCtx = {
+  getMainWindow: () => mainWindow,
+  getConfigManager: () => configManager,
+  runPythonNode
+}
 const radar = require('./radarService').create(sharedCtx)
 
 function saveRadarCache() {

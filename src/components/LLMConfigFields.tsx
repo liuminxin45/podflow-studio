@@ -1,7 +1,8 @@
 import { Form, Input, AutoComplete, Button, message } from 'antd'
 import { useState } from 'react'
 import { ApiOutlined, CheckCircleOutlined } from '../icons/antdCompat'
-import { fetchModels } from '../utils/modelFetcher'
+import { fetchModelsWithCache } from '../utils/modelFetcher'
+import { llmService } from '../services/llmService'
 
 /**
  * LLM Configuration Fields Component
@@ -56,13 +57,7 @@ export default function LLMConfigFields() {
         messages: [{ role: 'user', content: 'test' }],
         maxTokens: 5,
       })
-
-      if (response.ok) {
-        message.success('大模型连接成功')
-      } else {
-        const errorData = await response.json().catch(() => ({}))
-        message.error(`连接失败：${response.status} ${errorData.error?.message || response.statusText}`)
-      }
+      message.success('大模型连接成功')
     } catch (e: any) {
       message.error(`连接测试失败：${e.message}`)
     } finally {

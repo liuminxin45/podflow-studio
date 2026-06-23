@@ -4,12 +4,69 @@
 
 export type TextMode = 'standard' | 'deep' | 'quality'
 export type CostQualityBalance = 'cost' | 'balanced' | 'quality'
+export type SearchIntensity = 'light' | 'standard' | 'deep'
+export type SearchLanguage = 'zh' | 'en' | 'auto'
+export type AudioQuality = 'standard' | 'high' | 'ultra'
+export type ComplianceStrictness = 'relaxed' | 'standard' | 'strict'
+export type ReminderIntensity = 'gentle' | 'standard' | 'strong'
+export type AIAssistLevel = 'light' | 'standard' | 'deep'
+export type PublishFlowMode = 'smart' | 'quick' | 'remember'
+export type IdeationChallenge = 'normal' | 'critical' | 'reverse'
+export type ToneStyle = 'rational' | 'calm' | 'passionate' | 'latenight'
+export type ContentTendency = 'news' | 'commentary' | 'analysis' | 'narrative'
+export type DurationPreference = 'short' | 'medium' | 'long'
+export type RetentionPolicy = 'local' | 'archive' | 'delete'
 // --- API Configuration Center ---
 
 export type NodeCapabilityType = 'search' | 'text' | 'reasoning' | 'compliance' | 'audio'
 export type NodeOverrideMode = 'global' | 'custom'
 export type APIConnectionStatus = 'untested' | 'testing' | 'connected' | 'failed'
 export type AudioProvider = 'edge-tts' | 'openai-compatible'
+
+export interface SearchCapabilitySettings {
+  intensity: SearchIntensity
+  language: SearchLanguage
+  resultRange: [number, number]
+}
+
+export interface TextCapabilitySettings {
+  mode: TextMode
+  balance: CostQualityBalance
+}
+
+export interface AudioCapabilitySettings {
+  defaultVoice: string
+  quality: AudioQuality
+}
+
+export interface ComplianceCapabilitySettings {
+  strictness: ComplianceStrictness
+  reminderIntensity: ReminderIntensity
+}
+
+export interface CapabilitySettings {
+  search: SearchCapabilitySettings
+  text: TextCapabilitySettings
+  audio: AudioCapabilitySettings
+  compliance: ComplianceCapabilitySettings
+}
+
+export interface NodeBehaviorSettings {
+  assistLevel: AIAssistLevel
+  publishFlowMode: PublishFlowMode
+  ideationChallenge: IdeationChallenge
+}
+
+export interface CreatorPreferencesSettings {
+  toneStyle: ToneStyle
+  contentTendency: ContentTendency
+  durationPreference: DurationPreference
+}
+
+export interface SystemSettings {
+  defaultPlatforms: string[]
+  retentionPolicy: RetentionPolicy
+}
 
 export interface NodeAPIConfig {
   overrideMode: NodeOverrideMode
@@ -44,7 +101,6 @@ export interface GlobalAPIConfig {
   audioApiModel: string
   audioProvider: AudioProvider
   audioConnectionStatus: APIConnectionStatus
-  audioProvider: 'openai_compatible' | 'doubao_tts' | 'voice_clone'
   audioDoubaoAppId: string
   audioDoubaoAccessToken: string
   audioDoubaoCluster: string
@@ -62,6 +118,10 @@ export interface APIConfig {
 // --- Settings Root ---
 
 export interface AppSettings {
+  capability: CapabilitySettings
+  nodeBehavior: NodeBehaviorSettings
+  creatorPreferences: CreatorPreferencesSettings
+  system: SystemSettings
   apiConfig: APIConfig
 }
 
@@ -89,6 +149,39 @@ export const DEFAULT_NODE_API_CONFIG: NodeAPIConfig = {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  capability: {
+    search: {
+      intensity: 'standard',
+      language: 'zh',
+      resultRange: [5, 15],
+    },
+    text: {
+      mode: 'standard',
+      balance: 'balanced',
+    },
+    audio: {
+      defaultVoice: 'warm-male',
+      quality: 'high',
+    },
+    compliance: {
+      strictness: 'standard',
+      reminderIntensity: 'standard',
+    },
+  },
+  nodeBehavior: {
+    assistLevel: 'standard',
+    publishFlowMode: 'smart',
+    ideationChallenge: 'normal',
+  },
+  creatorPreferences: {
+    toneStyle: 'rational',
+    contentTendency: 'news',
+    durationPreference: 'medium',
+  },
+  system: {
+    defaultPlatforms: ['rss'],
+    retentionPolicy: 'local',
+  },
   apiConfig: {
     global: {
       textApiKey: '',
@@ -110,7 +203,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
       audioApiModel: 'tts-1',
       audioProvider: 'edge-tts',
       audioConnectionStatus: 'untested',
-      audioProvider: 'doubao_tts',
       audioDoubaoAppId: '',
       audioDoubaoAccessToken: '',
       audioDoubaoCluster: 'volcano_tts',
