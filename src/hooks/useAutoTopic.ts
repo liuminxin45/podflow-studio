@@ -116,10 +116,10 @@ export function useAutoTopic(
       return
     }
 
-    if (!llmConfig || !llmConfig.apiKey) {
+    if (!llmConfig || !llmConfig.apiKey || !llmConfig.apiBase || !llmConfig.model) {
       setState(prev => ({
         ...prev,
-        error: '未配置大模型 API，请先在节点设置中配置',
+        error: '未配置大模型 API，请先在 Settings → AI 能力接口中配置发现/搜索或文本模型',
       }))
       return
     }

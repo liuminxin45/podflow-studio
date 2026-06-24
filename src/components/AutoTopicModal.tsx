@@ -26,6 +26,10 @@ interface Props {
 
 type StepType = 'config' | 'running' | 'review'
 
+function hasUsableLLMConfig(config: Props['llmConfig']): boolean {
+  return Boolean(config?.apiKey && config.apiBase && config.model)
+}
+
 export default function AutoTopicModal({
   visible,
   onClose,
@@ -41,6 +45,7 @@ export default function AutoTopicModal({
     focus_instruction: '',
     max_items: TOPIC_ANALYSIS.MAX_ITEMS,
   })
+  const llmReady = hasUsableLLMConfig(llmConfig)
 
   const { state: autoTopicState, isProcessing, execute } = useAutoTopic(fetchContents, llmConfig, onRunFetch)
 
@@ -53,20 +58,23 @@ export default function AutoTopicModal({
   const handleStart = useCallback(async () => {
     setCurrentStep('running')
     await execute(config)
-    if (autoTopicState.stage === 'done' && !autoTopicState.error) {
-      setCurrentStep('review')
-    }
-  }, [config, execute, autoTopicState])
+  }, [config, execute])
 
   const [selectedItems, setSelectedItems] = useState<EnrichedContentItem[]>([])
   const [rejectedItems, setRejectedItems] = useState<EnrichedContentItem[]>([])
 
   useEffect(() => {
-    if (autoTopicState.selectedItems.length > 0) {
+    if (autoTopicState.stage === 'done' && !autoTopicState.error) {
       setSelectedItems(autoTopicState.selectedItems)
       setRejectedItems(autoTopicState.rejectedItems)
     }
-  }, [autoTopicState.selectedItems, autoTopicState.rejectedItems])
+  }, [autoTopicState.stage, autoTopicState.error, autoTopicState.selectedItems, autoTopicState.rejectedItems])
+
+  useEffect(() => {
+    if (currentStep === 'running' && !isProcessing && autoTopicState.stage === 'done' && !autoTopicState.error) {
+      setCurrentStep('review')
+    }
+  }, [currentStep, isProcessing, autoTopicState.stage, autoTopicState.error])
 
   const handleMoveToSelected = useCallback((item: ContentItem) => {
     setRejectedItems(prev => prev.filter(i => i !== item))
@@ -132,11 +140,11 @@ export default function AutoTopicModal({
           </Radio.Group>
         </div>
 
-        {!llmConfig?.apiKey && (
+        {!llmReady && (
           <Alert
             type="warning"
             message="未配置大模型 API"
-            description="自动选题需要 LLM 支持，请先在节点设置中配置 API Key"
+            description="自动选题需要 LLM 支持，请先在 Settings → AI 能力接口中配置发现/搜索或文本模型 API Key。"
             showIcon
           />
         )}
@@ -314,7 +322,7 @@ export default function AutoTopicModal({
           key="start"
           type="primary"
           icon={<ThunderboltOutlined />}
-          disabled={!config.target_topic.trim() || !llmConfig?.apiKey}
+          disabled={!config.target_topic.trim() || !llmReady}
           onClick={handleStart}
         >
           开始选题

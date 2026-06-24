@@ -19,6 +19,7 @@ import {
 } from '../icons/antdCompat'
 import AutoTopicModal from './AutoTopicModal'
 import type { ContentItem } from '../types/workflow'
+import { llmConfigResolver, type LLMConfig } from '../services/settings/llmConfigResolver'
 import type {
   TrendRadarConfigView,
   TrendRadarItem,
@@ -202,6 +203,7 @@ export default function DiscoverPanel({
   const [updatingDependency, setUpdatingDependency] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
   const [autoTopicModalVisible, setAutoTopicModalVisible] = useState(false)
+  const [autoTopicLlmConfig, setAutoTopicLlmConfig] = useState<LLMConfig | null>(null)
   const hasLoadedConfigRef = useRef(false)
 
   useEffect(() => {
@@ -256,6 +258,19 @@ export default function DiscoverPanel({
       return next
     })
   }, [onConfigChange])
+
+  const refreshAutoTopicLlmConfig = useCallback(() => {
+    setAutoTopicLlmConfig(llmConfigResolver.getLLMConfig('discover'))
+  }, [])
+
+  useEffect(() => {
+    if (visible) refreshAutoTopicLlmConfig()
+  }, [visible, refreshAutoTopicLlmConfig])
+
+  const handleOpenAutoTopic = useCallback(() => {
+    refreshAutoTopicLlmConfig()
+    setAutoTopicModalVisible(true)
+  }, [refreshAutoTopicLlmConfig])
 
   const toggleSource = useCallback((source: TrendRadarSource, enabled: boolean) => {
     if (source.kind === 'platform') {
@@ -422,7 +437,7 @@ export default function DiscoverPanel({
             <Button
               type="primary"
               icon={<BulbOutlined />}
-              onClick={() => setAutoTopicModalVisible(true)}
+              onClick={handleOpenAutoTopic}
               style={{ borderRadius: 8, fontSize: 12, height: 30 }}
             >
               自动选题
@@ -949,7 +964,7 @@ export default function DiscoverPanel({
         visible={autoTopicModalVisible}
         onClose={() => setAutoTopicModalVisible(false)}
         fetchContents={currentItems}
-        llmConfig={null}
+        llmConfig={autoTopicLlmConfig}
         onRunFetch={handleRunOnce}
         onComplete={(selected) => {
           setSelectedKeys(new Set(selected.map(identity)))
