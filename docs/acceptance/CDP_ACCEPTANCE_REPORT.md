@@ -1,50 +1,50 @@
 # CDP Acceptance Report
 
 - Status: PASS
-- Started: 2026-06-23T09:12:16.119Z
-- Ended: 2026-06-23T09:12:31.930Z
-- Duration: 16s
+- Started: 2026-06-24T03:17:38.201Z
+- Ended: 2026-06-24T03:17:56.733Z
+- Duration: 19s
 - CDP transport: Electron webContents.debugger
 
 ## Steps
 
 - PASS 读取首页 DOM: title=Auto-Podcast Studio
-- PASS 创建 episode: workflowId=1782205936219, episodeId=ep_2026_06_23_09_12
+- PASS 创建 episode: workflowId=1782271058349, episodeId=ep_2026_06_24_03_17
 - PASS TrendRadar 发现采集与采用: items=6
 - PASS 写作页保存脚本状态: stages=2
-- PASS 真人录制与保存: path=E:\Neo\auto-podcast\out\recordings\ep_2026_06_23_09_12\cdp-stage-1_1782205943653.webm, blobSize=8779
-- PASS 运行音频生成与 review: final_audio_path=out\episodes\ep_2026_06_23_09_12.mp3
-- PASS 运行本地发布与 RSS 导出: rss=out/rss\feed.xml, dir=out/published\ep_2026_06_23_09_12
+- PASS 真人录制与保存: path=E:\Neo\auto-podcast\out\recordings\ep_2026_06_24_03_17\cdp-stage-1_1782271068991.webm, blobSize=17537
+- PASS 运行音频生成与 review: final_audio_path=out\episodes\ep_2026_06_24_03_17.mp3
+- PASS 运行本地发布与 RSS 导出: rss=out/rss\feed.xml, dir=out/published\ep_2026_06_24_03_17
 
 ## Assertions
 
-- PASS 首页 DOM 可读取: bodyLength=64
+- PASS 首页 DOM 可读取: bodyLength=96
 - PASS 未出现剪枝后的精简主路径: DOM 中不应包含剪枝标记
 - PASS Electron API 已注入: window.electronAPI 必须存在
 - PASS 媒体 API 可用: getUserMedia 与 MediaRecorder 必须存在
-- PASS workflow:create 生成 episode_id: {"episodeId":"ep_2026_06_23_09_12","workflowId":"1782205936219"}
-- PASS TrendRadar 采集写入当前 workflow: {"content":"[今日头条 #1] 全球资产全线下跌","first_seen":"2026-06-23T09:12:21.368205+00:00","last_seen":"2026-06-23T09:12:21.368205+00:00","matched_reason":"今日头条 热榜第 1 位","platform_id":"toutiao","platform_name":"今日头条","published":"2026-06-23T09:12:21.368205+00:00","rank":1,"score":100,"source":"trendradar_toutiao","source_id":"toutiao","source_kind":"platform","source_name":"今日头条","title":"全球资产全线下跌","trendradar_id":"tr_platform_toutiao_10effb007951fb81","type":"hotlist","url":"https://www.toutiao.com/trending/7654160233615507494/"}
-- PASS TrendRadar 标题编码正常: 全球资产全线下跌
-- PASS 发现素材采用后写入 selected_materials: [{"content":"[今日头条 #1] 全球资产全线下跌","first_seen":"2026-06-23T09:12:21.368205+00:00","last_seen":"2026-06-23T09:12:21.368205+00:00","matched_reason":"今日头条 热榜第 1 位","platform_id":"toutiao","platform_name":"今日头条","published":"2026-06-23T09:12:21.368205+00:00","rank":1,"score":100,"source":"trendradar_toutiao","source_id":"toutiao","source_kind":"platform","source_name":"今日头条","title":"全球资产全线下跌","trendradar_id":"tr_platform_toutiao_10effb007951fb81","type":"hotlist","url":"https://www.toutiao.com/trending/7654160233615507494/"}]
+- PASS workflow:create 生成 episode_id: {"episodeId":"ep_2026_06_24_03_17","workflowId":"1782271058349"}
+- PASS TrendRadar 采集写入当前 workflow: {"content":"[今日头条 #1] “你只是高考完了不是家里发财了”","first_seen":"2026-06-24T03:17:45.844575+00:00","last_seen":"2026-06-24T03:17:45.844575+00:00","matched_reason":"今日头条 热榜第 1 位","platform_id":"toutiao","platform_name":"今日头条","published":"2026-06-24T03:17:45.844575+00:00","rank":1,"score":100,"source":"trendradar_toutiao","source_id":"toutiao","source_kind":"platform","source_name":"今日头条","title":"“你只是高考完了不是家里发财了”","trendradar_id":"tr_platform_toutiao_65132ab6f7081b2e","type":"hotlist","url":"https://www.toutiao.com/trending/7653747195086815259/"}
+- PASS TrendRadar 标题编码正常: “你只是高考完了不是家里发财了”
+- PASS 发现素材采用后写入 selected_materials: [{"content":"[今日头条 #1] “你只是高考完了不是家里发财了”","first_seen":"2026-06-24T03:17:45.844575+00:00","last_seen":"2026-06-24T03:17:45.844575+00:00","matched_reason":"今日头条 热榜第 1 位","platform_id":"toutiao","platform_name":"今日头条","published":"2026-06-24T03:17:45.844575+00:00","rank":1,"score":100,"source":"trendradar_toutiao","source_id":"toutiao","source_kind":"platform","source_name":"今日头条","title":"“你只是高考完了不是家里发财了”","trendradar_id":"tr_platform_toutiao_65132ab6f7081b2e","type":"hotlist","url":"https://www.toutiao.com/trending/7653747195086815259/"}]
 - PASS 写作状态已保存 script/stages: {"description":"通过 Electron CDP 自验收生成的测试节目","dialogue":[{"speaker":"Host A","text":"这是第一段 CDP 自验收脚本。"},{"speaker":"Host B","text":"这是第二段，用于确认 stages 与 script 会写入真实 workflow state。"}],"title":"CDP 验收节目"}
-- PASS 真人录制 WebM 已保存: E:\Neo\auto-podcast\out\recordings\ep_2026_06_23_09_12\cdp-stage-1_1782205943653.webm size=8779
-- PASS 录音段写入 workflow state: [{"duration_seconds":0.7,"id":"cdp-stage-1","mime_type":"audio/webm;codecs=opus","path":"E:\\Neo\\auto-podcast\\out\\recordings\\ep_2026_06_23_09_12\\cdp-stage-1_1782205943653.webm","segment_id":"cdp-stage-1","size":8779}]
-- PASS final_audio_path 存在且文件大于 0: out\episodes\ep_2026_06_23_09_12.mp3 size=8684
-- PASS review_summary 已生成: {"audio_metadata":{"duration_seconds":1.02,"file_size":8684,"format":"mp3","segments_count":1,"source_segments":["E:\\Neo\\auto-podcast\\out\\recordings\\ep_2026_06_23_09_12\\cdp-stage-1_1782205943653.webm"]},"checks":[{"level":"pass","message":"Audio file ready"},{"level":"pass","message":"Cover art ready"},{"level":"pass","message":"Title set"},{"level":"pass","message":"2 segments ready"}],"description":"通过 Electron CDP 自验收生成的测试节目","estimated_duration":7,"has_audio":true,"has_cover":true,"score":"4/4","segment_count":2,"title":"CDP 验收节目"}
-- PASS rss_path 存在且文件大于 0: out/rss\feed.xml size=779
-- PASS storage_info.base_dir 存在: out/published\ep_2026_06_23_09_12
-- PASS publish_status 标记本地/RSS 成功: {"platforms":{"local":"success","rss":"success"},"published_at":"2026-06-23T09:12:29.966369+00:00","rss_generated":true,"rss_path":"out/rss\\feed.xml","storage_dir":"out/published\\ep_2026_06_23_09_12"}
+- PASS 真人录制 WebM 已保存: E:\Neo\auto-podcast\out\recordings\ep_2026_06_24_03_17\cdp-stage-1_1782271068991.webm size=17537
+- PASS 录音段写入 workflow state: [{"duration_seconds":0.7,"id":"cdp-stage-1","mime_type":"audio/webm;codecs=opus","path":"E:\\Neo\\auto-podcast\\out\\recordings\\ep_2026_06_24_03_17\\cdp-stage-1_1782271068991.webm","segment_id":"cdp-stage-1","size":17537}]
+- PASS final_audio_path 存在且文件大于 0: out\episodes\ep_2026_06_24_03_17.mp3 size=12908
+- PASS review_summary 已生成: {"audio_metadata":{"duration_seconds":1.56,"file_size":12908,"format":"mp3","segments_count":1,"source_segments":["E:\\Neo\\auto-podcast\\out\\recordings\\ep_2026_06_24_03_17\\cdp-stage-1_1782271068991.webm"]},"checks":[{"level":"pass","message":"Audio file ready"},{"level":"pass","message":"Cover art ready"},{"level":"pass","message":"Title set"},{"level":"pass","message":"2 segments ready"},{"level":"pass","message":"Segment density OK: avg 32 chars/segment"}],"description":"通过 Electron CDP 自验收生成的测试节目","estimated_duration":7,"has_audio":true,"has_cover":true,"score":"5/5","segment_count":2,"title":"CDP 验收节目"}
+- PASS rss_path 存在且文件大于 0: out/rss\feed.xml size=788
+- PASS storage_info.base_dir 存在: out/published\ep_2026_06_24_03_17
+- PASS publish_status 标记本地/RSS 成功: {"platforms":{"local":"success","rss":"success"},"published_at":"2026-06-24T03:17:54.898121+00:00","rss_generated":true,"rss_path":"out/rss\\feed.xml","storage_dir":"out/published\\ep_2026_06_24_03_17"}
 - PASS 无前端 console error: - 无
 - PASS 无 Runtime exception: - 无
 - PASS 无 Network failure: - 无
 
 ## Screenshots
 
-- E:/Neo/auto-podcast/docs/acceptance/screenshots/2026-06-23T09-12-16-119Z/01-home.png
-- E:/Neo/auto-podcast/docs/acceptance/screenshots/2026-06-23T09-12-16-119Z/02-discover-trendradar-state.png
-- E:/Neo/auto-podcast/docs/acceptance/screenshots/2026-06-23T09-12-16-119Z/02-script-state.png
-- E:/Neo/auto-podcast/docs/acceptance/screenshots/2026-06-23T09-12-16-119Z/03-recording-state.png
-- E:/Neo/auto-podcast/docs/acceptance/screenshots/2026-06-23T09-12-16-119Z/04-publish-state.png
+- E:/Neo/auto-podcast/docs/acceptance/screenshots/2026-06-24T03-17-38-201Z/01-home.png
+- E:/Neo/auto-podcast/docs/acceptance/screenshots/2026-06-24T03-17-38-201Z/02-discover-trendradar-state.png
+- E:/Neo/auto-podcast/docs/acceptance/screenshots/2026-06-24T03-17-38-201Z/02-script-state.png
+- E:/Neo/auto-podcast/docs/acceptance/screenshots/2026-06-24T03-17-38-201Z/03-recording-state.png
+- E:/Neo/auto-podcast/docs/acceptance/screenshots/2026-06-24T03-17-38-201Z/04-publish-state.png
 
 ## Console Errors
 

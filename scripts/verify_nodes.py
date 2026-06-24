@@ -67,9 +67,6 @@ def test_node(node_name: str) -> bool:
         "rss_path": "",
         "publish_status": {}
     }
-    if node_name == "fetch":
-        test_state["runtime_config"]["fetch"] = {"enabled_sources": ["ai_news_daily"]}
-    
     try:
         env = {
             **os.environ,

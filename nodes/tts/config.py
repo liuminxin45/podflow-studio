@@ -1,4 +1,5 @@
-from typing import Dict
+from dataclasses import dataclass, field
+from typing import Any, Dict
 from pydantic import Field
 from protocol.config_base import NodeConfigBase
 

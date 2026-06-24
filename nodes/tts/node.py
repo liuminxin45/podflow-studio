@@ -6,14 +6,14 @@ from pathlib import Path
 from typing import Dict, Any
 import requests
 from nodes.tts.config import TTSConfig
+from protocol.node_runner import NodeContext
 
 
 def run(state: Dict[str, Any], config: TTSConfig = None) -> Dict[str, Any]:
     config = config or TTSConfig()
-    logs = state.get("logs", [])
-    errors = state.get("errors", [])
+    ctx = NodeContext("TTSNode", state)
 
-    logs.append("[TTSNode] Starting TTS conversion")
+    ctx.log_start("Starting TTS conversion")
     stages = state.get("stages", [])
 
     try:
@@ -21,25 +21,19 @@ def run(state: Dict[str, Any], config: TTSConfig = None) -> Dict[str, Any]:
         episode_id = state.get("episode_id", "unknown")
 
         ctx.log(f"使用引擎: {config.engine}")
-        if config.engine == "edge-tts":
-            segments = asyncio.run(_synthesize_all_edge(stages, config, episode_id))
-        elif config.engine == "doubao_tts":
-            segments = _synthesize_all_doubao(stages, config, episode_id)
-        elif config.engine == "voice_clone":
-            segments = _synthesize_all_remote(stages, config, episode_id)
+        engine = (config.engine or "edge-tts").lower()
+        if engine in {"edge-tts", "edge", "openai-compatible", "openai", "openai-audio"}:
+            segments = asyncio.run(_synthesize_all(stages, config, episode_id))
         else:
             raise ValueError(f"Unsupported TTS engine: {config.engine}")
         state["audio_segments"] = segments
         ctx.log(f"音频生成完成: {len(segments)} segments")
     except Exception as e:
-        errors.append({"node": "tts", "message": str(e), "detail": str(e)})
-        state["logs"] = logs
-        state["errors"] = errors
-        raise
+        ctx.add_error("tts", str(e), detail=str(e))
+        ctx.log(f"错误: {str(e)}")
 
-    state["logs"] = logs
-    state["errors"] = errors
-    return state
+    ctx.log_end(f"输出: audio_segments={len(state.get('audio_segments', []))}")
+    return ctx.finalize(state)
 
 
 async def _synthesize_all(stages, config, episode_id):

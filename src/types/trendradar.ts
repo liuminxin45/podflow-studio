@@ -73,6 +73,7 @@ export interface TrendRadarItem extends ContentItem {
   source_id: string
   source_name: string
   rank?: number
+  rank_highlight?: boolean
   score?: number
   first_seen?: string
   last_seen?: string
@@ -80,6 +81,7 @@ export interface TrendRadarItem extends ContentItem {
   matched_reason?: string
   ai_filter_tag?: string
   ai_filter_score?: number
+  keyword_tag?: string
   standalone?: boolean
 }
 

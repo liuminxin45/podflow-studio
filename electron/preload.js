@@ -22,6 +22,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readImageAsDataUrl: (targetPath) => ipcRenderer.invoke('file:readImageAsDataUrl', targetPath),
   onWorkflowUpdate: (callback) => ipcRenderer.on('workflow:update', (_, data) => callback(data)),
   onNeedApproval: (callback) => ipcRenderer.on('workflow:needApproval', (_, data) => callback(data)),
+  onAppCloseRequest: (callback) => {
+    const listener = () => callback()
+    ipcRenderer.on('app:close-request', listener)
+    return () => ipcRenderer.removeListener('app:close-request', listener)
+  },
+  confirmAppClose: () => ipcRenderer.invoke('app:confirmClose'),
   onRadarUpdate: (callback) => ipcRenderer.on('radar:update', (_, data) => callback(data)),
   getNodeSchema: (nodeName) => ipcRenderer.invoke('node:getSchema', nodeName),
   getAllNodeSchemas: () => ipcRenderer.invoke('node:getAllSchemas'),

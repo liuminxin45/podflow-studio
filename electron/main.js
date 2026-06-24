@@ -5,6 +5,7 @@ const { spawn } = require('child_process')
 const ConfigManager = require('./configManager')
 const { fetchModels, callLLM } = require('./llmService')
 const { PROVIDER_TO_ENGINE, buildTTSConfig, validateProviderConfig, buildStages } = require('./services/providerConfigBuilder')
+const { validateNodeOutput } = require('./nodeValidator')
 
 const PYTHON_PATH = process.platform === 'win32' ? 'python' : 'python3'
 const PROJECT_ROOT = path.join(__dirname, '..')
@@ -132,6 +133,7 @@ function getTrendRadarCliEnv(userDataDir, payload = {}) {
 let mainWindow = null
 let configManager = null
 let currentWorkflow = null
+let appCloseConfirmed = false
 const WORKFLOW_DIR = path.join(__dirname, '..', 'out', 'workflows')
 
 // TrendRadar daemon process
@@ -153,6 +155,21 @@ const DEFAULT_RADAR_STATE = {
 
 let radarState = { ...DEFAULT_RADAR_STATE }
 let radarTimer = null
+
+const NODE_STAGE_LABELS = {
+  fetch: '发现',
+  manual: '发现',
+  merge: '发现',
+  preprocess: '整理',
+  research: '构思',
+  topic_selection: '构思',
+  script: '写作',
+  tts: '制作',
+  audio_postprocess: '制作',
+  assets: '制作',
+  review: '发布',
+  publish: '发布'
+}
 
 function broadcastWorkflowUpdate() {
   if (mainWindow) {
@@ -365,6 +382,7 @@ function loadLatestWorkflow() {
 }
 
 function createWindow() {
+  appCloseConfirmed = false
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -386,6 +404,14 @@ function createWindow() {
 
   mainWindow.webContents.once('did-finish-load', () => {
     broadcastWorkflowUpdate()
+  })
+
+  mainWindow.on('close', (event) => {
+    if (appCloseConfirmed || process.env.CDP_ACCEPTANCE === '1') return
+    event.preventDefault()
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('app:close-request')
+    }
   })
 
   if (process.env.CDP_ACCEPTANCE === '1') {
@@ -530,6 +556,23 @@ function runTrendRadarCli(action, payload = {}, timeoutMs = 300000) {
 
 function getRadarCachePath() {
   return path.join(app.getPath('userData'), 'radar-cache.json')
+}
+
+function loadRadarCache() {
+  try {
+    const cachePath = getRadarCachePath()
+    if (!fs.existsSync(cachePath)) return { ...DEFAULT_RADAR_STATE }
+    const cached = JSON.parse(fs.readFileSync(cachePath, 'utf-8'))
+    return {
+      ...DEFAULT_RADAR_STATE,
+      ...(cached && typeof cached === 'object' ? cached : {}),
+      running: false,
+      runStartedAt: null
+    }
+  } catch (error) {
+    console.warn('Failed to load radar cache:', error)
+    return { ...DEFAULT_RADAR_STATE }
+  }
 }
 
 // ── Radar Service (extracted) ─────────────────────────────────────
@@ -763,6 +806,16 @@ ipcMain.handle('workflow:close', async (event, workflowId) => {
   if (currentWorkflow?.id === workflowId) {
     currentWorkflow = null
     broadcastWorkflowUpdate()
+  }
+  return { success: true }
+})
+
+ipcMain.handle('app:confirmClose', async () => {
+  appCloseConfirmed = true
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close()
+  } else {
+    app.quit()
   }
   return { success: true }
 })
@@ -1461,6 +1514,9 @@ ipcMain.handle('fetch:getSources', async (event) => {
 })
 
 async function runWorkflow(workflowId, resumeFrom = null, onlyNodes = null) {
+  const workflowStartTime = Date.now()
+  const episodeId = currentWorkflow?.state?.episode_id || workflowId
+
   // 6-stage creator workflow: 发现 → 整理 → 构思 → 写作 → 制作 → 发布
   // Each stage groups internal sub-nodes
   const defaultNodes = [
@@ -1533,6 +1589,7 @@ async function runWorkflow(workflowId, resumeFrom = null, onlyNodes = null) {
       }
 
       validateNodeOutput(nodeName, result)
+      currentWorkflow.state = result
       
       currentWorkflow.nodeExecutions[nodeName] = {
         status: 'completed',

@@ -1,3 +1,13 @@
+import type { TrendRadarConfigView } from './trendradar'
+
+export interface DiscoverUiState {
+  selectedCount?: number
+  lastRunAt?: string
+  proceededAt?: string
+  configUpdatedAt?: string
+  trendradar_config?: Partial<TrendRadarConfigView>
+}
+
 export interface PodcastState {
   episode_id: string
   created_at: string
@@ -25,7 +35,7 @@ export interface PodcastState {
   publish_status: Record<string, any>
   subtitle_path: string
   trendradar_meta?: Record<string, any>
-  discover_ui?: Record<string, any>
+  discover_ui?: DiscoverUiState
   organize_ui?: Record<string, any>
   episode_brief?: Record<string, any>
   writing_meta?: Record<string, any>

@@ -37,15 +37,16 @@ interface Props {
   items: TrendRadarItem[]
   selectedItems: TrendRadarItem[]
   meta?: TrendRadarMeta
+  initialConfig?: Partial<TrendRadarConfigView>
+  onConfigChange?: (config: TrendRadarConfigView) => void
   onRunOnce: (config: Partial<TrendRadarConfigView>) => Promise<TrendRadarRunResult>
   onLoadConfig: () => Promise<TrendRadarConfigView>
-  onSaveConfig: (config: Partial<TrendRadarConfigView>) => Promise<TrendRadarConfigView>
   onListSources: () => Promise<TrendRadarSource[]>
   onGetStatus: () => Promise<TrendRadarStatus>
   onCheckUpdate: () => Promise<TrendRadarUpdateStatus>
   onUpdateDependency: () => Promise<Record<string, any>>
   onOpenReport: (reportPath: string) => Promise<void>
-  onProceedToOrganize: (items: TrendRadarItem[], meta: TrendRadarMeta) => void
+  onProceedToOrganize: (items: TrendRadarItem[], meta: TrendRadarMeta, config: TrendRadarConfigView) => void
 }
 
 const DEFAULT_CONFIG: TrendRadarConfigView = {
@@ -137,15 +138,51 @@ function inputToList(value: string): string[] {
   return value.split(',').map(part => part.trim()).filter(Boolean)
 }
 
+function mergeConfig(...configs: Array<Partial<TrendRadarConfigView> | undefined>): TrendRadarConfigView {
+  return configs.reduce<TrendRadarConfigView>((merged, current) => ({
+    ...merged,
+    ...(current || {}),
+    enabled_platforms: current?.enabled_platforms ?? merged.enabled_platforms,
+    enabled_rss_feeds: current?.enabled_rss_feeds ?? merged.enabled_rss_feeds,
+    ai_fallback_models: current?.ai_fallback_models ?? merged.ai_fallback_models,
+    standalone_platforms: current?.standalone_platforms ?? merged.standalone_platforms,
+    standalone_rss_feeds: current?.standalone_rss_feeds ?? merged.standalone_rss_feeds,
+  }), { ...DEFAULT_CONFIG })
+}
+
+function buildEpisodeDefaultConfig(loadedConfig: TrendRadarConfigView, sources: TrendRadarSource[]): TrendRadarConfigView {
+  return mergeConfig({
+    timezone: loadedConfig.timezone || DEFAULT_CONFIG.timezone,
+    show_version_update: loadedConfig.show_version_update ?? DEFAULT_CONFIG.show_version_update,
+    enabled_platforms: sources
+      .filter(source => source.kind === 'platform' && source.enabled)
+      .map(source => source.id),
+    enabled_rss_feeds: sources
+      .filter(source => source.kind === 'rss' && source.enabled)
+      .map(source => source.id),
+    ai_available: loadedConfig.ai_available,
+    ai_api_key_set: loadedConfig.ai_api_key_set,
+    ai_provider_source: loadedConfig.ai_provider_source,
+    ai_model: loadedConfig.ai_model,
+    ai_api_base: loadedConfig.ai_api_base,
+    ai_timeout: loadedConfig.ai_timeout,
+    ai_temperature: loadedConfig.ai_temperature,
+    ai_max_tokens: loadedConfig.ai_max_tokens,
+    ai_num_retries: loadedConfig.ai_num_retries,
+    ai_fallback_models: loadedConfig.ai_fallback_models,
+  })
+}
+
 export default function DiscoverPanel({
   visible,
   onClose,
   items,
   selectedItems,
   meta,
+  initialConfig,
+  onConfigChange,
   onRunOnce,
   onLoadConfig,
-  onSaveConfig,
   onListSources,
   onGetStatus,
   onCheckUpdate,
@@ -182,7 +219,7 @@ export default function DiscoverPanel({
     Promise.all([onLoadConfig(), onListSources(), onGetStatus()])
       .then(([loadedConfig, loadedSources, loadedStatus]) => {
         if (cancelled) return
-        setConfig({ ...DEFAULT_CONFIG, ...loadedConfig })
+        setConfig(mergeConfig(buildEpisodeDefaultConfig(loadedConfig, loadedSources), initialConfig))
         setSources(loadedSources)
         setStatus(loadedStatus)
       })
@@ -210,8 +247,12 @@ export default function DiscoverPanel({
   const rssSources = useMemo(() => sources.filter(source => source.kind === 'rss'), [sources])
 
   const updateConfig = useCallback((patch: Partial<TrendRadarConfigView>) => {
-    setConfig(prev => ({ ...prev, ...patch }))
-  }, [])
+    setConfig(prev => {
+      const next = mergeConfig(prev, patch)
+      onConfigChange?.(next)
+      return next
+    })
+  }, [onConfigChange])
 
   const toggleSource = useCallback((source: TrendRadarSource, enabled: boolean) => {
     if (source.kind === 'platform') {
@@ -231,22 +272,20 @@ export default function DiscoverPanel({
     setSaving(true)
     setNotice(null)
     try {
-      const saved = await onSaveConfig(config)
-      setConfig({ ...DEFAULT_CONFIG, ...saved })
-      const loadedSources = await onListSources()
-      setSources(loadedSources)
-      setNotice({ type: 'success', text: 'TrendRadar 配置已保存' })
+      onConfigChange?.(config)
+      setNotice({ type: 'success', text: '采集设置已保存到当前节目' })
     } catch (error: any) {
       setNotice({ type: 'error', text: error.message || '配置保存失败' })
     } finally {
       setSaving(false)
     }
-  }, [config, onSaveConfig, onListSources])
+  }, [config, onConfigChange])
 
   const handleRunOnce = useCallback(async () => {
     setRunning(true)
     setNotice(null)
     try {
+      onConfigChange?.(config)
       const result = await onRunOnce(config)
       const nextItems = result.items || result.fetch_contents || []
       setCurrentItems(nextItems)
@@ -260,7 +299,7 @@ export default function DiscoverPanel({
     } finally {
       setRunning(false)
     }
-  }, [config, onRunOnce, onGetStatus])
+  }, [config, onConfigChange, onRunOnce, onGetStatus])
 
   const handleCheckUpdate = useCallback(async () => {
     setCheckingUpdate(true)
@@ -326,8 +365,8 @@ export default function DiscoverPanel({
       setNotice({ type: 'warning', text: '请先选择至少一条素材' })
       return
     }
-    onProceedToOrganize(selectedItemsForProceed, currentMeta)
-  }, [selectedItemsForProceed, currentMeta, onProceedToOrganize])
+    onProceedToOrganize(selectedItemsForProceed, currentMeta, config)
+  }, [selectedItemsForProceed, currentMeta, config, onProceedToOrganize])
 
   if (!visible) return null
 
@@ -742,7 +781,7 @@ export default function DiscoverPanel({
               />
             )}
             <Button block onClick={handleSaveConfig} loading={saving}>
-              保存设置
+              保存到节目
             </Button>
           </section>
 
@@ -853,7 +892,7 @@ export default function DiscoverPanel({
               return (
                 <article
                   key={identity(item)}
-                  className={`discover-item ${selected ? 'selected' : ''}`}
+                  className={`discover-item ${selected ? 'selected' : ''} ${item.rank_highlight ? 'rank-highlight' : ''}`}
                   onClick={() => toggleSelected(item)}
                 >
                   <div className="discover-item-check">

@@ -70,6 +70,8 @@ declare global {
       }>
       onWorkflowUpdate: (callback: (data: Workflow | null) => void) => void
       onNeedApproval: (callback: (data: any) => void) => void
+      onAppCloseRequest: (callback: () => void) => (() => void) | void
+      confirmAppClose: () => Promise<{ success: boolean }>
       getNodeSchema: (nodeName: string) => Promise<any>
       getAllNodeSchemas: () => Promise<Record<string, any>>
       saveNodeConfig: (nodeName: string, config: Record<string, any>) => Promise<{ success: boolean; error?: string }>
@@ -134,6 +136,7 @@ function App() {
   const [approvalData, setApprovalData] = useState<any>(null)
   const [studioVisible, setStudioVisible] = useState(false)
   const studioAutoOpened = useRef(false)
+  const appCloseConfirmingRef = useRef(false)
   const [isAutoExecute, setIsAutoExecute] = useState(false)
   const [discoverVisible, setDiscoverVisible] = useState(false)
   const [organizeVisible, setOrganizeVisible] = useState(false)
@@ -171,23 +174,89 @@ function App() {
   const confirmSaveBeforeReplace = async () => {
     if (!workflow || !hasUnsavedChanges) return true
     return new Promise<boolean>((resolve) => {
-      Modal.confirm({
+      let settled = false
+      let modal: { destroy: () => void } | null = null
+      const finish = (canContinue: boolean) => {
+        if (settled) return
+        settled = true
+        modal?.destroy()
+        resolve(canContinue)
+      }
+
+      modal = Modal.confirm({
         title: '保存当前节目？',
-        content: '当前节目有未保存更改。保存后再继续，或选择不保存并丢弃这些更改。',
-        okText: '保存',
-        cancelText: '不保存',
+        content: (
+          <div>
+            <p>当前节目有未保存更改。保存后再继续，或选择不保存并丢弃这些更改。</p>
+            <Space style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+              <Button onClick={() => finish(false)}>
+                取消
+              </Button>
+              <Button onClick={() => finish(true)}>
+                不保存
+              </Button>
+              <Button
+                type="primary"
+                onClick={async () => {
+                  try {
+                    await saveActiveWorkflow()
+                    finish(true)
+                  } catch (error: any) {
+                    showNotice('error', `保存失败：${error.message}`)
+                  }
+                }}
+              >
+                保存
+              </Button>
+            </Space>
+          </div>
+        ),
+        footer: null,
+        closable: true,
+        maskClosable: false,
         centered: true,
-        async onOk() {
-          try {
-            await saveActiveWorkflow()
-            resolve(true)
-          } catch (error: any) {
-            showNotice('error', `保存失败：${error.message}`)
-            resolve(false)
-          }
-        },
         onCancel() {
-          resolve(true)
+          finish(false)
+        },
+      })
+    })
+  }
+
+  const confirmCloseActiveWorkflow = async () => {
+    if (!workflow) return true
+    if (hasUnsavedChanges) return confirmSaveBeforeReplace()
+
+    return new Promise<boolean>((resolve) => {
+      let settled = false
+      let modal: { destroy: () => void } | null = null
+      const finish = (canClose: boolean) => {
+        if (settled) return
+        settled = true
+        modal?.destroy()
+        resolve(canClose)
+      }
+
+      modal = Modal.confirm({
+        title: '关闭软件？',
+        content: (
+          <div>
+            <p>当前正在编辑一个节目。确认关闭 Auto-Podcast Studio？</p>
+            <Space style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+              <Button onClick={() => finish(false)}>
+                取消
+              </Button>
+              <Button type="primary" danger onClick={() => finish(true)}>
+                关闭
+              </Button>
+            </Space>
+          </div>
+        ),
+        footer: null,
+        closable: true,
+        maskClosable: false,
+        centered: true,
+        onCancel() {
+          finish(false)
         },
       })
     })
@@ -325,6 +394,27 @@ function App() {
       setApprovalVisible(true)
     })
   }, [])
+
+  useEffect(() => {
+    if (!window.electronAPI?.onAppCloseRequest || !window.electronAPI?.confirmAppClose) return
+    const unsubscribe = window.electronAPI.onAppCloseRequest(async () => {
+      if (appCloseConfirmingRef.current) return
+      appCloseConfirmingRef.current = true
+      try {
+        const canClose = await confirmCloseActiveWorkflow()
+        if (canClose) {
+          await window.electronAPI.confirmAppClose()
+        }
+      } catch (error: any) {
+        showNotice('error', `关闭失败：${error.message}`)
+      } finally {
+        appCloseConfirmingRef.current = false
+      }
+    })
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe()
+    }
+  }, [workflow, hasUnsavedChanges])
 
   useEffect(() => {
     studioAutoOpened.current = false
@@ -731,14 +821,18 @@ function App() {
           items={(workflow?.state?.fetch_contents || []) as TrendRadarItem[]}
           selectedItems={(workflow?.state?.selected_materials || []) as TrendRadarItem[]}
           meta={(workflow?.state?.trendradar_meta || {}) as TrendRadarMeta}
+          initialConfig={workflow?.state?.discover_ui?.trendradar_config as Partial<TrendRadarConfigView> | undefined}
+          onConfigChange={(config) => {
+            void updateWorkflowPatch({
+              discover_ui: {
+                trendradar_config: config,
+                configUpdatedAt: new Date().toISOString(),
+              },
+            })
+          }}
           onLoadConfig={async () => {
             const result = await window.electronAPI.trendradarGetConfig()
             if (!result.success) throw new Error(result.error || '读取 TrendRadar 配置失败')
-            return result.config
-          }}
-          onSaveConfig={async (config) => {
-            const result = await window.electronAPI.trendradarSaveConfig(config)
-            if (!result.success) throw new Error(result.error || '保存 TrendRadar 配置失败')
             return result.config
           }}
           onListSources={async () => {
@@ -765,6 +859,7 @@ function App() {
               discover_ui: {
                 selectedCount: 0,
                 lastRunAt: meta.generated_at || new Date().toISOString(),
+                trendradar_config: config,
               },
               organize_ui: {
                 candidates: [],
@@ -777,7 +872,7 @@ function App() {
             setOrganizeCandidates([])
             return { ...result, items: contents, fetch_contents: contents, meta }
           }}
-          onProceedToOrganize={(candidates, meta) => {
+          onProceedToOrganize={(candidates, meta, config) => {
             setDiscoverCandidates(candidates)
             void updateWorkflowPatch({
               selected_materials: candidates,
@@ -790,6 +885,7 @@ function App() {
               discover_ui: {
                 selectedCount: candidates.length,
                 proceededAt: new Date().toISOString(),
+                trendradar_config: config,
               },
             })
             closeAllPanels()

@@ -23,6 +23,7 @@ import urllib.request
 import importlib.util
 from pathlib import Path
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing import List, Dict, Any, Optional, Tuple
 
 
@@ -295,6 +296,40 @@ def _coerce_list(value: Any) -> List[str]:
         return []
     if isinstance(value, list):
         return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, tuple) or isinstance(value, set):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        return [part.strip() for part in value.split(",") if part.strip()]
+    return []
+
+
+def _get_timezone(config: Optional[Dict[str, Any]] = None):
+    name = str((config or {}).get("timezone") or "Asia/Shanghai").strip() or "Asia/Shanghai"
+    try:
+        return ZoneInfo(name)
+    except ZoneInfoNotFoundError:
+        return timezone.utc
+
+
+def _now_iso(config: Optional[Dict[str, Any]] = None) -> str:
+    return datetime.now(_get_timezone(config)).isoformat()
+
+
+def _parse_datetime(value: Any, config: Optional[Dict[str, Any]] = None) -> Optional[datetime]:
+    if not value:
+        return None
+    text = str(value)
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=_get_timezone(config))
+    return parsed.astimezone(_get_timezone(config))
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
     if isinstance(value, str):
         return [part.strip() for part in value.split(",") if part.strip()]
     return [str(value).strip()] if str(value).strip() else []
@@ -442,12 +477,9 @@ def save_config_view(config: Dict[str, Any], user_data_dir: Optional[str] = None
 
 
 def list_sources(user_data_dir: Optional[str] = None) -> List[Dict[str, Any]]:
-    cfg = get_config_view(user_data_dir)
     source_cfg = _load_yaml(TRENDRADAR_ROOT / "config" / "config.yaml")
     platforms = source_cfg.get("platforms", {}).get("sources", [])
     rss_feeds = source_cfg.get("rss", {}).get("feeds", [])
-    enabled_platforms = set(cfg.get("enabled_platforms", []))
-    enabled_rss = set(cfg.get("enabled_rss_feeds", []))
     sources: List[Dict[str, Any]] = []
     for p in platforms:
         pid = p.get("id")
@@ -457,7 +489,7 @@ def list_sources(user_data_dir: Optional[str] = None) -> List[Dict[str, Any]]:
             "id": pid,
             "name": _normalize_text(p.get("name", pid)),
             "kind": "platform",
-            "enabled": pid in enabled_platforms,
+            "enabled": _coerce_bool(p.get("enabled"), True),
             "description": _normalize_text(p.get("expected_domain", "")),
         })
     for feed in rss_feeds:
@@ -468,7 +500,7 @@ def list_sources(user_data_dir: Optional[str] = None) -> List[Dict[str, Any]]:
             "id": fid,
             "name": _normalize_text(feed.get("name", fid)),
             "kind": "rss",
-            "enabled": fid in enabled_rss,
+            "enabled": _coerce_bool(feed.get("enabled"), True),
             "url": feed.get("url", ""),
         })
     return sources
@@ -483,8 +515,10 @@ def _normalize_platform_results(
     results: Dict[str, Dict],
     id_to_name: Dict[str, str],
     max_items_per_source: int,
+    config: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = _now_iso(config)
+    rank_threshold = _coerce_int((config or {}).get("rank_threshold"), 0, minimum=0, maximum=100)
     items: List[Dict[str, Any]] = []
     for platform_id, titles_data in results.items():
         platform_name = _normalize_text(id_to_name.get(platform_id, platform_id))
@@ -495,6 +529,7 @@ def _normalize_platform_results(
             url = str(title_info.get("url") or title_info.get("mobileUrl") or "")
             ranks = title_info.get("ranks", [])
             rank = ranks[0] if ranks else idx
+            rank_highlight = bool(rank_threshold and int(rank) <= rank_threshold)
             item_id = _make_item_id("platform", platform_id, str(title), url)
             items.append({
                 "trendradar_id": item_id,
@@ -510,6 +545,7 @@ def _normalize_platform_results(
                 "platform_id": platform_id,
                 "platform_name": platform_name,
                 "rank": rank,
+                "rank_highlight": rank_highlight,
                 "score": max(0, 101 - int(rank)),
                 "first_seen": now_iso,
                 "last_seen": now_iso,
@@ -562,7 +598,8 @@ def _fetch_rss_items(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List
         _log(f"[bridge] RSS fetch failed: {exc}")
         return [], [f.get("id", "rss") for f in feeds]
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = _now_iso(config)
+    rank_threshold = _coerce_int(config.get("rank_threshold"), 0, minimum=0, maximum=100)
     items: List[Dict[str, Any]] = []
     for feed_id, feed_items in data.items.items():
         feed_name = _normalize_text(data.id_to_name.get(feed_id, feed_id))
@@ -584,6 +621,7 @@ def _fetch_rss_items(config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List
                 "source_id": feed_id,
                 "source_name": feed_name,
                 "rank": idx,
+                "rank_highlight": bool(rank_threshold and idx <= rank_threshold),
                 "score": max(0, 80 - idx),
                 "first_seen": published,
                 "last_seen": now_iso,
@@ -773,6 +811,149 @@ def _apply_report_limits(items: List[Dict[str, Any]], config: Dict[str, Any]) ->
     return limited
 
 
+def _load_keyword_rules() -> Tuple[List[Dict[str, Any]], List[Any], List[str]]:
+    try:
+        _ensure_trendradar_path()
+        from trendradar.core.frequency import load_frequency_words
+        return load_frequency_words(str(TRENDRADAR_ROOT / "config" / "frequency_words.txt"))
+    except Exception as exc:
+        _log(f"[bridge] keyword rules unavailable: {exc}")
+        return [], [], []
+
+
+def _match_keyword_group(title: str, groups: List[Dict[str, Any]], filter_words: List[Any], global_filters: List[str]) -> Optional[Dict[str, Any]]:
+    try:
+        from trendradar.core.frequency import _word_matches
+    except Exception:
+        return None
+    title_lower = str(title or "").lower()
+    if not title_lower.strip():
+        return None
+    if any(str(global_word).lower() in title_lower for global_word in global_filters or []):
+        return None
+    for filter_item in filter_words or []:
+        if _word_matches(filter_item, title_lower):
+            return None
+    if not groups:
+        return {"display_name": "全部", "priority": 9999, "max_count": 0}
+    for index, group in enumerate(groups, 1):
+        required_words = group.get("required") or []
+        normal_words = group.get("normal") or []
+        if required_words and not all(_word_matches(req_item, title_lower) for req_item in required_words):
+            continue
+        if normal_words and not any(_word_matches(normal_item, title_lower) for normal_item in normal_words):
+            continue
+        return {
+            "display_name": group.get("display_name") or group.get("group_key") or f"关键词 {index}",
+            "priority": index,
+            "max_count": _coerce_int(group.get("max_count"), 0, minimum=0, maximum=100),
+        }
+    return None
+
+
+def _apply_keyword_filter(items: List[Dict[str, Any]], config: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    groups, filter_words, global_filters = _load_keyword_rules()
+    max_per_keyword = _coerce_int(config.get("max_news_per_keyword"), 0, minimum=0, maximum=100)
+    matched: List[Dict[str, Any]] = []
+    counts: Dict[str, int] = {}
+    group_limits: Dict[str, int] = {}
+    group_priorities: Dict[str, int] = {}
+    for item in items:
+        title = _normalize_text(item.get("title") or item.get("content") or "")
+        group = _match_keyword_group(title, groups, filter_words, global_filters)
+        if not group:
+            continue
+        keyword = str(group["display_name"])
+        group_limit = _coerce_int(group.get("max_count"), 0, minimum=0, maximum=100)
+        effective_limit = group_limit or max_per_keyword
+        current = counts.get(keyword, 0)
+        if effective_limit > 0 and current >= effective_limit:
+            continue
+        next_item = dict(item)
+        next_item["keyword_tag"] = keyword
+        next_item["_keyword_priority"] = group.get("priority", 9999)
+        next_item["matched_reason"] = f"关键词筛选：{keyword}"
+        matched.append(next_item)
+        counts[keyword] = current + 1
+        group_limits[keyword] = effective_limit
+        group_priorities[keyword] = _coerce_int(group.get("priority"), 9999, minimum=1)
+
+    if _coerce_bool(config.get("sort_by_position_first"), False):
+        matched.sort(key=lambda item: (
+            item.get("_keyword_priority") or 9999,
+            item.get("rank") or 9999,
+            item.get("source_name") or "",
+        ))
+    else:
+        matched.sort(key=lambda item: (
+            -counts.get(str(item.get("keyword_tag") or ""), 0),
+            item.get("rank") or 9999,
+            item.get("source_name") or "",
+        ))
+
+    for item in matched:
+        item.pop("_keyword_priority", None)
+
+    topics = [
+        {"name": name, "count": count}
+        for name, count in sorted(
+            counts.items(),
+            key=lambda pair: (
+                group_priorities.get(pair[0], 9999)
+                if _coerce_bool(config.get("sort_by_position_first"), False)
+                else -pair[1],
+                pair[0],
+            ),
+        )
+    ]
+    return matched, {
+        "enabled": False,
+        "method": "keyword",
+        "total_processed": len(items),
+        "total_matched": len(matched),
+        "topics": topics,
+        "max_news_per_keyword": max_per_keyword,
+        "group_limits": group_limits,
+    }
+
+
+def _apply_report_mode(items: List[Dict[str, Any]], config: Dict[str, Any], user_data_dir: Optional[str]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    mode = str(config.get("report_mode") or "current")
+    if mode == "daily":
+        today = datetime.now(_get_timezone(config)).date()
+        filtered = [
+            item for item in items
+            if (_parse_datetime(item.get("published") or item.get("first_seen"), config) or datetime.now(_get_timezone(config))).date() == today
+        ]
+        return filtered, {"mode": mode, "removed": len(items) - len(filtered)}
+    if mode == "incremental":
+        previous = get_latest(user_data_dir)
+        seen_ids = {
+            item.get("trendradar_id") or f"{item.get('url', '')}|{item.get('title', '')}"
+            for item in previous.get("items", [])
+        }
+        filtered = [
+            item for item in items
+            if (item.get("trendradar_id") or f"{item.get('url', '')}|{item.get('title', '')}") not in seen_ids
+        ]
+        return filtered, {"mode": mode, "removed": len(items) - len(filtered)}
+    return items, {"mode": "current", "removed": 0}
+
+
+def _sort_unfiltered_items(items: List[Dict[str, Any]], config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    if _coerce_bool(config.get("sort_by_position_first"), False):
+        return sorted(items, key=lambda item: (
+            item.get("rank") or 9999,
+            -(item.get("score") or 0),
+            item.get("source_name") or "",
+        ))
+    return sorted(items, key=lambda item: (
+        -(item.get("score") or 0),
+        item.get("rank") or 9999,
+        item.get("source_name") or "",
+    ))
+
+
 def _append_standalone_items(
     filtered_items: List[Dict[str, Any]],
     all_items: List[Dict[str, Any]],
@@ -827,28 +1008,14 @@ def _append_standalone_items(
 
 def _apply_light_filters(items: List[Dict[str, Any]], config: Dict[str, Any], user_data_dir: Optional[str] = None) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     # TrendRadar owns the data source; this adapter applies UI-facing limits and v6.10 AI filtering.
-    sorted_items = sorted(
-        items,
-        key=lambda item: (
-            -(item.get("score") or 0),
-            item.get("rank") or 9999,
-            item.get("source_name") or "",
-        ),
-    )
+    sorted_items = _sort_unfiltered_items(items, config)
     if config.get("filter_method") == "ai":
         filtered, meta = _apply_ai_filter(sorted_items, config, user_data_dir)
         limited = _apply_report_limits(filtered, config)
         if len(limited) != len(filtered):
             meta = {**meta, "report_limited": len(filtered) - len(limited), "total_returned": len(limited)}
         return limited, meta
-    return sorted(
-        items,
-        key=lambda item: (
-            -(item.get("score") or 0),
-            item.get("rank") or 9999,
-            item.get("source_name") or "",
-        ),
-    ), {"enabled": False, "method": "keyword"}
+    return _apply_keyword_filter(sorted_items, config)
 
 
 def run_once(config_override: Optional[Dict[str, Any]] = None, user_data_dir: Optional[str] = None) -> Dict[str, Any]:
@@ -868,6 +1035,7 @@ def run_once(config_override: Optional[Dict[str, Any]] = None, user_data_dir: Op
             results,
             id_to_name,
             int(config.get("max_items_per_source", 30) or 30),
+            config,
         )
         failed_sources.extend(failed_ids or [])
 
@@ -876,9 +1044,12 @@ def run_once(config_override: Optional[Dict[str, Any]] = None, user_data_dir: Op
     all_items = platform_items + rss_items
     items, filter_meta = _apply_light_filters(all_items, config, user_data_dir)
     items, standalone_meta = _append_standalone_items(items, all_items, config)
-    generated_at = datetime.now(timezone.utc).isoformat()
-    if filter_meta.get("enabled") and filter_meta.get("tags"):
+    items, report_mode_meta = _apply_report_mode(items, config, user_data_dir)
+    generated_at = _now_iso(config)
+    if filter_meta.get("enabled") and filter_meta.get("tags") and config.get("report_display_mode") != "platform":
         topics = [{"name": tag["tag"], "count": tag["count"]} for tag in filter_meta["tags"]]
+    elif filter_meta.get("topics") and config.get("report_display_mode") != "platform":
+        topics = filter_meta["topics"]
     else:
         topics = get_topics_from_items(items)
     meta = {
@@ -890,13 +1061,17 @@ def run_once(config_override: Optional[Dict[str, Any]] = None, user_data_dir: Op
         "topics": topics,
         "ai_filter": filter_meta,
         "standalone": standalone_meta,
+        "report_mode": report_mode_meta,
+        "rank_highlight_count": len([item for item in items if item.get("rank_highlight")]),
         "config": {k: config.get(k) for k in [
             "filter_method", "max_items_per_source", "freshness_days", "rss_freshness_enabled",
             "enabled_platforms", "enabled_rss_feeds", "crawler_request_interval",
-            "rss_request_interval", "rss_timeout", "ai_filter_min_score",
+            "rss_request_interval", "rss_timeout", "rss_proxy_enabled", "rss_proxy_url",
+            "platforms_enabled", "rss_enabled", "proxy_enabled", "proxy_url", "api_url",
+            "timezone", "rank_threshold", "sort_by_position_first", "ai_filter_min_score",
             "ai_filter_batch_size", "ai_interests_file", "report_mode", "report_display_mode",
             "max_news_per_keyword", "display_standalone_enabled", "standalone_platforms",
-            "standalone_rss_feeds", "standalone_max_items",
+            "standalone_rss_feeds", "standalone_max_items", "debug",
         ]},
     }
     result = {"success": True, "items": items, "fetch_contents": items, "meta": meta}
