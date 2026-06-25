@@ -826,7 +826,6 @@ function App() {
         <DiscoverPanel
           key={`discover-${workflow?.id || 'none'}`}
           visible={discoverVisible}
-          onClose={returnToEpisodeManager}
           items={(workflow?.state?.fetch_contents || []) as TrendRadarItem[]}
           selectedItems={(workflow?.state?.selected_materials || []) as TrendRadarItem[]}
           meta={(workflow?.state?.trendradar_meta || {}) as TrendRadarMeta}
@@ -850,8 +849,6 @@ function App() {
             return result.sources || []
           }}
           onGetStatus={() => window.electronAPI.trendradarGetStatus()}
-          onCheckUpdate={() => window.electronAPI.trendradarCheckUpdate()}
-          onUpdateDependency={() => window.electronAPI.trendradarUpdateDependency({ ref: 'latest', installDeps: true })}
           onGetNewsNowStatus={() => window.electronAPI.newsnowGetStatus()}
           onSyncNewsNow={() => window.electronAPI.newsnowSync({ update: 'lock' })}
           onSetupNewsNow={() => window.electronAPI.newsnowSetup()}

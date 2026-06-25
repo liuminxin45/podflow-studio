@@ -545,6 +545,13 @@ pre {
   white-space: nowrap;
 }
 
+.discover-status-link {
+  height: 20px;
+  margin-top: 2px;
+  padding: 0;
+  font-size: 12px;
+}
+
 .discover-topic-strip {
   display: flex;
   gap: 8px;
@@ -620,11 +627,23 @@ pre {
 }
 
 .discover-item h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 6px 0 4px;
   color: var(--text-primary);
   font-size: 14px;
   font-weight: 700;
   line-height: 1.45;
+}
+
+.discover-item h3 > span {
+  min-width: 0;
+}
+
+.discover-translation-tag {
+  flex: 0 0 auto;
+  margin-inline-end: 0;
 }
 
 .discover-item p {
@@ -650,6 +669,39 @@ pre {
 
 .discover-item-foot a:hover {
   text-decoration: underline;
+}
+
+.discover-failed-source-list {
+  display: grid;
+  gap: 10px;
+}
+
+.discover-failed-source-item {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  padding: 10px;
+}
+
+.discover-failed-source-item > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.discover-failed-source-item span {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.discover-failed-source-item p {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .discover-metric + .discover-metric {

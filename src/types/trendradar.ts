@@ -1,6 +1,7 @@
 import type { ContentItem } from './workflow'
 
 export type TrendRadarSourceKind = 'platform' | 'rss'
+export type TrendRadarFailedSourceKind = TrendRadarSourceKind | 'unknown'
 export type TrendRadarFilterMethod = 'keyword' | 'ai'
 export type TrendRadarAIProviderSource = 'app' | 'trendradar' | 'env' | 'none'
 export type TrendRadarReportMode = 'daily' | 'current' | 'incremental'
@@ -83,12 +84,28 @@ export interface TrendRadarItem extends ContentItem {
   ai_filter_score?: number
   keyword_tag?: string
   standalone?: boolean
+  original_title?: string
+  original_content?: string
+  translated_title?: string
+  translated_content?: string
+  translated_at?: string
+  translation_status?: 'translated'
+  translation_provider?: string
+}
+
+export interface TrendRadarFailedSourceDetail {
+  id: string
+  name?: string
+  kind: TrendRadarFailedSourceKind
+  reason?: string
+  detail?: string
 }
 
 export interface TrendRadarMeta {
   generated_at?: string
   report_path?: string
   failed_sources?: string[]
+  failed_source_details?: TrendRadarFailedSourceDetail[]
   platform_count?: number
   rss_count?: number
   item_count?: number

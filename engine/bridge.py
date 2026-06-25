@@ -560,6 +560,35 @@ def list_sources(user_data_dir: Optional[str] = None) -> List[Dict[str, Any]]:
     return sources
 
 
+def _build_failed_source_details(failed_sources: List[str]) -> List[Dict[str, Any]]:
+    if not failed_sources:
+        return []
+
+    source_lookup = {source["id"]: source for source in list_sources()}
+    details: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for source_id in failed_sources:
+        normalized_id = str(source_id or "").strip()
+        if not normalized_id or normalized_id in seen:
+            continue
+        seen.add(normalized_id)
+
+        source = source_lookup.get(normalized_id)
+        source_kind = source.get("kind") if source else "unknown"
+        label = "热榜平台" if source_kind == "platform" else "RSS 订阅" if source_kind == "rss" else "未知来源"
+        detail: Dict[str, Any] = {
+            "id": normalized_id,
+            "name": source.get("name") if source else normalized_id,
+            "kind": source_kind,
+            "reason": "TrendRadar v6.10 仅返回失败来源 ID，未提供具体错误原因。",
+            "detail": f"{label}抓取失败；如需根因，请查看运行日志或重试采集。",
+        }
+        if source and source.get("url"):
+            detail["url"] = source.get("url")
+        details.append(detail)
+    return details
+
+
 def _make_item_id(kind: str, source_id: str, title: str, url: str) -> str:
     digest = hashlib.sha1(f"{kind}|{source_id}|{title}|{url}".encode("utf-8")).hexdigest()[:16]
     return f"tr_{kind}_{source_id}_{digest}"
@@ -1110,6 +1139,7 @@ def run_once(config_override: Optional[Dict[str, Any]] = None, user_data_dir: Op
     meta = {
         "generated_at": generated_at,
         "failed_sources": failed_sources,
+        "failed_source_details": _build_failed_source_details(failed_sources),
         "platform_count": len(set(i.get("source_id") for i in platform_items)),
         "rss_count": len(set(i.get("source_id") for i in rss_items)),
         "item_count": len(items),

@@ -1,34 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Empty, Input, InputNumber, Select, Switch, Tooltip } from 'antd'
+import { Button, Empty, Input, InputNumber, Modal, Select, Switch, Tag, Tooltip } from 'antd'
 import {
-  ArrowLeftOutlined,
   ArrowRightOutlined,
   BulbOutlined,
   CheckCircleOutlined,
   CloseOutlined,
   DatabaseOutlined,
+  DeleteOutlined,
   ExportSquareOutlined,
   FilterOutlined,
+  GlobalOutlined,
   InfoCircleOutlined,
   LoadingOutlined,
   RadarChartOutlined,
   ReloadOutlined,
   SettingOutlined,
-  SyncOutlined,
   WarningOutlined,
 } from '../icons/antdCompat'
 import AutoTopicModal from './AutoTopicModal'
 import type { ContentItem } from '../types/workflow'
 import { llmConfigResolver, type LLMConfig } from '../services/settings/llmConfigResolver'
+import { llmService } from '../services/llmService'
 import type {
   NewsNowStatus,
   TrendRadarConfigView,
+  TrendRadarFailedSourceDetail,
   TrendRadarItem,
   TrendRadarMeta,
   TrendRadarRunResult,
   TrendRadarSource,
   TrendRadarStatus,
-  TrendRadarUpdateStatus,
 } from '../types/trendradar'
 
 type Notice = { type: 'info' | 'success' | 'warning' | 'error'; text: string } | null
@@ -36,7 +37,6 @@ type NewsNowAction = 'status' | 'sync' | 'setup' | 'start' | 'stop'
 
 interface Props {
   visible: boolean
-  onClose: () => void
   items: TrendRadarItem[]
   selectedItems: TrendRadarItem[]
   meta?: TrendRadarMeta
@@ -46,8 +46,6 @@ interface Props {
   onLoadConfig: () => Promise<TrendRadarConfigView>
   onListSources: () => Promise<TrendRadarSource[]>
   onGetStatus: () => Promise<TrendRadarStatus>
-  onCheckUpdate: () => Promise<TrendRadarUpdateStatus>
-  onUpdateDependency: () => Promise<Record<string, any>>
   onGetNewsNowStatus: () => Promise<NewsNowStatus>
   onSyncNewsNow: () => Promise<NewsNowStatus>
   onSetupNewsNow: () => Promise<NewsNowStatus>
@@ -198,9 +196,73 @@ function canUseAiFilter(config: TrendRadarConfigView): boolean {
   return Boolean(config.ai_available && config.ai_api_key_set)
 }
 
+function isTranslatedItem(item: TrendRadarItem): boolean {
+  return item.translation_status === 'translated' || Boolean(item.translated_at)
+}
+
+function isPureEnglishItem(item: TrendRadarItem): boolean {
+  if (isTranslatedItem(item)) return false
+  const text = `${item.title || ''} ${item.content || ''}`.trim()
+  if (!text) return false
+  if (/[^\x00-\x7F]/.test(text)) return false
+  const letters = text.match(/[A-Za-z]/g)?.length || 0
+  return letters >= 8
+}
+
+type TranslationRecord = {
+  id: string
+  title: string
+  content: string
+}
+
+function parseTranslationRecords(raw: string): TranslationRecord[] {
+  const trimmed = raw.trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+  const arrayStart = trimmed.indexOf('[')
+  const objectStart = trimmed.indexOf('{')
+  const start = arrayStart >= 0 && (objectStart < 0 || arrayStart < objectStart) ? arrayStart : objectStart
+  if (start < 0) return []
+  const candidate = trimmed.slice(start)
+  const parsed = JSON.parse(candidate)
+  const rows: Array<Record<string, unknown>> = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray(parsed?.items)
+      ? parsed.items
+      : Array.isArray(parsed?.translations)
+        ? parsed.translations
+        : []
+  return rows
+    .map((row: Record<string, unknown>) => ({
+      id: String(row.id || '').trim(),
+      title: String(row.title || row.translated_title || '').trim(),
+      content: String(row.content || row.translated_content || '').trim(),
+    }))
+    .filter(row => row.id && (row.title || row.content))
+}
+
+function buildFailedSourceDetails(meta: TrendRadarMeta, sources: TrendRadarSource[]): TrendRadarFailedSourceDetail[] {
+  if (meta.failed_source_details?.length) return meta.failed_source_details
+  const lookup = new Map(sources.map(source => [source.id, source]))
+  return (meta.failed_sources || [])
+    .map(sourceId => String(sourceId || '').trim())
+    .filter(Boolean)
+    .map(sourceId => {
+      const source = lookup.get(sourceId)
+      return {
+        id: sourceId,
+        name: source?.name || sourceId,
+        kind: source?.kind || 'unknown',
+        reason: 'TrendRadar v6.10 仅返回失败来源 ID，未提供具体错误原因。',
+        detail: source
+          ? `${source.kind === 'rss' ? 'RSS 订阅' : '热榜平台'}抓取失败；如需根因，请查看运行日志或重试采集。`
+          : '未在当前数据源配置中找到该 ID；如需根因，请查看运行日志或重试采集。',
+      }
+    })
+}
+
 export default function DiscoverPanel({
   visible,
-  onClose,
   items,
   selectedItems,
   meta,
@@ -210,8 +272,6 @@ export default function DiscoverPanel({
   onLoadConfig,
   onListSources,
   onGetStatus,
-  onCheckUpdate,
-  onUpdateDependency,
   onGetNewsNowStatus,
   onSyncNewsNow,
   onSetupNewsNow,
@@ -223,7 +283,6 @@ export default function DiscoverPanel({
   const [config, setConfig] = useState<TrendRadarConfigView>(DEFAULT_CONFIG)
   const [sources, setSources] = useState<TrendRadarSource[]>([])
   const [status, setStatus] = useState<TrendRadarStatus | null>(null)
-  const [updateStatus, setUpdateStatus] = useState<TrendRadarUpdateStatus | null>(null)
   const [currentItems, setCurrentItems] = useState<TrendRadarItem[]>(items)
   const [currentMeta, setCurrentMeta] = useState<TrendRadarMeta>(meta || {})
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set(selectedItems.map(identity)))
@@ -231,8 +290,8 @@ export default function DiscoverPanel({
   const [sourceKind, setSourceKind] = useState<'all' | 'platform' | 'rss'>('all')
   const [running, setRunning] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [checkingUpdate, setCheckingUpdate] = useState(false)
-  const [updatingDependency, setUpdatingDependency] = useState(false)
+  const [translating, setTranslating] = useState(false)
+  const [failedSourceModalOpen, setFailedSourceModalOpen] = useState(false)
   const [newsNowStatus, setNewsNowStatus] = useState<NewsNowStatus | null>(null)
   const [newsNowBusy, setNewsNowBusy] = useState<NewsNowAction | null>(null)
   const [notice, setNotice] = useState<Notice>(null)
@@ -285,6 +344,10 @@ export default function DiscoverPanel({
 
   const platformSources = useMemo(() => sources.filter(source => source.kind === 'platform'), [sources])
   const rssSources = useMemo(() => sources.filter(source => source.kind === 'rss'), [sources])
+  const failedSourceDetails = useMemo(() => buildFailedSourceDetails(currentMeta, sources), [currentMeta, sources])
+  const failedSourceCount = failedSourceDetails.length || currentMeta.failed_sources?.length || 0
+  const translationTargets = useMemo(() => currentItems.filter(isPureEnglishItem), [currentItems])
+  const translatedCount = useMemo(() => currentItems.filter(isTranslatedItem).length, [currentItems])
 
   const updateConfig = useCallback((patch: Partial<TrendRadarConfigView>) => {
     setConfig(prev => {
@@ -407,46 +470,92 @@ export default function DiscoverPanel({
     updateConfig({ filter_method: value })
   }, [config, updateConfig])
 
-  const handleCheckUpdate = useCallback(async () => {
-    setCheckingUpdate(true)
-    setNotice(null)
-    try {
-      const result = await onCheckUpdate()
-      setUpdateStatus(result)
-      if (result.blocked) {
-        setNotice({ type: 'warning', text: result.blocker || '当前运行时不满足上游版本要求' })
-      } else if (result.updateAvailable) {
-        setNotice({ type: 'info', text: `发现 TrendRadar ${result.remoteVersion}` })
-      } else {
-        setNotice({ type: 'success', text: 'TrendRadar 当前无需更新' })
-      }
-    } catch (error: any) {
-      setNotice({ type: 'error', text: error.message || '更新检查失败' })
-    } finally {
-      setCheckingUpdate(false)
-    }
-  }, [onCheckUpdate])
+  const handleClearCollection = useCallback(() => {
+    setCurrentItems([])
+    setCurrentMeta({})
+    setSelectedKeys(new Set())
+    setQuery('')
+    setSourceKind('all')
+    setFailedSourceModalOpen(false)
+    setNotice({ type: 'success', text: '已清空当前采集列表' })
+  }, [])
 
-  const handleUpdateDependency = useCallback(async () => {
-    setUpdatingDependency(true)
+  const handleTranslateEnglishItems = useCallback(async () => {
+    if (translationTargets.length === 0) {
+      setNotice({ type: 'info', text: '当前没有可翻译的纯英文素材' })
+      return
+    }
+
+    const llmConfig = llmConfigResolver.getLLMConfig('discover')
+    if (!llmConfig) {
+      setNotice({ type: 'warning', text: '请先在设置中配置发现/搜索模型，才能使用 AI 翻译。' })
+      return
+    }
+
+    setTranslating(true)
     setNotice(null)
     try {
-      await onUpdateDependency()
-      const [nextStatus, nextUpdateStatus, loadedSources] = await Promise.all([
-        onGetStatus(),
-        onCheckUpdate(),
-        onListSources(),
-      ])
-      setStatus(nextStatus)
-      setUpdateStatus(nextUpdateStatus)
-      setSources(loadedSources)
-      setNotice({ type: 'success', text: 'TrendRadar 依赖已更新' })
+      const payload = translationTargets.map(item => ({
+        id: identity(item),
+        title: item.title || '',
+        content: item.content || item.matched_reason || '',
+      }))
+      const response = await llmService.call({
+        apiBase: llmConfig.apiBase,
+        apiKey: llmConfig.apiKey,
+        model: llmConfig.model,
+        temperature: llmConfig.temperature ?? 0.2,
+        timeout: llmConfig.timeout,
+        maxTokens: Math.min(8000, Math.max(1200, payload.length * 500)),
+        messages: [
+          {
+            role: 'system',
+            content: '你是新闻素材翻译助手。把英文标题和摘要翻译成简体中文，保留事实、数字、专有名词和链接含义。只返回 JSON 数组，每项格式为 {"id":"...","title":"...","content":"..."}。',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify(payload),
+          },
+        ],
+      })
+      const raw = response.choices?.[0]?.message?.content || ''
+      const records = parseTranslationRecords(raw)
+      const targetIds = new Set(payload.map(item => item.id))
+      const translationMap = new Map(records.filter(record => targetIds.has(record.id)).map(record => [record.id, record]))
+      if (translationMap.size === 0) {
+        throw new Error('AI 未返回可用的翻译 JSON')
+      }
+
+      const translatedAt = new Date().toISOString()
+      setCurrentItems(prev => prev.map(item => {
+        const itemId = identity(item)
+        const record = translationMap.get(itemId)
+        if (!record) return item
+        return {
+          ...item,
+          original_title: item.original_title || item.title,
+          original_content: item.original_content || item.content,
+          title: record.title || item.title,
+          content: record.content || item.content,
+          translated_title: record.title || item.title,
+          translated_content: record.content || item.content,
+          translated_at: translatedAt,
+          translation_status: 'translated',
+          translation_provider: llmConfig.model,
+        }
+      }))
+
+      const noticeType = translationMap.size === payload.length ? 'success' : 'warning'
+      setNotice({
+        type: noticeType,
+        text: `已翻译 ${translationMap.size} 条英文素材${translationMap.size === payload.length ? '' : '，部分条目未返回结果'}`,
+      })
     } catch (error: any) {
-      setNotice({ type: 'error', text: error.message || 'TrendRadar 更新失败' })
+      setNotice({ type: 'error', text: error.message || 'AI 翻译失败' })
     } finally {
-      setUpdatingDependency(false)
+      setTranslating(false)
     }
-  }, [onUpdateDependency, onGetStatus, onCheckUpdate, onListSources])
+  }, [translationTargets])
 
   const toggleSelected = useCallback((item: TrendRadarItem) => {
     const key = identity(item)
@@ -494,16 +603,6 @@ export default function DiscoverPanel({
               <Button icon={<ExportSquareOutlined />} onClick={() => onOpenReport(currentMeta.report_path || '')} />
             </Tooltip>
           )}
-          <Tooltip title="检查 TrendRadar 更新">
-            <Button icon={checkingUpdate ? <LoadingOutlined spin /> : <SyncOutlined />} onClick={handleCheckUpdate} />
-          </Tooltip>
-          {updateStatus?.updateAvailable && !updateStatus.blocked && (
-            <Tooltip title="更新 TrendRadar 依赖">
-              <Button icon={updatingDependency ? <LoadingOutlined spin /> : <SyncOutlined />} loading={updatingDependency} onClick={handleUpdateDependency}>
-                更新
-              </Button>
-            </Tooltip>
-          )}
           <Tooltip title="立即采集">
             <Button type="primary" icon={running ? <LoadingOutlined spin /> : <ReloadOutlined />} loading={running} onClick={handleRunOnce}>
               采集
@@ -530,9 +629,6 @@ export default function DiscoverPanel({
                 borderRadius: 8, height: 32, minWidth: 32,
               }}
             />
-          </Tooltip>
-          <Tooltip title="返回">
-            <Button icon={<ArrowLeftOutlined />} onClick={onClose} />
           </Tooltip>
         </div>
       </header>
@@ -981,6 +1077,22 @@ export default function DiscoverPanel({
             />
             <Button onClick={selectAllVisible}>全选当前</Button>
             <Button onClick={() => setSelectedKeys(new Set())} icon={<CloseOutlined />}>清空选择</Button>
+            <Button
+              icon={<GlobalOutlined />}
+              loading={translating}
+              disabled={running || translating || translationTargets.length === 0}
+              onClick={handleTranslateEnglishItems}
+            >
+              翻译英文{translationTargets.length > 0 ? ` ${translationTargets.length}` : ''}
+            </Button>
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              disabled={running || translating || currentItems.length === 0}
+              onClick={handleClearCollection}
+            >
+              清空当前采集
+            </Button>
           </div>
 
           {notice && (
@@ -1001,11 +1113,16 @@ export default function DiscoverPanel({
             </div>
             <div>
               <span>失败来源</span>
-              <strong>{currentMeta.failed_sources?.length || 0}</strong>
+              <strong>{failedSourceCount}</strong>
+              {failedSourceCount > 0 && (
+                <Button type="link" size="small" className="discover-status-link" onClick={() => setFailedSourceModalOpen(true)}>
+                  查看明细
+                </Button>
+              )}
             </div>
             <div>
               <span>版本</span>
-              <strong>{updateStatus?.remoteVersion ? `${status?.localVersion || '未知'} / ${updateStatus.remoteVersion}` : status?.localVersion || '未知'}</strong>
+              <strong>{status?.localVersion || '未知'}</strong>
             </div>
           </div>
 
@@ -1013,13 +1130,6 @@ export default function DiscoverPanel({
             <div className="discover-notice" style={noticeStyle('warning')}>
               <WarningOutlined />
               <span>{status.runtimeBlocker || 'TrendRadar 完整运行时未就绪，热榜薄适配仍可用于采集。'}</span>
-            </div>
-          )}
-
-          {updateStatus?.blocked && (
-            <div className="discover-notice" style={noticeStyle('warning')}>
-              <WarningOutlined />
-              <span>{updateStatus.blocker}</span>
             </div>
           )}
 
@@ -1035,6 +1145,7 @@ export default function DiscoverPanel({
               <Empty description="暂无 TrendRadar 素材，点击右上角采集" />
             ) : filteredItems.map(item => {
               const selected = selectedKeys.has(identity(item))
+              const translated = isTranslatedItem(item)
               return (
                 <article
                   key={identity(item)}
@@ -1050,10 +1161,17 @@ export default function DiscoverPanel({
                       <span>{sourceLabel(item)}</span>
                       <span>{formatTime(item.published || item.first_seen)}</span>
                     </div>
-                    <h3>{item.title || '未命名素材'}</h3>
+                    <h3>
+                      <span>{item.title || '未命名素材'}</span>
+                      {translated && (
+                        <Tooltip title={item.original_title ? `原文：${item.original_title}` : '已由 AI 翻译，原文已保留'}>
+                          <Tag className="discover-translation-tag" icon={<GlobalOutlined />}>已翻译</Tag>
+                        </Tooltip>
+                      )}
+                    </h3>
                     <p>{item.content || item.matched_reason || '无摘要'}</p>
                     <div className="discover-item-foot">
-                      <span>{item.matched_reason || 'TrendRadar'}</span>
+                      <span>{translated ? 'AI 翻译 · 原文已保留' : item.matched_reason || 'TrendRadar'}</span>
                       {item.url && <a href={item.url} onClick={event => event.stopPropagation()} target="_blank" rel="noreferrer">打开链接</a>}
                     </div>
                   </div>
@@ -1068,6 +1186,7 @@ export default function DiscoverPanel({
             <div className="discover-block-title"><RadarChartOutlined /> 素材摘要</div>
             <div className="discover-metric"><span>当前列表</span><strong>{filteredItems.length}</strong></div>
             <div className="discover-metric"><span>已选择</span><strong>{selectedItemsForProceed.length}</strong></div>
+            <div className="discover-metric"><span>已翻译</span><strong>{translatedCount}</strong></div>
             <div className="discover-metric"><span>热榜来源</span><strong>{currentMeta.platform_count || 0}</strong></div>
             <div className="discover-metric"><span>RSS 来源</span><strong>{currentMeta.rss_count || 0}</strong></div>
             <Button type="primary" block icon={<ArrowRightOutlined />} onClick={handleProceed}>
@@ -1076,6 +1195,29 @@ export default function DiscoverPanel({
           </div>
         </aside>
       </main>
+      <Modal
+        title="失败来源明细"
+        open={failedSourceModalOpen}
+        onCancel={() => setFailedSourceModalOpen(false)}
+        footer={null}
+        width={560}
+      >
+        <div className="discover-failed-source-list">
+          {failedSourceDetails.length === 0 ? (
+            <Empty description="当前没有失败来源" />
+          ) : failedSourceDetails.map(source => (
+            <div key={source.id} className="discover-failed-source-item">
+              <div>
+                <strong>{source.name || source.id}</strong>
+                <Tag>{source.kind === 'rss' ? 'RSS' : source.kind === 'platform' ? '热榜' : '未知'}</Tag>
+              </div>
+              <span>ID: {source.id}</span>
+              <p>{source.reason || 'TrendRadar 未提供具体错误原因。'}</p>
+              {source.detail && <p>{source.detail}</p>}
+            </div>
+          ))}
+        </div>
+      </Modal>
       <AutoTopicModal
         visible={autoTopicModalVisible}
         onClose={() => setAutoTopicModalVisible(false)}

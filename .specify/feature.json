@@ -1,28 +1,31 @@
 {
-  "feature_directory": "specs/002-newsnow-pinned-install",
-  "spec_branch": "002-newsnow-pinned-install",
+  "feature_directory": "specs/003-discover-page-ai-translate",
+  "spec_branch": "003-discover-page-ai-translate",
   "branch_local_only": true,
   "task_type": "new-feature",
   "risk_level": "medium",
   "delivery_profile": "standard-bugfix",
+  "include_spec_docs": "include",
   "affected_repositories": [
     "auto-podcast"
   ],
-  "intake_summary": "让 npm install 阶段自动拉取固定提交的本地 NewsNow，并在同步后应用本项目额外自定义的数据采集能力。",
+  "intake_summary": "发现页移除固定版本下不需要的 TrendRadar 更新检查和返回入口，补充清空采集列表、失败来源明细查看，以及对纯英文采集条目的一次性 AI 翻译和已翻译标识。",
   "capability_tags": [
-    "tooling",
-    "external-engine",
-    "newsnow"
+    "frontend",
+    "discover-page",
+    "trendradar",
+    "ai-translation",
+    "ui"
   ],
   "allow_dirty_used": true,
   "dirty_risks": [],
-  "workspace_root": "E:\\Neo\\auto-podcast",
+  "workspace_root": "E:\\neo\\auto-podcast",
   "default_base_branch": "main",
   "repository_map": ".specify/memory/repository-map.md",
   "workspace_repositories": [
     {
       "name": "auto-podcast",
-      "path": "E:\\Neo\\auto-podcast\\.",
+      "path": "E:\\neo\\auto-podcast\\.",
       "role": "electron-react-python-podcast-workbench",
       "required": true,
       "participates_in_spec_branches": true

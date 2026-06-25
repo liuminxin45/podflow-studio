@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "workflow_model": {
+    "manifest": ".specify/templates/layer-manifest.yml",
+    "active_buckets": [
+      "WorkItem",
+      "Evidence"
+    ],
+    "feature_directory": "specs/003-discover-page-ai-translate",
+    "spec_branch": "003-discover-page-ai-translate",
+    "delivery_profile": "standard-bugfix"
+  },
+  "attempts": [
+    {
+      "stage": "implement",
+      "status": "completed",
+      "summary": "Removed fixed-version update/back controls, added clear current collection, failed-source detail modal, and AI translation for pure-English collected items.",
+      "completed_at": "2026-06-25T23:47:00+08:00"
+    }
+  ],
+  "validations": [
+    {
+      "command": "npx tsc --noEmit --pretty false",
+      "status": "passed"
+    },
+    {
+      "command": "python -m py_compile engine\\bridge.py",
+      "status": "passed"
+    },
+    {
+      "command": "npm run build",
+      "status": "passed"
+    },
+    {
+      "command": "npm install",
+      "status": "passed"
+    },
+    {
+      "command": ".specify\\scripts\\powershell\\validate-feature-artifacts.ps1 -FeatureDir specs\\003-discover-page-ai-translate -Stage implement -Json",
+      "status": "passed"
+    }
+  ],
+  "fact_layer": {
+    "status": "pending",
+    "fact_pack": "",
+    "latest_sdk_log": "",
+    "latest_biz_log": "",
+    "devtools_target": ""
+  },
+  "acceptance": {
+    "status": "accepted",
+    "evidence": "User confirmed acceptance in chat on 2026-06-25 after reviewing the generated acceptance checklist."
+  },
+  "retrospective": {
+    "status": "completed",
+    "workflow_record": "workflow-record.md",
+    "improvement_candidates": "improvement-candidates.md",
+    "language": "Chinese-first, preserving technical identifiers"
+  },
+  "promotion": {
+    "status": "pending",
+    "approved_candidates": [],
+    "pending_candidates": [],
+    "rejected_candidates": []
+  }
+}
