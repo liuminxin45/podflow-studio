@@ -111,7 +111,7 @@ def get_available_sources() -> List[Dict[str, Any]]:
     
     for source_file in sources_dir.glob("*.py"):
         # 跳过特殊文件
-        if source_file.name.startswith("_") or source_file.name == "base.py":
+        if source_file.name.startswith("_") or source_file.name in {"base.py", "example_custom.py"}:
             continue
         
         source_name = source_file.stem
@@ -168,7 +168,7 @@ def _resolve_enabled_sources(config: FetchConfig, available: List[str]) -> List[
         return selected
 
     # No explicit selection → enable all real sources
-    priority = ["newsnow", "hackernews", "techcrunch", "ai_news_daily"]
+    priority = ["hackernews", "techcrunch", "ai_news_daily"]
     ordered = [s for s in priority if s in available_set] + [
         s for s in available if s not in priority and s != "example_custom"
     ]

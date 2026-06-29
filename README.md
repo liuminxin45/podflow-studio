@@ -6,7 +6,7 @@
 
 ## 它是什么
 
-Auto-Podcast Studio 不是单次提示词生成器，而是一个本地运行的播客生产工作台。项目由 Electron 桌面壳、React/Vite 前端、Python 节点工作流和 TrendRadar 热点桥接层组成。
+Auto-Podcast Studio 不是单次提示词生成器，而是一个本地运行的播客生产工作台。项目由 Electron 桌面壳、React/Vite 前端、Python 节点工作流和内置素材采集源组成。
 
 它当前重点解决三件事：
 
@@ -20,7 +20,7 @@ Auto-Podcast Studio 不是单次提示词生成器，而是一个本地运行的
 | --- | --- |
 | 节目管理 | 支持节目新增、打开、保存、复制、删除、导入、导出和卡片列表展示。 |
 | 流程导航 | 左侧常驻流程导航，按发现、整理、构思、写作、制作、发布排列，并显示阶段状态。 |
-| 素材发现 | 支持 TrendRadar 热点、RSS/网页素材和手动素材进入素材池。 |
+| 素材发现 | 支持内置 RSS/API 数据源和手动素材进入素材池。 |
 | 素材整理 | 对素材进行清洗、候选筛选和状态写回。 |
 | 创作构思 | 从候选素材组织节目主题、讨论点和结构草案。 |
 | 脚本写作 | 支持分段编辑脚本，并将 `script/stages` 写入 workflow state。 |
@@ -80,11 +80,6 @@ flowchart TB
         Publish["nodes/publish"]
     end
 
-    subgraph Radar["TrendRadar 桥接层"]
-        Bridge["engine/bridge.py"]
-        Cache["engine/trendradar_data/*.json"]
-    end
-
     subgraph Output["本地产物"]
         Recordings["out/recordings"]
         Episodes["out/episodes"]
@@ -108,8 +103,6 @@ flowchart TB
     Main --> Assets
     Main --> Review
     Main --> Publish
-    Fetch --> Bridge
-    Bridge --> Cache
     TTS --> Output
     Audio --> Output
     Assets --> Output
@@ -167,11 +160,10 @@ npm install
 `postinstall` 会执行：
 
 ```bash
-python scripts/sync_trendradar.py
 python -m pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-第一步同步 `engine/trendradar`，第二步以可编辑模式安装 Python 节点包。
+该步骤以可编辑模式安装 Python 节点包。
 
 ### 启动
 
@@ -293,7 +285,7 @@ copy config.example.yaml config.yaml
 ```text
 auto-podcast/
 ├── electron/              # Electron 主进程、预加载脚本、配置管理、CDP 验收
-├── engine/                # TrendRadar 桥接层、守护进程和缓存
+├── engine/                # 项目本地采集辅助模块
 ├── nodes/                 # Python 工作流节点
 ├── protocol/              # 共享 state 和配置基类
 ├── scripts/               # 验证、同步、测试和 CDP 自验收脚本
@@ -337,9 +329,9 @@ rss_path
 publish_status
 ```
 
-### TrendRadar 桥接
+### 内置素材采集
 
-Auto-Podcast 不直接修改 TrendRadar 主体逻辑，而是通过 `engine/bridge.py` 读取 TrendRadar 平台配置、缓存和抓取结果，再转换为 `fetch` 节点可以消费的素材格式。
+`fetch` 节点会动态加载 `nodes/fetch/sources/` 下的内置数据源，并统一转换为素材列表。当前内置源包括 Hacker News、TechCrunch 和 AI 资讯快报。
 
 ## 输出产物
 
@@ -412,16 +404,15 @@ https://api.example.com/v1
 
 的 API Base，并且服务端需要支持 `/models` 或对应节点实际调用的接口。
 
-### TrendRadar 没有数据
+### 素材发现没有数据
 
-确认 `engine/trendradar` 已同步，应用启动日志中应看到 TrendRadar daemon 启动信息。也可以检查：
+先在发现页确认至少启用了一个内置数据源，再检查网络连通性和对应源站是否可访问。也可以运行：
 
-```text
-engine/trendradar_data/latest.json
-engine/trendradar_data/status.json
+```bash
+npm run verify:nodes
 ```
 
-如果缓存不存在，`fetch` 节点会回退到实时抓取。
+确认 `fetch` 节点和数据源模块可以被正常加载。
 
 ## License
 

@@ -86,7 +86,7 @@ function getLocalCapabilityCopy(capKey: 'search' | 'audio', audioProvider: Audio
   if (capKey === 'search') {
     return {
       title: '使用内置信息抓取源',
-      desc: '发现层实际使用抓取源、手动素材和 TrendRadar。抓取源配置在发现页维护，不需要在这里填写 OpenAI API Base。',
+      desc: '发现层实际使用内置抓取源和手动素材。抓取源配置在发现页维护，不需要在这里填写 OpenAI API Base。',
       badge: '内置可用',
     }
   }

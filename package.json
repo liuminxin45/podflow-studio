@@ -6,13 +6,7 @@
   "license": "MIT",
   "main": "electron/main.js",
   "scripts": {
-    "postinstall": "node scripts/without_proxy.js python scripts/sync_trendradar.py && node scripts/without_proxy.js python scripts/sync_newsnow.py && node scripts/newsnow_runtime.js setup && node scripts/without_proxy.js python scripts/setup_trendradar_runtime.py && node scripts/without_proxy.js python -m pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple",
-    "setup:trendradar": "node scripts/without_proxy.js python scripts/setup_trendradar_runtime.py",
-    "check:trendradar": "node scripts/without_proxy.js python scripts/setup_trendradar_runtime.py --check",
-    "sync:newsnow": "python scripts/sync_newsnow.py",
-    "check:newsnow": "node scripts/newsnow_runtime.js status",
-    "setup:newsnow": "node scripts/newsnow_runtime.js setup",
-    "build:newsnow": "node scripts/newsnow_runtime.js build",
+    "postinstall": "node scripts/without_proxy.js python -m pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple",
     "dev": "node scripts/dev.js",
     "dev:react": "vite --host 127.0.0.1 --port 5174 --strictPort",
     "dev:electron": "node scripts/without_proxy.js wait-on http://127.0.0.1:5174 && node scripts/without_proxy.js cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://127.0.0.1:5174 electron .",
@@ -29,11 +23,10 @@
     "test:coverage": "vitest --coverage",
     "verify:nodes": "python scripts/verify_nodes.py",
     "verify:config": "python scripts/test_config.py",
-    "verify:trendradar-settings": "python scripts/verify_trendradar_settings.py",
     "verify:build": "python scripts/build_check.py",
     "test:nodes": "python scripts/test_all_nodes.py",
     "test:integration": "python scripts/integration_test.py",
-    "verify": "npm run verify:config && npm run verify:nodes && npm run verify:trendradar-settings"
+    "verify": "npm run verify:config && npm run verify:nodes"
   },
   "dependencies": {
     "@ant-design/icons": "^5.2.6",

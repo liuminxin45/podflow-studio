@@ -418,57 +418,6 @@ pre {
   font-size: 12px;
 }
 
-.discover-newsnow-controls {
-  display: grid;
-  gap: 8px;
-}
-
-.discover-newsnow-status {
-  display: grid;
-  gap: 4px;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.discover-newsnow-status > span {
-  color: var(--text-tertiary);
-}
-
-.discover-newsnow-state {
-  overflow-wrap: anywhere;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.45;
-}
-
-.discover-newsnow-state.success {
-  color: var(--success-color);
-}
-
-.discover-newsnow-state.warning {
-  color: var(--warning-color);
-}
-
-.discover-newsnow-state.error {
-  color: var(--error-color);
-}
-
-.discover-newsnow-state.info {
-  color: var(--info-color);
-}
-
-.discover-newsnow-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.discover-newsnow-actions .ant-btn {
-  height: 24px;
-  padding: 0 8px;
-  font-size: 11px;
-}
-
 .discover-hint,
 .discover-notice {
   display: flex;

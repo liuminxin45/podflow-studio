@@ -1,7 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron')
 const path = require('path')
 const fs = require('fs')
-const http = require('http')
 const { spawn } = require('child_process')
 const ConfigManager = require('./configManager')
 const { fetchModels, callLLM } = require('./llmService')
@@ -9,17 +8,6 @@ const { PROVIDER_TO_ENGINE, buildTTSConfig, validateProviderConfig, buildStages 
 const { validateNodeOutput } = require('./nodeValidator')
 
 const PYTHON_PATH = process.platform === 'win32' ? 'python' : 'python3'
-const PROJECT_ROOT = path.join(__dirname, '..')
-function resolveTrendRadarPythonPath() {
-  const explicit = process.env.TRENDRADAR_PYTHON_PATH || process.env.TREND_RADAR_PYTHON_PATH
-  if (explicit) return explicit
-  const managedPython = process.platform === 'win32'
-    ? path.join(PROJECT_ROOT, '.venv-trendradar', 'Scripts', 'python.exe')
-    : path.join(PROJECT_ROOT, '.venv-trendradar', 'bin', 'python')
-  if (fs.existsSync(managedPython)) return managedPython
-  return PYTHON_PATH
-}
-const TRENDRADAR_PYTHON_PATH = resolveTrendRadarPythonPath()
 const SPAWN_SHELL = process.platform === 'win32'
 const CDP_DEBUG_ENABLED = process.env.CDP_DEBUG === '1' || process.env.CDP_ACCEPTANCE === '1'
 const CDP_PORT = process.env.CDP_PORT || process.env.CDP_ACCEPTANCE_PORT || (CDP_DEBUG_ENABLED ? '9222' : '')
@@ -55,97 +43,11 @@ function getCleanSpawnEnv(extra = {}) {
   }
 }
 
-function pickLLMConfig(source, sourceName) {
-  if (!source || typeof source !== 'object') return null
-  const apiKey = String(source.ai_api_key || source.api_key || source.apiKey || '').trim()
-  const apiBase = String(source.ai_api_base || source.api_base || source.apiBase || '').trim()
-  const model = String(source.ai_model || source.llm_model || source.model || source.apiModel || '').trim()
-  if (!apiKey && !apiBase && !model) return null
-  return { apiKey, apiBase, model, source: sourceName }
-}
-
-function resolveStageLLMConfig(appSettings, stageId) {
-  const apiConfig = appSettings?.apiConfig
-  if (!apiConfig) return null
-  const override = apiConfig.nodeOverrides?.[stageId]
-  if (override?.overrideMode === 'custom') {
-    const custom = pickLLMConfig({
-      apiKey: override.apiKey,
-      apiBase: override.apiBase,
-      apiModel: override.apiModel,
-    }, 'app')
-    if (custom?.apiKey || custom?.model) return custom
-  }
-
-  const capabilityType = override?.capabilityType || 'search'
-  const prefix = capabilityType === 'audio' ? 'audio' : capabilityType === 'search' ? 'search' : 'text'
-  const global = apiConfig.global || {}
-  const globalConfig = pickLLMConfig({
-    apiKey: global[`${prefix}ApiKey`],
-    apiBase: global[`${prefix}ApiBase`],
-    apiModel: global[`${prefix}ApiModel`],
-  }, 'app')
-  if (globalConfig?.apiKey || globalConfig?.model) return globalConfig
-
-  if (prefix !== 'text') {
-    return pickLLMConfig({
-      apiKey: global.textApiKey,
-      apiBase: global.textApiBase,
-      apiModel: global.textApiModel,
-    }, 'app')
-  }
-  return null
-}
-
-function normalizeLiteLLMModel(model, apiBase) {
-  const value = String(model || '').trim()
-  if (!value || value.includes('/')) return value
-  const base = String(apiBase || '').toLowerCase()
-  if (base && !base.includes('api.openai.com')) return `openai/${value}`
-  return value
-}
-
-function resolveTrendRadarLLMConfig(payload = {}) {
-  const payloadConfig = payload?.config && typeof payload.config === 'object' ? payload.config : payload
-  const explicit = pickLLMConfig(payloadConfig, 'app') || {}
-  const fetchConfig = configManager ? pickLLMConfig(configManager.loadNodeConfig('fetch'), 'app') : null
-  const appSettings = configManager ? configManager.loadNodeConfig('app_settings') : null
-  const stageConfig = resolveStageLLMConfig(appSettings, 'discover')
-  const fallbackTextConfig = resolveStageLLMConfig(appSettings, 'write')
-
-  const candidates = [fetchConfig, stageConfig, fallbackTextConfig].filter(Boolean)
-  const sourceConfig = candidates.find(config => config.apiKey && config.apiBase)
-    || candidates.find(config => config.apiKey)
-    || candidates.find(config => config.apiBase && config.model)
-    || candidates.find(config => config.model)
-    || {}
-  const apiKey = explicit.apiKey || sourceConfig.apiKey || ''
-  const apiBase = explicit.apiBase || sourceConfig.apiBase || ''
-  const model = normalizeLiteLLMModel(explicit.model || sourceConfig.model || '', apiBase)
-  const source = apiKey || apiBase || model ? 'app' : 'none'
-  return { apiKey, apiBase, model, source }
-}
-
-function getTrendRadarCliEnv(userDataDir, payload = {}) {
-  const aiConfig = resolveTrendRadarLLMConfig(payload)
-  const extra = { AUTO_PODCAST_USER_DATA: userDataDir }
-  if (aiConfig.apiKey) extra.AI_API_KEY = aiConfig.apiKey
-  if (aiConfig.apiBase) extra.AI_API_BASE = aiConfig.apiBase
-  if (aiConfig.model) extra.AI_MODEL = aiConfig.model
-  if (aiConfig.source) extra.AUTO_PODCAST_TRENDRADAR_AI_SOURCE = aiConfig.source
-  return getCleanSpawnEnv(extra)
-}
-
 let mainWindow = null
 let configManager = null
 let currentWorkflow = null
 let appCloseConfirmed = false
 const WORKFLOW_DIR = path.join(__dirname, '..', 'out', 'workflows')
-
-// TrendRadar daemon process
-let trendradarDaemon = null
-let newsnowProcess = null
-let newsnowPort = Number(process.env.NEWSNOW_PORT || 5175)
 
 const DEFAULT_RADAR_STATE = {
   enabled: false,
@@ -233,7 +135,7 @@ function createInitialState(episodeId, runtimeConfig) {
     rss_path: '',
     publish_status: {},
     subtitle_path: '',
-    trendradar_meta: {},
+    discover_meta: {},
     discover_ui: {},
     organize_ui: {},
     episode_brief: {},
@@ -289,7 +191,7 @@ function normalizeWorkflow(workflow) {
   state.review_summary = state.review_summary || {}
   state.storage_info = state.storage_info || {}
   state.publish_status = state.publish_status || {}
-  state.trendradar_meta = state.trendradar_meta || {}
+  state.discover_meta = state.discover_meta || {}
   state.discover_ui = state.discover_ui || {}
   state.organize_ui = state.organize_ui || {}
   state.episode_brief = state.episode_brief || {}
@@ -498,279 +400,6 @@ function runPythonNode(nodeName, state, timeoutMs = 600000) {
       reject(new Error(`Failed to write input to ${nodeName}: ${err.message}`))
     }
   })
-}
-
-function runTrendRadarCli(action, payload = {}, timeoutMs = 300000) {
-  return new Promise((resolve, reject) => {
-    const userDataDir = app.getPath('userData')
-    const env = getTrendRadarCliEnv(userDataDir, payload)
-    const proc = spawn(TRENDRADAR_PYTHON_PATH, [
-      path.join(__dirname, '..', 'scripts', 'trendradar_cli.py'),
-      action,
-      '--user-data-dir',
-      userDataDir
-    ], {
-      cwd: path.join(__dirname, '..'),
-      env,
-      shell: SPAWN_SHELL
-    })
-
-    let stdout = ''
-    let stderr = ''
-    let killed = false
-    const timeout = setTimeout(() => {
-      killed = true
-      proc.kill('SIGTERM')
-      setTimeout(() => proc.kill('SIGKILL'), 5000)
-      reject(new Error(`TrendRadar ${action} timeout after ${timeoutMs / 1000}s`))
-    }, timeoutMs)
-
-    proc.stdout.on('data', (data) => { stdout += data.toString() })
-    proc.stderr.on('data', (data) => {
-      stderr += data.toString()
-      if (mainWindow && data.toString().trim()) {
-        mainWindow.webContents.send('trendradar:log', data.toString())
-      }
-    })
-    proc.on('error', (err) => {
-      clearTimeout(timeout)
-      if (!killed) reject(new Error(`Failed to run TrendRadar ${action}: ${err.message}`))
-    })
-    proc.on('close', (code) => {
-      clearTimeout(timeout)
-      if (killed) return
-      try {
-        const result = JSON.parse(stdout || '{}')
-        if (code !== 0 || result.success === false) {
-          reject(new Error(result.error || stderr || `TrendRadar ${action} exited with code ${code}`))
-          return
-        }
-        resolve(result)
-      } catch (e) {
-        reject(new Error(`Failed to parse TrendRadar ${action} JSON: ${e.message}\nOutput: ${stdout.slice(0, 200)}`))
-      }
-    })
-
-    try {
-      proc.stdin.write(JSON.stringify(payload || {}))
-      proc.stdin.end()
-    } catch (err) {
-      clearTimeout(timeout)
-      proc.kill()
-      reject(new Error(`Failed to write TrendRadar ${action} input: ${err.message}`))
-    }
-  })
-}
-
-function runNewsNowRuntime(action, timeoutMs = 180000) {
-  return new Promise((resolve, reject) => {
-    const proc = spawn('node', [
-      path.join(__dirname, '..', 'scripts', 'newsnow_runtime.js'),
-      action
-    ], {
-      cwd: path.join(__dirname, '..'),
-      env: { ...process.env },
-      shell: SPAWN_SHELL
-    })
-
-    let stdout = ''
-    let stderr = ''
-    let killed = false
-    const timeout = setTimeout(() => {
-      killed = true
-      proc.kill('SIGTERM')
-      setTimeout(() => proc.kill('SIGKILL'), 5000)
-      reject(new Error(`NewsNow ${action} timeout after ${timeoutMs / 1000}s`))
-    }, timeoutMs)
-
-    proc.stdout.on('data', (data) => { stdout += data.toString() })
-    proc.stderr.on('data', (data) => { stderr += data.toString() })
-    proc.on('error', (err) => {
-      clearTimeout(timeout)
-      if (!killed) reject(new Error(`Failed to run NewsNow ${action}: ${err.message}`))
-    })
-    proc.on('close', (code) => {
-      clearTimeout(timeout)
-      if (killed) return
-      try {
-        const result = JSON.parse(stdout || '{}')
-        if (code !== 0 && !Object.keys(result).length) {
-          reject(new Error(stderr || `NewsNow ${action} exited with code ${code}`))
-          return
-        }
-        resolve(result)
-      } catch (e) {
-        reject(new Error(`Failed to parse NewsNow ${action} JSON: ${e.message}\nOutput: ${stdout.slice(0, 200)}\n${stderr.slice(0, 300)}`))
-      }
-    })
-  })
-}
-
-function runNewsNowSync(options = {}, timeoutMs = 180000) {
-  return new Promise((resolve, reject) => {
-    const args = [path.join(__dirname, '..', 'scripts', 'sync_newsnow.py')]
-    if (options.check) args.push('--check')
-    if (options.update) args.push('--update', options.update)
-    if (options.ref) args.push('--ref', options.ref)
-    if (options.dryRun) args.push('--dry-run')
-    if (options.noProxy) args.push('--no-proxy')
-    const proc = spawn(PYTHON_PATH, args, {
-      cwd: path.join(__dirname, '..'),
-      env: { ...process.env },
-      shell: SPAWN_SHELL
-    })
-
-    let stdout = ''
-    let stderr = ''
-    let killed = false
-    const timeout = setTimeout(() => {
-      killed = true
-      proc.kill('SIGTERM')
-      setTimeout(() => proc.kill('SIGKILL'), 5000)
-      reject(new Error(`NewsNow sync timeout after ${timeoutMs / 1000}s`))
-    }, timeoutMs)
-
-    proc.stdout.on('data', (data) => { stdout += data.toString() })
-    proc.stderr.on('data', (data) => { stderr += data.toString() })
-    proc.on('error', (err) => {
-      clearTimeout(timeout)
-      if (!killed) reject(new Error(`Failed to sync NewsNow: ${err.message}`))
-    })
-    proc.on('close', (code) => {
-      clearTimeout(timeout)
-      if (killed) return
-      if (code !== 0) {
-        reject(new Error(stderr || stdout || `NewsNow sync exited with code ${code}`))
-        return
-      }
-      resolve({ success: true, stdout, stderr })
-    })
-  })
-}
-
-function getNewsNowApiUrl(port = newsnowPort) {
-  return `http://127.0.0.1:${port}/api/s`
-}
-
-function requestUrl(url, timeoutMs = 2500) {
-  return new Promise((resolve) => {
-    const req = http.get(url, { timeout: timeoutMs }, (res) => {
-      res.resume()
-      res.on('end', () => resolve({ ok: res.statusCode >= 200 && res.statusCode < 500, statusCode: res.statusCode }))
-    })
-    req.on('timeout', () => {
-      req.destroy()
-      resolve({ ok: false, error: 'timeout' })
-    })
-    req.on('error', (error) => resolve({ ok: false, error: error.message }))
-  })
-}
-
-async function waitForNewsNowReady(apiUrl, timeoutMs = 45000) {
-  const started = Date.now()
-  let last = null
-  while (Date.now() - started < timeoutMs) {
-    last = await requestUrl(`${apiUrl}?id=zhihu&latest=false`, 3000)
-    if (last.ok) return { ready: true, statusCode: last.statusCode }
-    await new Promise(resolve => setTimeout(resolve, 1000))
-  }
-  return { ready: false, error: last?.error || 'NewsNow API did not become ready in time' }
-}
-
-function killProcessTree(proc) {
-  if (!proc) return
-  if (process.platform === 'win32') {
-    spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { shell: false })
-    return
-  }
-  proc.kill('SIGTERM')
-}
-
-async function getNewsNowStatus() {
-  const status = await runNewsNowRuntime('status', 60000)
-  return {
-    ...status,
-    processRunning: !!newsnowProcess,
-    pid: newsnowProcess?.pid || null,
-    apiUrl: getNewsNowApiUrl(),
-  }
-}
-
-async function startNewsNowService(options = {}) {
-  if (newsnowProcess) {
-    return { ...(await getNewsNowStatus()), success: true, processRunning: true }
-  }
-
-  let status = await runNewsNowRuntime('status', 60000)
-  if (!status.available) {
-    await runNewsNowSync({}, 180000)
-    status = await runNewsNowRuntime('status', 60000)
-  }
-  if (!status.dependenciesInstalled) {
-    return {
-      ...status,
-      processRunning: false,
-      apiUrl: getNewsNowApiUrl(),
-      success: false,
-      error: 'NewsNow 依赖未安装，请先执行 setup。',
-    }
-  }
-
-  const port = Number(options.port || process.env.NEWSNOW_PORT || newsnowPort || 5175)
-  newsnowPort = port
-  const apiUrl = getNewsNowApiUrl(port)
-  const newsnowDir = path.join(__dirname, '..', 'engine', 'newsnow')
-  newsnowProcess = spawn('pnpm', [
-    'run',
-    'dev',
-    '--host',
-    '127.0.0.1',
-    '--port',
-    String(port),
-    '--strictPort'
-  ], {
-    cwd: newsnowDir,
-    env: getCleanSpawnEnv({ BROWSER: 'none', NEWSNOW_PORT: String(port) }),
-    shell: SPAWN_SHELL
-  })
-
-  newsnowProcess.stdout.on('data', (data) => {
-    const text = data.toString()
-    if (mainWindow && text.trim()) mainWindow.webContents.send('newsnow:log', text)
-  })
-  newsnowProcess.stderr.on('data', (data) => {
-    const text = data.toString()
-    if (mainWindow && text.trim()) mainWindow.webContents.send('newsnow:log', text)
-  })
-  newsnowProcess.on('close', (code) => {
-    if (mainWindow) mainWindow.webContents.send('newsnow:status', { status: 'stopped', code })
-    newsnowProcess = null
-  })
-  newsnowProcess.on('error', (error) => {
-    if (mainWindow) mainWindow.webContents.send('newsnow:status', { status: 'error', error: error.message })
-    newsnowProcess = null
-  })
-
-  const ready = await waitForNewsNowReady(apiUrl)
-  return {
-    ...(await getNewsNowStatus()),
-    success: true,
-    processRunning: !!newsnowProcess,
-    pid: newsnowProcess?.pid || null,
-    apiUrl,
-    ready: ready.ready,
-    warning: ready.ready ? '' : ready.error,
-  }
-}
-
-function stopNewsNowService() {
-  if (!newsnowProcess) {
-    return { success: true, processRunning: false, apiUrl: getNewsNowApiUrl() }
-  }
-  const pid = newsnowProcess.pid
-  killProcessTree(newsnowProcess)
-  newsnowProcess = null
-  return { success: true, processRunning: false, stoppedPid: pid, apiUrl: getNewsNowApiUrl() }
 }
 
 function getRadarCachePath() {
@@ -1536,190 +1165,6 @@ ipcMain.handle('llm:call', async (event, { apiBase, apiKey, model, messages, tem
   }
 })
 
-function startTrendRadarDaemon(intervalMin = 30) {
-  if (trendradarDaemon) {
-    console.log('[TrendRadar] Daemon already running (PID:', trendradarDaemon.pid, ')')
-    return
-  }
-
-  const projectRoot = path.join(__dirname, '..')
-  const trendradarDir = path.join(projectRoot, 'engine', 'trendradar')
-  if (!fs.existsSync(trendradarDir)) {
-    console.log('[TrendRadar] Skipping daemon start — engine/trendradar not found (clone the submodule first)')
-    return
-  }
-
-  trendradarDaemon = spawn(TRENDRADAR_PYTHON_PATH, [
-    '-m', 'engine.daemon',
-    '--interval', String(intervalMin)
-  ], {
-    cwd: projectRoot,
-    env: getCleanSpawnEnv(),
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: false,
-    shell: SPAWN_SHELL
-  })
-
-  console.log(`[TrendRadar] Daemon started (PID=${trendradarDaemon.pid}, interval=${intervalMin}min)`)
-
-  trendradarDaemon.stdout.on('data', (data) => {
-    const lines = data.toString().trim().split('\n')
-    for (const line of lines) {
-      console.log('[TrendRadar]', line)
-    }
-    if (mainWindow) {
-      mainWindow.webContents.send('trendradar:log', data.toString())
-    }
-  })
-
-  trendradarDaemon.stderr.on('data', (data) => {
-    console.error('[TrendRadar:err]', data.toString().trim())
-  })
-
-  trendradarDaemon.on('close', (code) => {
-    console.log(`[TrendRadar] Daemon exited (code=${code})`)
-    trendradarDaemon = null
-    if (mainWindow) {
-      mainWindow.webContents.send('trendradar:status', { status: 'stopped', code })
-    }
-  })
-
-  trendradarDaemon.on('error', (err) => {
-    console.error('[TrendRadar] Daemon spawn error:', err.message)
-    trendradarDaemon = null
-  })
-}
-
-function stopTrendRadarDaemon() {
-  if (!trendradarDaemon) return
-  console.log('[TrendRadar] Stopping daemon (PID:', trendradarDaemon.pid, ')')
-  trendradarDaemon.kill('SIGTERM')
-  setTimeout(() => {
-    if (trendradarDaemon) {
-      trendradarDaemon.kill('SIGKILL')
-      trendradarDaemon = null
-    }
-  }, 5000)
-}
-
-ipcMain.handle('trendradar:start', async (event, intervalMin) => {
-  startTrendRadarDaemon(intervalMin || 30)
-  return { running: !!trendradarDaemon, pid: trendradarDaemon?.pid }
-})
-
-ipcMain.handle('trendradar:stop', async () => {
-  stopTrendRadarDaemon()
-  return { running: false }
-})
-
-ipcMain.handle('trendradar:status', async () => {
-  // Read daemon status file for detailed info
-  const statusPath = path.join(__dirname, '..', 'engine', 'trendradar_data', 'status.json')
-  let daemonStatus = { status: 'not_running' }
-  try {
-    if (fs.existsSync(statusPath)) {
-      daemonStatus = JSON.parse(fs.readFileSync(statusPath, 'utf-8'))
-    }
-  } catch (e) { /* ignore */ }
-  return {
-    processRunning: !!trendradarDaemon,
-    pid: trendradarDaemon?.pid || null,
-    ...daemonStatus
-  }
-})
-
-ipcMain.handle('trendradar:getStatus', async () => {
-  const status = await runTrendRadarCli('status')
-  return {
-    ...status,
-    processRunning: !!trendradarDaemon,
-    pid: trendradarDaemon?.pid || status.pid || null,
-  }
-})
-
-ipcMain.handle('trendradar:getConfig', async () => {
-  return runTrendRadarCli('get-config')
-})
-
-ipcMain.handle('trendradar:saveConfig', async (event, config) => {
-  return runTrendRadarCli('save-config', { config })
-})
-
-ipcMain.handle('trendradar:listSources', async () => {
-  return runTrendRadarCli('list-sources')
-})
-
-ipcMain.handle('trendradar:runOnce', async (event, config) => {
-  if (mainWindow) {
-    mainWindow.webContents.send('trendradar:status', { status: 'running' })
-  }
-  try {
-    const result = await runTrendRadarCli('run-once', { config }, 600000)
-    if (mainWindow) {
-      mainWindow.webContents.send('trendradar:status', { status: 'idle', itemCount: result.items?.length || 0 })
-    }
-    return result
-  } catch (error) {
-    if (mainWindow) {
-      mainWindow.webContents.send('trendradar:status', { status: 'error', error: error.message })
-    }
-    throw error
-  }
-})
-
-ipcMain.handle('trendradar:getLatest', async () => {
-  return runTrendRadarCli('get-latest')
-})
-
-ipcMain.handle('trendradar:getTopics', async () => {
-  return runTrendRadarCli('get-topics')
-})
-
-ipcMain.handle('trendradar:checkUpdate', async () => {
-  return runTrendRadarCli('check-update', {}, 60000)
-})
-
-ipcMain.handle('trendradar:updateDependency', async (event, options) => {
-  return runTrendRadarCli('update-dependency', options || {}, 600000)
-})
-
-ipcMain.handle('trendradar:openReport', async (event, reportPath) => {
-  if (!reportPath) {
-    return { success: false, error: '缺少报告路径' }
-  }
-  const targetPath = resolveProjectPath(reportPath)
-  if (!fs.existsSync(targetPath)) {
-    return { success: false, error: `文件不存在：${targetPath}` }
-  }
-  await shell.openPath(targetPath)
-  return { success: true }
-})
-
-ipcMain.handle('newsnow:getStatus', async () => {
-  return getNewsNowStatus()
-})
-
-ipcMain.handle('newsnow:sync', async (event, options) => {
-  await runNewsNowSync(options || {}, 180000)
-  return getNewsNowStatus()
-})
-
-ipcMain.handle('newsnow:setup', async () => {
-  return runNewsNowRuntime('setup', 600000)
-})
-
-ipcMain.handle('newsnow:build', async () => {
-  return runNewsNowRuntime('build', 600000)
-})
-
-ipcMain.handle('newsnow:start', async (event, options) => {
-  return startNewsNowService(options || {})
-})
-
-ipcMain.handle('newsnow:stop', async () => {
-  return stopNewsNowService()
-})
-
 // Fetch sources management
 ipcMain.handle('fetch:getSources', async (event) => {
   return new Promise((resolve, reject) => {
@@ -1945,10 +1390,6 @@ app.whenReady().then(() => {
   } else {
     radar.broadcast()
   }
-})
-
-app.on('before-quit', () => {
-  stopNewsNowService()
 })
 
 app.on('window-all-closed', () => {

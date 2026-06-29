@@ -6,7 +6,6 @@ __pycache__/
 .Python
 *.egg-info/
 .venv/
-.venv-trendradar/
 venv/
 .pytest_cache/
 .mypy_cache/
@@ -43,8 +42,3 @@ docs/acceptance/acceptance-run.*.log
 *.test.json
 script_schema*.json
 fetch_stderr.log
-
-# External engines (cloned separately, update via git pull)
-engine/trendradar/
-engine/trendradar_data/
-engine/newsnow/

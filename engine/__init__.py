@@ -1,2 +1,2 @@
 # coding=utf-8
-"""Engine package — hosts TrendRadar subsystem and bridge layer."""
+"""Engine package for project-local collection helpers."""

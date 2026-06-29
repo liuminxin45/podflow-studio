@@ -3,7 +3,7 @@ import { Layout, Button, Space, Typography, ConfigProvider, theme, Modal, Toolti
 import { AudioOutlined, CloseOutlined, FolderOpenOutlined, SaveOutlined, SettingOutlined } from './icons/antdCompat'
 import ApprovalModal from './components/ApprovalModal'
 import CreationStudio from './components/CreationStudio'
-import DiscoverPanel from './components/DiscoverPanel'
+import DiscoverPanel, { type DiscoverConfig, type DiscoverMeta } from './components/DiscoverPanel'
 import OrganizePanel from './components/OrganizePanel'
 import WritingLayer from './components/writing'
 import SoundStudio from './components/SoundStudio'
@@ -13,16 +13,6 @@ import WorkflowSidebar from './components/WorkflowSidebar'
 import EpisodeManager from './components/EpisodeManager'
 import { STAGES } from './components/workflowStages'
 import type { Workflow, WorkflowCreateResult, WorkflowSummary, ContentItem } from './types/workflow'
-import type {
-  NewsNowStatus,
-  TrendRadarConfigView,
-  TrendRadarItem,
-  TrendRadarMeta,
-  TrendRadarRunResult,
-  TrendRadarSource,
-  TrendRadarStatus,
-  TrendRadarUpdateStatus,
-} from './types/trendradar'
 
 const { Header, Content } = Layout
 const { Title } = Typography
@@ -106,29 +96,6 @@ declare global {
         lastRunContents?: ContentItem[]
         contents: ContentItem[]
       }) => void) => void
-      trendradarStart: (intervalMin?: number) => Promise<any>
-      trendradarStop: () => Promise<any>
-      trendradarStatus: () => Promise<any>
-      trendradarGetStatus: () => Promise<TrendRadarStatus>
-      trendradarGetConfig: () => Promise<{ success: boolean; config: TrendRadarConfigView; error?: string }>
-      trendradarSaveConfig: (config: Partial<TrendRadarConfigView>) => Promise<{ success: boolean; config: TrendRadarConfigView; error?: string }>
-      trendradarListSources: () => Promise<{ success: boolean; sources: TrendRadarSource[]; error?: string }>
-      trendradarRunOnce: (config?: Partial<TrendRadarConfigView>) => Promise<TrendRadarRunResult>
-      trendradarGetLatest: () => Promise<{ success: boolean; items: TrendRadarItem[]; fetch_contents: TrendRadarItem[]; meta: TrendRadarMeta; error?: string }>
-      trendradarGetTopics: () => Promise<{ success: boolean; topics: Array<{ name: string; count: number }>; error?: string }>
-      trendradarCheckUpdate: () => Promise<TrendRadarUpdateStatus>
-      trendradarUpdateDependency: (payload?: Record<string, any>) => Promise<Record<string, any>>
-      trendradarOpenReport: (reportPath: string) => Promise<{ success: boolean; error?: string }>
-      onTrendradarLog: (callback: (data: string) => void) => void
-      onTrendradarStatus: (callback: (data: any) => void) => void
-      newsnowGetStatus: () => Promise<NewsNowStatus>
-      newsnowSync: (options?: Record<string, any>) => Promise<NewsNowStatus>
-      newsnowSetup: () => Promise<NewsNowStatus>
-      newsnowBuild: () => Promise<NewsNowStatus>
-      newsnowStart: (options?: Record<string, any>) => Promise<NewsNowStatus>
-      newsnowStop: () => Promise<NewsNowStatus>
-      onNewsnowLog: (callback: (data: string) => void) => void
-      onNewsnowStatus: (callback: (data: any) => void) => void
       produceGenerate: (payload: Record<string, any>) => Promise<any>
       onProduceProgress: (callback: (data: any) => void) => void
       removeProduceProgressListeners: () => void
@@ -826,51 +793,49 @@ function App() {
         <DiscoverPanel
           key={`discover-${workflow?.id || 'none'}`}
           visible={discoverVisible}
-          items={(workflow?.state?.fetch_contents || []) as TrendRadarItem[]}
-          selectedItems={(workflow?.state?.selected_materials || []) as TrendRadarItem[]}
-          meta={(workflow?.state?.trendradar_meta || {}) as TrendRadarMeta}
-          initialConfig={workflow?.state?.discover_ui?.trendradar_config as Partial<TrendRadarConfigView> | undefined}
+          items={workflow?.state?.fetch_contents || []}
+          selectedItems={workflow?.state?.selected_materials || []}
+          meta={(workflow?.state?.discover_meta || {}) as DiscoverMeta}
+          initialConfig={workflow?.state?.discover_ui?.fetch_config as Partial<DiscoverConfig> | undefined}
           onConfigChange={(config) => {
             void updateWorkflowPatch({
               discover_ui: {
-                trendradar_config: config,
+                fetch_config: config,
                 configUpdatedAt: new Date().toISOString(),
               },
             })
           }}
           onLoadConfig={async () => {
-            const result = await window.electronAPI.trendradarGetConfig()
-            if (!result.success) throw new Error(result.error || '读取 TrendRadar 配置失败')
-            return result.config
+            return await window.electronAPI.loadNodeConfig('fetch') || {}
           }}
           onListSources={async () => {
-            const result = await window.electronAPI.trendradarListSources()
-            if (!result.success) throw new Error(result.error || '读取 TrendRadar 数据源失败')
-            return result.sources || []
-          }}
-          onGetStatus={() => window.electronAPI.trendradarGetStatus()}
-          onGetNewsNowStatus={() => window.electronAPI.newsnowGetStatus()}
-          onSyncNewsNow={() => window.electronAPI.newsnowSync({ update: 'lock' })}
-          onSetupNewsNow={() => window.electronAPI.newsnowSetup()}
-          onStartNewsNow={() => window.electronAPI.newsnowStart()}
-          onStopNewsNow={() => window.electronAPI.newsnowStop()}
-          onOpenReport={async (reportPath) => {
-            const result = await window.electronAPI.trendradarOpenReport(reportPath)
-            if (!result.success) throw new Error(result.error || '打开 TrendRadar 报告失败')
+            return await window.electronAPI.getFetchSources()
           }}
           onRunOnce={async (config) => {
-            const result = await window.electronAPI.trendradarRunOnce(config)
-            const contents = (result.fetch_contents || result.items || []) as TrendRadarItem[]
-            const meta = result.meta || {}
+            const saveResult = await window.electronAPI.saveNodeConfig('fetch', config)
+            if (!saveResult.success) throw new Error(saveResult.error || '保存采集配置失败')
+            const updatedWorkflow = await runWorkflowNodes(['fetch'])
+            const contents = updatedWorkflow?.state?.fetch_contents || []
+            const sourceCounts = contents.reduce<Record<string, number>>((acc, item) => {
+              const source = item.source || 'unknown'
+              acc[source] = (acc[source] || 0) + 1
+              return acc
+            }, {})
+            const meta: DiscoverMeta = {
+              generated_at: new Date().toISOString(),
+              item_count: contents.length,
+              source_counts: sourceCounts,
+              errors: updatedWorkflow?.state?.errors || [],
+            }
             await updateWorkflowPatch({
               fetch_contents: contents,
               raw_contents: [],
               selected_materials: [],
-              trendradar_meta: meta,
+              discover_meta: meta,
               discover_ui: {
                 selectedCount: 0,
                 lastRunAt: meta.generated_at || new Date().toISOString(),
-                trendradar_config: config,
+                fetch_config: config,
               },
               organize_ui: {
                 candidates: [],
@@ -881,22 +846,22 @@ function App() {
             })
             setDiscoverCandidates([])
             setOrganizeCandidates([])
-            return { ...result, items: contents, fetch_contents: contents, meta }
+            return { items: contents, meta }
           }}
           onProceedToOrganize={(candidates, meta, config) => {
             setDiscoverCandidates(candidates)
             void updateWorkflowPatch({
               selected_materials: candidates,
               raw_contents: candidates,
-              trendradar_meta: {
-                ...(workflow?.state?.trendradar_meta || {}),
+              discover_meta: {
+                ...(workflow?.state?.discover_meta || {}),
                 ...meta,
                 selected_count: candidates.length,
               },
               discover_ui: {
                 selectedCount: candidates.length,
                 proceededAt: new Date().toISOString(),
-                trendradar_config: config,
+                fetch_config: config,
               },
             })
             closeAllPanels()

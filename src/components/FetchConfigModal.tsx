@@ -257,7 +257,6 @@ const FRESHNESS_LABELS: Record<number, { text: string; desc: string }> = {
 // ============================================================
 
 const SOURCE_ICONS: Record<string, React.ReactNode> = {
-  newsnow: <span style={{ fontSize: 18 }}>热</span>,
   hackernews: <span style={{ fontSize: 18 }}>橙</span>,
   techcrunch: <span style={{ fontSize: 18 }}>绿</span>,
   ai_news_daily: <span style={{ fontSize: 18 }}>智</span>,

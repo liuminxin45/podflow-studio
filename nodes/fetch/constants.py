@@ -80,6 +80,6 @@ TOKENIZATION = {
     },
 }
 
-PRIORITY_SOURCES = ["newsnow", "hackernews", "techcrunch", "ai_news_daily"]
+PRIORITY_SOURCES = ["hackernews", "techcrunch", "ai_news_daily"]
 
 EXCLUDED_SOURCE_FILES = ["_", "base.py", "example_custom"]
