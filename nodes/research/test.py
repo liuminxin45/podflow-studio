@@ -18,21 +18,24 @@ setup_utf8_output()
 def test_research_node():
     """Test research node with mock data"""
     print_info("Testing research node...")
-    
+
     state = create_state_for_node("research")
-    
+
     config = ResearchConfig(enable_web_search=False, max_search_results=5)
     initial_count = len(state["cleaned_contents"])
     result = run(state, config)
-    
+
     assert "researched_contents" in result, "Should have researched_contents"
     assert isinstance(result["researched_contents"], list), "researched_contents should be a list"
-    assert len(result["researched_contents"]) == initial_count, "Should have same number of items as input"
-    
+    assert len(result["researched_contents"]) == initial_count, (
+        "Should have same number of items as input"
+    )
+
     state = result
 
-    
-    print_success(f"Research node test passed: {len(state['researched_contents'])} items researched")
+    print_success(
+        f"Research node test passed: {len(state['researched_contents'])} items researched"
+    )
     return True
 
 
@@ -46,5 +49,6 @@ if __name__ == "__main__":
     except Exception as e:
         print_error(f"Test error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

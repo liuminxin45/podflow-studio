@@ -4,14 +4,14 @@ Shared deduplication utilities.
 Used by merge and preprocess nodes to avoid duplicating logic.
 """
 
-from typing import List, Dict, Any
+from typing import Any
 from difflib import SequenceMatcher
 
 
 def deduplicate_by_title(
-    items: List[Dict[str, Any]],
+    items: list[dict[str, Any]],
     threshold: float = 0.8,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Title-based deduplication.
 
@@ -25,8 +25,8 @@ def deduplicate_by_title(
     Returns:
         Deduplicated list preserving original order.
     """
-    unique: List[Dict[str, Any]] = []
-    seen_titles: List[str] = []
+    unique: list[dict[str, Any]] = []
+    seen_titles: list[str] = []
 
     for item in items:
         title = item.get("title", "").strip().lower()
@@ -39,10 +39,7 @@ def deduplicate_by_title(
                 seen_titles.append(title)
                 unique.append(item)
         else:
-            is_dup = any(
-                SequenceMatcher(None, title, s).ratio() >= threshold
-                for s in seen_titles
-            )
+            is_dup = any(SequenceMatcher(None, title, s).ratio() >= threshold for s in seen_titles)
             if not is_dup:
                 seen_titles.append(title)
                 unique.append(item)

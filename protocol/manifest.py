@@ -18,20 +18,27 @@ Usage:
     resume_idx = manifest.resume_index(PIPELINE_ORDER)
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Any
 from datetime import datetime
 
 
 PIPELINE_ORDER = [
-    "fetch", "manual", "merge", "preprocess",
-    "research", "topic_selection",
+    "fetch",
+    "manual",
+    "merge",
+    "preprocess",
+    "research",
+    "topic_selection",
     "script",
-    "tts", "audio_postprocess", "assets",
-    "review", "publish",
+    "tts",
+    "audio_postprocess",
+    "assets",
+    "review",
+    "publish",
 ]
 
 # Map of node name → state keys it produces
-NODE_OUTPUT_KEYS: Dict[str, List[str]] = {
+NODE_OUTPUT_KEYS: dict[str, list[str]] = {
     "fetch": ["fetch_contents"],
     "manual": ["manual_contents"],
     "merge": ["raw_contents"],
@@ -51,21 +58,23 @@ class PipelineManifest:
     """Reads/writes the `_manifest` dict inside pipeline state."""
 
     @staticmethod
-    def load(state: Dict[str, Any]) -> "PipelineManifest":
+    def load(state: dict[str, Any]) -> "PipelineManifest":
         return PipelineManifest(state.get("_manifest", {}))
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         self._data = data
 
     @property
-    def nodes(self) -> Dict[str, Any]:
+    def nodes(self) -> dict[str, Any]:
         return self._data.get("nodes", {})
 
-    def completed_nodes(self) -> List[str]:
+    def completed_nodes(self) -> list[str]:
         """Return node names that completed successfully, in pipeline order."""
-        return [n for n in PIPELINE_ORDER if n in self.nodes and self.nodes[n].get("status") == "ok"]
+        return [
+            n for n in PIPELINE_ORDER if n in self.nodes and self.nodes[n].get("status") == "ok"
+        ]
 
-    def resume_index(self, pipeline: Optional[List[str]] = None) -> int:
+    def resume_index(self, pipeline: list[str] | None = None) -> int:
         """Return the index of the first incomplete node in the pipeline.
         Returns 0 if nothing completed, len(pipeline) if all completed."""
         pipeline = pipeline or PIPELINE_ORDER
@@ -75,16 +84,16 @@ class PipelineManifest:
                 return i
         return len(pipeline)
 
-    def last_completed_node(self) -> Optional[str]:
+    def last_completed_node(self) -> str | None:
         completed = self.completed_nodes()
         return completed[-1] if completed else None
 
     @staticmethod
     def record(
-        state: Dict[str, Any],
+        state: dict[str, Any],
         node_name: str,
         elapsed_seconds: float,
-        output_keys: Optional[List[str]] = None,
+        output_keys: list[str] | None = None,
         error_count: int = 0,
     ) -> None:
         """Record a node completion into the state's _manifest."""

@@ -1,4 +1,3 @@
-from typing import List, Optional
 from pydantic import Field
 from protocol.config_base import NodeConfigBase
 
@@ -11,19 +10,17 @@ class FetchConfig(NodeConfigBase):
     quality: int = Field(default=3, ge=1, le=5, description="内容质量 1-5")
     freshness: int = Field(default=4, ge=1, le=5, description="时效要求 1-5")
 
-    enabled_sources: List[str] = Field(
-        default_factory=list,
-        description="启用的数据源列表（文件名，不含.py扩展名）。"
+    enabled_sources: list[str] = Field(
+        default_factory=list, description="启用的数据源列表（文件名，不含.py扩展名）。"
     )
-
 
     min_relevance: int = Field(default=3, ge=1, le=5, description="最低相关度要求 1-5")
     allow_duplicates: bool = Field(default=False, description="是否允许重复内容")
     prefer_original: bool = Field(default=True, description="优先原始报道")
     language_mix: str = Field(default="mixed", description="语言偏好：chinese/english/mixed")
 
-    keywords: List[str] = Field(default_factory=list, description="重点关注词")
-    exclude_keywords: List[str] = Field(default_factory=list, description="排除关键词")
+    keywords: list[str] = Field(default_factory=list, description="重点关注词")
+    exclude_keywords: list[str] = Field(default_factory=list, description="排除关键词")
     event_detection: bool = Field(default=True, description="事件聚合")
     trending_boost: bool = Field(default=False, description="热度加权")
 
@@ -31,7 +28,7 @@ class FetchConfig(NodeConfigBase):
     group_by_topic: bool = Field(default=True, description="按主题分组")
     include_summary: bool = Field(default=True, description="生成摘要")
 
-    activePreset: Optional[str] = Field(default=None, description="当前使用的预设（前端使用）")
+    activePreset: str | None = Field(default=None, description="当前使用的预设（前端使用）")
 
     monitor_enabled: bool = Field(default=False, description="是否启用雷达持续监控")
     monitor_interval_min: int = Field(default=30, ge=5, le=1440, description="雷达监控间隔（分钟）")

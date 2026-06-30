@@ -18,31 +18,34 @@ setup_utf8_output()
 def test_preprocess_node():
     """Test preprocess node with mock data"""
     print_info("Testing preprocess node...")
-    
+
     state = create_state_for_node("preprocess")
-    
+
     config = PreprocessConfig(
         min_content_length=50,
         max_content_length=10000,
         remove_duplicates=True,
-        similarity_threshold=0.85
+        similarity_threshold=0.85,
     )
-    
+
     initial_count = len(state["raw_contents"])
     result = run(state, config)
-    
+
     assert "cleaned_contents" in result, "Should have cleaned_contents"
     assert isinstance(result["cleaned_contents"], list), "cleaned_contents should be a list"
     assert len(result["cleaned_contents"]) > 0, "Should have cleaned content"
     assert len(result["cleaned_contents"]) <= initial_count, "Should filter some content"
-    
+
     for item in result["cleaned_contents"]:
-        assert len(item.get("content", "")) >= config.min_content_length, "All content should meet minimum length"
-    
+        assert len(item.get("content", "")) >= config.min_content_length, (
+            "All content should meet minimum length"
+        )
+
     state = result
 
-    
-    print_success(f"Preprocess node test passed: {initial_count} -> {len(state['cleaned_contents'])} items")
+    print_success(
+        f"Preprocess node test passed: {initial_count} -> {len(state['cleaned_contents'])} items"
+    )
     return True
 
 
@@ -56,5 +59,6 @@ if __name__ == "__main__":
     except Exception as e:
         print_error(f"Test error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

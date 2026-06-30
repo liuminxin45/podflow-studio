@@ -1,20 +1,19 @@
 import os
 import json
 import re
-from typing import Dict, Any
+from typing import Any
 from nodes.script.config import ScriptConfig
 from protocol.llm_client import LLMClient
 from protocol.node_runner import NodeContext
 
 
 def _build_materials_text(materials: list) -> str:
-    return "\n\n".join([
-        f"- {m.get('title', '')}: {m.get('content', '')[:500]}"
-        for m in materials[:5]
-    ])
+    return "\n\n".join(
+        [f"- {m.get('title', '')}: {m.get('content', '')[:500]}" for m in materials[:5]]
+    )
 
 
-def _build_story_prompt(topic: Dict[str, Any], config: ScriptConfig, materials_text: str) -> str:
+def _build_story_prompt(topic: dict[str, Any], config: ScriptConfig, materials_text: str) -> str:
     if config.num_hosts == 1:
         host_desc = "solo narration (1 host, all lines by Host A)"
         structure_desc = "opening + story content + reflection + closing (all by Host A)"
@@ -36,8 +35,8 @@ def _build_story_prompt(topic: Dict[str, Any], config: ScriptConfig, materials_t
     target_chars = config.target_duration_minutes * config.words_per_minute
     return f"""Generate a {config.target_duration_minutes}-minute Chinese podcast script.
 
-Topic: {topic.get('title', '')}
-Description: {topic.get('description', '')}
+Topic: {topic.get("title", "")}
+Description: {topic.get("description", "")}
 
 Materials:
 {materials_text}
@@ -62,7 +61,9 @@ Return JSON (sections only, no dialogue field needed):
 """
 
 
-def _build_news_brief_prompt(topic: Dict[str, Any], config: ScriptConfig, materials_text: str) -> str:
+def _build_news_brief_prompt(
+    topic: dict[str, Any], config: ScriptConfig, materials_text: str
+) -> str:
     if config.num_hosts == 1:
         host_desc = "solo narration (1 host, all lines by Host A)"
     else:
@@ -70,8 +71,8 @@ def _build_news_brief_prompt(topic: Dict[str, Any], config: ScriptConfig, materi
     target_chars = config.target_duration_minutes * config.words_per_minute
     return f"""Generate a {config.target_duration_minutes}-minute Chinese news brief podcast script.
 
-Topic: {topic.get('title', '')}
-Description: {topic.get('description', '')}
+Topic: {topic.get("title", "")}
+Description: {topic.get("description", "")}
 
 Materials:
 {materials_text}
@@ -110,7 +111,9 @@ SYSTEM_PROMPTS = {
 }
 
 
-def _normalize_script(content_type: str, raw_script: Dict[str, Any], topic: Dict[str, Any]) -> Dict[str, Any]:
+def _normalize_script(
+    content_type: str, raw_script: dict[str, Any], topic: dict[str, Any]
+) -> dict[str, Any]:
     if not isinstance(raw_script, dict):
         raw_script = {}
 
@@ -122,8 +125,12 @@ def _normalize_script(content_type: str, raw_script: Dict[str, Any], topic: Dict
         "title": raw_script.get("title") or topic.get("title", "Untitled"),
         "description": raw_script.get("description", ""),
         "content_type": normalized_content_type,
-        "sections": raw_script.get("sections") if isinstance(raw_script.get("sections"), list) else [],
-        "dialogue": raw_script.get("dialogue") if isinstance(raw_script.get("dialogue"), list) else [],
+        "sections": raw_script.get("sections")
+        if isinstance(raw_script.get("sections"), list)
+        else [],
+        "dialogue": raw_script.get("dialogue")
+        if isinstance(raw_script.get("dialogue"), list)
+        else [],
     }
 
     normalized["dialogue"] = [
@@ -138,7 +145,7 @@ def _normalize_script(content_type: str, raw_script: Dict[str, Any], topic: Dict
     return normalized
 
 
-def run(state: Dict[str, Any], config: ScriptConfig = None) -> Dict[str, Any]:
+def run(state: dict[str, Any], config: ScriptConfig = None) -> dict[str, Any]:
     config = config or ScriptConfig()
     ctx = NodeContext("ScriptNode", state)
     topic = state.get("selected_topic", {})
@@ -172,12 +179,14 @@ def run(state: Dict[str, Any], config: ScriptConfig = None) -> Dict[str, Any]:
             text = line.get("text", "")
             word_count = len(text)
             duration = word_count / wpm * 60
-            stages.append({
-                "order": i,
-                "speaker": line.get("speaker", ""),
-                "text": text,
-                "estimated_duration": round(duration, 1),
-            })
+            stages.append(
+                {
+                    "order": i,
+                    "speaker": line.get("speaker", ""),
+                    "text": text,
+                    "estimated_duration": round(duration, 1),
+                }
+            )
         state["stages"] = stages
         total_dur = sum(s["estimated_duration"] for s in stages)
         ctx.log(f"分段完成: {len(stages)} segments, 预计时长 ~{total_dur:.0f}s")
@@ -188,8 +197,7 @@ def run(state: Dict[str, Any], config: ScriptConfig = None) -> Dict[str, Any]:
     script = state.get("script", {})
     stages = state.get("stages", [])
     detail = (
-        f"输出: script.title='{script.get('title', 'N/A')[:50]}', "
-        f"stages={len(stages)} segments"
+        f"输出: script.title='{script.get('title', 'N/A')[:50]}', stages={len(stages)} segments"
     )
     if script:
         detail += (
@@ -201,11 +209,11 @@ def run(state: Dict[str, Any], config: ScriptConfig = None) -> Dict[str, Any]:
 
 
 def _generate_script(
-    topic: Dict,
+    topic: dict,
     materials: list,
     config: ScriptConfig,
     ctx: NodeContext,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     api_key = config.api_key or os.environ.get("OPENAI_API_KEY", "")
     api_base = config.api_base or os.environ.get("OPENAI_API_BASE", "")
 
@@ -253,7 +261,7 @@ def _generate_script(
         response = client.call(messages, timeout=effective_timeout, logs=ctx.logs)
         content = client.extract_content(response)
 
-    json_match = re.search(r'\{.*\}', content, re.DOTALL)
+    json_match = re.search(r"\{.*\}", content, re.DOTALL)
     if json_match:
         try:
             parsed = json.loads(json_match.group())
@@ -261,8 +269,12 @@ def _generate_script(
         except json.JSONDecodeError:
             ctx.log("⚠ JSON解析失败，使用降级输出")
 
-    return _normalize_script(content_type, {
-        "title": topic.get("title", "Untitled"),
-        "description": "",
-        "dialogue": [],
-    }, topic)
+    return _normalize_script(
+        content_type,
+        {
+            "title": topic.get("title", "Untitled"),
+            "description": "",
+            "dialogue": [],
+        },
+        topic,
+    )

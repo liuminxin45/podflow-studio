@@ -4,6 +4,7 @@ from protocol.config_base import NodeConfigBase
 
 class PublishConfig(NodeConfigBase):
     """Publish node configuration."""
+
     # Storage settings (merged from store node)
     storage_type: str = Field(default="local", description="存储类型")
     local_base_dir: str = Field(default="out/published", description="本地存储根目录")

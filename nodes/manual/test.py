@@ -20,13 +20,15 @@ def test_manual_node():
     print_info("Testing manual node...")
 
     state = create_state_for_node("manual")
-    config = ManualConfig(news_items=[
-        {
-            "title": "Manual item",
-            "content": "A manually added material for testing",
-            "url": "https://example.com/manual",
-        }
-    ])
+    config = ManualConfig(
+        news_items=[
+            {
+                "title": "Manual item",
+                "content": "A manually added material for testing",
+                "url": "https://example.com/manual",
+            }
+        ]
+    )
 
     result = run(state, config)
 
@@ -52,5 +54,6 @@ if __name__ == "__main__":
     except Exception as e:
         print_error(f"Test error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

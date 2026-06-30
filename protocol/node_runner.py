@@ -10,9 +10,13 @@ import sys
 import json
 import time
 from datetime import datetime
-from typing import Dict, Any, Callable, List, Optional, Type
+from typing import Any
+
+from collections.abc import Callable
 from protocol.config_base import NodeConfigBase
-from protocol.manifest import PipelineManifest, NODE_OUTPUT_KEYS
+from protocol.manifest import PipelineManifest
+
+type RunFunc = Callable[[dict[str, Any], Any], dict[str, Any]]
 
 
 class NodeContext:
@@ -31,10 +35,10 @@ class NodeContext:
             return ctx.finalize(state)
     """
 
-    def __init__(self, label: str, state: Dict[str, Any]):
+    def __init__(self, label: str, state: dict[str, Any]):
         self.label = label
-        self.logs: List[str] = state.get("logs", [])
-        self.errors: List[str] = state.get("errors", [])
+        self.logs: list[str] = state.get("logs", [])
+        self.errors: list[str] = state.get("errors", [])
         self._t0 = time.time()
         self._start_ts = datetime.now().isoformat()
         rc = state.get("runtime_config", {})
@@ -63,43 +67,49 @@ class NodeContext:
         if detail:
             self.log(detail)
         node_name = self.label.replace("Node", "").lower()
-        err_count = len([e for e in self.errors if isinstance(e, dict) and e.get("node") == node_name])
+        err_count = sum(
+            1 for error in self.errors if isinstance(error, dict) and error.get("node") == node_name
+        )
         self.log(f"错误数: {err_count}")
 
-    def add_error(self, node_name: str, message: str, detail: Optional[str] = None) -> None:
-        self.errors.append({
-            "node": node_name,
-            "message": message,
-            "detail": detail or message,
-        })
+    def add_error(self, node_name: str, message: str, detail: str | None = None) -> None:
+        self.errors.append(
+            {
+                "node": node_name,
+                "message": message,
+                "detail": detail or message,
+            }
+        )
 
     @property
     def elapsed(self) -> float:
         return time.time() - self._t0
 
-    def finalize(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    def finalize(self, state: dict[str, Any]) -> dict[str, Any]:
         state["logs"] = self.logs
         state["errors"] = self.errors
         # Record completion in pipeline manifest
         node_name = self.label.replace("Node", "").lower()
-        err_count = len([e for e in self.errors if isinstance(e, dict) and e.get("node") == node_name])
+        err_count = sum(
+            1 for error in self.errors if isinstance(error, dict) and error.get("node") == node_name
+        )
         PipelineManifest.record(state, node_name, self.elapsed, error_count=err_count)
         return state
 
 
 def run_node_cli(
     node_name: str,
-    run_func: Callable[[Dict[str, Any], Any], Dict[str, Any]],
-    config_class: Type[NodeConfigBase]
+    run_func: RunFunc,
+    config_class: type[NodeConfigBase],
 ) -> None:
     """
     Standard CLI entry point for nodes.
-    
+
     Args:
         node_name: Node identifier for error messages
         run_func: The node's run() function
         config_class: The node's config class
-    
+
     Reads JSON state from stdin, executes node, writes result to stdout.
     Exit code 0 on success, 1 on failure.
     """
@@ -107,29 +117,21 @@ def run_node_cli(
         input_data = json.loads(sys.stdin.read())
         config_data = input_data.get("runtime_config", {}).get(node_name, {})
         config = config_class.from_dict(config_data) if config_data else config_class()
-        
+
         result = run_func(input_data, config)
         print(json.dumps(result, ensure_ascii=False))
         sys.exit(0)
-        
+
     except json.JSONDecodeError as e:
         error_output = {
-            "errors": [{
-                "node": node_name,
-                "message": f"Invalid JSON input: {str(e)}",
-                "detail": str(e)
-            }]
+            "errors": [
+                {"node": node_name, "message": f"Invalid JSON input: {str(e)}", "detail": str(e)}
+            ]
         }
         print(json.dumps(error_output, ensure_ascii=False), file=sys.stderr)
         sys.exit(1)
-        
+
     except Exception as e:
-        error_output = {
-            "errors": [{
-                "node": node_name,
-                "message": str(e),
-                "detail": str(e)
-            }]
-        }
+        error_output = {"errors": [{"node": node_name, "message": str(e), "detail": str(e)}]}
         print(json.dumps(error_output, ensure_ascii=False), file=sys.stderr)
         sys.exit(1)

@@ -10,10 +10,10 @@ import io
 
 def setup_utf8_output():
     """Setup UTF-8 output for Windows compatibility"""
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         # Force UTF-8 encoding for stdout/stderr on Windows
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 
 def print_success(message: str):

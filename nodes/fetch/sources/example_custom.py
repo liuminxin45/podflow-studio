@@ -3,32 +3,33 @@ Example Custom Source
 这是一个示例，展示如何创建自定义数据源
 你可以复制这个文件并修改为自己的数据源
 """
-from typing import List, Dict, Any, Optional
+
+from typing import Any
 from nodes.fetch.sources.base import FetchSourceBase
 
 
 class ExampleCustomSource(FetchSourceBase):
     """Example custom data source."""
-    
+
     @property
     def name(self) -> str:
         return "示例自定义源"
-    
+
     @property
     def description(self) -> str:
         return "这是一个示例数据源，展示如何创建自定义爬虫"
-    
-    def fetch(self, fetch_logs: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+
+    def fetch(self, fetch_logs: list[str] | None = None) -> list[dict[str, Any]]:
         """
         实现你的爬取逻辑。
-        
+
         你可以：
         1. 使用requests抓取网页
         2. 使用BeautifulSoup解析HTML
         3. 使用Selenium处理JavaScript渲染的页面
         4. 调用API获取数据
         5. 读取本地文件
-        
+
         返回标准格式的列表即可。
         """
         # 示例：返回一些模拟数据
@@ -50,7 +51,7 @@ class ExampleCustomSource(FetchSourceBase):
                 "type": "custom",
             },
         ]
-        
+
         return items
 
 

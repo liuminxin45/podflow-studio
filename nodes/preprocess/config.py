@@ -1,4 +1,3 @@
-from typing import Dict, Any
 from pydantic import Field
 from protocol.config_base import NodeConfigBase
 

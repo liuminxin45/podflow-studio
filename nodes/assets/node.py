@@ -1,11 +1,11 @@
 import os
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 from nodes.assets.config import AssetsConfig
 from protocol.node_runner import NodeContext
 
 
-def run(state: Dict[str, Any], config: AssetsConfig = None) -> Dict[str, Any]:
+def run(state: dict[str, Any], config: AssetsConfig = None) -> dict[str, Any]:
     config = config or AssetsConfig()
     ctx = NodeContext("AssetsNode", state)
     ctx.log_start(f"配置: generate_cover={config.generate_cover}, output_dir={config.output_dir}")
@@ -29,18 +29,20 @@ def run(state: Dict[str, Any], config: AssetsConfig = None) -> Dict[str, Any]:
     return ctx.finalize(state)
 
 
-def _generate_cover(episode_id: str, state: Dict, config: AssetsConfig) -> str:
+def _generate_cover(episode_id: str, state: dict, config: AssetsConfig) -> str:
     from PIL import Image, ImageDraw, ImageFont
 
     w, h = config.cover_size
     img = Image.new("RGB", (w, h), color=(30, 30, 60))
     draw = ImageDraw.Draw(img)
 
-    title = state.get("script", {}).get("title", state.get("selected_topic", {}).get("title", "Podcast"))
+    title = state.get("script", {}).get(
+        "title", state.get("selected_topic", {}).get("title", "Podcast")
+    )
 
     try:
         font = ImageFont.truetype("arial.ttf", 60)
-    except (IOError, OSError):
+    except OSError:
         font = ImageFont.load_default()
 
     bbox = draw.textbbox((0, 0), title, font=font)

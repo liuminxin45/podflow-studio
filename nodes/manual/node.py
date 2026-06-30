@@ -1,9 +1,9 @@
-from typing import Dict, Any
+from typing import Any
 from nodes.manual.config import ManualConfig
 from protocol.node_runner import NodeContext
 
 
-def run(state: Dict[str, Any], config: ManualConfig = None) -> Dict[str, Any]:
+def run(state: dict[str, Any], config: ManualConfig = None) -> dict[str, Any]:
     """Manual input node - 灵感收集箱：手动输入素材"""
     config = config or ManualConfig()
     ctx = NodeContext("ManualNode", state)
@@ -34,7 +34,7 @@ def run(state: Dict[str, Any], config: ManualConfig = None) -> Dict[str, Any]:
 
     detail = f"输出: manual_contents={len(manual_contents)} items"
     if manual_contents:
-        sample_titles = [item.get('title', 'Untitled')[:40] for item in manual_contents[:3]]
+        sample_titles = [item.get("title", "Untitled")[:40] for item in manual_contents[:3]]
         detail += f"\n[ManualNode] 样本标题: {sample_titles}"
     ctx.log_end(detail)
     return ctx.finalize(state)

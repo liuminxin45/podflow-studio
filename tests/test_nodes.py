@@ -11,7 +11,6 @@ Run:
     python tests/test_nodes.py
 """
 
-import copy
 import sys
 import os
 from pathlib import Path
@@ -20,12 +19,13 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tests.mock_data import create_state_for_node, create_base_state
+from tests.mock_data import create_base_state, create_state_for_node  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _run_node(node_name: str, state: dict, config=None):
     """Import and run a node, returning the updated state."""
@@ -49,11 +49,13 @@ def _assert_no_crash(state: dict, node_name: str):
 # Fetch Node
 # ---------------------------------------------------------------------------
 
+
 def test_fetch_node_empty():
     """Fetch with no sources configured produces empty fetch_contents."""
     state = create_state_for_node("fetch")
     # Override config to use no sources (empty list prevents any actual fetch)
     from nodes.fetch.config import FetchConfig
+
     config = FetchConfig(enabled_sources=["__nonexistent_source__"])
     result = _run_node("fetch", state, config)
     _assert_no_crash(result, "fetch")
@@ -64,6 +66,7 @@ def test_fetch_node_empty():
 # ---------------------------------------------------------------------------
 # Manual Node
 # ---------------------------------------------------------------------------
+
 
 def test_manual_node_empty():
     """Manual node with no items produces empty manual_contents."""
@@ -76,11 +79,14 @@ def test_manual_node_empty():
 def test_manual_node_with_items():
     """Manual node processes provided news items."""
     from nodes.manual.config import ManualConfig
+
     state = create_state_for_node("manual")
-    config = ManualConfig(news_items=[
-        {"title": "Test News", "content": "Test content body"},
-        {"title": "Another News", "content": "Another content"},
-    ])
+    config = ManualConfig(
+        news_items=[
+            {"title": "Test News", "content": "Test content body"},
+            {"title": "Another News", "content": "Another content"},
+        ]
+    )
     result = _run_node("manual", state, config)
     _assert_no_crash(result, "manual")
     assert len(result["manual_contents"]) == 2
@@ -91,6 +97,7 @@ def test_manual_node_with_items():
 # ---------------------------------------------------------------------------
 # Merge Node
 # ---------------------------------------------------------------------------
+
 
 def test_merge_node():
     """Merge combines fetch + manual contents."""
@@ -115,6 +122,7 @@ def test_merge_node_empty():
 # ---------------------------------------------------------------------------
 # Preprocess Node
 # ---------------------------------------------------------------------------
+
 
 def test_preprocess_node():
     """Preprocess filters and deduplicates raw_contents."""
@@ -141,6 +149,7 @@ def test_preprocess_auto_execute():
 # Research Node
 # ---------------------------------------------------------------------------
 
+
 def test_research_node_no_llm():
     """Research without LLM config passes items through with empty research fields."""
     state = create_state_for_node("research")
@@ -156,6 +165,7 @@ def test_research_node_no_llm():
 # ---------------------------------------------------------------------------
 # Topic Selection Node
 # ---------------------------------------------------------------------------
+
 
 def test_topic_selection_node_cluster():
     """Topic selection with cluster mode produces selected_topic and selected_materials."""
@@ -173,6 +183,7 @@ def test_topic_selection_node_cluster():
 # Script Node (without real LLM — will error but should not crash)
 # ---------------------------------------------------------------------------
 
+
 def test_script_node_no_api():
     """Script node without API key should add an error but not crash."""
     state = create_state_for_node("script")
@@ -181,13 +192,16 @@ def test_script_node_no_api():
     result = _run_node("script", state)
     _assert_no_crash(result, "script")
     # Should have an error about missing API key
-    script_errors = [e for e in result["errors"] if isinstance(e, dict) and e.get("node") == "script"]
+    script_errors = [
+        e for e in result["errors"] if isinstance(e, dict) and e.get("node") == "script"
+    ]
     assert len(script_errors) > 0, "Should report missing API key error"
 
 
 # ---------------------------------------------------------------------------
 # TTS Node (without real TTS — will error but should not crash)
 # ---------------------------------------------------------------------------
+
 
 def test_tts_node_empty_stages():
     """TTS with no stages produces empty audio_segments."""
@@ -200,6 +214,7 @@ def test_tts_node_empty_stages():
 # ---------------------------------------------------------------------------
 # Audio Postprocess Node
 # ---------------------------------------------------------------------------
+
 
 def test_audio_postprocess_no_segments():
     """Audio postprocess with no segments returns gracefully."""
@@ -215,11 +230,14 @@ def test_audio_postprocess_no_segments():
 # Assets Node
 # ---------------------------------------------------------------------------
 
+
 def test_assets_node():
     """Assets node generates a cover image."""
     import tempfile
+
     state = create_state_for_node("assets")
     from nodes.assets.config import AssetsConfig
+
     with tempfile.TemporaryDirectory() as tmpdir:
         config = AssetsConfig(output_dir=tmpdir, generate_cover=True)
         result = _run_node("assets", state, config)
@@ -231,6 +249,7 @@ def test_assets_node_skip_cover():
     """Assets node skips cover when generate_cover=False."""
     state = create_state_for_node("assets")
     from nodes.assets.config import AssetsConfig
+
     config = AssetsConfig(generate_cover=False)
     result = _run_node("assets", state, config)
     _assert_no_crash(result, "assets")
@@ -239,6 +258,7 @@ def test_assets_node_skip_cover():
 # ---------------------------------------------------------------------------
 # Review Node
 # ---------------------------------------------------------------------------
+
 
 def test_review_node():
     """Review node produces review_summary with checks."""
@@ -256,11 +276,14 @@ def test_review_node():
 # Publish Node
 # ---------------------------------------------------------------------------
 
+
 def test_publish_node():
     """Publish node generates RSS and stores files."""
     import tempfile
+
     state = create_state_for_node("publish")
     from nodes.publish.config import PublishConfig
+
     with tempfile.TemporaryDirectory() as tmpdir:
         config = PublishConfig(
             local_base_dir=tmpdir,
@@ -276,9 +299,11 @@ def test_publish_node():
 # NodeContext (protocol/node_runner)
 # ---------------------------------------------------------------------------
 
+
 def test_node_context():
     """NodeContext correctly manages logs, errors, and timing."""
     from protocol.node_runner import NodeContext
+
     state = create_base_state()
     ctx = NodeContext("TestNode", state)
     ctx.log_start("detail info")
@@ -297,12 +322,13 @@ def test_node_context():
 # Runner
 # ---------------------------------------------------------------------------
 
+
 def _run_all():
     """Run all tests without pytest."""
     import traceback
+
     tests = [
-        (name, obj) for name, obj in globals().items()
-        if name.startswith("test_") and callable(obj)
+        (name, obj) for name, obj in globals().items() if name.startswith("test_") and callable(obj)
     ]
     passed = 0
     failed = 0
@@ -315,8 +341,8 @@ def _run_all():
             failed += 1
             print(f"  FAIL  {name}: {e}")
             traceback.print_exc()
-    print(f"\n{'='*60}")
-    print(f"Results: {passed} passed, {failed} failed, {passed+failed} total")
+    print(f"\n{'=' * 60}")
+    print(f"Results: {passed} passed, {failed} failed, {passed + failed} total")
     return 0 if failed == 0 else 1
 
 

@@ -1,10 +1,10 @@
-from typing import Dict, Any, List
+from typing import Any
 from nodes.merge.config import MergeConfig
 from protocol.node_runner import NodeContext
 from protocol.dedup import deduplicate_by_title
 
 
-def run(state: Dict[str, Any], config: MergeConfig = None) -> Dict[str, Any]:
+def run(state: dict[str, Any], config: MergeConfig = None) -> dict[str, Any]:
     """Merge node - 创作素材池：整合 Fetch 与 Manual 两侧的内容"""
     config = config or MergeConfig()
     ctx = NodeContext("MergeNode", state)
@@ -35,9 +35,9 @@ def run(state: Dict[str, Any], config: MergeConfig = None) -> Dict[str, Any]:
         ctx.log(f"Final merged pool: {len(merged)} items")
 
     state["raw_contents"] = merged
-    auto_count = sum(1 for item in merged if item.get('_source_channel') == 'auto')
-    manual_count = sum(1 for item in merged if item.get('_source_channel') == 'manual')
-    ctx.log_end(f"输出: raw_contents={len(merged)} items | auto={auto_count}, manual={manual_count}")
+    auto_count = sum(1 for item in merged if item.get("_source_channel") == "auto")
+    manual_count = sum(1 for item in merged if item.get("_source_channel") == "manual")
+    ctx.log_end(
+        f"输出: raw_contents={len(merged)} items | auto={auto_count}, manual={manual_count}"
+    )
     return ctx.finalize(state)
-
-

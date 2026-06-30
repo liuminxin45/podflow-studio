@@ -1,6 +1,8 @@
-from typing import Dict, Any, List, Iterable, Optional, Tuple
+from typing import Any
+
+from collections.abc import Iterable
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from email.utils import parsedate_to_datetime
 from difflib import SequenceMatcher
 import importlib.util
@@ -9,7 +11,7 @@ import sys
 from nodes.fetch.config import FetchConfig
 
 
-def run(state: Dict[str, Any], config: FetchConfig = None) -> Dict[str, Any]:
+def run(state: dict[str, Any], config: FetchConfig = None) -> dict[str, Any]:
     """Run fetch node with dynamic source loading and discover filters."""
     config = config or FetchConfig()
     logs = state.get("logs", [])
@@ -19,11 +21,13 @@ def run(state: Dict[str, Any], config: FetchConfig = None) -> Dict[str, Any]:
 
     sources_dir = Path(__file__).parent / "sources"
     if not sources_dir.exists():
-        errors.append({
-            "node": "fetch",
-            "message": "Sources directory not found",
-            "detail": f"Directory {sources_dir} does not exist"
-        })
+        errors.append(
+            {
+                "node": "fetch",
+                "message": "Sources directory not found",
+                "detail": f"Directory {sources_dir} does not exist",
+            }
+        )
         state["fetch_contents"] = []
         state["logs"] = logs
         state["errors"] = errors
@@ -40,7 +44,7 @@ def run(state: Dict[str, Any], config: FetchConfig = None) -> Dict[str, Any]:
         state["errors"] = errors
         return state
 
-    all_contents: List[Dict[str, Any]] = []
+    all_contents: list[dict[str, Any]] = []
 
     # breadth controls per-source item cap: 1→20, 2→50, 3→100, 4→200, 5→unlimited
     per_source_cap = {1: 20, 2: 50, 3: 100, 4: 200, 5: 0}.get(config.breadth, 100)
@@ -55,8 +59,10 @@ def run(state: Dict[str, Any], config: FetchConfig = None) -> Dict[str, Any]:
             logs.append(f"[FetchNode] Loading source: {source_name}")
             source_module = _load_source_module(source_name, source_file)
 
-            if not hasattr(source_module, 'source'):
-                logs.append(f"[FetchNode] Warning: Source '{source_name}' has no 'source' instance, skipping")
+            if not hasattr(source_module, "source"):
+                logs.append(
+                    f"[FetchNode] Warning: Source '{source_name}' has no 'source' instance, skipping"
+                )
                 continue
 
             source_instance = source_module.source
@@ -65,7 +71,9 @@ def run(state: Dict[str, Any], config: FetchConfig = None) -> Dict[str, Any]:
             normalized = _normalize_items(items, source_name, logs)
 
             if per_source_cap > 0 and len(normalized) > per_source_cap:
-                logs.append(f"[FetchNode] Capping {source_name} from {len(normalized)} to {per_source_cap} (breadth={config.breadth})")
+                logs.append(
+                    f"[FetchNode] Capping {source_name} from {len(normalized)} to {per_source_cap} (breadth={config.breadth})"
+                )
                 normalized = normalized[:per_source_cap]
             logs.append(f"[FetchNode] Fetched {len(normalized)} valid items from {source_name}")
             all_contents.extend(normalized)
@@ -73,12 +81,9 @@ def run(state: Dict[str, Any], config: FetchConfig = None) -> Dict[str, Any]:
         except Exception as e:
             error_msg = f"Failed to fetch from {source_name}: {str(e)}"
             logs.append(f"[FetchNode] Error: {error_msg}")
-            errors.append({
-                "node": "fetch",
-                "source": source_name,
-                "message": error_msg,
-                "detail": str(e)
-            })
+            errors.append(
+                {"node": "fetch", "source": source_name, "message": error_msg, "detail": str(e)}
+            )
 
     logs.append(f"[FetchNode] Total items fetched: {len(all_contents)}")
 
@@ -100,55 +105,61 @@ def _load_source_module(source_name: str, source_file: Path):
     return module
 
 
-def get_available_sources() -> List[Dict[str, Any]]:
+def get_available_sources() -> list[dict[str, Any]]:
     """Get list of available data sources."""
     sources_dir = Path(__file__).parent / "sources"
-    
+
     if not sources_dir.exists():
         return []
-    
+
     available = []
-    
+
     for source_file in sources_dir.glob("*.py"):
         # 跳过特殊文件
         if source_file.name.startswith("_") or source_file.name in {"base.py", "example_custom.py"}:
             continue
-        
+
         source_name = source_file.stem
-        
+
         try:
             # 尝试加载模块获取元数据
             module = _load_source_module(source_name, source_file)
-            
-            if hasattr(module, 'source'):
+
+            if hasattr(module, "source"):
                 source_instance = module.source
-                available.append({
-                    "id": source_name,
-                    "name": source_instance.name,
-                    "description": source_instance.description,
-                })
+                available.append(
+                    {
+                        "id": source_name,
+                        "name": source_instance.name,
+                        "description": source_instance.description,
+                    }
+                )
             else:
                 # 如果没有source实例，只返回基本信息
-                available.append({
-                    "id": source_name,
-                    "name": source_name,
-                    "description": "No description available",
-                })
+                available.append(
+                    {
+                        "id": source_name,
+                        "name": source_name,
+                        "description": "No description available",
+                    }
+                )
         except Exception as e:
             # 加载失败，返回基本信息
-            available.append({
-                "id": source_name,
-                "name": source_name,
-                "description": f"Error loading: {str(e)}",
-            })
-    
+            available.append(
+                {
+                    "id": source_name,
+                    "name": source_name,
+                    "description": f"Error loading: {str(e)}",
+                }
+            )
+
     return available
 
 
-def _list_sources(sources_dir: Path) -> List[str]:
+def _list_sources(sources_dir: Path) -> list[str]:
     if not sources_dir.exists():
         return []
-    sources: List[str] = []
+    sources: list[str] = []
     for source_file in sources_dir.glob("*.py"):
         if source_file.name.startswith("_") or source_file.name == "base.py":
             continue
@@ -156,7 +167,7 @@ def _list_sources(sources_dir: Path) -> List[str]:
     return sources
 
 
-def _resolve_enabled_sources(config: FetchConfig, available: List[str]) -> List[str]:
+def _resolve_enabled_sources(config: FetchConfig, available: list[str]) -> list[str]:
     available_set = set(available)
     selected = [s for s in config.enabled_sources if s in available_set]
 
@@ -180,8 +191,10 @@ def _breadth_to_source_count(breadth: int, available_count: int) -> int:
     return mapping.get(breadth, min(3, available_count))
 
 
-def _normalize_items(items: Iterable[Any], source_name: str, logs: List[str]) -> List[Dict[str, Any]]:
-    normalized: List[Dict[str, Any]] = []
+def _normalize_items(
+    items: Iterable[Any], source_name: str, logs: list[str]
+) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
     for idx, item in enumerate(items or []):
         if not isinstance(item, dict):
             logs.append(f"[FetchNode] Skipping invalid item at {source_name}[{idx}] (not dict)")
@@ -201,34 +214,44 @@ def _normalize_items(items: Iterable[Any], source_name: str, logs: List[str]) ->
         if not title:
             title = content[:60] + ("..." if len(content) > 60 else "")
 
-        normalized.append({
-            "title": title,
-            "content": content,
-            "url": url,
-            "published": published,
-            "source": source,
-            "type": item_type,
-        })
+        normalized.append(
+            {
+                "title": title,
+                "content": content,
+                "url": url,
+                "published": published,
+                "source": source,
+                "type": item_type,
+            }
+        )
     return normalized
 
 
 def _apply_discover_filters(
-    items: List[Dict[str, Any]],
-    config: FetchConfig,
-    logs: List[str]
-) -> List[Dict[str, Any]]:
+    items: list[dict[str, Any]], config: FetchConfig, logs: list[str]
+) -> list[dict[str, Any]]:
     filtered = list(items)
 
     filtered = _filter_with_log(filtered, logs, "language", lambda i: _match_language(i, config))
-    filtered = _filter_with_log(filtered, logs, "exclude_keywords", lambda i: not _match_exclude(i, config))
+    filtered = _filter_with_log(
+        filtered, logs, "exclude_keywords", lambda i: not _match_exclude(i, config)
+    )
 
     min_len = _quality_min_length(config.quality)
-    filtered = _filter_with_log(filtered, logs, "quality",
-                                lambda i: i.get("type") == "hotlist" or len(i.get("content", "")) >= min_len)
+    filtered = _filter_with_log(
+        filtered,
+        logs,
+        "quality",
+        lambda i: i.get("type") == "hotlist" or len(i.get("content", "")) >= min_len,
+    )
 
     filtered = _filter_with_log(filtered, logs, "freshness", lambda i: _match_freshness(i, config))
-    filtered = _filter_with_log(filtered, logs, "relevance",
-                                lambda i: i.get("type") == "hotlist" or _relevance_score(i, config) >= config.min_relevance)
+    filtered = _filter_with_log(
+        filtered,
+        logs,
+        "relevance",
+        lambda i: i.get("type") == "hotlist" or _relevance_score(i, config) >= config.min_relevance,
+    )
 
     if config.prefer_original:
         filtered = _filter_with_log(filtered, logs, "prefer_original", lambda i: not _is_repost(i))
@@ -266,11 +289,8 @@ def _apply_discover_filters(
 
 
 def _filter_with_log(
-    items: List[Dict[str, Any]],
-    logs: List[str],
-    label: str,
-    predicate
-) -> List[Dict[str, Any]]:
+    items: list[dict[str, Any]], logs: list[str], label: str, predicate
+) -> list[dict[str, Any]]:
     before = len(items)
     filtered = [item for item in items if predicate(item)]
     removed = before - len(filtered)
@@ -284,7 +304,7 @@ def _quality_min_length(quality: int) -> int:
     return mapping.get(quality, 100)
 
 
-def _match_language(item: Dict[str, Any], config: FetchConfig) -> bool:
+def _match_language(item: dict[str, Any], config: FetchConfig) -> bool:
     if config.language_mix == "mixed":
         return True
     text = _normalize_text(item)
@@ -302,14 +322,14 @@ def _match_language(item: Dict[str, Any], config: FetchConfig) -> bool:
     return True
 
 
-def _match_exclude(item: Dict[str, Any], config: FetchConfig) -> bool:
+def _match_exclude(item: dict[str, Any], config: FetchConfig) -> bool:
     if not config.exclude_keywords:
         return False
     text = _normalize_text(item)
     return any(kw.strip().lower() in text for kw in config.exclude_keywords if kw.strip())
 
 
-def _relevance_score(item: Dict[str, Any], config: FetchConfig) -> int:
+def _relevance_score(item: dict[str, Any], config: FetchConfig) -> int:
     text = _normalize_text(item)
     topic_words = _tokenize(config.topic)
     keywords = [kw.strip().lower() for kw in config.keywords if kw.strip()]
@@ -337,15 +357,15 @@ def _relevance_score(item: Dict[str, Any], config: FetchConfig) -> int:
     return score
 
 
-def _match_freshness(item: Dict[str, Any], config: FetchConfig) -> bool:
+def _match_freshness(item: dict[str, Any], config: FetchConfig) -> bool:
     if config.freshness <= 1:
         return True
     published = _parse_datetime(item.get("published"))
     if not published:
         return True
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if published.tzinfo is None:
-        published = published.replace(tzinfo=timezone.utc)
+        published = published.replace(tzinfo=UTC)
     delta_hours = (now - published).total_seconds() / 3600
     if config.freshness >= 5:
         return delta_hours <= 6
@@ -358,14 +378,14 @@ def _match_freshness(item: Dict[str, Any], config: FetchConfig) -> bool:
     return True
 
 
-def _parse_datetime(value: Any) -> Optional[datetime]:
+def _parse_datetime(value: Any) -> datetime | None:
     if not value:
         return None
     if isinstance(value, datetime):
         return value
     if isinstance(value, (int, float)):
         try:
-            return datetime.fromtimestamp(value, tz=timezone.utc)
+            return datetime.fromtimestamp(value, tz=UTC)
         except Exception:
             return None
     if isinstance(value, str):
@@ -383,16 +403,16 @@ def _parse_datetime(value: Any) -> Optional[datetime]:
     return None
 
 
-def _is_repost(item: Dict[str, Any]) -> bool:
+def _is_repost(item: dict[str, Any]) -> bool:
     text = _normalize_text(item)
     if "转载" in text or "repost" in text:
         return True
     return False
 
 
-def _deduplicate(items: List[Dict[str, Any]], threshold: float) -> List[Dict[str, Any]]:
-    unique: List[Dict[str, Any]] = []
-    titles: List[str] = []
+def _deduplicate(items: list[dict[str, Any]], threshold: float) -> list[dict[str, Any]]:
+    unique: list[dict[str, Any]] = []
+    titles: list[str] = []
     for item in items:
         title = _normalize_title(item.get("title", ""))
         if not title:
@@ -405,9 +425,11 @@ def _deduplicate(items: List[Dict[str, Any]], threshold: float) -> List[Dict[str
     return unique
 
 
-def _detect_events(items: List[Dict[str, Any]], threshold: float, logs: List[str]) -> List[Dict[str, Any]]:
+def _detect_events(
+    items: list[dict[str, Any]], threshold: float, logs: list[str]
+) -> list[dict[str, Any]]:
     """Cluster items about the same event across sources, tag them with _event_id and _event_size."""
-    events: List[Tuple[str, List[int]]] = []  # (representative_title, [indices])
+    events: list[tuple[str, list[int]]] = []  # (representative_title, [indices])
     for idx, item in enumerate(items):
         key = _normalize_title(item.get("title", ""))
         if not key:
@@ -439,8 +461,8 @@ def _detect_events(items: List[Dict[str, Any]], threshold: float, logs: List[str
     return items
 
 
-def _group_by_topic(items: List[Dict[str, Any]], threshold: float) -> List[Dict[str, Any]]:
-    groups: List[Tuple[str, List[Dict[str, Any]]]] = []
+def _group_by_topic(items: list[dict[str, Any]], threshold: float) -> list[dict[str, Any]]:
+    groups: list[tuple[str, list[dict[str, Any]]]] = []
     for item in items:
         key = _normalize_title(item.get("title", ""))
         placed = False
@@ -453,7 +475,7 @@ def _group_by_topic(items: List[Dict[str, Any]], threshold: float) -> List[Dict[
         if not placed:
             groups.append((key, [item]))
 
-    grouped: List[Dict[str, Any]] = []
+    grouped: list[dict[str, Any]] = []
     for key, group_items in groups:
         representative = dict(group_items[0])
         if len(group_items) > 1:
@@ -462,23 +484,23 @@ def _group_by_topic(items: List[Dict[str, Any]], threshold: float) -> List[Dict[
     return grouped
 
 
-def _sort_items(items: List[Dict[str, Any]], config: FetchConfig) -> List[Dict[str, Any]]:
+def _sort_items(items: list[dict[str, Any]], config: FetchConfig) -> list[dict[str, Any]]:
     if not items:
         return items
 
-    trend_counts: Dict[str, int] = {}
+    trend_counts: dict[str, int] = {}
     for item in items:
         key = _normalize_title(item.get("title", ""))
         trend_counts[key] = trend_counts.get(key, 0) + 1
 
-    def score(item: Dict[str, Any]) -> Tuple[float, float]:
+    def score(item: dict[str, Any]) -> tuple[float, float]:
         rel = _relevance_score(item, config)
         published = _parse_datetime(item.get("published"))
         recency = 0.0
         if published:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             if published.tzinfo is None:
-                published = published.replace(tzinfo=timezone.utc)
+                published = published.replace(tzinfo=UTC)
             hours = (now - published).total_seconds() / 3600
             if hours < 6:
                 recency = 30
@@ -496,14 +518,14 @@ def _sort_items(items: List[Dict[str, Any]], config: FetchConfig) -> List[Dict[s
     return sorted(items, key=score, reverse=True)
 
 
-def _match_keywords(item: Dict[str, Any], config: FetchConfig) -> bool:
+def _match_keywords(item: dict[str, Any], config: FetchConfig) -> bool:
     if not config.keywords:
         return False
     text = _normalize_text(item)
     return any(kw.strip().lower() in text for kw in config.keywords if kw.strip())
 
 
-def _normalize_text(item: Dict[str, Any]) -> str:
+def _normalize_text(item: dict[str, Any]) -> str:
     return f"{item.get('title', '')} {item.get('content', '')}".lower()
 
 
@@ -523,7 +545,7 @@ def _extract_summary(content: str, max_len: int = 200) -> str:
     for sep in ["。", "！", "？", ". ", "! ", "? ", "\n\n", "\n"]:
         pos = text.find(sep)
         if 0 < pos <= max_len:
-            return text[:pos + len(sep)].strip()
+            return text[: pos + len(sep)].strip()
     # Fall back to word boundary near max_len
     if len(text) <= max_len:
         return text
@@ -536,18 +558,33 @@ def _extract_summary(content: str, max_len: int = 200) -> str:
     return cut.strip() + "…"
 
 
-def _tokenize(text: str) -> List[str]:
+def _tokenize(text: str) -> list[str]:
     if not text:
         return []
     tokens = re.split(r"[,，、\s]+", text.lower())
 
     short_allow = {"ai", "ml", "llm", "ar", "vr", "5g"}
     stopwords = {
-        "the", "and", "for", "with", "from", "that", "this", "into", "about",
-        "关注", "方向", "相关", "新闻", "资讯", "话题", "今天", "最新",
+        "the",
+        "and",
+        "for",
+        "with",
+        "from",
+        "that",
+        "this",
+        "into",
+        "about",
+        "关注",
+        "方向",
+        "相关",
+        "新闻",
+        "资讯",
+        "话题",
+        "今天",
+        "最新",
     }
 
-    cleaned: List[str] = []
+    cleaned: list[str] = []
     for token in tokens:
         t = token.strip("._-:;!?()[]{}\"'`“”‘’")
         if not t or t in stopwords:

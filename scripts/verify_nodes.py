@@ -7,12 +7,10 @@ Validates output structure and error handling.
 """
 
 import sys
-import io
 import json
 import subprocess
 import os
 from pathlib import Path
-from typing import Dict, Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -25,18 +23,25 @@ if hasattr(sys.stderr, "reconfigure"):
 
 NODES = [
     # discover
-    'fetch', 'manual', 'merge',
+    "fetch",
+    "manual",
+    "merge",
     # organize
-    'preprocess',
+    "preprocess",
     # ideate
-    'research', 'topic_selection',
+    "research",
+    "topic_selection",
     # write
-    'script',
+    "script",
     # produce
-    'tts', 'audio_postprocess', 'assets',
+    "tts",
+    "audio_postprocess",
+    "assets",
     # publish
-    'review', 'publish',
+    "review",
+    "publish",
 ]
+
 
 def test_node(node_name: str) -> bool:
     """Test a single node with minimal input."""
@@ -65,7 +70,7 @@ def test_node(node_name: str) -> bool:
         "review_summary": {},
         "storage_info": {},
         "rss_path": "",
-        "publish_status": {}
+        "publish_status": {},
     }
     try:
         env = {
@@ -74,7 +79,7 @@ def test_node(node_name: str) -> bool:
             "PYTHONIOENCODING": "utf-8",
         }
         proc = subprocess.run(
-            [sys.executable, '-m', f'nodes.{node_name}'],
+            [sys.executable, "-m", f"nodes.{node_name}"],
             input=json.dumps(test_state),
             capture_output=True,
             text=True,
@@ -84,27 +89,29 @@ def test_node(node_name: str) -> bool:
             cwd=PROJECT_ROOT,
             env=env,
         )
-        
+
         if proc.returncode != 0:
             print(f"❌ {node_name}: Exit code {proc.returncode}")
             print(f"   stderr: {proc.stderr[:200]}")
             return False
-        
+
         try:
             result = json.loads(proc.stdout)
-            
+
             if not isinstance(result, dict):
                 print(f"❌ {node_name}: Output is not a dict")
                 return False
-            
-            required_fields = ['logs', 'errors']
+
+            required_fields = ["logs", "errors"]
             missing = [f for f in required_fields if f not in result]
             if missing:
                 print(f"⚠️  {node_name}: Missing fields: {missing}")
-            
-            if result.get('errors') and len(result['errors']) > 0:
-                print(f"⚠️  {node_name}: Completed with errors: {result['errors'][0].get('message', 'Unknown')}")
-            
+
+            if result.get("errors") and len(result["errors"]) > 0:
+                print(
+                    f"⚠️  {node_name}: Completed with errors: {result['errors'][0].get('message', 'Unknown')}"
+                )
+
             print(f"✅ {node_name}: OK")
             return True
         except json.JSONDecodeError as e:
@@ -112,7 +119,7 @@ def test_node(node_name: str) -> bool:
             print(f"   Error: {e}")
             print(f"   stdout: {proc.stdout[:200]}")
             return False
-            
+
     except subprocess.TimeoutExpired:
         print(f"❌ {node_name}: Timeout")
         return False
@@ -126,17 +133,17 @@ def main():
     print("Node Verification Test")
     print("=" * 60)
     print()
-    
+
     results = {}
     for node in NODES:
         results[node] = test_node(node)
-    
+
     print()
     print("=" * 60)
     passed = sum(results.values())
     total = len(results)
     print(f"Results: {passed}/{total} passed")
-    
+
     if passed == total:
         print("✅ All nodes verified successfully!")
         sys.exit(0)

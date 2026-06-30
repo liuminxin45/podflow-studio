@@ -3,12 +3,12 @@ import asyncio
 import json
 import urllib.request
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 from nodes.tts.config import TTSConfig
 from protocol.node_runner import NodeContext
 
 
-def run(state: Dict[str, Any], config: TTSConfig = None) -> Dict[str, Any]:
+def run(state: dict[str, Any], config: TTSConfig = None) -> dict[str, Any]:
     config = config or TTSConfig()
     ctx = NodeContext("TTSNode", state)
 
@@ -76,6 +76,7 @@ def _normalize_output_format(output_format: str) -> str:
 
 async def _synthesize_edge_tts(text: str, voice: str, filepath: str, config: TTSConfig) -> None:
     import edge_tts
+
     communicate = edge_tts.Communicate(text, voice, rate=config.rate, volume=config.volume)
     await communicate.save(filepath)
 

@@ -1,9 +1,9 @@
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 from nodes.audio_postprocess.config import AudioPostprocessConfig
 
 
-def run(state: Dict[str, Any], config: AudioPostprocessConfig = None) -> Dict[str, Any]:
+def run(state: dict[str, Any], config: AudioPostprocessConfig = None) -> dict[str, Any]:
     config = config or AudioPostprocessConfig()
     logs = state.get("logs", [])
     errors = state.get("errors", [])
@@ -24,6 +24,7 @@ def run(state: Dict[str, Any], config: AudioPostprocessConfig = None) -> Dict[st
             return state
 
         from pydub import AudioSegment
+
         combined = AudioSegment.empty()
         used_segments = []
         for item in segments:
@@ -38,7 +39,9 @@ def run(state: Dict[str, Any], config: AudioPostprocessConfig = None) -> Dict[st
                 logs.append(f"[AudioPostprocessNode] Missing segment skipped: {seg_path}")
 
         if not used_segments or len(combined) == 0:
-            raise RuntimeError("No readable audio segments found. Check TTS output, recording files, and ffmpeg installation.")
+            raise RuntimeError(
+                "No readable audio segments found. Check TTS output, recording files, and ffmpeg installation."
+            )
 
         output_path = str(Path(config.output_dir) / f"{episode_id}.{config.output_format}")
         combined.export(output_path, format=config.output_format)
@@ -51,7 +54,7 @@ def run(state: Dict[str, Any], config: AudioPostprocessConfig = None) -> Dict[st
             "source_segments": used_segments,
             "file_size": Path(output_path).stat().st_size if Path(output_path).exists() else 0,
         }
-        logs.append(f"[AudioPostprocessNode] Output: {output_path} ({len(combined)/1000:.1f}s)")
+        logs.append(f"[AudioPostprocessNode] Output: {output_path} ({len(combined) / 1000:.1f}s)")
     except Exception as e:
         errors.append({"node": "audio_postprocess", "message": str(e), "detail": str(e)})
 

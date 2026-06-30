@@ -18,7 +18,7 @@ setup_utf8_output()
 def test_fetch_node():
     """Test fetch node with mock data"""
     print_info("Testing fetch node...")
-    
+
     state = create_state_for_node("fetch")
 
     config = FetchConfig(enabled_sources=["example_custom"], max_articles=10)
@@ -45,5 +45,6 @@ if __name__ == "__main__":
     except Exception as e:
         print_error(f"Test error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

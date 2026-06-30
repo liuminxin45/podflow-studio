@@ -11,6 +11,7 @@ Usage:
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tests.mock_data import create_base_state, create_mock_raw_contents
@@ -67,38 +68,56 @@ def test_full_pipeline_no_external_services():
 
     # ---- 3. Merge ----
     state = merge_run(state)
-    check("merge", len(state.get("raw_contents", [])) > 0,
-          f"raw_contents={len(state.get('raw_contents', []))}")
+    check(
+        "merge",
+        len(state.get("raw_contents", [])) > 0,
+        f"raw_contents={len(state.get('raw_contents', []))}",
+    )
 
     # ---- 4. Preprocess ----
     state = preprocess_run(state)
-    check("preprocess", len(state.get("cleaned_contents", [])) > 0,
-          f"cleaned={len(state.get('cleaned_contents', []))}")
+    check(
+        "preprocess",
+        len(state.get("cleaned_contents", [])) > 0,
+        f"cleaned={len(state.get('cleaned_contents', []))}",
+    )
 
     # ---- 5. Research (no LLM — basic passthrough mode) ----
     state = research_run(state)
-    check("research", len(state.get("researched_contents", [])) > 0,
-          f"researched={len(state.get('researched_contents', []))}")
+    check(
+        "research",
+        len(state.get("researched_contents", [])) > 0,
+        f"researched={len(state.get('researched_contents', []))}",
+    )
 
     # ---- 6. Topic Selection (cluster mode, no LLM) ----
     state = topic_selection_run(state)
-    check("topic_selection",
-          state.get("selected_topic", {}).get("title", "") != "",
-          f"topic='{state.get('selected_topic', {}).get('title', '')}'")
-    check("topic_selection_materials",
-          len(state.get("selected_materials", [])) > 0,
-          f"materials={len(state.get('selected_materials', []))}")
+    check(
+        "topic_selection",
+        state.get("selected_topic", {}).get("title", "") != "",
+        f"topic='{state.get('selected_topic', {}).get('title', '')}'",
+    )
+    check(
+        "topic_selection_materials",
+        len(state.get("selected_materials", [])) > 0,
+        f"materials={len(state.get('selected_materials', []))}",
+    )
 
     # ---- 7. Script (no API key — should error gracefully) ----
     state = script_run(state)
     # Script node adds error when no API key, but doesn't crash
-    script_errors = [e for e in state.get("errors", []) if isinstance(e, dict) and e.get("node") == "script"]
-    check("script (no api, graceful)",
-          len(script_errors) > 0 or state.get("script", {}).get("title", "") != "",
-          f"errors={len(script_errors)}, script.title='{state.get('script', {}).get('title', '')}'")
+    script_errors = [
+        e for e in state.get("errors", []) if isinstance(e, dict) and e.get("node") == "script"
+    ]
+    check(
+        "script (no api, graceful)",
+        len(script_errors) > 0 or state.get("script", {}).get("title", "") != "",
+        f"errors={len(script_errors)}, script.title='{state.get('script', {}).get('title', '')}'",
+    )
 
     # ---- Inject mock script/stages for downstream nodes ----
     from tests.mock_data import create_mock_script, create_mock_stages
+
     state["script"] = create_mock_script()
     state["stages"] = create_mock_stages()
 
@@ -113,6 +132,7 @@ def test_full_pipeline_no_external_services():
 
     # ---- 10. Assets (skip cover generation flag) ----
     from nodes.assets.config import AssetsConfig
+
     assets_config = AssetsConfig(skip_cover=True)
     state = assets_run(state, config=assets_config)
     check("assets (skip_cover)", True)
@@ -120,8 +140,11 @@ def test_full_pipeline_no_external_services():
     # ---- 11. Review ----
     state["final_audio_path"] = "out/episodes/test_ep_001.mp3"
     state = review_run(state)
-    check("review", "review_summary" in state,
-          f"review_summary keys={list(state.get('review_summary', {}).keys())}")
+    check(
+        "review",
+        "review_summary" in state,
+        f"review_summary keys={list(state.get('review_summary', {}).keys())}",
+    )
 
     # ---- 12. Publish ----
     state = publish_run(state)
@@ -143,26 +166,26 @@ def test_manifest_tracking():
     manifest = PipelineManifest.load(state)
 
     check("manifest_exists", state.get("_manifest") is not None)
-    check("manifest_has_nodes", len(manifest.nodes) > 0,
-          f"nodes={list(manifest.nodes.keys())}")
+    check("manifest_has_nodes", len(manifest.nodes) > 0, f"nodes={list(manifest.nodes.keys())}")
 
     # Check that completed nodes are tracked
     completed = manifest.completed_nodes()
-    check("manifest_completed", "preprocess" in completed,
-          f"completed={completed}")
+    check("manifest_completed", "preprocess" in completed, f"completed={completed}")
 
     # Check resume index — fetch was mock-injected (no NodeContext), so manifest
     # has manual/merge/preprocess but not fetch. resume_index correctly returns 0.
     # Verify against a sub-pipeline starting from manual:
     sub_pipeline = ["manual", "merge", "preprocess", "research", "topic_selection"]
     sub_idx = manifest.resume_index(sub_pipeline)
-    check("manifest_resume_index", sub_idx == 3,
-          f"sub_resume_index={sub_idx}, next={sub_pipeline[sub_idx] if sub_idx < len(sub_pipeline) else 'END'}")
+    check(
+        "manifest_resume_index",
+        sub_idx == 3,
+        f"sub_resume_index={sub_idx}, next={sub_pipeline[sub_idx] if sub_idx < len(sub_pipeline) else 'END'}",
+    )
 
     # Check last completed node
     last = manifest.last_completed_node()
-    check("manifest_last_completed", last is not None,
-          f"last={last}")
+    check("manifest_last_completed", last is not None, f"last={last}")
 
 
 def test_manifest_resume_detection():
@@ -184,13 +207,15 @@ def test_manifest_resume_detection():
 
     # Should resume from preprocess (first non-ok node)
     completed = manifest.completed_nodes()
-    check("resume_skips_error", "preprocess" not in completed,
-          f"completed={completed}")
+    check("resume_skips_error", "preprocess" not in completed, f"completed={completed}")
 
     idx = manifest.resume_index()
     expected_node = "preprocess"
-    check("resume_index_correct", PIPELINE_ORDER[idx] == expected_node,
-          f"resume_from={PIPELINE_ORDER[idx]}, expected={expected_node}")
+    check(
+        "resume_index_correct",
+        PIPELINE_ORDER[idx] == expected_node,
+        f"resume_from={PIPELINE_ORDER[idx]}, expected={expected_node}",
+    )
 
 
 # ============================================================

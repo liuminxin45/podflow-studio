@@ -4,6 +4,7 @@ from protocol.config_base import NodeConfigBase, LLMConfigMixin
 
 class TopicSelectionConfig(NodeConfigBase, LLMConfigMixin):
     """Topic selection node configuration."""
+
     temperature: float = Field(default=0.3, ge=0.0, le=2.0, description="LLM temperature")
     min_cluster_size: int = Field(default=3, ge=1, le=20, description="最小聚类大小")
     max_topics: int = Field(default=1, ge=1, le=10, description="最大主题数")

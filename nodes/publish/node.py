@@ -2,15 +2,15 @@ import os
 import json
 import shutil
 import mimetypes
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from email.utils import format_datetime
 from html import escape
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 from nodes.publish.config import PublishConfig
 
 
-def run(state: Dict[str, Any], config: PublishConfig = None) -> Dict[str, Any]:
+def run(state: dict[str, Any], config: PublishConfig = None) -> dict[str, Any]:
     config = config or PublishConfig()
     logs = state.get("logs", [])
     errors = state.get("errors", [])
@@ -49,7 +49,11 @@ def run(state: Dict[str, Any], config: PublishConfig = None) -> Dict[str, Any]:
                 json.dump(meta, f, ensure_ascii=False, indent=2)
             stored_files["metadata"] = meta_path
 
-        state["storage_info"] = {"type": config.storage_type, "base_dir": episode_dir, "files": stored_files}
+        state["storage_info"] = {
+            "type": config.storage_type,
+            "base_dir": episode_dir,
+            "files": stored_files,
+        }
         logs.append(f"[PublishNode] Stored: {episode_dir}")
     except Exception as e:
         errors.append({"node": "publish", "message": f"Storage failed: {str(e)}", "detail": str(e)})
@@ -71,7 +75,7 @@ def run(state: Dict[str, Any], config: PublishConfig = None) -> Dict[str, Any]:
             "rss_generated": True,
             "rss_path": rss_path,
             "storage_dir": state.get("storage_info", {}).get("base_dir", ""),
-            "published_at": datetime.now(timezone.utc).isoformat(),
+            "published_at": datetime.now(UTC).isoformat(),
             "platforms": {"local": "success", "rss": "success"},
         }
         logs.append(f"[PublishNode] RSS: {rss_path}")
@@ -83,7 +87,7 @@ def run(state: Dict[str, Any], config: PublishConfig = None) -> Dict[str, Any]:
     return state
 
 
-def _generate_rss(state: Dict, config: PublishConfig) -> str:
+def _generate_rss(state: dict, config: PublishConfig) -> str:
     script = state.get("script", {})
     title = script.get("title", config.podcast_title)
     desc = script.get("description", config.podcast_description)
@@ -119,10 +123,10 @@ def _format_pub_date(value: str) -> str:
     try:
         dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
         return format_datetime(dt)
     except Exception:
-        return format_datetime(datetime.now(timezone.utc))
+        return format_datetime(datetime.now(UTC))
 
 
 def _format_duration(value: Any) -> str:
