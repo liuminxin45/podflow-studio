@@ -44,6 +44,54 @@ def test_episode_run_payload_validates_with_model():
     assert ok, errors
 
 
+def test_episode_run_accepts_versioned_production_plan():
+    state = create_base_state()
+    state["production_plan"] = {
+        "version": 1,
+        "script_hash": "script-hash",
+        "clips": [{
+            "id": "seg_001__001",
+            "parent_segment_id": "seg_001",
+            "segment_type": "opening",
+            "segment_title": "开场",
+            "text": "欢迎收听。",
+            "speaker": "Host A",
+            "source_fact_ids": [],
+            "source": "tts",
+            "path": "",
+            "duration_seconds": 0,
+            "trim_start_ms": 0,
+            "trim_end_ms": 0,
+            "generation_key": "",
+        }],
+        "joins": [],
+        "music": {
+            name: {
+                "enabled": False,
+                "path": "",
+                "volume": 0.15,
+                "duration_ms": 1500 if name == "transition" else 5000,
+                "fade_in_ms": 150 if name == "transition" else 500,
+                "fade_out_ms": 300 if name == "transition" else 1000,
+            }
+            for name in ("intro", "transition", "bed", "outro")
+        },
+        "render": {
+            "output_format": "mp3",
+            "normalize_loudness": True,
+            "target_lufs": -16,
+            "true_peak_db": -1,
+        },
+        "updated_at": "2026-07-19T00:00:00Z",
+    }
+
+    ok, errors = validate_episode_run_payload(state)
+    schema_errors = list(Draft202012Validator(_episode_run_schema()).iter_errors(state))
+
+    assert ok, errors
+    assert schema_errors == []
+
+
 def test_episode_run_accepts_legacy_publish_platform_metadata():
     state = create_base_state()
     state["publish_outputs"]["enabled_platforms"] = ["rss", "apple"]

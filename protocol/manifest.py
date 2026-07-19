@@ -51,7 +51,7 @@ NODE_OUTPUT_KEYS: dict[str, list[str]] = {
         "downstream_stale",
         "run_report",
     ],
-    "tts": ["voice_segments"],
+    "tts": ["voice_segments", "production_plan"],
     "audio_postprocess": ["audio_outputs"],
     "assets": ["cover_path"],
     "review": ["review_summary"],

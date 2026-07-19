@@ -103,6 +103,7 @@ declare global {
       mimeType?: string
       dataUrl?: string
     }>
+    selectAudioFile: () => Promise<{ success: boolean; canceled?: boolean; path?: string }>
     onWorkflowUpdate: (callback: (data: Workflow | null) => void) => (() => void) | void
     onNeedApproval: (callback: (data: any) => void) => (() => void) | void
     saveNodeConfig: (nodeName: string, config: Record<string, any>) => Promise<{ success: boolean; error?: string }>

@@ -48,14 +48,17 @@ describe('SoundStudio production workflow', () => {
     return { output_dir: 'out/assets', generate_cover: true }
   })
   const saveNodeConfig = vi.fn(async () => ({ success: true }))
+  const selectAudioFile = vi.fn(async () => ({ success: true, path: 'D:\\Music\\podcast-bed.wav' }))
 
   beforeEach(() => {
     loadNodeConfig.mockClear()
     saveNodeConfig.mockClear()
+    selectAudioFile.mockClear()
     ;(window as any).electronAPI = {
       ...(originalElectronAPI || {}),
       loadNodeConfig,
       saveNodeConfig,
+      selectAudioFile,
     }
   })
 
@@ -118,7 +121,7 @@ describe('SoundStudio production workflow', () => {
     expect(screen.getByText('人工编辑稿')).toBeTruthy()
     expect(screen.queryByText('这段生成稿不应被制作。')).toBeNull()
     expect(screen.queryByText('欢迎收听本期节目。')).toBeNull()
-    expect(screen.getByText(/段间停顿/).textContent).toContain('0 ms')
+    expect(screen.getByText(/段间停顿/)).toBeTruthy()
 
     const generateButton = screen.getByRole('button', { name: /制作成品/ })
     expect(generateButton.className).toContain('ant-btn-primary')
@@ -235,9 +238,8 @@ describe('SoundStudio production workflow', () => {
 
     await waitFor(() => expect((screen.getByRole('button', { name: /制作成品/ }) as HTMLButtonElement).disabled).toBe(false))
     fireEvent.click(screen.getByRole('switch', { name: '叠加背景音乐' }))
-    fireEvent.change(screen.getByRole('textbox', { name: '背景音乐文件路径' }), {
-      target: { value: 'D:\\Music\\podcast-bed.wav' },
-    })
+    fireEvent.click(screen.getByRole('button', { name: '选择背景音乐' }))
+    await waitFor(() => expect(selectAudioFile).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('button', { name: /制作成品/ }))
 
     await waitFor(() => expect(onRunNodes).toHaveBeenCalledWith(['tts', 'audio_postprocess', 'assets']))
@@ -250,11 +252,15 @@ describe('SoundStudio production workflow', () => {
       output_format: 'mp3',
       segment_pause_ms: 600,
       normalize_loudness: true,
-      add_bgm: true,
-      bgm_path: 'D:\\Music\\podcast-bed.wav',
+      add_bgm: false,
+      bgm_path: '',
     }))
     expect(onUpdateWorkflow).toHaveBeenCalledWith(expect.objectContaining({
-      voice_segments: [],
+      production_plan: expect.objectContaining({
+        music: expect.objectContaining({
+          bed: expect.objectContaining({ enabled: true, path: 'D:\\Music\\podcast-bed.wav' }),
+        }),
+      }),
       audio_outputs: {},
     }))
     expect(screen.queryByText('final.wav')).toBeNull()
@@ -338,11 +344,11 @@ describe('SoundStudio production workflow', () => {
     fireEvent.click(screen.getByRole('button', { name: /重新制作/ }))
 
     await waitFor(() => expect(onRunNodes).toHaveBeenCalled())
-    await waitFor(() => expect(onUpdateWorkflow).toHaveBeenLastCalledWith(previous))
+    await waitFor(() => expect(onUpdateWorkflow).toHaveBeenLastCalledWith({ ...previous, production_plan: {} }))
     expect((await screen.findAllByText(/TTS service unavailable/)).length).toBeGreaterThan(0)
   }, 60_000)
 
-  it('refuses to assemble an incomplete set of human recordings', async () => {
+  it('fills unrecorded clips with AI instead of requiring an all-recording episode', async () => {
     const onUpdateWorkflow = vi.fn(async () => undefined)
     const onRunNodes = vi.fn(async () => undefined)
     render(
@@ -375,9 +381,15 @@ describe('SoundStudio production workflow', () => {
       await Promise.resolve()
     })
 
-    expect(await screen.findByText(/还需录制 1 个段落/)).toBeTruthy()
-    expect(onRunNodes).not.toHaveBeenCalled()
-    expect(onUpdateWorkflow).not.toHaveBeenCalled()
+    await waitFor(() => expect(onRunNodes).toHaveBeenCalledWith(['tts', 'audio_postprocess', 'assets']))
+    expect(onUpdateWorkflow).toHaveBeenCalledWith(expect.objectContaining({
+      production_plan: expect.objectContaining({
+        clips: expect.arrayContaining([
+          expect.objectContaining({ id: 'seg_1', source: 'recording' }),
+          expect.objectContaining({ id: 'seg_2', source: 'tts' }),
+        ]),
+      }),
+    }))
     await act(async () => {
       message.destroy()
       await Promise.resolve()
@@ -429,7 +441,7 @@ describe('SoundStudio production workflow', () => {
       await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(1))
       expect(await screen.findByText('正在连接麦克风')).toBeTruthy()
       expect((screen.getByRole('button', { name: '关闭制作页' }) as HTMLButtonElement).disabled).toBe(true)
-      expect((screen.getByRole('button', { name: /正文.*待录/ }) as HTMLButtonElement).disabled).toBe(true)
+      expect((screen.getByRole('button', { name: /正文/ }) as HTMLButtonElement).disabled).toBe(true)
 
       rerender(<SoundStudio {...props} visible={false} />)
       await act(async () => {

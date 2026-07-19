@@ -155,6 +155,7 @@ function createInitialState(episodeId, runtimeConfig) {
     script_snapshots: [],
     downstream_stale: {},
     voice_segments: [],
+    production_plan: {},
     audio_outputs: {},
     cover_path: '',
     intro_outro_paths: {},
@@ -175,7 +176,7 @@ const CURRENT_STATE_KEYS = new Set([
   'logs', 'errors', 'fetch_contents', 'cleaned_contents', 'researched_contents', 'facts',
   'selected_topic', 'selected_topics', 'selected_materials', 'auto_selected_items',
   'auto_rejected_items', 'script', 'edited_script', 'generation_request', 'generation_meta',
-  'script_snapshots', 'downstream_stale', 'voice_segments', 'audio_outputs', 'cover_path',
+  'script_snapshots', 'downstream_stale', 'voice_segments', 'production_plan', 'audio_outputs', 'cover_path',
   'intro_outro_paths', 'review_summary', 'publish_outputs', 'subtitle_path', 'run_report',
   'discover_meta', 'discover_ui', 'organize_ui', 'episode_brief', 'writing_meta', '_manifest',
 ])
@@ -204,7 +205,7 @@ function normalizeWorkflow(workflow) {
 
   return {
     id: String(workflow.id || Date.now()),
-    state,
+    state: { ...state, production_plan: state.production_plan || {} },
     status: workflow.status || 'draft',
     currentNode: workflow.currentNode || null,
     nodeExecutions: workflow.nodeExecutions || {},
@@ -1092,6 +1093,21 @@ ipcMain.handle('file:showItemInFolder', async (event, targetPath) => {
 
 ipcMain.handle('file:readImageAsDataUrl', async (event, targetPath) => {
   return fileService.readImageAsDataUrl(targetPath)
+})
+
+ipcMain.handle('file:selectAudio', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择音频文件',
+    properties: ['openFile'],
+    filters: [{
+      name: '音频文件',
+      extensions: ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'opus', 'webm'],
+    }],
+  })
+  if (result.canceled || !result.filePaths?.[0]) {
+    return { success: false, canceled: true }
+  }
+  return { success: true, path: result.filePaths[0] }
 })
 
 ipcMain.handle('config:save', async (event, nodeName, config) => {

@@ -13,6 +13,11 @@ from typing import Any
 from nodes.tts.config import TTSConfig
 from protocol.node_runner import NodeContext
 from protocol.path_utils import safe_path_part as _safe_path_part
+from protocol.production_plan import (
+    build_production_plan,
+    update_plan_clip,
+    voice_generation_key,
+)
 
 
 def run(state: dict[str, Any], config: TTSConfig = None) -> dict[str, Any]:
@@ -21,10 +26,17 @@ def run(state: dict[str, Any], config: TTSConfig = None) -> dict[str, Any]:
 
     script = state.get("edited_script")
     script_segments = script.get("segments", []) if isinstance(script, dict) else []
-    # A failed regeneration must not leave a previous run looking current.
+    previous_voice_segments = [
+        segment for segment in state.get("voice_segments", []) if isinstance(segment, dict)
+    ]
+    production_plan = build_production_plan(script_segments, state.get("production_plan"))
+    state["production_plan"] = production_plan
     state["voice_segments"] = []
 
-    ctx.log_start(f"Starting TTS conversion | source=edited_script, segments={len(script_segments)}")
+    ctx.log_start(
+        f"Starting TTS conversion | source=edited_script, segments={len(script_segments)}, "
+        f"clips={len(production_plan.get('clips', []))}"
+    )
     if not script_segments:
         ctx.log("无脚本段落，跳过 TTS 生成")
         ctx.log_end("输出: voice_segments=0")
@@ -34,21 +46,20 @@ def run(state: dict[str, Any], config: TTSConfig = None) -> dict[str, Any]:
         Path(config.output_dir).mkdir(parents=True, exist_ok=True)
         episode_id = _safe_path_part(state.get("episode_id", "unknown"), "unknown")
 
-        ctx.log(f"使用引擎: {config.engine}")
-        engine = (config.engine or "mock").lower()
-        if engine == "mock":
-            voice_segments = _synthesize_mock_all(script_segments, config, episode_id)
-        elif engine in {
-            "edge-tts",
-            "openai-compatible",
-            "doubao_tts",
-            "voice_clone",
-        }:
-            voice_segments = asyncio.run(_synthesize_all(script_segments, config, episode_id))
-        else:
-            raise ValueError(f"Unsupported TTS engine: {config.engine}")
+        ctx.log(f"使用引擎: {config.engine}（已有可用片段会直接复用）")
+        voice_segments, reused_count = asyncio.run(
+            _synthesize_plan(
+                production_plan,
+                previous_voice_segments,
+                config,
+                episode_id,
+            )
+        )
         state["voice_segments"] = voice_segments
-        ctx.log(f"音频片段生成完成: {len(voice_segments)} segments")
+        ctx.log(
+            f"音频片段生成完成: {len(voice_segments)} clips, "
+            f"reused={reused_count}, generated={len(voice_segments) - reused_count}"
+        )
     except Exception as e:
         ctx.add_error("tts", str(e), detail=str(e))
         ctx.log(f"错误: {str(e)}")
@@ -57,40 +68,103 @@ def run(state: dict[str, Any], config: TTSConfig = None) -> dict[str, Any]:
     return ctx.finalize(state)
 
 
-async def _synthesize_all(script_segments: list[dict[str, Any]], config: TTSConfig, episode_id: str):
-    segments = []
-    for segment_index, segment in enumerate(script_segments, start=1):
-        text = segment.get("text", "")
+async def _synthesize_plan(
+    production_plan: dict[str, Any],
+    previous_voice_segments: list[dict[str, Any]],
+    config: TTSConfig,
+    episode_id: str,
+) -> tuple[list[dict[str, Any]], int]:
+    engine = (config.engine or "mock").lower()
+    supported_engines = {
+        "mock",
+        "edge-tts",
+        "openai-compatible",
+        "doubao_tts",
+        "voice_clone",
+    }
+    clips = [clip for clip in production_plan.get("clips", []) if isinstance(clip, dict)]
+    if any(clip.get("source", "tts") == "tts" for clip in clips) and engine not in supported_engines:
+        raise ValueError(f"Unsupported TTS engine: {config.engine}")
+
+    previous_by_id = {
+        str(segment.get("segment_id")): segment
+        for segment in previous_voice_segments
+        if segment.get("segment_id")
+    }
+    segments: list[dict[str, Any]] = []
+    reused_count = 0
+
+    for clip_index, clip in enumerate(clips, start=1):
+        clip_id = str(clip.get("id") or f"clip_{clip_index:03d}")
+        text = str(clip.get("text") or "").strip()
         if not text:
             continue
-        output_format = _normalize_output_format(config.output_format)
-        filepath = os.path.join(config.output_dir, f"{episode_id}_{segment_index:03d}.{output_format}")
-        voice = config.voice_mapping.get(segment.get("speaker", ""), config.default_voice)
-        engine = (config.engine or "mock").lower()
-        if engine == "edge-tts":
-            await _synthesize_edge_tts(text, voice, filepath, config)
-        elif engine == "openai-compatible":
-            _synthesize_openai_compatible(text, voice, filepath, config)
-        elif engine in {"doubao_tts", "voice_clone"}:
-            _synthesize_doubao(text, voice, filepath, config)
+        source = str(clip.get("source") or "tts")
+        previous = previous_by_id.get(clip_id, {})
+
+        if source in {"recording", "local"}:
+            filepath = str(clip.get("path") or previous.get("path") or "")
+            if not filepath or not Path(filepath).is_file():
+                raise RuntimeError(f"Audio source for clip {clip_id} is missing: {filepath or '(empty)'}")
+            segment_engine = "recording" if source == "recording" else "local"
+            voice = str(previous.get("voice") or source)
+            duration_seconds = _audio_duration_seconds(filepath)
+            generation_key = ""
+            reused_count += 1
         else:
-            raise ValueError(f"Unsupported TTS engine: {config.engine}")
-        segments.append(_voice_segment(segment, filepath, engine, voice, segment_index))
-    return segments
+            voice = config.voice_mapping.get(str(clip.get("speaker") or ""), config.default_voice)
+            generation_key = voice_generation_key(
+                text=text,
+                engine=engine,
+                voice=voice,
+                rate=config.rate,
+                volume=config.volume,
+            )
+            previous_path = str(previous.get("path") or "")
+            if (
+                previous.get("generation_key") == generation_key
+                and previous_path
+                and Path(previous_path).is_file()
+            ):
+                filepath = previous_path
+                duration_seconds = float(previous.get("duration_seconds") or _audio_duration_seconds(filepath))
+                reused_count += 1
+            else:
+                output_format = "wav" if engine == "mock" else _normalize_output_format(config.output_format)
+                safe_clip_id = _safe_path_part(clip_id, f"clip_{clip_index:03d}")
+                filepath = os.path.join(config.output_dir, f"{episode_id}_{safe_clip_id}.{output_format}")
+                if engine == "mock":
+                    _write_mock_wav(filepath, text)
+                elif engine == "edge-tts":
+                    await _synthesize_edge_tts(text, voice, filepath, config)
+                elif engine == "openai-compatible":
+                    _synthesize_openai_compatible(text, voice, filepath, config)
+                elif engine in {"doubao_tts", "voice_clone"}:
+                    _synthesize_doubao(text, voice, filepath, config)
+                duration_seconds = _audio_duration_seconds(filepath)
+            segment_engine = engine
 
+        segment = _voice_segment(
+            clip,
+            filepath,
+            segment_engine,
+            voice,
+            clip_index,
+            duration_seconds=duration_seconds,
+            generation_key=generation_key,
+        )
+        segments.append(segment)
+        update_plan_clip(
+            production_plan,
+            clip_id,
+            {
+                "path": filepath,
+                "duration_seconds": duration_seconds,
+                "generation_key": generation_key,
+            },
+        )
 
-def _synthesize_mock_all(
-    script_segments: list[dict[str, Any]], config: TTSConfig, episode_id: str
-) -> list[dict[str, Any]]:
-    segments = []
-    for segment_index, segment in enumerate(script_segments, start=1):
-        text = segment.get("text", "")
-        if not text:
-            continue
-        filepath = os.path.join(config.output_dir, f"{episode_id}_{segment_index:03d}.wav")
-        _write_mock_wav(filepath, text)
-        segments.append(_voice_segment(segment, filepath, "mock", config.default_voice, segment_index))
-    return segments
+    return segments, reused_count
 
 
 def _voice_segment(
@@ -99,16 +173,37 @@ def _voice_segment(
     engine: str,
     voice: str,
     segment_index: int,
+    *,
+    duration_seconds: float = 0.0,
+    generation_key: str = "",
 ) -> dict[str, Any]:
     return {
         "segment_id": segment.get("id") or f"seg_{segment_index:03d}",
+        "parent_segment_id": segment.get("parent_segment_id") or segment.get("id") or "",
         "path": filepath,
         "text": segment.get("text", ""),
         "speaker": segment.get("speaker", "Host A"),
         "source_fact_ids": segment.get("source_fact_ids", []),
         "engine": engine,
         "voice": voice,
+        "duration_seconds": duration_seconds,
+        "generation_key": generation_key,
     }
+
+
+def _audio_duration_seconds(filepath: str) -> float:
+    try:
+        from pydub import AudioSegment
+
+        return round(len(AudioSegment.from_file(filepath)) / 1000.0, 3)
+    except Exception:
+        try:
+            with wave.open(filepath, "rb") as wav:
+                return round(wav.getnframes() / wav.getframerate(), 3)
+        except Exception:
+            return 0.0
+
+
 def _normalize_output_format(output_format: str) -> str:
     fmt = (output_format or "mp3").lower().lstrip(".")
     return fmt if fmt in {"mp3", "wav", "opus", "aac", "flac"} else "mp3"

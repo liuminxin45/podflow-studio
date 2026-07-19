@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openPath: (targetPath) => ipcRenderer.invoke('file:openPath', targetPath),
   showItemInFolder: (targetPath) => ipcRenderer.invoke('file:showItemInFolder', targetPath),
   readImageAsDataUrl: (targetPath) => ipcRenderer.invoke('file:readImageAsDataUrl', targetPath),
+  selectAudioFile: () => ipcRenderer.invoke('file:selectAudio'),
   onWorkflowUpdate: (callback) => {
     const listener = (_, data) => callback(data)
     ipcRenderer.on('workflow:update', listener)

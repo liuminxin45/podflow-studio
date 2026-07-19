@@ -144,6 +144,110 @@ def test_audio_postprocess_uses_the_same_expanded_bgm_path_for_validation_and_mi
     assert "mix_bgm" in result["audio_outputs"]["operations"]
 
 
+def test_audio_postprocess_renders_clip_trims_and_individual_joins(tmp_path: Path):
+    first = tmp_path / "first.wav"
+    second = tmp_path / "second.wav"
+    _write_wav(first, frequency=440, seconds=0.25)
+    _write_wav(second, frequency=330, seconds=0.25)
+    state = create_base_state()
+    state["voice_segments"] = [
+        {"segment_id": "clip_1", "path": str(first), "engine": "recording"},
+        {"segment_id": "clip_2", "path": str(second), "engine": "mock"},
+    ]
+    state["production_plan"] = {
+        "version": 1,
+        "clips": [
+            {
+                "id": "clip_1",
+                "path": str(first),
+                "trim_start_ms": 50,
+                "trim_end_ms": 50,
+            },
+            {"id": "clip_2", "path": str(second), "trim_start_ms": 0, "trim_end_ms": 0},
+        ],
+        "joins": [{"after_clip_id": "clip_1", "type": "pause", "duration_ms": 100}],
+        "music": {},
+        "render": {"output_format": "wav", "normalize_loudness": False},
+    }
+
+    result = audio_postprocess_run(
+        state,
+        AudioPostprocessConfig(output_dir=str(tmp_path / "audio"), output_format="wav"),
+    )
+
+    assert result["audio_outputs"]["status"] == "ok"
+    assert result["audio_outputs"]["source_engines"] == ["mock", "recording"]
+    assert "production_plan_v1" in result["audio_outputs"]["operations"]
+    assert "trim_clip_clip_1" in result["audio_outputs"]["operations"]
+    assert "pause_clip_1_100ms" in result["audio_outputs"]["operations"]
+    assert result["audio_outputs"]["duration_seconds"] == 0.5
+
+
+def test_audio_postprocess_renders_intro_transition_bed_and_outro(tmp_path: Path):
+    voice = tmp_path / "voice.wav"
+    music = tmp_path / "music.wav"
+    _write_wav(voice, frequency=440, seconds=0.25)
+    _write_wav(music, frequency=220, seconds=0.1)
+    state = create_base_state()
+    state["voice_segments"] = [{"segment_id": "clip_1", "path": str(voice), "engine": "recording"}]
+    slot = {
+        "enabled": True,
+        "path": str(music),
+        "volume": 0.15,
+        "duration_ms": 100,
+        "fade_in_ms": 10,
+        "fade_out_ms": 10,
+    }
+    state["production_plan"] = {
+        "version": 1,
+        "clips": [{"id": "clip_1", "path": str(voice), "trim_start_ms": 0, "trim_end_ms": 0}],
+        "joins": [],
+        "music": {"intro": slot, "transition": slot, "bed": slot, "outro": slot},
+        "render": {"output_format": "wav", "normalize_loudness": False},
+    }
+
+    result = audio_postprocess_run(
+        state,
+        AudioPostprocessConfig(output_dir=str(tmp_path / "audio"), output_format="wav"),
+    )
+
+    operations = result["audio_outputs"]["operations"]
+    assert result["audio_outputs"]["status"] == "ok"
+    assert "mix_bed_music" in operations
+    assert "mix_intro_music" in operations
+    assert "mix_outro_music" in operations
+
+
+def test_tts_splits_long_script_and_reuses_unchanged_clips(tmp_path: Path, monkeypatch):
+    state = create_base_state()
+    state["edited_script"] = {
+        "segments": [{
+            "id": "seg_long",
+            "type": "deep_dive",
+            "title": "深度",
+            "speaker": "Host A",
+            "text": "这是一个需要拆分的句子。" * 80,
+            "source_fact_ids": [],
+            "estimated_seconds": 120,
+        }]
+    }
+    config = TTSConfig(engine="mock", output_dir=str(tmp_path))
+
+    first = tts_run(state, config)
+    generated_paths = [Path(item["path"]) for item in first["voice_segments"]]
+    assert len(generated_paths) > 2
+    assert all(path.exists() for path in generated_paths)
+
+    monkeypatch.setattr(
+        "nodes.tts.node._write_mock_wav",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unchanged clip regenerated")),
+    )
+    second = tts_run(first, config)
+
+    assert len(second["voice_segments"]) == len(generated_paths)
+    assert not any(error["node"] == "tts" for error in second["errors"])
+
+
 def test_tts_failed_regeneration_clears_stale_audio(tmp_path: Path):
     state = create_base_state()
     state["edited_script"] = {"segments": [{"id": "seg_1", "type": "quick_news", "title": "新闻", "speaker": "Host A", "text": "真实稿件", "source_fact_ids": [], "estimated_seconds": 5}]}

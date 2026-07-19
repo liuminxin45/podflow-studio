@@ -106,6 +106,75 @@ class AudioOutputsModel(BaseModel):
     message: str = ""
 
 
+class ProductionClipModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    parent_segment_id: str
+    segment_type: str = "custom"
+    segment_title: str = ""
+    text: str
+    speaker: str = "Host A"
+    source_fact_ids: list[str] = Field(default_factory=list)
+    source: Literal["tts", "recording", "local"] = "tts"
+    path: str = ""
+    duration_seconds: float = 0.0
+    trim_start_ms: int = Field(default=0, ge=0)
+    trim_end_ms: int = Field(default=0, ge=0)
+    generation_key: str = ""
+
+
+class ProductionJoinModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    after_clip_id: str
+    type: Literal["pause", "transition"] = "pause"
+    duration_ms: int = Field(default=600, ge=0, le=15000)
+
+
+class ProductionMusicSlotModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    path: str = ""
+    volume: float = Field(default=0.15, ge=0.0, le=1.0)
+    duration_ms: int = Field(default=5000, ge=0, le=120000)
+    fade_in_ms: int = Field(default=500, ge=0, le=15000)
+    fade_out_ms: int = Field(default=1000, ge=0, le=15000)
+
+
+class ProductionMusicModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    intro: ProductionMusicSlotModel = Field(default_factory=ProductionMusicSlotModel)
+    transition: ProductionMusicSlotModel = Field(
+        default_factory=lambda: ProductionMusicSlotModel(duration_ms=1500, fade_in_ms=150, fade_out_ms=300)
+    )
+    bed: ProductionMusicSlotModel = Field(default_factory=ProductionMusicSlotModel)
+    outro: ProductionMusicSlotModel = Field(default_factory=ProductionMusicSlotModel)
+
+
+class ProductionRenderModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    output_format: Literal["mp3", "wav", "opus"] = "mp3"
+    normalize_loudness: bool = True
+    target_lufs: float = -16.0
+    true_peak_db: float = -1.0
+
+
+class ProductionPlanModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Literal[1] = 1
+    script_hash: str = ""
+    clips: list[ProductionClipModel] = Field(default_factory=list)
+    joins: list[ProductionJoinModel] = Field(default_factory=list)
+    music: ProductionMusicModel = Field(default_factory=ProductionMusicModel)
+    render: ProductionRenderModel = Field(default_factory=ProductionRenderModel)
+    updated_at: str = ""
+
+
 class RssValidationModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -179,6 +248,7 @@ class EpisodeRunModel(BaseModel):
     script_snapshots: list[dict[str, Any]] = Field(default_factory=list)
     downstream_stale: dict[str, Any] = Field(default_factory=dict)
     voice_segments: list[dict[str, Any]] = Field(default_factory=list)
+    production_plan: ProductionPlanModel = Field(default_factory=ProductionPlanModel)
     audio_outputs: AudioOutputsModel = Field(default_factory=AudioOutputsModel)
     cover_path: str = ""
     intro_outro_paths: dict[str, str] = Field(default_factory=dict)

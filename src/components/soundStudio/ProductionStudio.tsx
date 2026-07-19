@@ -14,7 +14,13 @@ import {
   StopOutlined,
   WarningOutlined,
 } from '../../icons/antdCompat'
-import type { VoiceSegment, Workflow } from '../../types/workflow'
+import type {
+  ProductionClip,
+  ProductionMusicSlot,
+  ProductionPlan,
+  VoiceSegment,
+  Workflow,
+} from '../../types/workflow'
 import StageHeader from '../StageHeader'
 import {
   AUDIO_PROVIDERS,
@@ -33,6 +39,7 @@ import type {
   StudioMode,
   StudioRecording,
 } from './types'
+import { planContentSignature, reconcileProductionPlan } from './productionPlan'
 import './productionStudio.css'
 
 interface Props {
@@ -207,16 +214,17 @@ function savedRecordings(items: VoiceSegment[] | undefined): Record<string, Stud
 
 function toPersistedRecordings(
   recordings: Record<string, StudioRecording>,
-  segments: ScriptSegment[],
+  units: Array<{ id: string; text?: string; content?: string; speaker: string; parent_segment_id?: string }>,
 ): VoiceSegment[] {
-  return segments.flatMap(segment => {
-    const recording = recordings[segment.id]
+  return units.flatMap(unit => {
+    const recording = recordings[unit.id]
     if (!recording?.path || recording.status !== 'recorded' || !isAllowedArtifactPath(recording.path, 'audio')) return []
     return [{
-      segment_id: segment.id,
+      segment_id: unit.id,
+      parent_segment_id: unit.parent_segment_id || unit.id,
       path: recording.path,
-      text: segment.content,
-      speaker: segment.speaker,
+      text: unit.text || unit.content || '',
+      speaker: unit.speaker,
       engine: 'recording',
       voice: 'recording',
       mime_type: recording.mimeType || 'audio/webm',
@@ -259,13 +267,26 @@ export default function ProductionStudio({
 }: Props) {
   const scriptSelection = useMemo(() => scriptSegments(workflow?.state), [workflow?.state])
   const segments = scriptSelection.segments
-  const recordingSignature = JSON.stringify(workflow?.state?.voice_segments || [])
+  const workflowScriptSegments = useMemo(
+    () => workflow?.state?.edited_script?.segments || [],
+    [workflow?.state?.edited_script?.segments],
+  )
+  const voiceSegments = useMemo(
+    () => workflow?.state?.voice_segments || [],
+    [workflow?.state?.voice_segments],
+  )
+  const savedProductionPlan = workflow?.state?.production_plan
+  const legacyIntroPath = workflow?.state?.intro_outro_paths?.intro
+  const legacyOutroPath = workflow?.state?.intro_outro_paths?.outro
+  const recordingSignature = JSON.stringify(voiceSegments)
   const restoredRecordings = useMemo(
     () => savedRecordings(JSON.parse(recordingSignature) as VoiceSegment[]),
     [recordingSignature],
   )
   const [mode, setMode] = useState<StudioMode>('ai')
   const [activeSegmentId, setActiveSegmentId] = useState('')
+  const [activeClipId, setActiveClipId] = useState('')
+  const [clipGeneratingId, setClipGeneratingId] = useState('')
   const [audioProvider, setAudioProvider] = useState<AudioProvider>('edge-tts')
   const [voice, setVoice] = useState(VOICE_PRESETS['edge-tts'][0].id)
   const [rate, setRate] = useState('+0%')
@@ -304,18 +325,27 @@ export default function ProductionStudio({
   const storedCoverPath = text(workflow?.state?.cover_path)
   const audioReportPath = isAllowedArtifactPath(storedAudioReportPath, 'report') ? storedAudioReportPath : ''
   const coverPath = isAllowedArtifactPath(storedCoverPath, 'image') ? storedCoverPath : ''
-  const voiceSegments = workflow?.state?.voice_segments || []
-  const recordedSegments = toPersistedRecordings(recordings, segments)
+  const reconciledPlan = useMemo(
+    () => reconcileProductionPlan(
+      workflowScriptSegments,
+      savedProductionPlan,
+      voiceSegments,
+    ),
+    [savedProductionPlan, voiceSegments, workflowScriptSegments],
+  )
+  const reconciledPlanSignature = planContentSignature(reconciledPlan)
+  const [productionPlan, setProductionPlan] = useState<ProductionPlan>(reconciledPlan)
+  const productionPlanRef = useRef(productionPlan)
+  const voiceSegmentsRef = useRef(voiceSegments)
+  const recordedSegments = toPersistedRecordings(recordings, productionPlan.clips)
   const isBusy = ['saving', 'running', 'awaiting-result'].includes(runState.status)
   const recordingLocked = recordingPending || Boolean(recordingSegmentRef.current)
   const activeSegment = segments.find(segment => segment.id === activeSegmentId) || segments[0]
-  const activeVoiceSegment = voiceSegments.find(item => item.segment_id === activeSegment?.id)
-  const activeVoicePath = isAllowedArtifactPath(activeVoiceSegment?.path || '', 'audio')
-    ? activeVoiceSegment?.path || ''
-    : ''
-  const activeRecording = activeSegment ? recordings[activeSegment.id] : undefined
+  const activeClips = productionPlan.clips.filter(clip => clip.parent_segment_id === activeSegment?.id)
+  const activeClip = activeClips.find(clip => clip.id === activeClipId) || activeClips[0]
+  const activeRecording = activeClip ? recordings[activeClip.id] : undefined
   const scriptReady = segments.length > 0 && segments.every(segment => Boolean(segment.content))
-  const allRecorded = segments.length > 0 && recordedSegments.length === segments.length
+  const ttsClipCount = productionPlan.clips.filter(clip => clip.source === 'tts').length
   const providerConfigured = !unsupportedEngine && isAudioProviderConfigured(audioProvider, ttsConfig)
   const visibleVoicePresets = useMemo(() => {
     const presets = VOICE_PRESETS[audioProvider]
@@ -332,10 +362,30 @@ export default function ProductionStudio({
   }, [recordings])
 
   useEffect(() => {
+    productionPlanRef.current = productionPlan
+  }, [productionPlan])
+
+  useEffect(() => {
+    voiceSegmentsRef.current = voiceSegments
+  }, [voiceSegments])
+
+  useEffect(() => {
+    setProductionPlan(current => (
+      planContentSignature(current) === reconciledPlanSignature ? current : reconciledPlan
+    ))
+  }, [reconciledPlan, reconciledPlanSignature])
+
+  useEffect(() => {
     if (!activeSegmentId || !segments.some(segment => segment.id === activeSegmentId)) {
       setActiveSegmentId(segments[0]?.id || '')
     }
   }, [activeSegmentId, segments])
+
+  useEffect(() => {
+    if (!activeClipId || !activeClips.some(clip => clip.id === activeClipId)) {
+      setActiveClipId(activeClips[0]?.id || '')
+    }
+  }, [activeClipId, activeClips])
 
   useEffect(() => {
     setRecordings(restoredRecordings)
@@ -392,6 +442,43 @@ export default function ProductionStudio({
           bgmPath: text(nextPostprocess.bgm_path),
           bgmVolume: clamp(finiteNumber(nextPostprocess.bgm_volume, DEFAULT_POSTPROCESS.bgmVolume), 0.01, 1),
         })
+        if (!savedProductionPlan?.version) {
+          const legacyIntro = text(legacyIntroPath)
+          const legacyOutro = text(legacyOutroPath)
+          setProductionPlan(current => {
+            const migrated: ProductionPlan = {
+              ...current,
+              joins: current.joins.map(join => ({
+                ...join,
+                duration_ms: clamp(
+                  finiteNumber(nextPostprocess.segment_pause_ms, join.duration_ms),
+                  0,
+                  5000,
+                ),
+              })),
+              render: {
+                ...current.render,
+                output_format: OUTPUT_FORMATS.some(item => item.value === nextPostprocess.output_format)
+                  ? nextPostprocess.output_format as OutputFormat
+                  : current.render.output_format,
+                normalize_loudness: nextPostprocess.normalize_loudness !== false,
+              },
+              music: {
+                ...current.music,
+                intro: legacyIntro ? { ...current.music.intro, enabled: true, path: legacyIntro } : current.music.intro,
+                outro: legacyOutro ? { ...current.music.outro, enabled: true, path: legacyOutro } : current.music.outro,
+                bed: {
+                  ...current.music.bed,
+                  enabled: Boolean(nextPostprocess.add_bgm),
+                  path: text(nextPostprocess.bgm_path),
+                  volume: clamp(finiteNumber(nextPostprocess.bgm_volume, DEFAULT_POSTPROCESS.bgmVolume), 0.01, 1),
+                },
+              },
+            }
+            productionPlanRef.current = migrated
+            return migrated
+          })
+        }
         setGenerateCover(nextAssets.generate_cover !== false)
         setConfigReady(true)
       })
@@ -408,7 +495,14 @@ export default function ProductionStudio({
     return () => {
       cancelled = true
     }
-  }, [configLoadAttempt, visible, workflow?.state?.episode_id])
+  }, [
+    configLoadAttempt,
+    legacyIntroPath,
+    legacyOutroPath,
+    savedProductionPlan?.version,
+    visible,
+    workflow?.state?.episode_id,
+  ])
 
   useEffect(() => {
     if (!awaitedRunRef.current?.executionComplete || !workflow || workflow.status === 'running') return
@@ -462,11 +556,52 @@ export default function ProductionStudio({
     }
   }, [])
 
+  const persistProductionPlan = useCallback(async (
+    next: ProductionPlan,
+    voicePatch?: VoiceSegment[],
+  ) => {
+    const timestamped = { ...next, updated_at: new Date().toISOString() }
+    productionPlanRef.current = timestamped
+    setProductionPlan(timestamped)
+    await onUpdateWorkflow?.({
+      production_plan: timestamped,
+      audio_outputs: {},
+      ...(voicePatch ? { voice_segments: voicePatch } : {}),
+    })
+  }, [onUpdateWorkflow])
+
   const persistRecordings = useCallback(async (next: Record<string, StudioRecording>) => {
     recordingsRef.current = next
     setRecordings(next)
-    await onUpdateWorkflow?.({ voice_segments: toPersistedRecordings(next, segments) })
-  }, [onUpdateWorkflow, segments])
+    const recordingItems = toPersistedRecordings(next, productionPlanRef.current.clips)
+    const recordingIds = new Set(recordingItems.map(item => item.segment_id))
+    const mergedVoiceSegments = [
+      ...voiceSegmentsRef.current.filter(item => item.engine !== 'recording' && !recordingIds.has(item.segment_id)),
+      ...recordingItems,
+    ]
+    const nextPlan: ProductionPlan = {
+      ...productionPlanRef.current,
+      clips: productionPlanRef.current.clips.map(clip => {
+        const recording = next[clip.id]
+        if (recording?.status === 'recorded' && recording.path) {
+          return {
+            ...clip,
+            source: 'recording',
+            path: recording.path,
+            duration_seconds: recording.durationSeconds,
+            trim_start_ms: 0,
+            trim_end_ms: 0,
+            generation_key: '',
+          }
+        }
+        if (clip.source === 'recording') {
+          return { ...clip, source: 'tts', path: '', duration_seconds: 0, generation_key: '' }
+        }
+        return clip
+      }),
+    }
+    await persistProductionPlan(nextPlan, mergedVoiceSegments)
+  }, [persistProductionPlan])
 
   const stopRecordingTimer = useCallback(() => {
     if (recordingTimerRef.current) window.clearInterval(recordingTimerRef.current)
@@ -723,7 +858,128 @@ export default function ProductionStudio({
     }
   }, [saveNodeConfig])
 
+  const buildTtsConfig = useCallback(() => ({
+    ...ttsConfig,
+    engine: audioProvider,
+    default_voice: voice,
+    voice_mapping: { ...(ttsConfig.voice_mapping || {}), 'Host A': voice },
+    ...((audioProvider === 'doubao_tts' || audioProvider === 'voice_clone')
+      ? { doubao_voice_type: voice }
+      : {}),
+    rate,
+    volume: text(ttsConfig.volume) || '+0%',
+    output_format: audioProvider === 'openai-compatible'
+      ? (text(ttsConfig.output_format) || 'mp3')
+      : 'mp3',
+  }), [audioProvider, rate, ttsConfig, voice])
+
+  const updateClip = useCallback(async (clipId: string, patch: Partial<ProductionClip>) => {
+    const next: ProductionPlan = {
+      ...productionPlanRef.current,
+      clips: productionPlanRef.current.clips.map(clip => clip.id === clipId ? { ...clip, ...patch } : clip),
+    }
+    await persistProductionPlan(next)
+  }, [persistProductionPlan])
+
+  const previewClip = useCallback((clipId: string, patch: Partial<ProductionClip>) => {
+    const next: ProductionPlan = {
+      ...productionPlanRef.current,
+      clips: productionPlanRef.current.clips.map(clip => clip.id === clipId ? { ...clip, ...patch } : clip),
+    }
+    productionPlanRef.current = next
+    setProductionPlan(next)
+  }, [])
+
+  const chooseClipFile = useCallback(async (clip: ProductionClip) => {
+    const result = await window.electronAPI?.selectAudioFile?.()
+    if (!result?.success || !result.path) return
+    await updateClip(clip.id, {
+      source: 'local',
+      path: result.path,
+      duration_seconds: 0,
+      trim_start_ms: 0,
+      trim_end_ms: 0,
+      generation_key: '',
+    })
+  }, [updateClip])
+
+  const updateJoin = useCallback(async (
+    clipId: string,
+    patch: Partial<ProductionPlan['joins'][number]>,
+  ) => {
+    const next: ProductionPlan = {
+      ...productionPlanRef.current,
+      joins: productionPlanRef.current.joins.map(join => (
+        join.after_clip_id === clipId ? { ...join, ...patch } : join
+      )),
+      music: patch.type === 'transition'
+        ? {
+            ...productionPlanRef.current.music,
+            transition: { ...productionPlanRef.current.music.transition, enabled: true },
+          }
+        : productionPlanRef.current.music,
+    }
+    await persistProductionPlan(next)
+  }, [persistProductionPlan])
+
+  const updateMusic = useCallback(async (
+    name: keyof ProductionPlan['music'],
+    patch: Partial<ProductionMusicSlot>,
+  ) => {
+    const next: ProductionPlan = {
+      ...productionPlanRef.current,
+      music: {
+        ...productionPlanRef.current.music,
+        [name]: { ...productionPlanRef.current.music[name], ...patch },
+      },
+    }
+    await persistProductionPlan(next)
+  }, [persistProductionPlan])
+
+  const chooseMusicFile = useCallback(async (name: keyof ProductionPlan['music']) => {
+    if (!window.electronAPI?.selectAudioFile) {
+      message.warning({ content: '当前环境没有音频文件选择接口。', duration: 2, style: { marginTop: 60 } })
+      return
+    }
+    const result = await window.electronAPI.selectAudioFile()
+    if (!result.success || !result.path) return
+    await updateMusic(name, { path: result.path, enabled: true })
+  }, [updateMusic])
+
+  const regenerateClip = useCallback(async (clip: ProductionClip) => {
+    if (!onRunNodes || !onUpdateWorkflow || clipGeneratingId) return
+    if (!providerConfigured) {
+      message.warning({ content: '请先配置可用的语音服务。', duration: 2, style: { marginTop: 60 } })
+      return
+    }
+    setClipGeneratingId(clip.id)
+    try {
+      const nextTtsConfig = buildTtsConfig()
+      await saveNodeConfig('tts', nextTtsConfig)
+      setTtsConfig(nextTtsConfig)
+      const nextPlan: ProductionPlan = {
+        ...productionPlanRef.current,
+        clips: productionPlanRef.current.clips.map(item => item.id === clip.id
+          ? { ...item, source: 'tts', path: '', duration_seconds: 0, generation_key: '' }
+          : item),
+        updated_at: new Date().toISOString(),
+      }
+      const nextVoices = voiceSegmentsRef.current.filter(item => item.segment_id !== clip.id)
+      await onUpdateWorkflow({ production_plan: nextPlan, voice_segments: nextVoices, audio_outputs: {} })
+      productionPlanRef.current = nextPlan
+      setProductionPlan(nextPlan)
+      await onRunNodes(['tts'])
+      message.success({ content: '这一语音块已重新生成，其他片段保持不变。', duration: 2, style: { marginTop: 60 } })
+    } catch (error: any) {
+      message.error({ content: `语音块生成失败：${error?.message || String(error)}`, duration: 3, style: { marginTop: 60 } })
+    } finally {
+      setClipGeneratingId('')
+    }
+  }, [buildTtsConfig, clipGeneratingId, onRunNodes, onUpdateWorkflow, providerConfigured, saveNodeConfig])
+
   const handleGenerate = useCallback(async () => {
+    const currentPlan = productionPlanRef.current
+    const currentTtsClipCount = currentPlan.clips.filter(clip => clip.source === 'tts').length
     if (configLoading || !configReady || configError) {
       message.error({ content: '制作配置尚未成功读取，请重试后再制作。', duration: 3, style: { marginTop: 60 } })
       return
@@ -736,58 +992,43 @@ export default function ProductionStudio({
       message.error({ content: '当前环境没有制作节点执行接口。', duration: 3, style: { marginTop: 60 } })
       return
     }
-    if (mode === 'recording' && !allRecorded) {
-      message.warning({ content: `还需录制 ${segments.length - recordedSegments.length} 个段落。完整录制后才能合成。`, duration: 3, style: { marginTop: 60 } })
-      return
-    }
-    if (mode === 'ai' && !providerConfigured) {
+    if (currentTtsClipCount > 0 && !providerConfigured) {
       const detail = unsupportedEngine
         ? `当前配置使用不受支持的语音引擎“${unsupportedEngine}”，请重新选择语音服务。`
         : '当前语音服务配置不完整，请先在设置页补齐必填字段。'
       message.warning({ content: detail, duration: 3, style: { marginTop: 60 } })
       return
     }
-    if (postprocess.addBgm && !postprocess.bgmPath) {
-      message.warning({ content: '已开启背景音乐，请填写可读取的音频文件路径。', duration: 3, style: { marginTop: 60 } })
+    const missingMusic = Object.entries(currentPlan.music)
+      .find(([, slot]) => slot.enabled && !text(slot.path))
+    if (missingMusic) {
+      message.warning({ content: '已启用节目音乐，请先选择可读取的音频文件。', duration: 3, style: { marginTop: 60 } })
       return
     }
 
     setRunState({ status: 'saving', message: '保存制作配置', error: '' })
     const previousArtifacts = {
       voice_segments: structuredClone(workflow?.state?.voice_segments || []),
+      production_plan: structuredClone(savedProductionPlan || {}),
       audio_outputs: structuredClone(workflow?.state?.audio_outputs || {}),
       cover_path: workflow?.state?.cover_path || '',
     }
     let artifactsCleared = false
     try {
-      const nextTtsConfig = {
-        ...ttsConfig,
-        engine: audioProvider,
-        default_voice: voice,
-        voice_mapping: { ...(ttsConfig.voice_mapping || {}), 'Host A': voice },
-        ...((audioProvider === 'doubao_tts' || audioProvider === 'voice_clone')
-          ? { doubao_voice_type: voice }
-          : {}),
-        rate,
-        volume: text(ttsConfig.volume) || '+0%',
-        output_format: audioProvider === 'openai-compatible'
-          ? (text(ttsConfig.output_format) || 'mp3')
-          : 'mp3',
-      }
+      const nextTtsConfig = buildTtsConfig()
       const nextPostprocessConfig = {
         ...postprocessConfig,
-        output_format: postprocess.outputFormat,
+        output_format: currentPlan.render.output_format,
         segment_pause_ms: postprocess.segmentPauseMs,
-        normalize_loudness: postprocess.normalizeLoudness,
+        normalize_loudness: currentPlan.render.normalize_loudness,
         trim_silence: postprocess.trimSilence,
-        add_bgm: postprocess.addBgm,
-        bgm_path: postprocess.addBgm ? postprocess.bgmPath : '',
-        bgm_volume: postprocess.bgmVolume,
+        add_bgm: false,
+        bgm_path: '',
       }
       const nextAssetsConfig = { ...assetsConfig, generate_cover: generateCover }
 
       await saveConfigBatch([
-        ...(mode === 'ai' ? [{ nodeName: 'tts', next: nextTtsConfig, previous: ttsConfig }] : []),
+        ...(currentTtsClipCount > 0 ? [{ nodeName: 'tts', next: nextTtsConfig, previous: ttsConfig }] : []),
         { nodeName: 'audio_postprocess', next: nextPostprocessConfig, previous: postprocessConfig },
         { nodeName: 'assets', next: nextAssetsConfig, previous: assetsConfig },
       ])
@@ -795,9 +1036,15 @@ export default function ProductionStudio({
       setPostprocessConfig(nextPostprocessConfig)
       setAssetsConfig(nextAssetsConfig)
 
-      const recordingItems = toPersistedRecordings(recordingsRef.current, segments)
+      const recordingItems = toPersistedRecordings(recordingsRef.current, currentPlan.clips)
+      const recordingIds = new Set(recordingItems.map(item => item.segment_id))
+      const nextVoiceSegments = [
+        ...voiceSegmentsRef.current.filter(item => item.engine !== 'recording' && !recordingIds.has(item.segment_id)),
+        ...recordingItems,
+      ]
       await onUpdateWorkflow({
-        voice_segments: mode === 'recording' ? recordingItems : [],
+        production_plan: { ...currentPlan, updated_at: new Date().toISOString() },
+        voice_segments: nextVoiceSegments,
         audio_outputs: {},
         ...(generateCover ? {} : { cover_path: '' }),
       })
@@ -807,8 +1054,8 @@ export default function ProductionStudio({
         errorCount: workflow?.state?.errors?.length || 0,
         executionComplete: false,
       }
-      setRunState({ status: 'running', message: mode === 'ai' ? '生成分段语音' : '合成真人录音', error: '' })
-      const nodes = mode === 'ai' ? ['tts', 'audio_postprocess'] : ['audio_postprocess']
+      setRunState({ status: 'running', message: currentTtsClipCount > 0 ? '生成或复用语音块' : '合成真人录音', error: '' })
+      const nodes = currentTtsClipCount > 0 ? ['tts', 'audio_postprocess'] : ['audio_postprocess']
       if (generateCover) nodes.push('assets')
       await onRunNodes(nodes)
       if (awaitedRunRef.current) awaitedRunRef.current.executionComplete = true
@@ -829,27 +1076,22 @@ export default function ProductionStudio({
       message.error({ content: `制作失败：${detail}`, duration: 3, style: { marginTop: 60 } })
     }
   }, [
-    allRecorded,
     assetsConfig,
-    audioProvider,
+    buildTtsConfig,
     configError,
     configLoading,
     configReady,
     generateCover,
-    mode,
     onRunNodes,
     onUpdateWorkflow,
     postprocess,
     postprocessConfig,
     providerConfigured,
-    rate,
-    recordedSegments.length,
     saveConfigBatch,
+    savedProductionPlan,
     scriptReady,
-    segments,
     ttsConfig,
     unsupportedEngine,
-    voice,
     workflow?.state?.errors?.length,
     workflow?.state?.audio_outputs,
     workflow?.state?.cover_path,
@@ -915,7 +1157,7 @@ export default function ProductionStudio({
                 || !configReady
                 || Boolean(configError)
                 || !scriptReady
-                || (mode === 'ai' && Boolean(unsupportedEngine))
+                || (ttsClipCount > 0 && Boolean(unsupportedEngine))
               }
               onClick={handleGenerate}
             >
@@ -967,11 +1209,12 @@ export default function ProductionStudio({
 
           <div className="produce-segment-list">
             {segments.map((segment, index) => {
-              const recording = recordings[segment.id]
-              const generated = voiceSegments.find(item => item.segment_id === segment.id)
-              const ready = mode === 'recording'
-                ? recording?.status === 'recorded' && isAllowedArtifactPath(recording.path || '', 'audio')
-                : isAllowedArtifactPath(generated?.path || '', 'audio')
+              const segmentClips = productionPlan.clips.filter(clip => clip.parent_segment_id === segment.id)
+              const readyCount = segmentClips.filter(clip => {
+                const generated = voiceSegments.find(item => item.segment_id === clip.id)
+                return isAllowedArtifactPath(clip.path || generated?.path || '', 'audio')
+              }).length
+              const ready = segmentClips.length > 0 && readyCount === segmentClips.length
               return (
                 <button
                   type="button"
@@ -991,7 +1234,7 @@ export default function ProductionStudio({
                     <small>{segment.speaker} · {formatTime(segment.estimatedSeconds)}</small>
                   </span>
                   <span className={`produce-segment-state ${ready ? 'is-ready' : ''}`}>
-                    {ready ? <CheckCircleOutlined /> : mode === 'recording' ? '待录' : '待生成'}
+                    {ready ? <CheckCircleOutlined /> : `${readyCount}/${segmentClips.length}`}
                   </span>
                 </button>
               )
@@ -999,11 +1242,11 @@ export default function ProductionStudio({
             {segments.length === 0 && <div className="produce-empty-list">没有可制作的稿件分段。</div>}
           </div>
 
-          {mode === 'recording' && segments.length > 0 && (
+          {mode === 'recording' && productionPlan.clips.length > 0 && (
             <div className="produce-recording-total">
-              <span>录制进度</span>
-              <strong>{recordedSegments.length}/{segments.length}</strong>
-              <Progress percent={Math.round((recordedSegments.length / segments.length) * 100)} showInfo={false} size="small" />
+              <span>真人替换</span>
+              <strong>{recordedSegments.length}/{productionPlan.clips.length}</strong>
+              <Progress percent={Math.round((recordedSegments.length / productionPlan.clips.length) * 100)} showInfo={false} size="small" />
             </div>
           )}
         </aside>
@@ -1099,80 +1342,161 @@ export default function ProductionStudio({
           )}
 
           {!isBusy && activeSegment && (
-            <section className="produce-script-card">
-              <div className="produce-script-meta">
+            <section className="produce-assembly-card">
+              <div className="produce-assembly-heading">
                 <span className="produce-segment-index large" style={{ borderColor: activeSegment.color, color: activeSegment.color }}>
                   {segments.findIndex(item => item.id === activeSegment.id) + 1}
                 </span>
                 <div>
-                  <span className="produce-eyebrow">{activeSegment.speaker}</span>
+                  <span className="produce-eyebrow">节目装配单 · {activeSegment.speaker}</span>
                   <h2>{activeSegment.label}</h2>
+                  <p>{activeClips.length} 个可独立生成、替换和裁剪的语音块</p>
                 </div>
                 <Tag>{formatTime(activeSegment.estimatedSeconds)}</Tag>
               </div>
-              <p className="produce-script-text">{activeSegment.content}</p>
 
-              {mode === 'ai' ? (
-                <div className="produce-segment-action">
-                  {activeVoicePath ? (
-                    <>
-                      <div>
-                        <strong>分段语音已生成</strong>
-                        <small>{fileName(activeVoicePath)} · {activeVoiceSegment?.voice}</small>
-                      </div>
-                      <Button icon={<PlayCircleOutlined />} onClick={() => openArtifact(activeVoicePath)}>
-                        试听真实文件
-                      </Button>
-                    </>
-                  ) : (
-                    <div>
-                      <strong>尚未生成分段语音</strong>
-                      <small>配置声音后点击“制作成品”，TTS 节点会生成可试听的实际文件。</small>
+              <div className="produce-clip-stack">
+                {activeClips.map((clip, clipIndex) => {
+                  const voiceSegment = voiceSegments.find(item => item.segment_id === clip.id)
+                  const clipPath = isAllowedArtifactPath(clip.path || voiceSegment?.path || '', 'audio')
+                    ? clip.path || voiceSegment?.path || ''
+                    : ''
+                  const recording = recordings[clip.id]
+                  const durationMs = Math.max(100, Math.round(Number(clip.duration_seconds || voiceSegment?.duration_seconds || 0) * 1000))
+                  const rangeEnd = Math.max(clip.trim_start_ms + 50, durationMs - clip.trim_end_ms)
+                  const join = productionPlan.joins.find(item => item.after_clip_id === clip.id)
+                  const isSelected = activeClip?.id === clip.id
+                  const sourceLabel = clip.source === 'recording' ? '真人录音' : clip.source === 'local' ? '本地替换' : 'AI 语音'
+                  return (
+                    <div key={clip.id} className={`produce-clip-wrap ${isSelected ? 'is-active' : ''}`}>
+                      <article
+                        className="produce-clip-card"
+                        onClick={() => setActiveClipId(clip.id)}
+                      >
+                        <div className="produce-clip-index">{clipIndex + 1}</div>
+                        <div className="produce-clip-body">
+                          <div className="produce-clip-meta">
+                            <span>{sourceLabel}</span>
+                            <span>{clipPath ? formatTime(Number(clip.duration_seconds || voiceSegment?.duration_seconds)) : '待生成'}</span>
+                            {clip.trim_start_ms + clip.trim_end_ms > 0 && <span>已裁剪 {(clip.trim_start_ms + clip.trim_end_ms) / 1000}s</span>}
+                          </div>
+                          <p>{clip.text}</p>
+                          <div className="produce-waveform" aria-hidden="true">
+                            {Array.from({ length: 32 }, (_, bar) => (
+                              <i key={bar} style={{ height: `${24 + ((bar * 17 + clipIndex * 13) % 58)}%` }} />
+                            ))}
+                          </div>
+                          {clipPath && durationMs > 100 && (
+                            <div className="produce-trim-row">
+                              <span>首尾裁剪</span>
+                              <Slider
+                                range
+                                min={0}
+                                max={durationMs}
+                                step={50}
+                                value={[clip.trim_start_ms, rangeEnd]}
+                                disabled={isBusy || recordingLocked}
+                                onChange={value => previewClip(clip.id, {
+                                  trim_start_ms: value[0],
+                                  trim_end_ms: Math.max(0, durationMs - value[1]),
+                                })}
+                                onChangeComplete={value => void updateClip(clip.id, {
+                                  trim_start_ms: value[0],
+                                  trim_end_ms: Math.max(0, durationMs - value[1]),
+                                })}
+                              />
+                              <strong>{(clip.trim_start_ms / 1000).toFixed(1)}s — {(rangeEnd / 1000).toFixed(1)}s</strong>
+                            </div>
+                          )}
+                        </div>
+                        <div className="produce-clip-actions">
+                          {clipPath && (
+                            <Button size="small" icon={<PlayCircleOutlined />} onClick={event => {
+                              event.stopPropagation()
+                              void openArtifact(clipPath)
+                            }}>试听</Button>
+                          )}
+                          <Button size="small" onClick={event => {
+                            event.stopPropagation()
+                            void chooseClipFile(clip)
+                          }}>替换文件</Button>
+                          {mode === 'ai' ? (
+                            <Button
+                              size="small"
+                              icon={<ReloadOutlined />}
+                              loading={clipGeneratingId === clip.id}
+                              disabled={Boolean(clipGeneratingId) || recordingLocked}
+                              onClick={event => {
+                                event.stopPropagation()
+                                void regenerateClip(clip)
+                              }}
+                            >重新生成</Button>
+                          ) : recordingPending && isSelected ? (
+                            <Button size="small" danger loading disabled>连接麦克风</Button>
+                          ) : recording?.status === 'recording' && isSelected ? (
+                            <Button size="small" danger type="primary" icon={<StopOutlined />} onClick={event => {
+                              event.stopPropagation()
+                              stopRecording()
+                            }}>结束录制</Button>
+                          ) : recording?.status === 'saving' && isSelected ? (
+                            <Button size="small" loading disabled>保存中</Button>
+                          ) : recording?.status === 'recorded' ? (
+                            <Button size="small" icon={<ReloadOutlined />} onClick={async event => {
+                              event.stopPropagation()
+                              await removeRecording(clip.id)
+                              await startRecording(clip.id)
+                            }}>重录</Button>
+                          ) : (
+                            <Button size="small" danger icon={<AudioOutlined />} disabled={recordingLocked} onClick={event => {
+                              event.stopPropagation()
+                              setActiveClipId(clip.id)
+                              void startRecording(clip.id)
+                            }}>开始录制</Button>
+                          )}
+                        </div>
+                      </article>
+
+                      {join && (
+                        <div className="produce-join-row">
+                          <span className="produce-join-line" />
+                          <Select
+                            aria-label={`语音块 ${clipIndex + 1} 后的衔接`}
+                            size="small"
+                            value={join.type === 'transition' ? 'transition' : String(join.duration_ms)}
+                            disabled={isBusy || recordingLocked}
+                            options={[
+                              { value: '0', label: '无停顿' },
+                              { value: '300', label: '短停顿 · 0.3s' },
+                              { value: '600', label: '标准停顿 · 0.6s' },
+                              { value: '1200', label: '长停顿 · 1.2s' },
+                              { value: 'transition', label: '转场音乐' },
+                            ]}
+                            onChange={value => void updateJoin(clip.id, value === 'transition'
+                              ? { type: 'transition', duration_ms: productionPlan.music.transition.duration_ms }
+                              : { type: 'pause', duration_ms: Number(value) })}
+                          />
+                          <span className="produce-join-line" />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="produce-segment-action recording">
+                  )
+                })}
+              </div>
+
+              {mode === 'recording' && activeClip && (
+                <div className="produce-recording-dock">
                   <div>
-                    <strong>
-                      {recordingPending
-                        ? '正在请求麦克风权限'
-                        : activeRecording?.status === 'recording'
-                          ? `录制中 ${formatTime(activeRecordingDuration)}`
-                          : activeRecording?.status === 'saving'
-                            ? '正在保存录音'
-                            : activeRecording?.status === 'recorded'
-                              ? `录音已保存 · ${formatTime(activeRecording.durationSeconds)}`
-                              : '等待录制'}
-                    </strong>
-                    <small>
-                      {activeRecording?.path
-                        ? `${fileName(activeRecording.path)} · ${formatBytes(activeRecording.size)}`
-                        : activeRecording?.error || '录音会逐段写入本期节目目录，并在全部完成后合成为成品。'}
-                    </small>
+                    <strong>{recordingPending
+                      ? '正在连接麦克风'
+                      : activeRecording?.status === 'recording'
+                        ? `正在录制语音块 ${activeClips.findIndex(item => item.id === activeClip.id) + 1} · ${formatTime(activeRecordingDuration)}`
+                        : '真人录音只替换当前语音块'}</strong>
+                    <small>未录制的部分继续使用 AI 语音，不再要求整期二选一。</small>
+                    {activeRecording?.error && <small className="produce-recording-error">{activeRecording.error}</small>}
                   </div>
-                  <div className="produce-inline-actions">
-                    {recordingPending ? (
-                      <Button danger type="primary" icon={<AudioOutlined />} loading disabled>正在连接麦克风</Button>
-                    ) : activeRecording?.status === 'recording' ? (
-                      <Button danger type="primary" icon={<StopOutlined />} onClick={stopRecording}>结束录制</Button>
-                    ) : activeRecording?.status === 'saving' ? (
-                      <Button loading disabled>保存中</Button>
-                    ) : activeRecording?.status === 'recorded' ? (
-                      <>
-                        <Button icon={<PlayCircleOutlined />} onClick={() => openArtifact(activeRecording.path || '')}>试听</Button>
-                        <Button onClick={() => removeRecording(activeSegment.id)}>移出合成</Button>
-                        <Button icon={<ReloadOutlined />} onClick={async () => {
-                          await removeRecording(activeSegment.id)
-                          await startRecording(activeSegment.id)
-                        }}>重录</Button>
-                      </>
-                    ) : (
-                      <Button danger type="primary" icon={<AudioOutlined />} onClick={() => startRecording(activeSegment.id)}>
-                        开始录制
-                      </Button>
-                    )}
-                  </div>
+                  {activeRecording?.status === 'recorded' && (
+                    <Button size="small" onClick={() => void removeRecording(activeClip.id)}>恢复 AI 语音</Button>
+                  )}
                 </div>
               )}
             </section>
@@ -1189,14 +1513,14 @@ export default function ProductionStudio({
                   <CheckCircleOutlined />
                   <span><strong>稿件分段</strong><small>{scriptReady ? '正文完整，可以制作' : '需要返回写作页补齐'}</small></span>
                 </li>
-                <li className={(mode === 'ai' ? providerConfigured : allRecorded) ? 'is-complete' : ''}>
-                  {mode === 'ai' ? <SoundOutlined /> : <AudioOutlined />}
+                <li className={(ttsClipCount === 0 || providerConfigured) ? 'is-complete' : ''}>
+                  <SoundOutlined />
                   <span>
-                    <strong>{mode === 'ai' ? '语音提供方' : '真人录音'}</strong>
-                    <small>{mode === 'ai' ? (providerConfigured ? '配置可用' : '远程接口配置不完整') : `${recordedSegments.length}/${segments.length} 段已保存`}</small>
+                    <strong>混合语音来源</strong>
+                    <small>{recordedSegments.length} 段真人录音 · {ttsClipCount} 段 AI 语音</small>
                   </span>
                 </li>
-                <li><ReloadOutlined /><span><strong>音频合成</strong><small>按当前停顿、响度、静音和 BGM 设置处理</small></span></li>
+                <li><ReloadOutlined /><span><strong>音频合成</strong><small>按装配单中的裁剪、停顿和音乐渲染</small></span></li>
                 <li><FileImageOutlined /><span><strong>节目资产</strong><small>{generateCover ? '同步生成封面' : '本次不生成封面'}</small></span></li>
               </ol>
             </section>
@@ -1280,26 +1604,27 @@ export default function ProductionStudio({
                 <label>
                   <span>输出格式</span>
                   <Select
-                    value={postprocess.outputFormat}
+                    value={productionPlan.render.output_format}
                     disabled={isBusy}
                     options={OUTPUT_FORMATS}
-                    onChange={(value: OutputFormat) => setPostprocess(current => ({ ...current, outputFormat: value }))}
+                    onChange={(value: OutputFormat) => void persistProductionPlan({
+                      ...productionPlanRef.current,
+                      render: { ...productionPlanRef.current.render, output_format: value },
+                    })}
                   />
                 </label>
-                <label>
-                  <span>段间停顿 <strong>{postprocess.segmentPauseMs} ms</strong></span>
-                  <Slider
-                    min={0}
-                    max={2000}
-                    step={100}
-                    value={postprocess.segmentPauseMs}
-                    disabled={isBusy}
-                    onChange={value => setPostprocess(current => ({ ...current, segmentPauseMs: value }))}
-                  />
-                </label>
+                <p className="produce-field-help">段间停顿已移到节目装配单，可为每个衔接单独设置。</p>
                 <div className="produce-switch-row">
                   <span><strong>响度标准化</strong><small>统一各段音量</small></span>
-                  <Switch aria-label="响度标准化" checked={postprocess.normalizeLoudness} disabled={isBusy} onChange={value => setPostprocess(current => ({ ...current, normalizeLoudness: value }))} />
+                  <Switch
+                    aria-label="响度标准化"
+                    checked={productionPlan.render.normalize_loudness}
+                    disabled={isBusy}
+                    onChange={value => void persistProductionPlan({
+                      ...productionPlanRef.current,
+                      render: { ...productionPlanRef.current.render, normalize_loudness: value },
+                    })}
+                  />
                 </div>
                 <div className="produce-switch-row">
                   <span><strong>裁剪静音</strong><small>移除每段过长的无声区</small></span>
@@ -1308,33 +1633,78 @@ export default function ProductionStudio({
               </section>
 
               <section className="produce-settings-section">
-                <div className="produce-settings-title"><div><span className="produce-eyebrow">混音</span><h3>背景音乐</h3></div></div>
+                <div className="produce-settings-title"><div><span className="produce-eyebrow">节目音乐</span><h3>片头与转场</h3></div></div>
+                {(['intro', 'transition', 'outro'] as const).map(name => {
+                  const slot = productionPlan.music[name]
+                  const label = name === 'intro' ? '片头音乐' : name === 'transition' ? '转场音乐' : '片尾音乐'
+                  return (
+                    <div className="produce-music-slot" key={name}>
+                      <div className="produce-switch-row">
+                        <span><strong>{label}</strong><small>{slot.path ? fileName(slot.path) : '尚未选择文件'}</small></span>
+                        <Switch
+                          aria-label={label}
+                          checked={slot.enabled}
+                          disabled={isBusy}
+                          onChange={value => void updateMusic(name, { enabled: value })}
+                        />
+                      </div>
+                      {slot.enabled && (
+                        <div className="produce-file-row">
+                          <Input value={slot.path} readOnly placeholder="选择本地音频文件" />
+                          <Button aria-label={`选择${label}`} onClick={() => void chooseMusicFile(name)}>选择</Button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </section>
+
+              <section className="produce-settings-section">
+                <div className="produce-settings-title"><div><span className="produce-eyebrow">混音</span><h3>背景铺底</h3></div></div>
                 <div className="produce-switch-row">
                   <span><strong>叠加 BGM</strong><small>循环并铺满成品时长</small></span>
-                  <Switch aria-label="叠加背景音乐" checked={postprocess.addBgm} disabled={isBusy} onChange={value => setPostprocess(current => ({ ...current, addBgm: value }))} />
+                  <Switch
+                    aria-label="叠加背景音乐"
+                    checked={productionPlan.music.bed.enabled}
+                    disabled={isBusy}
+                    onChange={value => void updateMusic('bed', { enabled: value })}
+                  />
                 </div>
-                {postprocess.addBgm && (
+                {productionPlan.music.bed.enabled && (
                   <>
                     <label>
                       <span>音频文件路径</span>
-                      <Input
-                        aria-label="背景音乐文件路径"
-                        value={postprocess.bgmPath}
-                        disabled={isBusy}
-                        placeholder="例如 D:\\Music\\podcast-bed.mp3"
-                        onChange={event => setPostprocess(current => ({ ...current, bgmPath: event.target.value }))}
-                      />
+                      <div className="produce-file-row">
+                        <Input
+                          aria-label="背景音乐文件路径"
+                          value={productionPlan.music.bed.path}
+                          readOnly
+                          placeholder="选择本地背景音乐"
+                        />
+                        <Button aria-label="选择背景音乐" disabled={isBusy} onClick={() => void chooseMusicFile('bed')}>选择</Button>
+                      </div>
                     </label>
                     <p className="produce-field-help"><WarningOutlined /> 路径必须可被桌面应用读取；不存在时制作会明确失败。</p>
                     <label>
-                      <span>背景音量 <strong>{Math.round(postprocess.bgmVolume * 100)}%</strong></span>
+                      <span>背景音量 <strong>{Math.round(productionPlan.music.bed.volume * 100)}%</strong></span>
                       <Slider
                         min={0.01}
                         max={0.5}
                         step={0.01}
-                        value={postprocess.bgmVolume}
+                        value={productionPlan.music.bed.volume}
                         disabled={isBusy}
-                        onChange={value => setPostprocess(current => ({ ...current, bgmVolume: value }))}
+                        onChange={value => {
+                          const next = {
+                            ...productionPlanRef.current,
+                            music: {
+                              ...productionPlanRef.current.music,
+                              bed: { ...productionPlanRef.current.music.bed, volume: value },
+                            },
+                          }
+                          productionPlanRef.current = next
+                          setProductionPlan(next)
+                        }}
+                        onChangeComplete={value => void updateMusic('bed', { volume: value })}
                       />
                     </label>
                   </>

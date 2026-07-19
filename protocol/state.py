@@ -42,6 +42,7 @@ class PodcastState:
     downstream_stale: dict[str, Any] = field(default_factory=dict)
 
     voice_segments: list[dict[str, Any]] = field(default_factory=list)
+    production_plan: dict[str, Any] = field(default_factory=dict)
     audio_outputs: dict[str, Any] = field(default_factory=dict)
 
     cover_path: str = ""

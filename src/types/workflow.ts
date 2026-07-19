@@ -84,6 +84,7 @@ export interface PodcastState {
   script_snapshots?: ScriptSnapshot[]
   downstream_stale?: DownstreamStale
   voice_segments: VoiceSegment[]
+  production_plan?: ProductionPlan
   audio_outputs: Record<string, any>
   cover_path: string
   intro_outro_paths: Record<string, string>
@@ -206,6 +207,61 @@ export interface VoiceSegment {
   duration_seconds?: number
   size?: number
   updated_at?: string
+  parent_segment_id?: string
+  generation_key?: string
+}
+
+export type ProductionClipSource = 'tts' | 'recording' | 'local'
+
+export interface ProductionClip {
+  id: string
+  parent_segment_id: string
+  segment_type: ScriptSegment['type']
+  segment_title: string
+  text: string
+  speaker: string
+  source_fact_ids: string[]
+  source: ProductionClipSource
+  path: string
+  duration_seconds: number
+  trim_start_ms: number
+  trim_end_ms: number
+  generation_key: string
+}
+
+export interface ProductionJoin {
+  after_clip_id: string
+  type: 'pause' | 'transition'
+  duration_ms: number
+}
+
+export interface ProductionMusicSlot {
+  enabled: boolean
+  path: string
+  volume: number
+  duration_ms: number
+  fade_in_ms: number
+  fade_out_ms: number
+}
+
+export interface ProductionPlan {
+  version: 1
+  script_hash: string
+  clips: ProductionClip[]
+  joins: ProductionJoin[]
+  music: {
+    intro: ProductionMusicSlot
+    transition: ProductionMusicSlot
+    bed: ProductionMusicSlot
+    outro: ProductionMusicSlot
+  }
+  render: {
+    output_format: 'mp3' | 'wav' | 'opus'
+    normalize_loudness: boolean
+    target_lufs: number
+    true_peak_db: number
+  }
+  updated_at: string
 }
 
 export interface RssValidation {

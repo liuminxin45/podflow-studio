@@ -38,6 +38,7 @@ def create_base_state() -> dict[str, Any]:
         "script_snapshots": [],
         "downstream_stale": {},
         "voice_segments": [],
+        "production_plan": {},
         "audio_outputs": {},
         "cover_path": "",
         "intro_outro_paths": {},
