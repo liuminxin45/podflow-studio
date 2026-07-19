@@ -1,0 +1,89 @@
+{
+  "name": "podflow-studio",
+  "version": "0.0.1",
+  "description": "Local-first solo morning news podcast pipeline",
+  "author": "PodFlow Studio Contributors",
+  "license": "MIT",
+  "main": "electron/main.js",
+  "scripts": {
+    "setup": "npm run setup:python",
+    "setup:python": "node scripts/python313.js --setup",
+    "demo:news": "node scripts/python313.js scripts/run_demo_news.py",
+    "dev": "node scripts/dev.js",
+    "dev:react": "vite --host 127.0.0.1 --port 5174 --strictPort",
+    "dev:electron": "wait-on http://127.0.0.1:5174 && cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://127.0.0.1:5174 electron .",
+    "dev:electron:cdp": "wait-on http://127.0.0.1:5174 && cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://127.0.0.1:5174 CDP_DEBUG=1 CDP_PORT=9222 CDP_FAKE_MEDIA=1 electron .",
+    "dev:cdp": "node scripts/dev.js --cdp",
+    "acceptance:cdp": "node scripts/run_cdp_acceptance.js",
+    "build": "tsc && vite build",
+    "build:electron": "npm run build && electron-builder",
+    "start": "npm run dev",
+    "lint": "eslint .",
+    "lint:py": "node scripts/python313.js -m ruff check .",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:run": "vitest run --pool=threads --maxWorkers=2 --minWorkers=1",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "verify:nodes": "node scripts/python313.js scripts/verify_nodes.py",
+    "verify:config": "node scripts/python313.js scripts/test_config.py",
+    "verify:tts-live": "node scripts/python313.js scripts/live_tts_smoke.py --engine edge-tts",
+    "verify:tts-openai-live": "node scripts/python313.js scripts/live_tts_smoke.py --engine openai-compatible",
+    "verify:rss-public": "node scripts/python313.js scripts/public_rss_smoke.py",
+    "verify:build": "node scripts/python313.js scripts/build_check.py",
+    "test:nodes": "node scripts/python313.js scripts/test_all_nodes.py",
+    "test:integration": "node scripts/python313.js scripts/integration_test.py",
+    "verify:ui-system": "node scripts/verify_ui_system.js",
+    "verify:offline": "npm run verify:ui-system && npm run verify:config && npm run verify:nodes",
+    "verify": "npm run verify:offline && npm run verify:tts-live"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.2.6",
+    "@phosphor-icons/react": "^2.1.10",
+    "antd": "^5.12.8",
+    "http-proxy-agent": "^7.0.2",
+    "https-proxy-agent": "^7.0.6",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^14.1.2",
+    "@types/node": "^22.10.5",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@typescript-eslint/eslint-plugin": "^8.19.1",
+    "@typescript-eslint/parser": "^8.19.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^1.0.4",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^40.2.1",
+    "electron-builder": "^24.9.1",
+    "eslint": "^9.18.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "jsdom": "^23.0.1",
+    "typescript": "~5.6.2",
+    "vite": "^5.4.11",
+    "vitest": "^1.0.4",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.podflow.studio",
+    "productName": "PodFlow Studio",
+    "icon": "electron/assets/PodFlow_Studio_Icon_Pack/app/light-theme/png/podflow-app-1024x1024.png",
+    "win": {
+      "icon": "electron/assets/PodFlow_Studio_Icon_Pack/app/light-theme/PodFlow_Studio_light-theme.ico"
+    },
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "nodes/**/*",
+      "protocol/**/*",
+      "scripts/**/*"
+    ]
+  }
+}

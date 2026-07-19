@@ -1,0 +1,126 @@
+# PodFlow Studio 配置示例
+# 默认路径固定为：单人新闻早报 / 通勤早咖啡式内容生产。
+# 复制为 config.yaml 后可按需替换真实 LLM / TTS provider。
+
+preset:
+  id: "morning_news_brief"
+  content_type: "news_brief"
+  num_hosts: 1
+  target_duration_minutes: 22
+  target_duration_minutes_range: "20-24"
+  template_variant: "quick_9_plus_deep_1"
+  recommended_news_item_count: 10
+  quick_news_recommended_count: 9
+  deep_dive_recommended_count: 1
+  allow_custom_news_item_count: true
+  tone: "clear, concise, commute-friendly"
+  language: "zh-CN"
+  segment_plan:
+    - type: opening
+      count: 1
+      target_seconds: [75, 110]
+    - type: quick_news
+      recommended_count: 9
+      target_seconds: [55, 90]
+    - type: deep_dive
+      recommended_count: 1
+      target_seconds: [480, 625]
+    - type: closing
+      count: 1
+      target_seconds: [20, 40]
+
+fetch:
+  sources:
+    - type: rss
+      url: "https://hnrss.org/frontpage"
+  max_items_per_source: 10
+  timeout: 30
+
+preprocess:
+  min_content_length: 80
+  max_content_length: 50000
+  remove_duplicates: true
+  similarity_threshold: 0.85
+
+# 成稿阶段内部节点：素材分析
+research:
+  enable_web_search: false
+  max_search_results: 5
+  llm_model: "gpt-4o-mini"
+  api_key: ""
+  api_base: ""
+  temperature: 0.5
+
+# 成稿阶段内部节点：结构确认
+topic_selection:
+  min_cluster_size: 2
+  max_topics: 1
+  use_llm_scoring: false
+  llm_model: "gpt-4o-mini"
+  api_key: ""
+  api_base: ""
+  temperature: 0.3
+
+facts:
+  max_facts: 20
+  selected_topic_count: 10
+
+# 成稿阶段内部节点：口播稿生成
+script:
+  preset_id: "morning_news_brief"
+  content_type: "news_brief"
+  target_duration_minutes: 22
+  num_hosts: 1
+  recommended_news_item_count: 10
+  quick_news_recommended_count: 9
+  deep_dive_recommended_count: 1
+  quick_news_chars_min: 240
+  quick_news_chars_max: 360
+  deep_dive_chars_min: 2000
+  deep_dive_chars_max: 2600
+  episode_chars_min: 5200
+  episode_chars_max: 6200
+  tone: "clear, concise, commute-friendly"
+  language: "zh-CN"
+  require_approval: true
+  words_per_minute: 250
+  llm_model: "gpt-4o"
+  api_key: ""
+  api_base: ""
+  temperature: 0.5
+
+tts:
+  # mock 会生成本地 WAV 片段，保证无外部 key 时 demo 可跑通。
+  # 可改为 edge-tts 或 openai-compatible 走真实语音。
+  engine: "mock"
+  voice_mapping:
+    Host A: "zh-CN-XiaoxiaoNeural"
+  default_voice: "zh-CN-XiaoxiaoNeural"
+  output_dir: "out/voice_segments"
+  output_format: "wav"
+  rate: "+0%"
+  volume: "+0%"
+
+audio_postprocess:
+  output_dir: "out/episodes"
+  output_format: "mp3"
+  final_basename: "final"
+  segment_pause_ms: 600
+  normalize_loudness: true
+  trim_silence: false
+  add_bgm: false
+
+assets:
+  output_dir: "out/assets"
+  generate_cover: true
+  cover_size: [1400, 1400]
+
+publish:
+  local_base_dir: "dist/episodes"
+  rss_output_dir: "out/rss"
+  public_base_url: ""
+  podcast_title: "通勤早咖啡"
+  podcast_description: "单人新闻早报播客"
+  podcast_author: "PodFlow Studio"
+  podcast_language: "zh-CN"
+  podcast_category: "News"

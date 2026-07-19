@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <g fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <!-- microphone capsule -->
+    <rect x="270" y="132" width="350" height="516" rx="175" stroke-width="72"/>
+    <!-- grille bars -->
+    <g stroke-width="66">
+      <path d="M306 286 H398 M492 286 H584"/>
+      <path d="M306 398 H398 M492 398 H584"/>
+      <path d="M306 510 H398 M492 510 H584"/>
+    </g>
+    <!-- microphone yoke and stand -->
+    <path d="M204 484 V614 C204 784 322 874 445 874 C568 874 686 784 686 614 V484" stroke-width="76"/>
+    <path d="M445 874 V938 M318 938 H572" stroke-width="76"/>
+    <!-- RSS / publishing cue -->
+    <circle cx="748" cy="420" r="27" fill="#FFFFFF" stroke="none"/>
+    <path d="M790 368 A126 126 0 0 1 884 462" stroke-width="64"/>
+    <path d="M802 242 A250 250 0 0 1 980 420" stroke-width="64"/>
+  </g>
+</svg>

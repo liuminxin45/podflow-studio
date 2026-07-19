@@ -1,0 +1,43 @@
+[project]
+name = "podflow-studio"
+version = "0.0.1"
+description = "Local-first solo morning news podcast pipeline"
+requires-python = ">=3.13"
+readme = "README.md"
+dependencies = [
+  "feedparser>=6.0.11",
+  "requests>=2.31.0",
+  "openai>=1.0.0",
+  "pydantic>=2.7.0",
+  "edge-tts>=7.2.7",
+  "pydub>=0.25.1",
+  "audioop-lts>=0.2.1",
+  "Pillow>=10.0.0",
+  "rich>=13.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "jsonschema>=4.23.0",
+  "pytest>=8.2.0",
+  "pyupgrade>=3.21.2",
+  "ruff>=0.15.20",
+]
+
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["protocol", "protocol.*", "nodes", "nodes.*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.pyright]
+pythonVersion = "3.13"
+venvPath = "."
+venv = ".venv"

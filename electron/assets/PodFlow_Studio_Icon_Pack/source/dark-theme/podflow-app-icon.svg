@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <g fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <!-- microphone capsule -->
+    <rect x="330" y="76" width="300" height="584" rx="150" stroke-width="54"/>
+    <!-- grille bars -->
+    <g stroke-width="48">
+      <path d="M358 242 H424 M536 242 H602"/>
+      <path d="M358 342 H424 M536 342 H602"/>
+      <path d="M358 442 H424 M536 442 H602"/>
+      <path d="M358 542 H424 M536 542 H602"/>
+    </g>
+    <!-- microphone yoke and stand -->
+    <path d="M270 458 V638 C270 800 374 882 480 882 C586 882 690 800 690 638 V458" stroke-width="58"/>
+    <path d="M480 882 V950 M354 950 H606" stroke-width="58"/>
+    <!-- input connector / flow node -->
+    <path d="M270 594 H222 C176 594 142 558 142 512 V410 C142 372 116 346 78 346" stroke-width="50"/>
+    <circle cx="70" cy="346" r="35" stroke-width="46"/>
+    <!-- output waveform -->
+    <path d="M690 594 H724" stroke-width="48"/>
+    <path d="M764 552 V636" stroke-width="48"/>
+    <path d="M828 500 V688" stroke-width="48"/>
+    <path d="M892 448 V740" stroke-width="48"/>
+    <path d="M956 526 V662" stroke-width="48"/>
+    <!-- RSS publishing cue -->
+    <circle cx="792" cy="244" r="22" fill="#FFFFFF" stroke="none"/>
+    <path d="M830 208 A112 112 0 0 1 908 286" stroke-width="46"/>
+    <path d="M842 112 A210 210 0 0 1 988 258" stroke-width="46"/>
+  </g>
+</svg>

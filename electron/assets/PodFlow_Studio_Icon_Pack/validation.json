@@ -1,0 +1,206 @@
+{
+  "package": "PodFlow Studio Icon Pack",
+  "transparent_background": true,
+  "themes": {
+    "light-theme": {
+      "description": "黑色线条、透明背景；用于浅色界面。",
+      "files": {
+        "app/light-theme/png/podflow-app-1024x1024.png": {
+          "size": [
+            1024,
+            1024
+          ],
+          "mode": "RGBA",
+          "alpha_extrema": [
+            0,
+            255
+          ],
+          "alpha_bbox": [
+            12,
+            49,
+            1011,
+            979
+          ],
+          "fully_transparent_pixels": 760643,
+          "visible_pixels": 287933,
+          "visible_pixels_with_unexpected_rgb": 0,
+          "partially_transparent_edge_pixels": 7842
+        },
+        "app/light-theme/png/podflow-app-32x32.png": {
+          "size": [
+            32,
+            32
+          ],
+          "mode": "RGBA",
+          "alpha_extrema": [
+            0,
+            255
+          ],
+          "alpha_bbox": [
+            5,
+            3,
+            32,
+            31
+          ],
+          "fully_transparent_pixels": 612,
+          "visible_pixels": 412,
+          "visible_pixels_with_unexpected_rgb": 0,
+          "partially_transparent_edge_pixels": 284
+        },
+        "favicon/light-theme/favicon-32x32.png": {
+          "size": [
+            32,
+            32
+          ],
+          "mode": "RGBA",
+          "alpha_extrema": [
+            0,
+            255
+          ],
+          "alpha_bbox": [
+            5,
+            3,
+            32,
+            31
+          ],
+          "fully_transparent_pixels": 612,
+          "visible_pixels": 412,
+          "visible_pixels_with_unexpected_rgb": 0,
+          "partially_transparent_edge_pixels": 284
+        },
+        "tray/light-theme/podflow-tray-20x20.png": {
+          "size": [
+            20,
+            20
+          ],
+          "mode": "RGBA",
+          "alpha_extrema": [
+            0,
+            255
+          ],
+          "alpha_bbox": [
+            3,
+            1,
+            20,
+            20
+          ],
+          "fully_transparent_pixels": 209,
+          "visible_pixels": 191,
+          "visible_pixels_with_unexpected_rgb": 0,
+          "partially_transparent_edge_pixels": 172
+        }
+      },
+      "ico_files": {
+        "app/light-theme/PodFlow_Studio_light-theme.ico": {
+          "sha256": "6818de72b87f820f109e66e46758adc8f85e3bd963b0b575f9c05c9faffb8696"
+        },
+        "favicon/light-theme/favicon.ico": {
+          "sha256": "9c812af03fde88159b67028be90c61867c8f385e7cbfede66bf5e188d7d88e67"
+        },
+        "tray/light-theme/podflow-tray-light-theme.ico": {
+          "sha256": "81d835c6254501a3a8447f440a9a0989bdeb6a545698ff90505f14fc6ce3e631"
+        }
+      }
+    },
+    "dark-theme": {
+      "description": "白色线条、透明背景；用于深色界面。",
+      "files": {
+        "app/dark-theme/png/podflow-app-1024x1024.png": {
+          "size": [
+            1024,
+            1024
+          ],
+          "mode": "RGBA",
+          "alpha_extrema": [
+            0,
+            255
+          ],
+          "alpha_bbox": [
+            12,
+            49,
+            1011,
+            979
+          ],
+          "fully_transparent_pixels": 760643,
+          "visible_pixels": 287933,
+          "visible_pixels_with_unexpected_rgb": 0,
+          "partially_transparent_edge_pixels": 7842
+        },
+        "app/dark-theme/png/podflow-app-32x32.png": {
+          "size": [
+            32,
+            32
+          ],
+          "mode": "RGBA",
+          "alpha_extrema": [
+            0,
+            255
+          ],
+          "alpha_bbox": [
+            5,
+            3,
+            32,
+            31
+          ],
+          "fully_transparent_pixels": 612,
+          "visible_pixels": 412,
+          "visible_pixels_with_unexpected_rgb": 0,
+          "partially_transparent_edge_pixels": 284
+        },
+        "favicon/dark-theme/favicon-32x32.png": {
+          "size": [
+            32,
+            32
+          ],
+          "mode": "RGBA",
+          "alpha_extrema": [
+            0,
+            255
+          ],
+          "alpha_bbox": [
+            5,
+            3,
+            32,
+            31
+          ],
+          "fully_transparent_pixels": 612,
+          "visible_pixels": 412,
+          "visible_pixels_with_unexpected_rgb": 0,
+          "partially_transparent_edge_pixels": 284
+        },
+        "tray/dark-theme/podflow-tray-20x20.png": {
+          "size": [
+            20,
+            20
+          ],
+          "mode": "RGBA",
+          "alpha_extrema": [
+            0,
+            255
+          ],
+          "alpha_bbox": [
+            3,
+            1,
+            20,
+            20
+          ],
+          "fully_transparent_pixels": 209,
+          "visible_pixels": 191,
+          "visible_pixels_with_unexpected_rgb": 0,
+          "partially_transparent_edge_pixels": 172
+        }
+      },
+      "ico_files": {
+        "app/dark-theme/PodFlow_Studio_dark-theme.ico": {
+          "sha256": "e8c29ae0d2ed120185eaf9238b28094f767ce368b1aafee198074963cb71f3e7"
+        },
+        "favicon/dark-theme/favicon.ico": {
+          "sha256": "33ce6a142d89fc1c088b21c8fd72fb794656687433c4c76a52e83c59ecdfdc48"
+        },
+        "tray/dark-theme/podflow-tray-dark-theme.ico": {
+          "sha256": "2df3d0eff5676fd942b3660222bf284e1f317fe7f69f919ed6485af8764ec760"
+        }
+      }
+    }
+  }
+}

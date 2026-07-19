@@ -1,0 +1,92 @@
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_live_tts:
+        description: Run live Edge TTS smoke
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install system audio tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto-cjk
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: npm run setup
+
+      - name: Verify configs and node CLIs
+        run: npm run verify:offline
+
+      - name: Run Python tests
+        run: node scripts/python313.js -m pytest tests -q
+
+      - name: Python lint
+        run: npm run lint:py
+
+      - name: Frontend lint
+        run: npm run lint
+
+      - name: Frontend build
+        run: npm run build
+
+      - name: Frontend tests
+        run: npx vitest run --reporter=dot
+
+      - name: Node smoke tests
+        run: npm run test:nodes
+
+      - name: Integration tests
+        run: npm run test:integration
+
+  live-tts:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_live_tts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install system audio tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto-cjk
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm run setup
+
+      - name: Live Edge TTS smoke
+        run: npm run verify:tts-live

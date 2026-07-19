@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node.js
+node_modules/
+
+# Build outputs
+out/
+dist/
+dist-electron/
+build/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Test and debug files
+.codex-run/
+tests/debug/
+tmp/
+docs/acceptance/acceptance-run.*.log
+docs/acceptance/CDP_ACCEPTANCE_REPORT.md
+docs/acceptance/screenshots/
+docs/images/
+docs/**/*.gif
+docs/**/*.jpeg
+docs/**/*.jpg
+docs/**/*.png
+docs/**/*.svg
+docs/**/*.webp
+examples/demo-news/output/
+*.test.json
+script_schema*.json
+fetch_stderr.log

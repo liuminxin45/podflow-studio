@@ -1,0 +1,332 @@
+[
+  {
+    "path": "README.md",
+    "bytes": 2061,
+    "sha256": "7de037f2dfcee54ebdef6c55cc8232180ef6255690c433acb302890dee677c1e"
+  },
+  {
+    "path": "app/dark-theme/PodFlow_Studio_dark-theme.ico",
+    "bytes": 17928,
+    "sha256": "e8c29ae0d2ed120185eaf9238b28094f767ce368b1aafee198074963cb71f3e7"
+  },
+  {
+    "path": "app/dark-theme/png/podflow-app-1024x1024.png",
+    "bytes": 40576,
+    "sha256": "f59812792b83837e42cd639192a97b4566650e55e05e3079ca6419ac34cc42af"
+  },
+  {
+    "path": "app/dark-theme/png/podflow-app-128x128.png",
+    "bytes": 3744,
+    "sha256": "8cb3d1f4ef7d4a25d0b4ef45aaef278a4813c15d08b856c7ae3acba149806404"
+  },
+  {
+    "path": "app/dark-theme/png/podflow-app-16x16.png",
+    "bytes": 417,
+    "sha256": "84df69868f40fc453dec93da4bbc19c7105c60d7b3e33e411d9388772f204efc"
+  },
+  {
+    "path": "app/dark-theme/png/podflow-app-20x20.png",
+    "bytes": 505,
+    "sha256": "21bc53c45dac79a2556b155a0e818a3621e13f1d81f1b546eb76a57621c22a3c"
+  },
+  {
+    "path": "app/dark-theme/png/podflow-app-24x24.png",
+    "bytes": 625,
+    "sha256": "7c9bd4cf93d918404c57752badc07e5e8151d752b87290cc69c5a0141a6bb0e2"
+  },
+  {
+    "path": "app/dark-theme/png/podflow-app-256x256.png",
+    "bytes": 7422,
+    "sha256": "daa9c541c3fe3cc787ee6f632a34e19de93d04f7555f077773be1cc86f4ab86f"
+  },
+  {
+    "path": "app/dark-theme/png/podflow-app-32x32.png",
+    "bytes": 833,
+    "sha256": "9d6cf2b7c62d911cdd3ec20be8dd5ad47c9cf83e481ef94d43adafe7d567ece8"
+  },
+  {
+    "path": "app/dark-theme/png/podflow-app-40x40.png",
+    "bytes": 1085,
+    "sha256": "38d642bac177fbda1b2fd69f5892b4ba78342b226dc5a5866de06aac34fa6d5f"
+  },
+  {
+    "path": "app/dark-theme/png/podflow-app-48x48.png",
+    "bytes": 1199,
+    "sha256": "b930064314a861d0dd927a33d83cc04edd268aae40bc5866e6034703e9f82945"
+  },
+  {
+    "path": "app/dark-theme/png/podflow-app-512x512.png",
+    "bytes": 17218,
+    "sha256": "b44c0499409800800d4781297cf62920a9caeac72abad300b5310ffcf915e66e"
+  },
+  {
+    "path": "app/dark-theme/png/podflow-app-64x64.png",
+    "bytes": 1948,
+    "sha256": "9982eceb0c72abfc486e607c210bbfeec8079b2d70e5e938b0d77977867470ee"
+  },
+  {
+    "path": "app/dark-theme/png/podflow-app-96x96.png",
+    "bytes": 2894,
+    "sha256": "7c384d208df09a9db3fca8dcf2b75bb2d64180932b7b1e73a8deac2d94b51dbb"
+  },
+  {
+    "path": "app/light-theme/PodFlow_Studio_light-theme.ico",
+    "bytes": 16265,
+    "sha256": "6818de72b87f820f109e66e46758adc8f85e3bd963b0b575f9c05c9faffb8696"
+  },
+  {
+    "path": "app/light-theme/png/podflow-app-1024x1024.png",
+    "bytes": 34490,
+    "sha256": "55525d8d3c524d89535d290990d4e63dddfad2b22bc571d291ec95a12347f39c"
+  },
+  {
+    "path": "app/light-theme/png/podflow-app-128x128.png",
+    "bytes": 3469,
+    "sha256": "499b40b54235471414ca1aa822d4445692e6a55b21c2ead195159d17b273db2d"
+  },
+  {
+    "path": "app/light-theme/png/podflow-app-16x16.png",
+    "bytes": 376,
+    "sha256": "ac2ee2a825c5f671fa1bee6e92e0206f0be038f49a285b76866e509bfc0eccb0"
+  },
+  {
+    "path": "app/light-theme/png/podflow-app-20x20.png",
+    "bytes": 472,
+    "sha256": "fc27776444f7762e5966dbe0f5e1525fda19a039862f8a73cbe35ae3935462ad"
+  },
+  {
+    "path": "app/light-theme/png/podflow-app-24x24.png",
+    "bytes": 568,
+    "sha256": "5039ee782a4e11e2ac8c365135f52aa8f07a292eed4ccd8cd61456c079f4cb50"
+  },
+  {
+    "path": "app/light-theme/png/podflow-app-256x256.png",
+    "bytes": 6579,
+    "sha256": "72af23fbe70828964b7733f295eb392ca0eed54cd03bcfa90160578888faa2f6"
+  },
+  {
+    "path": "app/light-theme/png/podflow-app-32x32.png",
+    "bytes": 756,
+    "sha256": "76bc556fc0a722009e2f31ba27ea1cd72db5492162237859a7a4d7bbecaf2f1e"
+  },
+  {
+    "path": "app/light-theme/png/podflow-app-40x40.png",
+    "bytes": 983,
+    "sha256": "d47bc20f059038acc70f3bd2b2b11f5688685c833e9cc661c0c1dfe216087405"
+  },
+  {
+    "path": "app/light-theme/png/podflow-app-48x48.png",
+    "bytes": 1115,
+    "sha256": "6766d848f6b6840e7fffb207ba4217c7700fea66b93e11e9ff767221e4b8ea12"
+  },
+  {
+    "path": "app/light-theme/png/podflow-app-512x512.png",
+    "bytes": 14653,
+    "sha256": "e1d353471e5626643f90af8ff23d6f396566375cbb10bc88ff88dddd15195d48"
+  },
+  {
+    "path": "app/light-theme/png/podflow-app-64x64.png",
+    "bytes": 1797,
+    "sha256": "130596a20e11f947674a99cbf44d371f53b55e50ae10195a75f2962116330045"
+  },
+  {
+    "path": "app/light-theme/png/podflow-app-96x96.png",
+    "bytes": 2671,
+    "sha256": "40150644455ff394d487ddcb297dc08a59cb25a17b38e5c89faedcdab12b3483"
+  },
+  {
+    "path": "favicon/dark-theme/android-chrome-192x192.png",
+    "bytes": 5096,
+    "sha256": "652ab830e3a697645f0aa38cc1f6b8ad8ed7edcb52e94d6fcb2265547e5da525"
+  },
+  {
+    "path": "favicon/dark-theme/android-chrome-512x512.png",
+    "bytes": 16503,
+    "sha256": "e8ddb69b49930c9491e013d09b05ef224556bf0d09c343ace4877cbfac7901f4"
+  },
+  {
+    "path": "favicon/dark-theme/apple-touch-icon.png",
+    "bytes": 4970,
+    "sha256": "17320b08082c7d49495219b77d73d3eded0b618df6abe9a2bbf2bcf669215ac7"
+  },
+  {
+    "path": "favicon/dark-theme/favicon-16x16.png",
+    "bytes": 417,
+    "sha256": "84df69868f40fc453dec93da4bbc19c7105c60d7b3e33e411d9388772f204efc"
+  },
+  {
+    "path": "favicon/dark-theme/favicon-32x32.png",
+    "bytes": 833,
+    "sha256": "9d6cf2b7c62d911cdd3ec20be8dd5ad47c9cf83e481ef94d43adafe7d567ece8"
+  },
+  {
+    "path": "favicon/dark-theme/favicon-48x48.png",
+    "bytes": 1199,
+    "sha256": "b930064314a861d0dd927a33d83cc04edd268aae40bc5866e6034703e9f82945"
+  },
+  {
+    "path": "favicon/dark-theme/favicon.ico",
+    "bytes": 2503,
+    "sha256": "33ce6a142d89fc1c088b21c8fd72fb794656687433c4c76a52e83c59ecdfdc48"
+  },
+  {
+    "path": "favicon/light-theme/android-chrome-192x192.png",
+    "bytes": 4352,
+    "sha256": "acb99b240f69b1a314adbddd3a5f6e7c2514bbf6712cc8ee6e481c66992cc4bc"
+  },
+  {
+    "path": "favicon/light-theme/android-chrome-512x512.png",
+    "bytes": 12952,
+    "sha256": "714b92b662288f5fb84b002cc442d0a256bf13cbf5dd115ea0cb1e010d67ad44"
+  },
+  {
+    "path": "favicon/light-theme/apple-touch-icon.png",
+    "bytes": 4258,
+    "sha256": "42b2017d1dc5bc79a592672b82e7363bd3bb9585f31db35aede13c49ab410054"
+  },
+  {
+    "path": "favicon/light-theme/favicon-16x16.png",
+    "bytes": 376,
+    "sha256": "ac2ee2a825c5f671fa1bee6e92e0206f0be038f49a285b76866e509bfc0eccb0"
+  },
+  {
+    "path": "favicon/light-theme/favicon-32x32.png",
+    "bytes": 756,
+    "sha256": "76bc556fc0a722009e2f31ba27ea1cd72db5492162237859a7a4d7bbecaf2f1e"
+  },
+  {
+    "path": "favicon/light-theme/favicon-48x48.png",
+    "bytes": 1115,
+    "sha256": "6766d848f6b6840e7fffb207ba4217c7700fea66b93e11e9ff767221e4b8ea12"
+  },
+  {
+    "path": "favicon/light-theme/favicon.ico",
+    "bytes": 2301,
+    "sha256": "9c812af03fde88159b67028be90c61867c8f385e7cbfede66bf5e188d7d88e67"
+  },
+  {
+    "path": "preview/app-dark-theme-preview.png",
+    "bytes": 70722,
+    "sha256": "50f229683e2e07cbcdddf9ed030f5f5feb9e434e9d73606e60cfa74dd5ef82ff"
+  },
+  {
+    "path": "preview/app-light-theme-preview.png",
+    "bytes": 70174,
+    "sha256": "75b66a624df9de7f7a9e9d29ae767fb030c6335b056435f1feee66a19016f621"
+  },
+  {
+    "path": "preview/compact-dark-theme-preview.png",
+    "bytes": 62106,
+    "sha256": "22ad42c8cc86753d59800ceff94bfe9c77db545c02cf7c908cd6983f7f6fe98c"
+  },
+  {
+    "path": "preview/compact-light-theme-preview.png",
+    "bytes": 61732,
+    "sha256": "1bde52d9ea02d13f82ea76d14c97a6124c77e756c7dbc42a3cefcd1505350ef2"
+  },
+  {
+    "path": "source/dark-theme/podflow-app-icon.svg",
+    "bytes": 1446,
+    "sha256": "a2b17d7e680d8f26d7fa2a11497ccaa63da3c54e6c6bf0b726868f38cab46a95"
+  },
+  {
+    "path": "source/dark-theme/podflow-compact-icon.svg",
+    "bytes": 935,
+    "sha256": "0fc46aa4c461c3674b5927b5115944fdae6f3e7ae4de19636d4c99c993a3c88c"
+  },
+  {
+    "path": "source/light-theme/podflow-app-icon.svg",
+    "bytes": 1446,
+    "sha256": "f4be10d7a8acdf0b8192da10e87e29426d54bd52580af6fc724137c2e383d586"
+  },
+  {
+    "path": "source/light-theme/podflow-compact-icon.svg",
+    "bytes": 935,
+    "sha256": "eca6e49371cb0c3253efb0db97a7979ca178a453e1de81019b05b8435ac3100e"
+  },
+  {
+    "path": "tray/dark-theme/podflow-tray-16x16.png",
+    "bytes": 417,
+    "sha256": "84df69868f40fc453dec93da4bbc19c7105c60d7b3e33e411d9388772f204efc"
+  },
+  {
+    "path": "tray/dark-theme/podflow-tray-20x20.png",
+    "bytes": 505,
+    "sha256": "21bc53c45dac79a2556b155a0e818a3621e13f1d81f1b546eb76a57621c22a3c"
+  },
+  {
+    "path": "tray/dark-theme/podflow-tray-24x24.png",
+    "bytes": 625,
+    "sha256": "7c9bd4cf93d918404c57752badc07e5e8151d752b87290cc69c5a0141a6bb0e2"
+  },
+  {
+    "path": "tray/dark-theme/podflow-tray-32x32.png",
+    "bytes": 833,
+    "sha256": "9d6cf2b7c62d911cdd3ec20be8dd5ad47c9cf83e481ef94d43adafe7d567ece8"
+  },
+  {
+    "path": "tray/dark-theme/podflow-tray-40x40.png",
+    "bytes": 1085,
+    "sha256": "38d642bac177fbda1b2fd69f5892b4ba78342b226dc5a5866de06aac34fa6d5f"
+  },
+  {
+    "path": "tray/dark-theme/podflow-tray-48x48.png",
+    "bytes": 1199,
+    "sha256": "b930064314a861d0dd927a33d83cc04edd268aae40bc5866e6034703e9f82945"
+  },
+  {
+    "path": "tray/dark-theme/podflow-tray-64x64.png",
+    "bytes": 1561,
+    "sha256": "91f6de45385934c7c07a0d195edf939ffe258929b3ab7afdecc35b4b529b6d0a"
+  },
+  {
+    "path": "tray/dark-theme/podflow-tray-dark-theme.ico",
+    "bytes": 6343,
+    "sha256": "2df3d0eff5676fd942b3660222bf284e1f317fe7f69f919ed6485af8764ec760"
+  },
+  {
+    "path": "tray/light-theme/podflow-tray-16x16.png",
+    "bytes": 376,
+    "sha256": "ac2ee2a825c5f671fa1bee6e92e0206f0be038f49a285b76866e509bfc0eccb0"
+  },
+  {
+    "path": "tray/light-theme/podflow-tray-20x20.png",
+    "bytes": 472,
+    "sha256": "fc27776444f7762e5966dbe0f5e1525fda19a039862f8a73cbe35ae3935462ad"
+  },
+  {
+    "path": "tray/light-theme/podflow-tray-24x24.png",
+    "bytes": 568,
+    "sha256": "5039ee782a4e11e2ac8c365135f52aa8f07a292eed4ccd8cd61456c079f4cb50"
+  },
+  {
+    "path": "tray/light-theme/podflow-tray-32x32.png",
+    "bytes": 756,
+    "sha256": "76bc556fc0a722009e2f31ba27ea1cd72db5492162237859a7a4d7bbecaf2f1e"
+  },
+  {
+    "path": "tray/light-theme/podflow-tray-40x40.png",
+    "bytes": 983,
+    "sha256": "d47bc20f059038acc70f3bd2b2b11f5688685c833e9cc661c0c1dfe216087405"
+  },
+  {
+    "path": "tray/light-theme/podflow-tray-48x48.png",
+    "bytes": 1115,
+    "sha256": "6766d848f6b6840e7fffb207ba4217c7700fea66b93e11e9ff767221e4b8ea12"
+  },
+  {
+    "path": "tray/light-theme/podflow-tray-64x64.png",
+    "bytes": 1425,
+    "sha256": "d4efd97e4e5eb649cac9b61014b29a24ea55f4859df8afc94a648686d08adeee"
+  },
+  {
+    "path": "tray/light-theme/podflow-tray-light-theme.ico",
+    "bytes": 5813,
+    "sha256": "81d835c6254501a3a8447f440a9a0989bdeb6a545698ff90505f14fc6ce3e631"
+  },
+  {
+    "path": "validation.json",
+    "bytes": 5399,
+    "sha256": "7bfa09fdc07eda5569e3fa9177a1afcddc6fcd6857d0169cd8b30af993818686"
+  }
+]

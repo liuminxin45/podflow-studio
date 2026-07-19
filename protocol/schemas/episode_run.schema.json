@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://podflow.local/schemas/episode_run.schema.json",
+  "title": "PodFlow Studio EpisodeRun",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_id",
+    "preset",
+    "source_inputs",
+    "facts",
+    "selected_topics",
+    "script",
+    "edited_script",
+    "voice_segments",
+    "audio_outputs",
+    "publish_outputs",
+    "run_report"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "episode_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string" },
+    "preset": {
+      "type": "object",
+      "required": ["id", "content_type", "num_hosts"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "const": "morning_news_brief" },
+        "content_type": { "const": "news_brief" },
+        "num_hosts": { "const": 1 }
+      }
+    },
+    "source_inputs": { "type": "array", "items": { "type": "object" } },
+    "runtime_config": { "type": "object" },
+    "logs": { "type": "array", "items": { "type": "string" } },
+    "errors": { "type": "array", "items": { "type": "object" } },
+    "fetch_contents": { "type": "array", "items": { "type": "object" } },
+    "cleaned_contents": { "type": "array", "items": { "type": "object" } },
+    "researched_contents": { "type": "array", "items": { "type": "object" } },
+    "facts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/factCard" }
+    },
+    "selected_topics": { "type": "array", "items": { "type": "object" } },
+    "selected_topic": { "type": "object" },
+    "selected_materials": { "type": "array", "items": { "type": "object" } },
+    "auto_selected_items": { "type": "array", "items": { "type": "object" } },
+    "auto_rejected_items": { "type": "array", "items": { "type": "object" } },
+    "script": { "$ref": "#/$defs/script" },
+    "edited_script": { "$ref": "#/$defs/script" },
+    "generation_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        { "maxProperties": 0 },
+        { "required": ["mode"] }
+      ],
+      "properties": {
+        "mode": { "enum": ["initial", "regenerate"] },
+        "require_llm": { "type": "boolean" },
+        "requested_at": { "type": "string" },
+        "status": {
+          "oneOf": [
+            { "const": "failed" },
+            { "type": "null" }
+          ]
+        },
+        "failed_at": { "type": "string" },
+        "draft_snapshot": {
+          "oneOf": [
+            { "$ref": "#/$defs/script" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "generation_meta": { "type": "object", "additionalProperties": true },
+    "script_snapshots": { "type": "array", "items": { "type": "object" } },
+    "downstream_stale": { "type": "object", "additionalProperties": true },
+    "voice_segments": { "type": "array", "items": { "type": "object" } },
+    "audio_outputs": { "$ref": "#/$defs/audioOutputs" },
+    "cover_path": { "type": "string" },
+    "intro_outro_paths": { "type": "object", "additionalProperties": { "type": "string" } },
+    "review_summary": { "type": "object" },
+    "publish_outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "episode_dir": { "type": "string" },
+        "audio_path": { "type": "string" },
+        "episode_json": { "type": "string" },
+        "feed_xml": { "type": "string" },
+        "run_report_json": { "type": "string" },
+        "enclosure_url": { "type": "string" },
+        "local_preview_only": { "type": "boolean" },
+        "contains_mock_audio": { "type": "boolean" },
+        "package_feed_xml": { "type": "string" },
+        "published_at": { "type": "string" },
+        "status": { "enum": ["success", "partial_success", "failed"] },
+        "enabled_platforms": { "type": "array", "items": { "type": "string" } },
+        "platforms": { "type": "object", "additionalProperties": { "type": "string" } },
+        "rss_validation_ok": { "type": "boolean" },
+        "warning": { "type": "string" },
+        "rss_validation": { "$ref": "#/$defs/rssValidation" }
+      }
+    },
+    "subtitle_path": { "type": "string" },
+    "run_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "episode_id": { "type": "string" },
+        "preset_id": { "type": "string" },
+        "facts": { "type": "object" },
+        "script": { "type": "object" },
+        "audio": { "type": "object" },
+        "publish": { "type": "object" },
+        "schema_validation": { "type": "object" },
+        "rss_validation": { "$ref": "#/$defs/rssValidation" },
+        "tts_live_validation": { "type": "object" },
+        "warnings": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "discover_meta": { "type": "object" },
+    "discover_ui": { "type": "object" },
+    "organize_ui": { "type": "object" },
+    "episode_brief": { "type": "object" },
+    "writing_meta": { "type": "object" },
+    "_manifest": { "type": "object" }
+  },
+  "$defs": {
+    "factCard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "source_title",
+        "source_url",
+        "published_at",
+        "claim",
+        "confidence",
+        "used_in_segments"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^fact_[0-9]{3}$" },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "source_title": { "type": "string" },
+        "source_url": { "type": "string" },
+        "published_at": { "type": "string" },
+        "claim": { "type": "string" },
+        "confidence": { "enum": ["high", "medium", "low"] },
+        "source_titles": { "type": "array", "items": { "type": "string" } },
+        "source_urls": { "type": "array", "items": { "type": "string" } },
+        "is_deep_dive": { "type": "boolean" },
+        "used_in_segments": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "script": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "content_type": { "const": "news_brief" },
+        "preset_id": { "const": "morning_news_brief" },
+        "num_hosts": { "const": 1 },
+        "segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scriptSegment" }
+        },
+        "generated_by": { "type": "string" },
+        "edited_from": { "type": "string" },
+        "edit_mode": { "type": "string" },
+        "manual_notes": { "type": "string" },
+        "facts_snapshot": { "type": "array", "items": { "$ref": "#/$defs/factCard" } },
+        "recommended_news_item_count": { "type": "integer" },
+        "recommended_quick_news_count": { "type": "integer" },
+        "recommended_deep_dive_count": { "type": "integer" },
+        "actual_news_item_count": { "type": "integer" },
+        "actual_quick_news_count": { "type": "integer" },
+        "actual_deep_dive_count": { "type": "integer" },
+        "template_variant": { "type": "string" },
+        "generation_profile": { "type": "object" },
+        "warnings": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "scriptSegment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "text", "source_fact_ids", "estimated_seconds"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": {
+          "enum": ["opening", "quick_news", "deep_dive", "closing", "custom"]
+        },
+        "title": { "type": "string" },
+        "text": { "type": "string" },
+        "source_fact_ids": { "type": "array", "items": { "type": "string" } },
+        "estimated_seconds": { "type": "integer", "minimum": 0 },
+        "speaker": { "type": "string" }
+      }
+    },
+    "rssValidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "errors", "warnings", "enclosure_url", "local_preview_only"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "errors": { "type": "array", "items": { "type": "string" } },
+        "warnings": { "type": "array", "items": { "type": "string" } },
+        "enclosure_url": { "type": "string" },
+        "local_preview_only": { "type": "boolean" }
+      }
+    },
+    "audioOutputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string" },
+        "final_audio_path": { "type": "string" },
+        "format": { "type": "string" },
+        "requested_format": { "type": "string" },
+        "degraded": { "type": "boolean" },
+        "duration_seconds": { "type": "number" },
+        "segments_count": { "type": "integer" },
+        "source_segments": { "type": "array", "items": { "type": "string" } },
+        "source_engines": { "type": "array", "items": { "type": "string" } },
+        "contains_mock_audio": { "type": "boolean" },
+        "missing_segments": { "type": "array", "items": { "type": "string" } },
+        "operations": { "type": "array", "items": { "type": "string" } },
+        "file_size": { "type": "integer" },
+        "audio_report_path": { "type": "string" },
+        "audio_artifact": { "type": "object" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}
