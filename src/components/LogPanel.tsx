@@ -5,6 +5,7 @@ import {
   ClockCircleOutlined,
   CloseCircleOutlined,
   CopyOutlined,
+  DeleteOutlined,
   DownOutlined,
   FileTextOutlined,
   SyncOutlined,
@@ -17,9 +18,10 @@ interface Props {
   collapsed?: boolean
   onToggle?: () => void
   showToggle?: boolean
+  onClearLogs?: () => void | Promise<void>
 }
 
-export default function LogPanel({ workflow, collapsed = false, onToggle, showToggle = true }: Props) {
+export default function LogPanel({ workflow, collapsed = false, onToggle, showToggle = true, onClearLogs }: Props) {
   const state = workflow?.state || {}
   const logs = state.logs || []
   const errors = state.errors || []
@@ -27,6 +29,8 @@ export default function LogPanel({ workflow, collapsed = false, onToggle, showTo
   const logContainerRef = useRef<HTMLDivElement>(null)
   const [autoScroll] = useState(true)
   const [activeTab, setActiveTab] = useState('nodes')
+  const [clearingLogs, setClearingLogs] = useState(false)
+  const [confirmingClear, setConfirmingClear] = useState(false)
 
   useEffect(() => {
     if (activeTab === 'logs' && autoScroll && logContainerRef.current) {
@@ -41,6 +45,20 @@ export default function LogPanel({ workflow, collapsed = false, onToggle, showTo
     }).catch(() => {
       message.error('Failed to copy logs')
     })
+  }
+
+  const handleClearLogs = async () => {
+    if (!onClearLogs || clearingLogs) return
+    setClearingLogs(true)
+    try {
+      await onClearLogs()
+      setConfirmingClear(false)
+      message.success('执行日志已清空')
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '清空执行日志失败')
+    } finally {
+      setClearingLogs(false)
+    }
   }
   
   const getNodeStatusIcon = (status: string) => {
@@ -143,54 +161,64 @@ export default function LogPanel({ workflow, collapsed = false, onToggle, showTo
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
                 <FileTextOutlined />
                 <span>执行日志</span>
-                <Badge count={logs.length} overflowCount={999} style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', boxShadow: 'none' }} />
-                {logs.length > 0 && (
-                  <Button 
-                    type="text" 
-                    size="small" 
-                    icon={<CopyOutlined />}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleCopyLogs()
-                    }}
-                    style={{ marginLeft: '4px', padding: '0 4px', height: '20px' }}
-                  />
-                )}
+                <Badge count={logs.length} overflowCount={10000} style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', boxShadow: 'none' }} />
               </span>
             ),
             children: (
-              <div ref={logContainerRef} className="log-panel-scroll" style={{
-                height: '100%',
-                overflow: 'auto', 
-                padding: '12px 16px 28px',
-                boxSizing: 'border-box',
-                fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-                fontSize: '12px',
-                color: 'var(--text-secondary)',
-                lineHeight: '1.6',
-                background: 'var(--bg-primary)',
-                margin: '0 12px 12px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-color)',
-                display: collapsed ? 'none' : 'block'
-              }}>
-                {logs.length > 0 ? (
-                  logs.map((log: string, i: number) => (
-                    <div key={i} style={{ 
-                      padding: '2px 0',
-                      borderBottom: '1px solid var(--border-light)',
-                      color: log.includes('Error') || log.includes('Failed') || log.includes('错误') || log.includes('失败') ? 'var(--error-color)' : 'inherit',
-                      display: 'flex',
-                      gap: '12px',
-                      wordBreak: 'break-word'
-                    }}>
-                      <span style={{ opacity: 0.4, minWidth: '24px', textAlign: 'right', userSelect: 'none', flexShrink: 0 }}>{i + 1}</span>
-                      <span style={{ flex: 1 }}>{log}</span>
-                    </div>
-                  ))
-                ) : (
-                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无日志" style={{ margin: '20px 0' }} />
+              <div style={{ height: '100%', minHeight: 0, display: collapsed ? 'none' : 'flex', flexDirection: 'column' }}>
+                {logs.length > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, padding: '8px 12px' }}>
+                    <Button type="text" size="small" aria-label="复制执行日志" icon={<CopyOutlined />} onClick={handleCopyLogs}>
+                      复制
+                    </Button>
+                    {onClearLogs && (confirmingClear ? (
+                      <>
+                        <span style={{ alignSelf: 'center', color: 'var(--text-secondary)', fontSize: 12 }}>清空后无法恢复</span>
+                        <Button type="text" size="small" onClick={() => setConfirmingClear(false)}>取消</Button>
+                        <Button type="text" size="small" danger loading={clearingLogs} aria-label="确认清空执行日志" icon={<DeleteOutlined />} onClick={handleClearLogs}>
+                          确认清空
+                        </Button>
+                      </>
+                    ) : (
+                      <Button type="text" size="small" danger aria-label="清空执行日志" icon={<DeleteOutlined />} onClick={() => setConfirmingClear(true)}>
+                        清空
+                      </Button>
+                    ))}
+                  </div>
                 )}
+                <div ref={logContainerRef} className="log-panel-scroll" style={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflow: 'auto',
+                  padding: '12px 16px 28px',
+                  boxSizing: 'border-box',
+                  fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)',
+                  lineHeight: '1.6',
+                  background: 'var(--bg-primary)',
+                  margin: '0 12px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-color)',
+                }}>
+                  {logs.length > 0 ? (
+                    logs.map((log: string, i: number) => (
+                      <div key={i} style={{
+                        padding: '2px 0',
+                        borderBottom: '1px solid var(--border-light)',
+                        color: log.includes('Error') || log.includes('Failed') || log.includes('错误') || log.includes('失败') ? 'var(--error-color)' : 'inherit',
+                        display: 'flex',
+                        gap: '12px',
+                        wordBreak: 'break-word',
+                      }}>
+                        <span style={{ opacity: 0.4, minWidth: '24px', textAlign: 'right', userSelect: 'none', flexShrink: 0 }}>{i + 1}</span>
+                        <span style={{ flex: 1 }}>{log}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无日志" style={{ margin: '20px 0' }} />
+                  )}
+                </div>
               </div>
             )
           },

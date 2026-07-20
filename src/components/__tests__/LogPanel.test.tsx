@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import LogPanel from '../LogPanel'
 
 describe('LogPanel', () => {
@@ -12,5 +12,18 @@ describe('LogPanel', () => {
 
     await waitFor(() => expect(container.scrollTop).toBe(640))
     expect(screen.getByText('latest')).toBeTruthy()
+  })
+
+  it('lets the user confirm clearing workflow logs', async () => {
+    const onClearLogs = vi.fn().mockResolvedValue(undefined)
+    render(<LogPanel
+      workflow={{ state: { logs: ['existing'], errors: [] }, nodeExecutions: {} }}
+      onClearLogs={onClearLogs}
+    />)
+    fireEvent.click(screen.getByRole('tab', { name: /执行日志/ }))
+    fireEvent.click(screen.getByRole('button', { name: '清空执行日志' }))
+    fireEvent.click(await screen.findByRole('button', { name: '确认清空执行日志' }))
+
+    await waitFor(() => expect(onClearLogs).toHaveBeenCalledTimes(1))
   })
 })

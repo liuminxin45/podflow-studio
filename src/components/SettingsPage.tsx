@@ -50,6 +50,7 @@ interface Props {
   visible: boolean
   workflow: Workflow | null
   onClose: () => void
+  onClearLogs?: () => void | Promise<void>
 }
 
 const CAPABILITY_TO_GLOBAL_PREFIX: Record<NodeCapabilityType, 'text' | 'audio'> = {
@@ -431,7 +432,7 @@ function SubsectionBlock({ title, desc, children, collapsible = false }: {
 // Main Component
 // ============================================================
 
-export default function SettingsPage({ visible, workflow, onClose }: Props) {
+export default function SettingsPage({ visible, workflow, onClose, onClearLogs }: Props) {
   const [activeSection, setActiveSection] = useState<SettingsSection>('creation')
   const [settings, setSettings] = useState<AppSettings>(() => structuredClone(DEFAULT_SETTINGS))
   const [hasChanges, setHasChanges] = useState(false)
@@ -756,7 +757,7 @@ export default function SettingsPage({ visible, workflow, onClose }: Props) {
         borderRadius: 12,
         overflow: 'hidden',
       }}>
-        <LogPanel workflow={workflow} collapsed={false} showToggle={false} />
+        <LogPanel workflow={workflow} collapsed={false} showToggle={false} onClearLogs={onClearLogs} />
       </div>
     </div>
   )

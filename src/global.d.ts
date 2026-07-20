@@ -84,6 +84,7 @@ declare global {
     setAppDirtyState: (dirty: boolean) => Promise<{ success: boolean }>
     updateWorkflowState: (id: string, patch: Record<string, any>) => Promise<Workflow>
     appendWorkflowLogs: (id: string, entries: string[]) => Promise<Workflow>
+    clearWorkflowLogs: (id: string) => Promise<Workflow>
     runWorkflowNodes: (id: string, nodeNames: string[]) => Promise<Workflow>
     discoverRun: (id: string, config: Record<string, any>) => Promise<Workflow>
     saveRecording: (payload: {

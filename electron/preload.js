@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setAppDirtyState: (dirty) => ipcRenderer.invoke('app:setDirtyState', dirty),
   updateWorkflowState: (workflowId, patch) => ipcRenderer.invoke('workflow:updateState', workflowId, patch),
   appendWorkflowLogs: (workflowId, entries) => ipcRenderer.invoke('workflow:appendLogs', workflowId, entries),
+  clearWorkflowLogs: (workflowId) => ipcRenderer.invoke('workflow:clearLogs', workflowId),
   runWorkflowNodes: (workflowId, nodeNames) => ipcRenderer.invoke('workflow:runNodes', workflowId, nodeNames),
   discoverRun: (workflowId, config) => ipcRenderer.invoke('discover:run', workflowId, config),
   saveRecording: (payload) => ipcRenderer.invoke('recording:save', payload),

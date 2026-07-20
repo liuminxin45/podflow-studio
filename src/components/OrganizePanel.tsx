@@ -807,6 +807,11 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
         writeProcessLog(`KNOWLEDGE_RESPONSE request=${requestId} responseChars=${knowledgeRaw.length} finishReason=${knowledgeFinishReason}`)
         assertStructuredResponseComplete(knowledgeDetails)
         const knowledgePlan = parseStructuredResponse(knowledgeRaw, '扩展 AI 知识')
+        const rawKnowledgeCandidates = Array.isArray(knowledgePlan.knowledgeCandidates) ? knowledgePlan.knowledgeCandidates : []
+        const knowledgeFieldValues = (field: 'confidence' | 'temporalRisk') => rawKnowledgeCandidates.map(candidate => (
+          candidate && typeof candidate === 'object' ? (candidate as Record<string, unknown>)[field] ?? null : null
+        ))
+        writeProcessLog(`KNOWLEDGE_SHAPE request=${requestId} count=${rawKnowledgeCandidates.length} confidences=${JSON.stringify(knowledgeFieldValues('confidence'))} temporalRisks=${JSON.stringify(knowledgeFieldValues('temporalRisk'))}`)
         knowledgeCandidates = parseKnowledgeCandidates(knowledgePlan.knowledgeCandidates, isDeepDive ? { min: 5, max: 8 } : { min: 3, max: 5 })
         completePhase(`已生成 ${knowledgeCandidates.length} 条知识候选`)
       }

@@ -106,5 +106,5 @@ export function promoteKnowledgeCandidates(
 export function knowledgeExpansionInstruction(mode: OrganizeCompletionMode, isDeepDive: boolean): string {
   if (mode === 'web_only') throw new Error('纯联网模式不应调用 AI 知识扩展')
   const count = isDeepDive ? '5-8' : '3-5'
-  return `只返回 JSON 对象 {"knowledgeCandidates": [...]}，knowledgeCandidates 必须有 ${count} 条，用于发挥模型自身的通用知识、历史记忆和分析能力。每项包含 id、role、statement、basis、temporalRisk、confidence、verificationQuery、limitations。role 只能是 historical_context、mechanism、comparison、counter_view、stakeholder、listener_question、practical_implication；basis 只能是 model_memory 或 model_inference。不得返回研究计划，不得声称模型知识已有网页来源，不得编造 URL；最新状态、精确数字、日期、人物原话、法律政策和产品规格必须 temporalRisk=high。statement、verificationQuery 和 limitations 应简洁，提供背景、机制、对照、反方或听众问题，避免复述主材料。`
+  return `只返回 JSON 对象 {"knowledgeCandidates": [...]}，knowledgeCandidates 必须有 ${count} 条，用于发挥模型自身的通用知识、历史记忆和分析能力。每项包含 id、role、statement、basis、temporalRisk、confidence、verificationQuery、limitations。role 只能是 historical_context、mechanism、comparison、counter_view、stakeholder、listener_question、practical_implication；basis 只能是 model_memory 或 model_inference；temporalRisk 和 confidence 都只能是 low、medium 或 high，不得使用中文、百分比或其他等级。limitations 必须是字符串数组，没有限制时返回空数组。不得返回研究计划，不得声称模型知识已有网页来源，不得编造 URL；最新状态、精确数字、日期、人物原话、法律政策和产品规格必须 temporalRisk=high。statement 和 verificationQuery 应简洁，提供背景、机制、对照、反方或听众问题，避免复述主材料。`
 }

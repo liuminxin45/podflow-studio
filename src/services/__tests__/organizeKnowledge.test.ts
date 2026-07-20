@@ -13,6 +13,8 @@ describe('organizeKnowledge', () => {
     expect(prompt).toContain('只返回 JSON 对象')
     expect(prompt).toContain('不得返回研究计划')
     expect(prompt).toContain('3-5 条')
+    expect(prompt).toContain('temporalRisk 和 confidence 都只能是 low、medium 或 high')
+    expect(prompt).toContain('limitations 必须是字符串数组')
     expect(() => knowledgeExpansionInstruction('web_only', false)).toThrow('纯联网模式不应调用 AI 知识扩展')
   })
 
@@ -53,6 +55,21 @@ describe('organizeKnowledge', () => {
     }))
 
     expect(() => parseKnowledgeCandidates(response, { min: 3, max: 5 })).toThrow('第 2 条候选 statement 或 role 无效')
+  })
+
+  it('rejects confidence values outside the declared enum', () => {
+    const response = Array.from({ length: 3 }, (_, index) => ({
+      id: `candidate-${index + 1}`,
+      role: 'historical_context',
+      statement: `历史背景 ${index + 1}`,
+      basis: 'model_memory',
+      temporalRisk: 'low',
+      confidence: index === 0 ? 'moderate' : 'medium',
+      verificationQuery: `核验问题 ${index + 1}`,
+      limitations: [],
+    }))
+
+    expect(() => parseKnowledgeCandidates(response, { min: 3, max: 5 })).toThrow('第 1 条候选 confidence 无效')
   })
 
   it('promotes a knowledge candidate only when an accepted result supports it', () => {

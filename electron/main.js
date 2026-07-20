@@ -10,7 +10,11 @@ const { detectLocalAgents } = require('./aiTargetManager')
 const { listDoubaoVoices } = require('./services/doubaoVoiceService')
 const { resolvePythonCommand } = require('../scripts/python313')
 const { create: createFileService } = require('./services/fileService')
-const { createAppendWorkflowLogsHandler } = require('./services/workflowLogService')
+const {
+  capWorkflowLogs,
+  createAppendWorkflowLogsHandler,
+  createClearWorkflowLogsHandler,
+} = require('./services/workflowLogService')
 const { create: createWorkflowRunner } = require('./workflowRunner')
 const { resolveWorkflowById } = require('./services/workflowLookup')
 const { validateNodeOutput } = require('./nodeValidator')
@@ -84,6 +88,7 @@ let fetchSourcesCacheSignature = ''
 let fetchSourcesInflight = null
 
 function broadcastWorkflowUpdate() {
+  capWorkflowLogs(currentWorkflow)
   if (mainWindow) {
     mainWindow.webContents.send('workflow:update', currentWorkflow)
   }
@@ -215,6 +220,7 @@ function normalizeWorkflow(workflow) {
 
 function saveWorkflow(workflow) {
   if (!workflow?.id) return
+  capWorkflowLogs(workflow)
   ensureWorkflowDir()
   fs.writeFileSync(workflowFilePath(workflow.id), JSON.stringify(normalizeWorkflow(workflow), null, 2), 'utf8')
 }
@@ -982,6 +988,12 @@ ipcMain.handle('workflow:updateState', async (event, workflowId, patch) => {
 })
 
 ipcMain.handle('workflow:appendLogs', createAppendWorkflowLogsHandler({
+  getCurrentWorkflow: () => currentWorkflow,
+  markDirty: () => { currentWorkflowDirty = true },
+  broadcastWorkflowUpdate,
+}))
+
+ipcMain.handle('workflow:clearLogs', createClearWorkflowLogsHandler({
   getCurrentWorkflow: () => currentWorkflow,
   markDirty: () => { currentWorkflowDirty = true },
   broadcastWorkflowUpdate,

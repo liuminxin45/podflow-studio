@@ -1214,6 +1214,12 @@ function App() {
           visible={settingsVisible}
           workflow={workflow}
           onClose={closeSettings}
+          onClearLogs={async () => {
+            if (!workflow?.id || !window.electronAPI?.clearWorkflowLogs) throw new Error('当前环境无法清空执行日志')
+            const updated = await window.electronAPI.clearWorkflowLogs(workflow.id)
+            setWorkflow(updated)
+            setHasUnsavedChanges(true)
+          }}
         />
       </Layout>
     </ConfigProvider>

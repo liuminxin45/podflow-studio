@@ -134,6 +134,31 @@ describe('OrganizePanel research tolerance', () => {
     expect(screen.getByText(/AI 知识扩展完成，共 3 条/)).toBeTruthy()
   })
 
+  it('reports knowledge enum values when the model violates the confidence contract', async () => {
+    settingsRepository.save({
+      ...structuredClone(DEFAULT_SETTINGS),
+      creatorPreferences: { ...DEFAULT_SETTINGS.creatorPreferences, organizeCompletionMode: 'hybrid' },
+    })
+    const invalidKnowledge = knowledgeExpansion()
+    invalidKnowledge.knowledgeCandidates[0].confidence = 'moderate'
+    const onProcessLog = vi.fn()
+    vi.mocked(llmService.call)
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(researchPlan(['事实问题', '背景问题'])) } }] } as any)
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(invalidKnowledge) } }] } as any)
+
+    render(<OrganizePanel
+      visible
+      onClose={vi.fn()}
+      onProcessLog={onProcessLog}
+      contents={[{ title: '原始新闻', content: '原始内容', source: '来源甲' }]}
+    />)
+    fireEvent.click(screen.getByRole('button', { name: '自动补全资料' }))
+
+    await waitFor(() => expect(screen.getAllByText(/第 1 条候选 confidence 无效/).length).toBeGreaterThan(0))
+    expect(onProcessLog).toHaveBeenCalledWith(expect.stringContaining('KNOWLEDGE_SHAPE request=1 count=3 confidences=["moderate","medium","medium"]'))
+    expect(searchForOrganize).not.toHaveBeenCalled()
+  })
+
   it('puts AI knowledge usage boundaries in the synthesis system prompt', async () => {
     vi.mocked(llmService.call).mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({
       title: '整理后的标题',
