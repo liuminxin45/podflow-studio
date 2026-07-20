@@ -744,7 +744,7 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
             role: 'system',
             content: isDeepDive
               ? '你是严谨的中文播客深度研究编辑。先判断报道类型 reportType：event（单一事件）、explanatory（解释原因/机制）、trend（趋势与多案例）。只返回 JSON：coreSubject、reportType、needsClarification、researchTasks。researchTasks 为 4-6 个对象，每项包含 id、question、purpose、role、freshness、queries。role 只能是 direct_fact、historical_context、mechanism、comparison、counter_evidence、consumer_experience、expert_opinion、data_benchmark；freshness 只能是 latest、year、any。每项给 1-2 个短而原子的查询，主体查询尽量使用引号精确匹配；历史、机制、竞品和反例允许不限时间。不要把所有任务都限制为近期。解释型报道允许不同来源分别支撑不同论点，不要求它们描述同一事件。只有标题和正文仍无法识别核心研究对象时才 needsClarification=true。'
-              : '你是严谨的中文播客研究编辑。先判断报道类型 reportType：event、explanatory 或 trend。只返回 JSON：coreSubject、reportType、needsClarification、researchTasks。researchTasks 为 2-4 个对象，每项包含 id、question、purpose、role、freshness、queries；role 只能是 direct_fact、historical_context、mechanism、comparison、counter_evidence、consumer_experience、expert_opinion、data_benchmark；freshness 只能是 latest、year、any。查询应短而原子，当前事实可用 latest，历史背景、同比环比、机制和反方材料使用 year 或 any，不得统一限制为近期。只有标题和正文仍无法识别核心对象时才 needsClarification=true。',
+              : '你是严谨的中文播客研究编辑。先判断报道类型 reportType：event、explanatory 或 trend。只返回 JSON：coreSubject、reportType、needsClarification、researchTasks。researchTasks 为 2-4 个对象，每项包含 id、question、purpose、role、freshness、queries；每项 queries 必须包含 1-2 个短而原子的查询，不得超过 2 个，全部任务的查询总数不得超过 8 个。role 只能是 direct_fact、historical_context、mechanism、comparison、counter_evidence、consumer_experience、expert_opinion、data_benchmark；freshness 只能是 latest、year、any。当前事实可用 latest，历史背景、同比环比、机制和反方材料使用 year 或 any，不得统一限制为近期。只有标题和正文仍无法识别核心对象时才 needsClarification=true。',
           },
           {
             role: 'user',
@@ -758,6 +758,11 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
       writeProcessLog(`PLAN_RESPONSE request=${requestId} responseChars=${raw.length} finishReason=${planningFinishReason}`)
       assertStructuredResponseComplete(planningDetails)
       const plan = parseStructuredResponse(raw, '制定搜索问题')
+      const rawResearchTasks = Array.isArray(plan.researchTasks) ? plan.researchTasks : []
+      const queryCounts = rawResearchTasks.map(task => task && typeof task === 'object' && Array.isArray((task as Record<string, unknown>).queries)
+        ? ((task as Record<string, unknown>).queries as unknown[]).length
+        : null)
+      writeProcessLog(`PLAN_SHAPE request=${requestId} taskCount=${rawResearchTasks.length} queryCounts=${JSON.stringify(queryCounts)}`)
       plannedResearch = normalizeResearchPlan(plan, researchQueryLimit)
       const requiredTaskCount = isDeepDive ? { min: 4, max: 6 } : { min: 2, max: 4 }
       if (plannedResearch.tasks.length < requiredTaskCount.min || plannedResearch.tasks.length > requiredTaskCount.max) {

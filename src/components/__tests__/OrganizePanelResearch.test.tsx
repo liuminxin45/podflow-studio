@@ -385,6 +385,31 @@ describe('OrganizePanel research tolerance', () => {
     expect(searchForOrganize).not.toHaveBeenCalled()
   })
 
+  it('reports research-task query counts when the model violates the planning contract', async () => {
+    const onProcessLog = vi.fn()
+    const plan = researchPlan(['背景问题'], 'explanatory')
+    plan.researchTasks.unshift({
+      id: 'facts',
+      question: '事实核验',
+      purpose: '核验核心事实',
+      role: 'direct_fact',
+      freshness: 'year',
+      queries: ['事实问题一', '事实问题二', '事实问题三'],
+    })
+    vi.mocked(llmService.call).mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify(plan) } }],
+    } as any)
+
+    render(<OrganizePanel visible onClose={vi.fn()} onProcessLog={onProcessLog} contents={[{ title: '原始新闻', content: '原始内容', source: '来源甲' }]} />)
+    fireEvent.click(screen.getByRole('button', { name: '自动补全资料' }))
+
+    await waitFor(() => expect(screen.getAllByText(/第 1 个任务必须包含 1-2 个 queries/).length).toBeGreaterThan(0))
+    expect(onProcessLog).toHaveBeenCalledWith(expect.stringContaining('PLAN_SHAPE request=1 taskCount=2 queryCounts=[3,1]'))
+    const planningPrompt = vi.mocked(llmService.call).mock.calls[0]?.[0]?.messages?.[0]?.content || ''
+    expect(planningPrompt).toContain('每项 queries 必须包含 1-2 个')
+    expect(searchForOrganize).not.toHaveBeenCalled()
+  })
+
   it('rejects the removed researchQueries response instead of converting it', async () => {
     vi.mocked(llmService.call).mockResolvedValue({
       choices: [{ message: { content: JSON.stringify({ researchQueries: ['旧版问题一', '旧版问题二'] }) } }],
