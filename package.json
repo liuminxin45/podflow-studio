@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "Local-first solo morning news podcast pipeline",
   "author": "PodFlow Studio Contributors",
-  "license": "MIT",
+  "license": "LGPL-3.0-only",
   "main": "electron/main.js",
   "scripts": {
     "setup": "npm run setup:python",
