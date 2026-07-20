@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildOrganizeUiPatch,
+  contentOriginKeys,
+  organizeWorkspaceMatchesSelection,
   prepareCandidateForDraft,
   readyCandidatesForDraft,
   toCandidateItems,
@@ -87,5 +89,33 @@ describe('buildOrganizeUiPatch', () => {
         content: expect.stringContaining('不同说法与边界'),
       }),
     ])
+  })
+
+  it('matches discovery selection to organized origins after titles change or units merge', () => {
+    const selection = [
+      { title: '原始标题 A', url: 'https://example.com/a' },
+      { title: '原始标题 B', url: 'https://example.com/b' },
+    ]
+    const merged = [{
+      _id: 1,
+      _order: 0,
+      _priority: 'important' as const,
+      _status: 'ready' as const,
+      title: '整理后的合并标题',
+      _originKeys: ['url:https://example.com/a', 'url:https://example.com/b'],
+    }]
+
+    expect(organizeWorkspaceMatchesSelection(merged, selection)).toBe(true)
+    expect(organizeWorkspaceMatchesSelection(merged, selection.slice(0, 1))).toBe(false)
+  })
+
+  it('keeps the original identity for a URL-less material after its title is edited', () => {
+    const edited = {
+      title: '整理后的标题',
+      source_id: 'manual',
+      _originKeys: ['source-title:manual|原始标题'],
+    }
+
+    expect(contentOriginKeys(edited as any)).toEqual(['source-title:manual|原始标题'])
   })
 })

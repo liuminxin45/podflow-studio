@@ -1,6 +1,8 @@
 import type { CandidateItem } from '../types/organize'
 import type { OrganizeResearchSession } from '../types/organize'
+import type { ContentItem } from '../types/workflow'
 import { isCurrentResearchSession } from '../services/organizeEvidence'
+import { contentIdentity } from './contentIdentity'
 
 const EMPTY_EDITORIAL = {
   lead: '',
@@ -51,6 +53,24 @@ export function readyCandidatesForDraft(value: unknown): CandidateItem[] {
   return toCandidateItems(value)
     .filter(candidate => candidate._status === 'ready')
     .map(prepareCandidateForDraft)
+}
+
+export function contentOriginKeys(item: ContentItem): string[] {
+  const originKeys = (item as CandidateItem)._originKeys
+  return Array.isArray(originKeys) && originKeys.length > 0
+    ? originKeys
+    : [contentIdentity(item)]
+}
+
+export function organizeWorkspaceMatchesSelection(
+  candidates: unknown,
+  selectedItems: ContentItem[],
+): boolean {
+  const selectedKeys = new Set(selectedItems.map(contentIdentity))
+  const workspaceKeys = new Set(toCandidateItems(candidates).flatMap(contentOriginKeys))
+
+  return selectedKeys.size === workspaceKeys.size
+    && [...selectedKeys].every(key => workspaceKeys.has(key))
 }
 
 export function buildOrganizeUiPatch(candidates: CandidateItem[], researchSessions: OrganizeResearchSession[] = []) {

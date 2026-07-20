@@ -18,7 +18,9 @@ import { canEnterStage } from './services/workflowStageStatus'
 import type { Workflow, WorkflowSummary, ContentItem, PodcastState } from './types/workflow'
 import {
   buildOrganizeUiPatch,
+  contentOriginKeys,
   getErrorMessage,
+  organizeWorkspaceMatchesSelection,
   readyCandidatesForDraft,
   toCandidateItems,
 } from './utils'
@@ -95,6 +97,35 @@ function buildDiscoveryRerunResetPatch(): Record<string, any> {
     subtitle_path: '',
     run_report: {},
     organize_ui: buildOrganizeUiPatch([]),
+  }
+}
+
+function buildOrganizeSelectionChangeResetPatch(): Record<string, any> {
+  return {
+    cleaned_contents: [],
+    researched_contents: [],
+    auto_selected_items: [],
+    auto_rejected_items: [],
+    selected_topic: {},
+    selected_topics: [],
+    facts: [],
+    episode_brief: {},
+    script: {},
+    edited_script: {},
+    generation_request: {},
+    generation_meta: {},
+    script_snapshots: [],
+    downstream_stale: {},
+    writing_meta: {},
+    voice_segments: [],
+    production_plan: {},
+    audio_outputs: {},
+    cover_path: '',
+    intro_outro_paths: {},
+    review_summary: {},
+    publish_outputs: {},
+    subtitle_path: '',
+    run_report: {},
   }
 }
 
@@ -953,9 +984,16 @@ function App() {
               showNotice('warning', '没有可进入整理的素材。')
               return
             }
+            const savedWorkspace = toCandidateItems(workflow?.state?.organize_ui?.candidates)
+            const reusingWorkspace = organizeWorkspaceMatchesSelection(savedWorkspace, safeCandidates)
+            const readyMaterials = reusingWorkspace
+              ? readyCandidatesForDraft(savedWorkspace)
+              : []
             setDiscoverCandidates(safeCandidates)
             void updateWorkflowPatch({
-              selected_materials: safeCandidates,
+              // This field is the ready-only writing handoff. Re-entering
+              // organize must not replace enriched rows with raw discovery data.
+              selected_materials: readyMaterials,
               discover_meta: {
                 ...(workflow?.state?.discover_meta || {}),
                 ...meta,
@@ -968,6 +1006,7 @@ function App() {
                 proceededAt: new Date().toISOString(),
                 fetch_config: config,
               },
+              ...(!reusingWorkspace ? buildOrganizeSelectionChangeResetPatch() : {}),
             })
             closeAllPanels()
             setOrganizeVisible(true)
@@ -1007,6 +1046,7 @@ function App() {
                 const selectedItems = (current.state.discover_ui?.selectedItems || [])
                   .filter(item => !removed.has(contentIdentity(item)))
                 await updateWorkflowPatch({
+                  ...buildOrganizeSelectionChangeResetPatch(),
                   discover_ui: {
                     ...(current.state.discover_ui || {}),
                     selectedCount: selectedItems.length,
@@ -1017,7 +1057,7 @@ function App() {
                     selected_count: selectedItems.length,
                   },
                   selected_materials: (current.state.selected_materials || [])
-                    .filter(item => !removed.has(contentIdentity(item))),
+                    .filter(item => !contentOriginKeys(item).some(key => removed.has(key))),
                 })
               })
             void organizeSaveQueueRef.current.catch(error => {
@@ -1027,6 +1067,7 @@ function App() {
           onStateChange={(state) => {
             const patch = {
               organize_ui: buildOrganizeUiPatch(state.candidates, state.researchSessions),
+              selected_materials: readyCandidatesForDraft(state.candidates),
             }
             organizeSaveQueueRef.current = organizeSaveQueueRef.current
               .catch(() => undefined)

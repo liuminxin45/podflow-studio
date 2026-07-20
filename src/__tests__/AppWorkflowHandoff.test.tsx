@@ -91,6 +91,9 @@ vi.mock('../components/OrganizePanel', async () => {
         ])}>
           删除合并来源
         </button>
+        <button type="button" onClick={() => props.onRemoveFromMaterialPool(['source-title:manual|原始无链接新闻'])}>
+          删除无链接来源
+        </button>
       </div>
     ) : null
   }) }
@@ -176,6 +179,147 @@ describe('App discover-to-draft handoff', () => {
     })
   })
 
+  it('does not overwrite organized materials with raw rows when re-entering organize', async () => {
+    currentWorkflow = {
+      ...currentWorkflow,
+      state: {
+        ...currentWorkflow.state,
+        selected_materials: [{
+          ...allCandidates[0],
+          title: '整理后的新闻标题',
+        }],
+        discover_ui: {
+          selectedCount: 1,
+          selectedItems: [{ title: '原始发现标题', url: 'https://example.com/intern' }],
+        },
+        organize_ui: {
+          candidates: [{
+            ...allCandidates[0],
+            title: '整理后的新闻标题',
+            _originKeys: ['url:https://example.com/intern'],
+          }],
+          researchSessions: [],
+        },
+      },
+    }
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
+    fireEvent.click(await screen.findByRole('button', { name: '进入整理' }))
+
+    await waitFor(() => {
+      expect(currentWorkflow.state.selected_materials.map(item => item.title)).toEqual(['整理后的新闻标题'])
+      expect(currentWorkflow.state.discover_ui?.selectedItems?.map(item => item.title)).toEqual(['原始发现标题'])
+      expect((currentWorkflow.state.organize_ui?.candidates as any[]).map(item => item.title)).toEqual(['整理后的新闻标题'])
+    })
+  })
+
+  it('invalidates stale writing inputs when the discovery identity set changes', async () => {
+    currentWorkflow = {
+      ...currentWorkflow,
+      state: {
+        ...currentWorkflow.state,
+        selected_materials: [allCandidates[1]],
+        discover_ui: {
+          selectedCount: 1,
+          selectedItems: [allCandidates[0]],
+        },
+        organize_ui: {
+          candidates: [{
+            ...allCandidates[1],
+            _originKeys: ['url:https://example.com/market'],
+          }],
+          researchSessions: [],
+        },
+        facts: [{
+          id: 'stale-fact',
+          title: '旧事实',
+          summary: '旧摘要',
+          source_title: '旧来源',
+          source_url: 'https://example.com/stale',
+          published_at: '2026-07-19T00:00:00.000Z',
+          claim: '旧事实',
+          confidence: 'high',
+        }],
+        selected_topics: [{ id: 'stale-topic', title: '旧选题' }],
+        episode_brief: { title: '旧节目结构' },
+        script: { title: '旧稿件', segments: [] },
+        edited_script: { title: '旧编辑稿', segments: [] },
+        production_plan: { clips: [{ id: 'old-clip' }] },
+        audio_outputs: { final_audio_path: 'old.mp3' },
+        review_summary: { status: 'passed' },
+        publish_outputs: { rss_path: 'old.xml' },
+      },
+    } as unknown as Workflow
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
+    fireEvent.click(await screen.findByRole('button', { name: '进入整理' }))
+
+    await waitFor(() => {
+      expect(currentWorkflow.state.selected_materials).toEqual([])
+      expect(currentWorkflow.state.facts).toEqual([])
+      expect(currentWorkflow.state.selected_topics).toEqual([])
+      expect(currentWorkflow.state.episode_brief).toEqual({})
+      expect(currentWorkflow.state.script).toEqual({})
+      expect(currentWorkflow.state.edited_script).toEqual({})
+      expect(currentWorkflow.state.production_plan).toEqual({})
+      expect(currentWorkflow.state.audio_outputs).toEqual({})
+      expect(currentWorkflow.state.review_summary).toEqual({})
+      expect(currentWorkflow.state.publish_outputs).toEqual({})
+    })
+  })
+
+  it('removes a URL-less ready material by its original identity after title editing', async () => {
+    const original = { title: '原始无链接新闻', source_id: 'manual', content: '原始内容' }
+    const organized = {
+      ...original,
+      title: '整理后的无链接新闻',
+      _id: 0,
+      _order: 0,
+      _priority: 'important' as const,
+      _status: 'ready' as const,
+      _originKeys: ['source-title:manual|原始无链接新闻'],
+    }
+    currentWorkflow = {
+      ...currentWorkflow,
+      state: {
+        ...currentWorkflow.state,
+        selected_materials: [organized as any],
+        discover_ui: { selectedCount: 1, selectedItems: [original] },
+        discover_meta: { selected_count: 1 },
+        organize_ui: { candidates: [organized], researchSessions: [] },
+        facts: [{
+          id: 'stale-fact',
+          title: '旧事实',
+          summary: '旧摘要',
+          source_title: '旧来源',
+          source_url: 'https://example.com/stale',
+          published_at: '2026-07-19T00:00:00.000Z',
+          claim: '旧事实',
+          confidence: 'high',
+        }],
+        selected_topics: [{ id: 'stale-topic', title: '旧选题' }],
+        script: { title: '旧稿件', segments: [] },
+        audio_outputs: { final_audio_path: 'old.mp3' },
+      },
+    } as unknown as Workflow
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
+    fireEvent.click(await screen.findByRole('button', { name: '进入整理' }))
+    fireEvent.click(await screen.findByRole('button', { name: '删除无链接来源' }))
+
+    await waitFor(() => {
+      expect(currentWorkflow.state.discover_ui?.selectedItems).toEqual([])
+      expect(currentWorkflow.state.selected_materials).toEqual([])
+      expect(currentWorkflow.state.facts).toEqual([])
+      expect(currentWorkflow.state.selected_topics).toEqual([])
+      expect(currentWorkflow.state.script).toEqual({})
+      expect(currentWorkflow.state.audio_outputs).toEqual({})
+    })
+  })
+
   it('waits for the latest organize workspace before saving the workflow', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
@@ -196,12 +340,13 @@ describe('App discover-to-draft handoff', () => {
       })],
       researchSessions: [expect.objectContaining({ queries: ['官方资料', '新闻背景'] })],
     }))
+    expect(currentWorkflow.state.selected_materials.map(item => item.title)).toEqual(['补全并整理后的新闻'])
   })
 
   it.each([
-    { button: '删除单一来源', remaining: ['股市新闻', '痴迷'], count: 2 },
-    { button: '删除合并来源', remaining: ['痴迷'], count: 1 },
-  ])('synchronizes every discovery selection surface after $button', async ({ button, remaining, count }) => {
+    { button: '删除单一来源', remaining: ['股市新闻', '痴迷'], ready: ['股市新闻'], count: 2 },
+    { button: '删除合并来源', remaining: ['痴迷'], ready: [], count: 1 },
+  ])('synchronizes every discovery selection surface after $button', async ({ button, remaining, ready, count }) => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
     fireEvent.click(await screen.findByRole('button', { name: '进入整理' }))
@@ -211,7 +356,7 @@ describe('App discover-to-draft handoff', () => {
       expect(currentWorkflow.state.discover_ui?.selectedCount).toBe(count)
       expect(currentWorkflow.state.discover_ui?.selectedItems?.map(item => item.title)).toEqual(remaining)
       expect(currentWorkflow.state.discover_meta?.selected_count).toBe(count)
-      expect(currentWorkflow.state.selected_materials.map(item => item.title)).toEqual(remaining)
+      expect(currentWorkflow.state.selected_materials.map(item => item.title)).toEqual(ready)
     })
   })
 })

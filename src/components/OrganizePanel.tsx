@@ -427,6 +427,15 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
     () => [...units].sort((a, b) => a._order - b._order),
     [units],
   )
+  const originalTitlesByKey = useMemo(
+    () => new Map(contents.map(item => [contentIdentity(item), item.title || '无标题'])),
+    [contents],
+  )
+  const originalTitlesFor = useCallback((unit: CandidateItem) => Array.from(new Set(
+    (unit._originKeys || [contentIdentity(unit)])
+      .map(key => originalTitlesByKey.get(key))
+      .filter((title): title is string => Boolean(title) && title !== unit.title),
+  )), [originalTitlesByKey])
   const activeUnit = orderedUnits.find(unit => unit._id === activeId) || orderedUnits[0] || null
   const readyUnits = orderedUnits.filter(unit => unit._status === 'ready')
   const syncState = useCallback(async () => {
@@ -1660,6 +1669,7 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
             ) : orderedUnits.map(unit => {
               const isActive = activeUnit?._id === unit._id
               const isReady = unit._status === 'ready'
+              const originalTitles = originalTitlesFor(unit)
               return (
                 <div
                   key={unit._id}
@@ -1687,7 +1697,14 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
                     )
                   )}
                   <div className="organize-unit-copy">
-                    <strong title={unit.title || '无标题'}>{unit.title || '无标题'}</strong>
+                    <div className="organize-unit-titles">
+                      <strong title={unit.title || '无标题'}>{unit.title || '无标题'}</strong>
+                      {originalTitles.length > 0 && (
+                        <span className="organize-origin-title" title={originalTitles.join('；')}>
+                          原始：{originalTitles.join(' / ')}
+                        </span>
+                      )}
+                    </div>
                     {!mergeMode && unit._isDeepDive && (
                       <span className="organize-deep-badge" aria-label="深度稿" title="本期唯一深度稿">深度</span>
                     )}
@@ -1756,6 +1773,11 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
                   {activeUnit._status === 'ready' ? '取消整理完成' : '标记为整理完成'}
                 </Button>
               </div>
+              {originalTitlesFor(activeUnit).length > 0 && (
+                <div className="organize-origin-title organize-origin-title-editor">
+                  原始发现标题：{originalTitlesFor(activeUnit).join(' / ')}
+                </div>
+              )}
 
               <section className="organize-editor-section organize-lead-section">
                 <label htmlFor="organize-lead">一句话导语</label>
