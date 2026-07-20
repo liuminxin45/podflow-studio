@@ -60,39 +60,56 @@ function evidenceAssessments(count: number) {
   }
 }
 
+function knowledgeExpansion(statement = '该模式可以追溯到更早的行业实践。') {
+  return {
+    knowledgeCandidates: Array.from({ length: 3 }, (_, index) => ({
+      id: `history-${index + 1}`,
+      role: 'historical_context',
+      statement: index === 0 ? statement : `补充知识候选 ${index + 1}`,
+      basis: 'model_memory',
+      temporalRisk: 'low',
+      confidence: 'medium',
+      verificationQuery: `行业模式 发展历史 ${index + 1}`,
+      limitations: ['需要进一步确认具体年份'],
+    })),
+  }
+}
+
 describe('OrganizePanel research tolerance', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     window.localStorage.clear()
     organizeResearchMockState.provider = 'tavily'
+    settingsRepository.save({
+      ...structuredClone(DEFAULT_SETTINGS),
+      creatorPreferences: {
+        ...DEFAULT_SETTINGS.creatorPreferences,
+        organizeCompletionMode: 'web_only',
+      },
+    })
   })
 
   it('keeps AI knowledge separate when hybrid web verification fails', async () => {
-    vi.mocked(llmService.call).mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({
-      ...researchPlan(['历史核验', '机制核验'], 'explanatory'),
-      knowledgeCandidates: [{
-        id: 'history',
-        role: 'historical_context',
-        statement: '该模式可以追溯到更早的行业实践。',
-        basis: 'model_memory',
-        temporalRisk: 'low',
-        confidence: 'medium',
-        verificationQuery: '行业模式 发展历史',
-        limitations: ['需要进一步确认具体年份'],
-      }],
-    }) } }] } as any)
+    settingsRepository.save({
+      ...structuredClone(DEFAULT_SETTINGS),
+      creatorPreferences: { ...DEFAULT_SETTINGS.creatorPreferences, organizeCompletionMode: 'hybrid' },
+    })
+    vi.mocked(llmService.call)
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(researchPlan(['历史核验', '机制核验'], 'explanatory')) } }] } as any)
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(knowledgeExpansion()) } }] } as any)
     vi.mocked(searchForOrganize).mockRejectedValue(new Error('搜索服务暂时不可用'))
 
     render(<OrganizePanel visible onClose={vi.fn()} contents={[{ title: '原始新闻', content: '原始内容', source: '来源甲' }]} />)
     fireEvent.click(screen.getByRole('button', { name: '自动补全资料' }))
 
     await waitFor(() => expect(screen.getByText('该模式可以追溯到更早的行业实践。')).toBeTruthy())
-    expect(vi.mocked(llmService.call).mock.calls[0]?.[0]?.messages?.[0]?.content).toContain('knowledgeCandidates')
-    expect(screen.getByText('未联网核验')).toBeTruthy()
-    expect(screen.getByText('0/1 已联网核验')).toBeTruthy()
-    expect(screen.getByText(/联网核验失败，已保留 1 条 AI 知识候选/)).toBeTruthy()
+    expect(vi.mocked(llmService.call).mock.calls[0]?.[0]?.messages?.[0]?.content).not.toContain('knowledgeCandidates')
+    expect(vi.mocked(llmService.call).mock.calls[1]?.[0]?.messages?.[0]?.content).toContain('knowledgeCandidates')
+    expect(screen.getAllByText('未联网核验')).toHaveLength(3)
+    expect(screen.getByText('0/3 已联网核验')).toBeTruthy()
+    expect(screen.getByText(/联网核验失败，已保留 3 条 AI 知识候选/)).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '采纳为分析角度' }))
+    fireEvent.click(screen.getAllByRole('button', { name: '采纳为分析角度' })[0])
     expect((screen.getByLabelText('背景脉络') as HTMLTextAreaElement).value).toContain('AI 知识（未联网核验）')
   })
 
@@ -104,18 +121,9 @@ describe('OrganizePanel research tolerance', () => {
         organizeCompletionMode: 'ai_knowledge',
       },
     })
-    vi.mocked(llmService.call).mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({
-      ...researchPlan(['背景问题', '机制问题'], 'explanatory'),
-      knowledgeCandidates: [{
-        id: 'mechanism',
-        role: 'mechanism',
-        statement: '可以从供需两端解释这一变化。',
-        basis: 'model_inference',
-        temporalRisk: 'medium',
-        confidence: 'medium',
-        verificationQuery: '供需机制 变化原因',
-      }],
-    }) } }] } as any)
+    vi.mocked(llmService.call)
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(researchPlan(['背景问题', '机制问题'], 'explanatory')) } }] } as any)
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(knowledgeExpansion('可以从供需两端解释这一变化。')) } }] } as any)
 
     render(<OrganizePanel visible onClose={vi.fn()} contents={[{ title: '原始新闻', content: '原始内容', source: '来源甲' }]} />)
     expect(screen.queryByRole('button', { name: '选择 AI 补全模式' })).toBeNull()
@@ -123,7 +131,7 @@ describe('OrganizePanel research tolerance', () => {
 
     await waitFor(() => expect(screen.getByText('可以从供需两端解释这一变化。')).toBeTruthy())
     expect(searchForOrganize).not.toHaveBeenCalled()
-    expect(screen.getByText(/AI 知识扩展完成，共 1 条/)).toBeTruthy()
+    expect(screen.getByText(/AI 知识扩展完成，共 3 条/)).toBeTruthy()
   })
 
   it('puts AI knowledge usage boundaries in the synthesis system prompt', async () => {
@@ -299,8 +307,13 @@ describe('OrganizePanel research tolerance', () => {
 
   it('runs default AI searches one at a time and streams visible progress', async () => {
     organizeResearchMockState.provider = 'default_ai'
+    settingsRepository.save({
+      ...structuredClone(DEFAULT_SETTINGS),
+      creatorPreferences: { ...DEFAULT_SETTINGS.creatorPreferences, organizeCompletionMode: 'hybrid' },
+    })
     vi.mocked(llmService.call)
       .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(researchPlan(['问题一', '问题二', '问题三'])) } }] } as any)
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(knowledgeExpansion()) } }] } as any)
       .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(evidenceAssessments(3)) } }] } as any)
 
     let resolveFirst!: (value: any) => void
@@ -344,6 +357,32 @@ describe('OrganizePanel research tolerance', () => {
     expect(screen.getAllByText(/There's an authentication problem/).length).toBeGreaterThan(0)
     expect(searchForOrganize).not.toHaveBeenCalled()
     expect(screen.queryByText(/Unexpected token/)).toBeNull()
+  })
+
+  it('rejects Markdown-wrapped JSON instead of extracting it', async () => {
+    vi.mocked(llmService.call).mockResolvedValue({
+      choices: [{ message: { content: `\`\`\`json\n${JSON.stringify(researchPlan(['问题一', '问题二']))}\n\`\`\`` } }],
+    } as any)
+
+    render(<OrganizePanel visible onClose={vi.fn()} contents={[{ title: '原始新闻', content: '原始内容', source: '来源甲' }]} />)
+    fireEvent.click(screen.getByRole('button', { name: '自动补全资料' }))
+
+    await waitFor(() => expect(screen.getAllByText(/制定搜索问题失败：AI 未返回有效 JSON/).length).toBeGreaterThan(0))
+    expect(searchForOrganize).not.toHaveBeenCalled()
+  })
+
+  it('reports provider output truncation before attempting to parse partial JSON', async () => {
+    const onProcessLog = vi.fn()
+    vi.mocked(llmService.call).mockResolvedValue({
+      choices: [{ finish_reason: 'length', message: { content: '{"coreSubject":"原始新闻","researchTasks":[' } }],
+    } as any)
+
+    render(<OrganizePanel visible onClose={vi.fn()} onProcessLog={onProcessLog} contents={[{ title: '原始新闻', content: '原始内容', source: '来源甲' }]} />)
+    fireEvent.click(screen.getByRole('button', { name: '自动补全资料' }))
+
+    await waitFor(() => expect(screen.getAllByText(/AI 输出达到长度上限/).length).toBeGreaterThan(0))
+    expect(onProcessLog).toHaveBeenCalledWith(expect.stringContaining('responseChars=39 finishReason=length'))
+    expect(searchForOrganize).not.toHaveBeenCalled()
   })
 
   it('rejects the removed researchQueries response instead of converting it', async () => {
@@ -468,7 +507,8 @@ describe('OrganizePanel research tolerance', () => {
       .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({
         ...researchPlan(['事实核验', '形成机制', '历史背景', '反方证据'], 'explanatory'),
       }) } }] } as any)
-      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(assessmentBatch(10)) } }] } as any)
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(assessmentBatch(5)) } }] } as any)
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(assessmentBatch(5)) } }] } as any)
       .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(assessmentBatch(2)) } }] } as any)
     vi.mocked(searchForOrganize).mockImplementation(async query => ({
       provider: 'tavily',
@@ -487,15 +527,19 @@ describe('OrganizePanel research tolerance', () => {
     fireEvent.click(screen.getByRole('button', { name: '自动补全深度资料' }))
 
     await waitFor(() => expect(screen.getByText(/网页 12 · AI 0/)).toBeTruthy())
-    expect(llmService.call).toHaveBeenCalledTimes(3)
+    expect(llmService.call).toHaveBeenCalledTimes(4)
     const firstBatch = vi.mocked(llmService.call).mock.calls[1]?.[0] as { timeout?: number; messages?: Array<{ content: string }> }
     const secondBatch = vi.mocked(llmService.call).mock.calls[2]?.[0] as { timeout?: number; messages?: Array<{ content: string }> }
+    const thirdBatch = vi.mocked(llmService.call).mock.calls[3]?.[0] as { timeout?: number; messages?: Array<{ content: string }> }
     expect(firstBatch.timeout).toBe(480_000)
     expect(secondBatch.timeout).toBe(480_000)
-    expect(firstBatch.messages?.[1]?.content).toContain('"index":9')
-    expect(firstBatch.messages?.[1]?.content).not.toContain('"index":10')
-    expect(secondBatch.messages?.[1]?.content).toContain('"index":1')
-    expect(secondBatch.messages?.[1]?.content).not.toContain('"index":2')
+    expect(thirdBatch.timeout).toBe(480_000)
+    expect(firstBatch.messages?.[1]?.content).toContain('"index":4')
+    expect(firstBatch.messages?.[1]?.content).not.toContain('"index":5')
+    expect(secondBatch.messages?.[1]?.content).toContain('"index":4')
+    expect(secondBatch.messages?.[1]?.content).not.toContain('"index":5')
+    expect(thirdBatch.messages?.[1]?.content).toContain('"index":1')
+    expect(thirdBatch.messages?.[1]?.content).not.toContain('"index":2')
   }, 15_000)
 
   it('rejects evidence screening responses with duplicate indexes', async () => {
@@ -712,7 +756,7 @@ describe('OrganizePanel research tolerance', () => {
     const callOptions = vi.mocked(llmService.call).mock.calls[0]?.[0] as { timeout?: number; signal?: AbortSignal }
     expect(callOptions.timeout).toBe(180_000)
     expect(callOptions.signal?.aborted).toBe(false)
-    expect(screen.getByText('当前阶段：计划与知识')).toBeTruthy()
+    expect(screen.getByText('当前阶段：制定计划')).toBeTruthy()
     expect(screen.getByText(/本阶段最多 180 秒/)).toBeTruthy()
 
     fireEvent.click(stopButton)

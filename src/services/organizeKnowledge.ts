@@ -27,36 +27,45 @@ function cleanTextList(value: unknown): string[] {
   return Array.isArray(value) ? value.map(cleanText).filter(Boolean) : []
 }
 
-export function normalizeKnowledgeCandidates(value: unknown, limit = 8): OrganizeKnowledgeCandidate[] {
-  if (!Array.isArray(value)) return []
+export function parseKnowledgeCandidates(value: unknown, expected: { min: number; max: number }): OrganizeKnowledgeCandidate[] {
+  if (!Array.isArray(value) || value.length < expected.min || value.length > expected.max) {
+    throw new Error(`AI 知识格式错误：knowledgeCandidates 必须包含 ${expected.min}-${expected.max} 条`)
+  }
   const ids = new Set<string>()
-  return value.flatMap((candidate, index) => {
-    if (!candidate || typeof candidate !== 'object') return []
+  return value.map((candidate, index) => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+      throw new Error(`AI 知识格式错误：第 ${index + 1} 条候选不是对象`)
+    }
     const raw = candidate as Record<string, unknown>
     const statement = cleanText(raw.statement)
     const role = raw.role as OrganizeKnowledgeRole
-    if (!statement || !KNOWLEDGE_ROLES.has(role)) return []
-    const requestedId = cleanText(raw.id)
-    const baseId = /^[a-zA-Z0-9_-]+$/.test(requestedId) ? requestedId : `knowledge-${index + 1}`
-    let id = baseId
-    let suffix = 2
-    while (ids.has(id)) {
-      id = `${baseId}-${suffix}`
-      suffix += 1
+    const id = cleanText(raw.id)
+    const verificationQuery = cleanText(raw.verificationQuery)
+    const limitations = cleanTextList(raw.limitations)
+    if (!/^[a-zA-Z0-9_-]+$/.test(id) || ids.has(id)) {
+      throw new Error(`AI 知识格式错误：第 ${index + 1} 条候选 id 无效或重复`)
+    }
+    if (!statement || !KNOWLEDGE_ROLES.has(role)) throw new Error(`AI 知识格式错误：第 ${index + 1} 条候选 statement 或 role 无效`)
+    if (!KNOWLEDGE_BASES.has(String(raw.basis))) throw new Error(`AI 知识格式错误：第 ${index + 1} 条候选 basis 无效`)
+    if (!KNOWLEDGE_RISKS.has(String(raw.temporalRisk))) throw new Error(`AI 知识格式错误：第 ${index + 1} 条候选 temporalRisk 无效`)
+    if (!KNOWLEDGE_CONFIDENCES.has(String(raw.confidence))) throw new Error(`AI 知识格式错误：第 ${index + 1} 条候选 confidence 无效`)
+    if (!verificationQuery) throw new Error(`AI 知识格式错误：第 ${index + 1} 条候选 verificationQuery 不能为空`)
+    if (!Array.isArray(raw.limitations) || limitations.length !== raw.limitations.length) {
+      throw new Error(`AI 知识格式错误：第 ${index + 1} 条候选 limitations 必须是字符串数组`)
     }
     ids.add(id)
-    return [{
+    return {
       id,
       role,
       statement,
-      basis: KNOWLEDGE_BASES.has(String(raw.basis)) ? raw.basis as OrganizeKnowledgeCandidate['basis'] : 'model_memory',
-      temporalRisk: KNOWLEDGE_RISKS.has(String(raw.temporalRisk)) ? raw.temporalRisk as OrganizeKnowledgeCandidate['temporalRisk'] : 'medium',
-      confidence: KNOWLEDGE_CONFIDENCES.has(String(raw.confidence)) ? raw.confidence as OrganizeKnowledgeCandidate['confidence'] : 'medium',
+      basis: raw.basis as OrganizeKnowledgeCandidate['basis'],
+      temporalRisk: raw.temporalRisk as OrganizeKnowledgeCandidate['temporalRisk'],
+      confidence: raw.confidence as OrganizeKnowledgeCandidate['confidence'],
       verificationStatus: 'unverified' as const,
-      verificationQuery: cleanText(raw.verificationQuery) || statement,
-      limitations: cleanTextList(raw.limitations),
-    }]
-  }).slice(0, Math.max(0, limit))
+      verificationQuery,
+      limitations,
+    }
+  })
 }
 
 export function isCurrentKnowledgeCandidate(value: unknown): value is OrganizeKnowledgeCandidate {
@@ -94,8 +103,8 @@ export function promoteKnowledgeCandidates(
   })
 }
 
-export function knowledgePlanningInstruction(mode: OrganizeCompletionMode, isDeepDive: boolean): string {
-  if (mode === 'web_only') return '不要返回 knowledgeCandidates。'
+export function knowledgeExpansionInstruction(mode: OrganizeCompletionMode, isDeepDive: boolean): string {
+  if (mode === 'web_only') throw new Error('纯联网模式不应调用 AI 知识扩展')
   const count = isDeepDive ? '5-8' : '3-5'
-  return `同时返回 knowledgeCandidates（${count} 条），用于发挥模型自身的通用知识、历史记忆和分析能力。每项包含 id、role、statement、basis、temporalRisk、confidence、verificationQuery、limitations。role 只能是 historical_context、mechanism、comparison、counter_view、stakeholder、listener_question、practical_implication；basis 只能是 model_memory 或 model_inference。不得声称模型知识已有网页来源，不得编造 URL；最新状态、精确数字、日期、人物原话、法律政策和产品规格必须 temporalRisk=high。statement 应提供有信息量的背景、机制、对照、反方或听众问题，避免复述主材料。`
+  return `只返回 JSON 对象 {"knowledgeCandidates": [...]}，knowledgeCandidates 必须有 ${count} 条，用于发挥模型自身的通用知识、历史记忆和分析能力。每项包含 id、role、statement、basis、temporalRisk、confidence、verificationQuery、limitations。role 只能是 historical_context、mechanism、comparison、counter_view、stakeholder、listener_question、practical_implication；basis 只能是 model_memory 或 model_inference。不得返回研究计划，不得声称模型知识已有网页来源，不得编造 URL；最新状态、精确数字、日期、人物原话、法律政策和产品规格必须 temporalRisk=high。statement、verificationQuery 和 limitations 应简洁，提供背景、机制、对照、反方或听众问题，避免复述主材料。`
 }
