@@ -51,3 +51,6 @@ examples/demo-news/output/
 *.test.json
 script_schema*.json
 fetch_stderr.log
+
+# Local competitive research (not for repository distribution)
+/.local-research/product-competitive-analysis.md
