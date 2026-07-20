@@ -70,6 +70,31 @@ function resolveDownstreamStale(state, executedNodes) {
   }
 }
 
+function applySeriesDefaults(nodeName, loadedConfig, state) {
+  const config = { ...(loadedConfig || {}) }
+  const series = state?.series
+  const defaults = series?.defaults
+  if (!series?.id || !defaults) return loadedConfig
+  if (nodeName === 'script') {
+    config.target_duration_minutes = defaults.targetDurationMinutes
+    config.language = defaults.language
+    config.template_variant = defaults.templateVariant
+    state.selected_topic = {
+      ...(state.selected_topic || {}),
+      show_name: state.selected_topic?.show_name || series.title,
+      host_name: state.selected_topic?.host_name || defaults.hostName,
+    }
+  }
+  if (nodeName === 'tts' && defaults.defaultVoice) config.default_voice = defaults.defaultVoice
+  if (nodeName === 'publish') {
+    config.podcast_title = series.title
+    config.podcast_description = series.description || series.title
+    config.podcast_author = defaults.author
+    config.enabled_platforms = defaults.enabledPlatforms
+  }
+  return config
+}
+
 const RUNTIME_SECRET_FIELD = /(^|_)(api_key|access_token|secret)$/i
 const RUNTIME_CAMEL_SECRET_FIELD = /(apiKey|accessToken|secret)$/
 
@@ -98,6 +123,7 @@ function redactRuntimeConfigSecrets(state) {
  * @param {(name: string, state: object, timeout?: number) => Promise<object>} ctx.runPythonNode
  * @param {() => object} ctx.getCurrentWorkflow
  * @param {(wf: object) => void} ctx.setCurrentWorkflow
+ * @param {(wf: object) => void} ctx.persistWorkflow
  */
 function create(ctx) {
 
@@ -166,9 +192,11 @@ function create(ctx) {
       console.log(`[Workflow] Starting node: ${nodeName} (${i+1}/${nodes.length})`)
 
       currentWorkflow.currentNode = nodeName
+      const executionHistory = currentWorkflow.nodeExecutions[nodeName]?.history || []
       currentWorkflow.nodeExecutions[nodeName] = {
         status: 'running',
-        startedAt: new Date().toISOString()
+        startedAt: new Date().toISOString(),
+        history: executionHistory,
       }
 
       currentWorkflow.state.logs = currentWorkflow.state.logs || []
@@ -177,9 +205,11 @@ function create(ctx) {
       currentWorkflow.state.logs.push(`[Orchestrator] node=${nodeName} | time=${new Date().toISOString()}`)
 
       broadcastUpdate()
+      ctx.persistWorkflow?.(currentWorkflow)
 
       try {
-        const nodeConfig = configManager ? configManager.loadNodeConfig(nodeName) : null
+        const loadedNodeConfig = configManager ? configManager.loadNodeConfig(nodeName) : null
+        const nodeConfig = applySeriesDefaults(nodeName, loadedNodeConfig, currentWorkflow.state)
 
         if (nodeConfig) {
           currentWorkflow.state.runtime_config = currentWorkflow.state.runtime_config || {}
@@ -205,6 +235,12 @@ function create(ctx) {
         const maxAttempts = RETRYABLE_NODES.has(nodeName) ? 1 + MAX_RETRIES : 1
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          const attemptRecord = {
+            attempt,
+            startedAt: new Date().toISOString(),
+            status: 'running',
+          }
+          executionHistory.push(attemptRecord)
           try {
             const startTime = Date.now()
             previousNodeErrorCount = getNodeErrors(currentWorkflow.state, nodeName).length
@@ -231,11 +267,22 @@ function create(ctx) {
               completedAt: new Date().toISOString(),
               duration,
               attempts: attempt,
+              history: executionHistory,
             }
+            Object.assign(attemptRecord, {
+              status: 'completed',
+              completedAt: currentWorkflow.nodeExecutions[nodeName].completedAt,
+              duration,
+            })
             lastError = null
             break  // success
           } catch (attemptError) {
             lastError = attemptError
+            Object.assign(attemptRecord, {
+              status: 'failed',
+              completedAt: new Date().toISOString(),
+              error: attemptError.message,
+            })
             if (attempt < maxAttempts) {
               console.warn(`[${nodeName}] Attempt ${attempt} failed; retrying in ${RETRY_DELAY_MS}ms...`)
               currentWorkflow.state.logs = currentWorkflow.state.logs || []
@@ -275,6 +322,7 @@ function create(ctx) {
         currentWorkflow.state = redactRuntimeConfigSecrets(result)
 
         broadcastUpdate()
+        ctx.persistWorkflow?.(currentWorkflow)
 
         // Approval gate after script node
         if (nodeName === 'script' && !currentWorkflow.approvals?.script) {
@@ -287,6 +335,7 @@ function create(ctx) {
             console.log('[Approval] Pausing workflow for approval')
             currentWorkflow.status = 'waiting_approval'
             currentWorkflow.nodeExecutions[nodeName].status = 'waiting_approval'
+            ctx.persistWorkflow?.(currentWorkflow)
 
             const win = ctx.getMainWindow()
             if (win) {
@@ -312,9 +361,12 @@ function create(ctx) {
           startedAt: currentWorkflow.nodeExecutions[nodeName].startedAt,
           completedAt: new Date().toISOString(),
           error: error.message,
-          errorStack: error.stack
+          errorStack: error.stack,
+          attempts: executionHistory.length,
+          history: executionHistory,
         }
         currentWorkflow.status = 'failed'
+        currentWorkflow.currentNode = null
         currentWorkflow.state.errors = currentWorkflow.state.errors || []
         currentWorkflow.state.errors.push({
           node: nodeName,
@@ -327,6 +379,7 @@ function create(ctx) {
         currentWorkflow.state.logs.push(`[Orchestrator]   time: ${new Date().toISOString()}`)
 
         broadcastUpdate()
+        ctx.persistWorkflow?.(currentWorkflow)
         return
       }
     }
@@ -349,9 +402,10 @@ function create(ctx) {
     currentWorkflow.status = 'completed'
     currentWorkflow.currentNode = null
     broadcastUpdate()
+    ctx.persistWorkflow?.(currentWorkflow)
   }
 
   return { run, PIPELINE_NODES, NODE_STAGE_LABELS }
 }
 
-module.exports = { create, getNodeResultError, redactRuntimeConfigSecrets, resolveDownstreamStale }
+module.exports = { applySeriesDefaults, create, getNodeResultError, redactRuntimeConfigSecrets, resolveDownstreamStale }

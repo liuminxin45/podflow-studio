@@ -129,6 +129,44 @@
     "organize_ui": { "type": "object" },
     "episode_brief": { "type": "object" },
     "writing_meta": { "type": "object" },
+    "series": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [{ "maxProperties": 0 }, { "required": ["id", "title", "cadence", "defaults"] }],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "coverPath": { "type": "string" },
+        "cadence": { "enum": ["daily", "weekly"] },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["language", "targetDurationMinutes", "author", "hostName", "defaultVoice", "enabledPlatforms", "templateVariant"],
+          "properties": {
+            "language": { "type": "string" },
+            "targetDurationMinutes": { "type": "integer", "minimum": 1, "maximum": 240 },
+            "author": { "type": "string" },
+            "hostName": { "type": "string" },
+            "defaultVoice": { "type": "string" },
+            "enabledPlatforms": { "type": "array", "items": { "type": "string" } },
+            "templateVariant": { "const": "quick_9_plus_deep_1" }
+          }
+        }
+      }
+    },
+    "playback": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "positionSeconds": { "type": "number", "minimum": 0 },
+        "durationSeconds": { "type": "number", "minimum": 0 },
+        "completed": { "type": "boolean" },
+        "speed": { "type": "number", "minimum": 0.5, "maximum": 3 },
+        "playCount": { "type": "integer", "minimum": 0 },
+        "updatedAt": { "type": "string" }
+      }
+    },
     "_manifest": { "type": "object" }
   },
   "$defs": {

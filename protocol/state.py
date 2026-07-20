@@ -61,6 +61,8 @@ class PodcastState:
     organize_ui: dict[str, Any] = field(default_factory=dict)
     episode_brief: dict[str, Any] = field(default_factory=dict)
     writing_meta: dict[str, Any] = field(default_factory=dict)
+    series: dict[str, Any] = field(default_factory=dict)
+    playback: dict[str, Any] = field(default_factory=dict)
     _manifest: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

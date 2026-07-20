@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Layout, Button, Space, ConfigProvider, theme, Modal, message } from 'antd'
+import { Layout, Button, Space, ConfigProvider, theme, Modal, Select, message } from 'antd'
 import ApprovalModal from './components/ApprovalModal'
 import EpisodeDraftStudio from './components/EpisodeDraftStudio'
 import DiscoverPanel, { type DiscoverConfig, type DiscoverMeta } from './components/DiscoverPanel'
@@ -9,13 +9,14 @@ import PublishLayer from './components/PublishLayer'
 import SettingsPage from './components/SettingsPage'
 import WorkflowSidebar from './components/WorkflowSidebar'
 import EpisodeManager from './components/EpisodeManager'
+import GlobalPlayer from './components/GlobalPlayer'
 import GlobalSettingsButton from './components/GlobalSettingsButton'
 import { STAGES } from './components/workflowStages'
 import { detectAndPersistLocalAgentsOnStartup } from './services/settings/localAgentDetection'
 import { llmConfigResolver } from './services/settings/llmConfigResolver'
 import { postProcessDiscoverItems, type DiscoverPostProcessProgressHandler } from './services/discoverPostProcess'
 import { canEnterStage } from './services/workflowStageStatus'
-import type { Workflow, WorkflowSummary, ContentItem, PodcastState } from './types/workflow'
+import type { Workflow, WorkflowSummary, ContentItem, PodcastState, RecoveryPlan, Series } from './types/workflow'
 import {
   buildOrganizeUiPatch,
   contentOriginKeys,
@@ -134,6 +135,11 @@ function App() {
   const [messageApi, messageContextHolder] = message.useMessage()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [workflowSummaries, setWorkflowSummaries] = useState<WorkflowSummary[]>([])
+  const [libraryLoading, setLibraryLoading] = useState(true)
+  const [series, setSeries] = useState<Series[]>([])
+  const [playingEpisode, setPlayingEpisode] = useState<WorkflowSummary | null>(null)
+  const [playingWorkflow, setPlayingWorkflow] = useState<Workflow | null>(null)
+  const [recovery, setRecovery] = useState<{ workflowId: string; plan: RecoveryPlan; running: boolean } | null>(null)
   const [homePage, setHomePage] = useState<'blank' | 'episodes'>('episodes')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [approvalVisible, setApprovalVisible] = useState(false)
@@ -210,6 +216,17 @@ function App() {
       }
     } catch (error) {
       console.error('Failed to load workflows:', error)
+    } finally {
+      setLibraryLoading(false)
+    }
+  }, [])
+
+  const loadSeries = useCallback(async () => {
+    if (!window.electronAPI?.listSeries) return
+    try {
+      setSeries(await window.electronAPI.listSeries())
+    } catch (error) {
+      console.error('Failed to load series:', error)
     }
   }, [])
 
@@ -427,7 +444,8 @@ function App() {
 
   useEffect(() => {
     void loadWorkflowSummaries()
-  }, [loadWorkflowSummaries])
+    void loadSeries()
+  }, [loadSeries, loadWorkflowSummaries])
 
   useEffect(() => {
     if (!hasElectronBackend) return
@@ -495,7 +513,7 @@ function App() {
     workflow?.state?.organize_ui?.candidates,
   ])
 
-  const handleStart = async () => {
+  const handleStart = async (seriesId?: string) => {
     try {
       if (!window.electronAPI?.createWorkflow) {
         showNotice('warning', '当前浏览器预览没有 Electron 后端，无法创建节目')
@@ -503,11 +521,16 @@ function App() {
       }
       const canContinue = await confirmSaveBeforeReplace()
       if (!canContinue) return
-      const result = await window.electronAPI.createWorkflow({ autoRun: false })
+      const selectedSeries = series.find(item => item.id === seriesId)
+      const result = await window.electronAPI.createWorkflow({ autoRun: false, series: selectedSeries })
+      if (selectedSeries) {
+        await window.electronAPI.assignEpisodeToSeries(selectedSeries.id, result.workflowId)
+      }
       const created = await window.electronAPI.getWorkflow(result.workflowId)
       if (created) setWorkflow(created)
       setHasUnsavedChanges(true)
       await loadWorkflowSummaries()
+      await loadSeries()
       showNotice('success', `已创建节目：${result.episodeId}`)
       openStage('discover')
     } catch (error) {
@@ -609,6 +632,10 @@ function App() {
         if (!canContinue) return
       }
       await window.electronAPI.deleteWorkflow(workflowId)
+      if (playingEpisode?.id === workflowId) {
+        setPlayingEpisode(null)
+        setPlayingWorkflow(null)
+      }
       if (workflow?.id === workflowId) {
         setWorkflow(null)
         setHasUnsavedChanges(false)
@@ -691,6 +718,104 @@ function App() {
       showNotice('success', '节目已复制')
     } catch (error) {
       showNotice('error', `复制失败：${getErrorMessage(error)}`)
+    }
+  }
+
+  const handlePlayEpisode = async (workflowId: string) => {
+    try {
+      const summary = workflowSummaries.find(item => item.id === workflowId)
+      if (!summary?.audioPath) throw new Error('这期节目还没有可播放的音频成片')
+      const mediaWorkflow = await window.electronAPI.getWorkflow(workflowId)
+      if (!mediaWorkflow) throw new Error('无法读取节目稿件和事实来源')
+      setPlayingEpisode(summary)
+      setPlayingWorkflow(mediaWorkflow)
+    } catch (error) {
+      showNotice('error', `播放失败：${getErrorMessage(error)}`)
+    }
+  }
+
+  const playNextSeriesEpisode = () => {
+    if (!playingEpisode?.series?.id) return
+    const catalog = series.find(item => item.id === playingEpisode.series?.id)
+    if (!catalog) return
+    const currentIndex = catalog.episodeIds.indexOf(playingEpisode.id)
+    const nextId = catalog.episodeIds[currentIndex + 1]
+    if (nextId) void handlePlayEpisode(nextId)
+  }
+
+  const handleOpenRecovery = async (workflowId: string) => {
+    try {
+      const initial = await window.electronAPI.previewWorkflowRerun(workflowId, 'fetch')
+      const plan = initial.recommendedNode === 'fetch'
+        ? initial
+        : await window.electronAPI.previewWorkflowRerun(workflowId, initial.recommendedNode)
+      setRecovery({ workflowId, plan, running: false })
+    } catch (error) {
+      showNotice('error', `无法评估重跑范围：${getErrorMessage(error)}`)
+    }
+  }
+
+  const updateRecoveryNode = async (nodeName: string) => {
+    if (!recovery) return
+    try {
+      const plan = await window.electronAPI.previewWorkflowRerun(recovery.workflowId, nodeName)
+      setRecovery({ ...recovery, plan })
+    } catch (error) {
+      showNotice('error', `无法评估重跑范围：${getErrorMessage(error)}`)
+    }
+  }
+
+  const confirmRecovery = async () => {
+    if (!recovery) return
+    try {
+      if (workflow?.id !== recovery.workflowId) {
+        const canContinue = await confirmSaveBeforeReplace()
+        if (!canContinue) return
+        const opened = await window.electronAPI.openWorkflow(recovery.workflowId)
+        setWorkflow(opened)
+        setHasUnsavedChanges(false)
+      }
+      setRecovery(current => current ? { ...current, running: true } : current)
+      const updated = await window.electronAPI.rerunWorkflowStage(recovery.workflowId, recovery.plan.nodeName)
+      setWorkflow(updated)
+      setHasUnsavedChanges(false)
+      await loadWorkflowSummaries()
+      setRecovery(null)
+      showNotice(updated.status === 'failed' ? 'error' : 'success', updated.status === 'failed' ? '阶段重跑仍有失败，请查看尝试记录。' : '阶段重跑完成。')
+    } catch (error) {
+      setRecovery(current => current ? { ...current, running: false } : current)
+      showNotice('error', `阶段重跑失败：${getErrorMessage(error)}`)
+    }
+  }
+
+  const handleUpsertSeries = async (value: Partial<Series> & { title: string }) => {
+    const saved = await window.electronAPI.upsertSeries(value)
+    if (workflow?.state.series?.id === saved.id) setHasUnsavedChanges(true)
+    await loadSeries()
+    await loadWorkflowSummaries()
+    showNotice('success', '栏目已保存')
+    return saved
+  }
+
+  const handleAssignSeries = async (seriesId: string, workflowId: string) => {
+    await window.electronAPI.assignEpisodeToSeries(seriesId, workflowId)
+    if (workflow?.id === workflowId) setHasUnsavedChanges(true)
+    await loadSeries()
+    await loadWorkflowSummaries()
+    showNotice('success', '节目已加入栏目')
+  }
+
+  const handleReorderSeries = async (seriesId: string, episodeIds: string[]) => {
+    await window.electronAPI.reorderSeriesEpisodes(seriesId, episodeIds)
+    await loadSeries()
+  }
+
+  const handleGenerateSeriesFeed = async (seriesId: string) => {
+    try {
+      const result = await window.electronAPI.generateSeriesFeed(seriesId)
+      showNotice('success', `栏目 RSS 本地预览已生成，共 ${result.episodeCount} 期：${result.feedPath}`)
+    } catch (error) {
+      showNotice('error', `栏目 RSS 生成失败：${getErrorMessage(error)}`)
     }
   }
 
@@ -803,16 +928,24 @@ function App() {
               {homePage === 'episodes' && (
                 <EpisodeManager
                   episodes={workflowSummaries}
+                  loading={libraryLoading}
+                  series={series}
                   activeWorkflowId={workflow?.id}
                   activeWorkflowDirty={hasUnsavedChanges}
                   hasElectronBackend={hasElectronBackend}
                   onCreate={handleStart}
                   onOpen={handleOpenWorkflow}
+                  onPlay={handlePlayEpisode}
+                  onRerun={handleOpenRecovery}
                   onDelete={handleDeleteWorkflow}
                   onDuplicate={handleDuplicateWorkflow}
                   onImport={handleImportWorkflow}
                   onExport={handleExportWorkflow}
                   onEdit={handleEditWorkflow}
+                  onUpsertSeries={handleUpsertSeries}
+                  onAssignSeries={handleAssignSeries}
+                  onReorderSeries={handleReorderSeries}
+                  onGenerateSeriesFeed={handleGenerateSeriesFeed}
                 />
               )}
             </main>
@@ -821,6 +954,57 @@ function App() {
         {!showWorkflowSidebar && !settingsVisible && (
           <GlobalSettingsButton onOpen={openSettings} floating />
         )}
+
+        <GlobalPlayer
+          episode={playingEpisode}
+          workflow={playingWorkflow}
+          onClose={() => { setPlayingEpisode(null); setPlayingWorkflow(null) }}
+          onPlaybackPersisted={() => void loadWorkflowSummaries()}
+          onEnded={playNextSeriesEpisode}
+        />
+
+        <Modal
+          title="阶段重跑"
+          open={Boolean(recovery)}
+          confirmLoading={Boolean(recovery?.running)}
+          okText="确认重跑"
+          cancelText="取消"
+          onOk={() => void confirmRecovery()}
+          onCancel={() => !recovery?.running && setRecovery(null)}
+          maskClosable={!recovery?.running}
+          closable={!recovery?.running}
+        >
+          {recovery && (
+            <div className="recovery-dialog">
+              <label className="ui-field">
+                <span>从哪个节点开始</span>
+                <Select
+                  value={recovery.plan.nodeName}
+                  disabled={recovery.running}
+                  onChange={value => void updateRecoveryNode(value)}
+                  options={[
+                    ['fetch', '发现抓取'], ['preprocess', '内容清洗'], ['research', '补充研究'],
+                    ['topic_selection', '选题结构'], ['facts', '事实卡'], ['script', '口播稿'],
+                    ['tts', '语音合成'], ['audio_postprocess', '音频装配'], ['assets', '封面资产'],
+                    ['review', '发布审核'], ['publish', '发布包'],
+                  ].map(([value, label]) => ({ value, label }))}
+                />
+              </label>
+              <div className="recovery-impact">
+                <strong>将重新执行</strong>
+                <p>{recovery.plan.rerunNodes.join(' → ')}</p>
+              </div>
+              <div className="recovery-impact is-warning">
+                <strong>会清除的已有产物</strong>
+                <p>{recovery.plan.populatedLabels.length > 0 ? recovery.plan.populatedLabels.join('、') : '当前没有已生成的下游产物。'}</p>
+              </div>
+              <div className="recovery-impact">
+                <strong>保留范围</strong>
+                <p>所选节点之前的输入、研究证据和编辑成果保持不变。</p>
+              </div>
+            </div>
+          )}
+        </Modal>
 
         <ApprovalModal
           visible={approvalVisible}

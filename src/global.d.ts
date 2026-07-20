@@ -1,4 +1,12 @@
-import type { ContentItem, Workflow, WorkflowCreateResult, WorkflowSummary } from './types/workflow'
+import type {
+  ContentItem,
+  PlaybackState,
+  RecoveryPlan,
+  Series,
+  Workflow,
+  WorkflowCreateResult,
+  WorkflowSummary,
+} from './types/workflow'
 
 declare global {
   interface LLMCallParams {
@@ -86,6 +94,20 @@ declare global {
     appendWorkflowLogs: (id: string, entries: string[]) => Promise<Workflow>
     clearWorkflowLogs: (id: string) => Promise<Workflow>
     runWorkflowNodes: (id: string, nodeNames: string[]) => Promise<Workflow>
+    previewWorkflowRerun: (id: string, nodeName: string) => Promise<RecoveryPlan>
+    rerunWorkflowStage: (id: string, nodeName: string) => Promise<Workflow>
+    updatePlayback: (id: string, patch: Partial<PlaybackState>) => Promise<PlaybackState>
+    getMediaUrl: (id: string) => Promise<{ url: string }>
+    listSeries: () => Promise<Series[]>
+    upsertSeries: (series: Partial<Series> & { title: string }) => Promise<Series>
+    assignEpisodeToSeries: (seriesId: string, workflowId: string) => Promise<{ series: Series; workflow: Workflow }>
+    reorderSeriesEpisodes: (seriesId: string, episodeIds: string[]) => Promise<Series>
+    generateSeriesFeed: (seriesId: string) => Promise<{
+      feedPath: string
+      episodeCount: number
+      localPreviewOnly: boolean
+      validation: { ok: boolean; warnings: string[] }
+    }>
     discoverRun: (id: string, config: Record<string, any>) => Promise<Workflow>
     saveRecording: (payload: {
       episodeId: string
@@ -96,6 +118,7 @@ declare global {
     }) => Promise<{ success: boolean; path: string; size: number; mimeType: string; durationSeconds: number }>
     openPath: (targetPath: string) => Promise<{ success: boolean; error?: string }>
     showItemInFolder: (targetPath: string) => Promise<{ success: boolean; error?: string }>
+    openExternal: (targetUrl: string) => Promise<{ success: boolean; error?: string }>
     readImageAsDataUrl: (targetPath: string) => Promise<{
       success: boolean
       error?: string

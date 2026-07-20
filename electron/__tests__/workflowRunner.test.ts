@@ -1,8 +1,40 @@
 import { describe, expect, it } from 'vitest'
 
-const { getNodeResultError, redactRuntimeConfigSecrets, resolveDownstreamStale } = require('../workflowRunner')
+const { applySeriesDefaults, getNodeResultError, redactRuntimeConfigSecrets, resolveDownstreamStale } = require('../workflowRunner')
 
 describe('workflow runner result guards', () => {
+  it('applies series defaults to script, speech and publish nodes', () => {
+    const state = {
+      selected_topic: { title: '今日科技' },
+      series: {
+        id: 'daily',
+        title: '每日科技',
+        description: '科技早报',
+        defaults: {
+          language: 'zh-CN',
+          targetDurationMinutes: 18,
+          author: '编辑部',
+          hostName: '小流',
+          defaultVoice: 'voice-a',
+          enabledPlatforms: ['local', 'rss'],
+          templateVariant: 'quick_9_plus_deep_1',
+        },
+      },
+    }
+
+    expect(applySeriesDefaults('script', { temperature: 0.2 }, state)).toMatchObject({
+      target_duration_minutes: 18,
+      language: 'zh-CN',
+    })
+    expect(state.selected_topic).toMatchObject({ show_name: '每日科技', host_name: '小流' })
+    expect(applySeriesDefaults('tts', {}, state).default_voice).toBe('voice-a')
+    expect(applySeriesDefaults('publish', {}, state)).toMatchObject({
+      podcast_title: '每日科技',
+      podcast_author: '编辑部',
+      enabled_platforms: ['local', 'rss'],
+    })
+  })
+
   it('fails a script result that returned an old draft together with a node error', () => {
     const error = getNodeResultError('script', {
       script: { id: 'old-script' },

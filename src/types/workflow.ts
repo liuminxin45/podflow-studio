@@ -97,7 +97,43 @@ export interface PodcastState {
   organize_ui?: Record<string, any>
   episode_brief?: Record<string, any>
   writing_meta?: Record<string, any>
+  series?: SeriesSnapshot
+  playback?: PlaybackState
   _manifest?: Record<string, any>
+}
+
+export interface SeriesDefaults {
+  language: string
+  targetDurationMinutes: number
+  author: string
+  hostName: string
+  defaultVoice: string
+  enabledPlatforms: string[]
+  templateVariant: 'quick_9_plus_deep_1'
+}
+
+export interface SeriesSnapshot {
+  id: string
+  title: string
+  description: string
+  coverPath: string
+  cadence: 'daily' | 'weekly'
+  defaults: SeriesDefaults
+}
+
+export interface Series extends SeriesSnapshot {
+  episodeIds: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PlaybackState {
+  positionSeconds: number
+  durationSeconds: number
+  completed: boolean
+  speed: number
+  playCount: number
+  updatedAt: string
 }
 
 export interface ContentItem {
@@ -286,6 +322,17 @@ export interface NodeExecution {
   duration?: number
   error?: string
   errorStack?: string
+  attempts?: number
+  history?: NodeAttempt[]
+}
+
+export interface NodeAttempt {
+  attempt: number
+  startedAt: string
+  completedAt?: string
+  duration?: number
+  status: 'running' | 'completed' | 'failed'
+  error?: string
 }
 
 export interface Workflow {
@@ -313,4 +360,22 @@ export interface WorkflowSummary {
   previewPath?: string
   isCurrent?: boolean
   isSaved?: boolean
+  audioPath?: string
+  durationSeconds?: number
+  playback?: PlaybackState
+  series?: SeriesSnapshot
+  failedNode?: string
+  topicKeys?: string[]
+  sourceDomains?: string[]
+}
+
+export interface RecoveryPlan {
+  nodeName: string
+  recommendedNode: string
+  rerunNodes: string[]
+  clearFields: string[]
+  clearLabels: string[]
+  populatedFields: string[]
+  populatedLabels: string[]
+  preserveFields: string[]
 }

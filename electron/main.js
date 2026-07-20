@@ -1,6 +1,8 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, nativeTheme } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, Menu, nativeTheme, net, protocol, shell } = require('electron')
 const path = require('path')
 const fs = require('fs')
+const { pathToFileURL } = require('url')
+const { randomBytes } = require('crypto')
 const { spawn } = require('child_process')
 const ConfigManager = require('./configManager')
 const { fetchModels, callLLM, stopLLMGateway } = require('./llmService')
@@ -17,6 +19,10 @@ const {
 } = require('./services/workflowLogService')
 const { create: createWorkflowRunner } = require('./workflowRunner')
 const { resolveWorkflowById } = require('./services/workflowLookup')
+const { create: createSeriesService } = require('./services/seriesService')
+const { create: createSeriesFeedService } = require('./services/seriesFeedService')
+const { create: createPlaybackService } = require('./services/playbackService')
+const { applyRecoveryPlan, buildRecoveryPlan } = require('./services/workflowRecovery')
 const { validateNodeOutput } = require('./nodeValidator')
 
 const SPAWN_SHELL = false
@@ -32,6 +38,13 @@ const WINDOWS_APP_ICON_PATHS = {
 }
 const PFS_FORMAT = 'podflow-studio/pfs'
 const PFS_VERSION = 1
+const mediaTokens = new Map()
+const MEDIA_TOKEN_TTL_MS = 60 * 60 * 1000
+const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.opus', '.flac'])
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'podflow-media', privileges: { secure: true, supportFetchAPI: true, stream: true } },
+])
 
 if (CDP_PORT) {
   app.commandLine.appendSwitch('remote-debugging-port', String(CDP_PORT))
@@ -116,6 +129,11 @@ function sanitizePathPart(value, fallback = 'unknown') {
 }
 
 function createInitialState(episodeId, runtimeConfig) {
+  const series = runtimeConfig?.series?.id ? toSeriesSnapshot(runtimeConfig.series) : {}
+  const cleanRuntimeConfig = { ...(runtimeConfig || {}) }
+  delete cleanRuntimeConfig.series
+  const targetDuration = Number(series?.defaults?.targetDurationMinutes || 22)
+  const language = String(series?.defaults?.language || 'zh-CN')
   return {
     episode_id: episodeId,
     created_at: new Date().toISOString(),
@@ -124,15 +142,15 @@ function createInitialState(episodeId, runtimeConfig) {
       id: 'morning_news_brief',
       content_type: 'news_brief',
       num_hosts: 1,
-      target_duration_minutes: 22,
-      target_duration_minutes_range: '20-24',
+      target_duration_minutes: targetDuration,
+      target_duration_minutes_range: `${Math.max(1, targetDuration - 2)}-${targetDuration + 2}`,
       template_variant: 'quick_9_plus_deep_1',
       recommended_news_item_count: 10,
       quick_news_recommended_count: 9,
       deep_dive_recommended_count: 1,
       allow_custom_news_item_count: true,
       tone: 'clear, concise, commute-friendly',
-      language: 'zh-CN',
+      language,
       segment_plan: [
         { type: 'opening', count: 1, target_seconds: [75, 110] },
         { type: 'quick_news', recommended_count: 9, target_seconds: [55, 90] },
@@ -141,7 +159,7 @@ function createInitialState(episodeId, runtimeConfig) {
       ]
     },
     source_inputs: [],
-    runtime_config: runtimeConfig || {},
+    runtime_config: cleanRuntimeConfig,
     logs: [],
     errors: [],
     fetch_contents: [],
@@ -162,7 +180,7 @@ function createInitialState(episodeId, runtimeConfig) {
     voice_segments: [],
     production_plan: {},
     audio_outputs: {},
-    cover_path: '',
+    cover_path: series.coverPath || '',
     intro_outro_paths: {},
     review_summary: {},
     publish_outputs: {},
@@ -172,7 +190,16 @@ function createInitialState(episodeId, runtimeConfig) {
     discover_ui: {},
     organize_ui: {},
     episode_brief: {},
-    writing_meta: {}
+    writing_meta: {},
+    series,
+    playback: {
+      positionSeconds: 0,
+      durationSeconds: 0,
+      completed: false,
+      speed: 1,
+      playCount: 0,
+      updatedAt: ''
+    }
   }
 }
 
@@ -183,7 +210,7 @@ const CURRENT_STATE_KEYS = new Set([
   'auto_rejected_items', 'script', 'edited_script', 'generation_request', 'generation_meta',
   'script_snapshots', 'downstream_stale', 'voice_segments', 'production_plan', 'audio_outputs', 'cover_path',
   'intro_outro_paths', 'review_summary', 'publish_outputs', 'subtitle_path', 'run_report',
-  'discover_meta', 'discover_ui', 'organize_ui', 'episode_brief', 'writing_meta', '_manifest',
+  'discover_meta', 'discover_ui', 'organize_ui', 'episode_brief', 'writing_meta', 'series', 'playback', '_manifest',
 ])
 
 function ensureWorkflowDir() {
@@ -270,8 +297,20 @@ function getWorkflowDescription(workflow) {
     ''
 }
 
+function toSeriesSnapshot(series) {
+  return {
+    id: series.id,
+    title: series.title,
+    description: series.description || '',
+    coverPath: series.coverPath || '',
+    cadence: series.cadence,
+    defaults: { ...series.defaults },
+  }
+}
+
 function createWorkflowSummary(workflow) {
   const normalized = normalizeWorkflow(workflow)
+  const playback = playbackService.get(normalized.id) || normalized.state.playback || undefined
   const filePath = workflowFilePath(normalized.id)
   const isSaved = fs.existsSync(filePath)
   let updatedAt = normalized.state.created_at
@@ -280,6 +319,17 @@ function createWorkflowSummary(workflow) {
       updatedAt = fs.statSync(filePath).mtime.toISOString()
     }
   } catch {}
+  const topicKeys = (normalized.state.selected_topics || [])
+    .map(topic => String(topic?.title || '').trim().toLocaleLowerCase())
+    .filter(Boolean)
+  const sourceDomains = [...new Set((normalized.state.facts || []).flatMap(fact => (
+    Array.isArray(fact?.source_urls) && fact.source_urls.length > 0
+      ? fact.source_urls
+      : [fact?.source_url]
+  )).map(value => {
+    try { return new URL(String(value || '')).hostname.replace(/^www\./, '').toLocaleLowerCase() }
+    catch { return '' }
+  }).filter(Boolean))]
 
   return {
     id: normalized.id,
@@ -290,6 +340,13 @@ function createWorkflowSummary(workflow) {
     createdAt: normalized.state.created_at,
     updatedAt,
     previewPath: normalized.state.cover_path || '',
+    audioPath: normalized.state.audio_outputs?.final_audio_path || normalized.state.publish_outputs?.audio_path || '',
+    durationSeconds: Number(normalized.state.audio_outputs?.duration_seconds || playback?.durationSeconds || 0),
+    playback,
+    series: normalized.state.series?.id ? normalized.state.series : undefined,
+    failedNode: Object.keys(normalized.nodeExecutions || {}).find(node => normalized.nodeExecutions[node]?.status === 'failed'),
+    topicKeys,
+    sourceDomains,
     isCurrent: currentWorkflow?.id === normalized.id,
     isSaved
   }
@@ -697,9 +754,17 @@ const sharedCtx = {
     currentWorkflow = workflow
     currentWorkflowDirty = Boolean(workflow)
   },
+  persistWorkflow: (workflow) => {
+    if (!workflow) return
+    saveWorkflow(workflow)
+    if (currentWorkflow?.id === workflow.id) currentWorkflowDirty = false
+  },
   runPythonNode
 }
 const workflowRunner = createWorkflowRunner(sharedCtx)
+const seriesService = createSeriesService({ projectRoot: PROJECT_ROOT })
+const seriesFeedService = createSeriesFeedService({ projectRoot: PROJECT_ROOT })
+const playbackService = createPlaybackService({ projectRoot: PROJECT_ROOT })
 const fileService = createFileService({
   projectRoot: PROJECT_ROOT,
   getCurrentWorkflow: () => currentWorkflow
@@ -718,6 +783,7 @@ function stopActivePythonProcesses() {
 
 function cleanupBeforeQuit() {
   isQuitting = true
+  mediaTokens.clear()
   stopLLMGateway()
   stopLocalAgentProcesses()
   stopActivePythonProcesses()
@@ -860,6 +926,13 @@ ipcMain.handle('workflow:duplicate', async (event, workflowId) => {
   copied.id = Date.now().toString()
   copied.state.episode_id = `ep_${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '_')}`
   copied.state.created_at = new Date().toISOString()
+  copied.state.playback = {
+    positionSeconds: 0,
+    durationSeconds: Number(copied.state.audio_outputs?.duration_seconds || 0),
+    completed: false,
+    speed: 1,
+    playCount: 0,
+  }
   copied.state.selected_topic = copied.state.selected_topic || {}
   copied.state.script = copied.state.script || {}
   const originalTitle = getWorkflowTitle(source)
@@ -868,6 +941,7 @@ ipcMain.handle('workflow:duplicate', async (event, workflowId) => {
   copied.state.logs = copied.state.logs || []
   copied.state.logs.push(`[Electron] Workflow duplicated from ${source.id} at ${new Date().toISOString()}`)
   saveWorkflow(copied)
+  if (copied.state.series?.id) seriesService.assign(copied.state.series.id, copied.id)
   return copied
 })
 
@@ -880,6 +954,8 @@ ipcMain.handle('workflow:delete', async (event, workflowId) => {
   if (fs.existsSync(filePath)) {
     fs.unlinkSync(filePath)
   }
+  seriesService.unassign(workflowId)
+  playbackService.remove(workflowId)
   if (currentWorkflow?.id === workflowId) {
     currentWorkflow = null
     currentWorkflowDirty = false
@@ -953,6 +1029,11 @@ ipcMain.handle('workflow:import', async () => {
   imported.id = workflowId
   imported.state.logs = imported.state.logs || []
   imported.state.logs.push(`[Electron] Workflow imported from ${result.filePaths[0]} at ${new Date().toISOString()}`)
+  if (imported.state.series?.id) {
+    const importedSeries = seriesService.upsert(imported.state.series)
+    imported.state.series = toSeriesSnapshot(importedSeries)
+    seriesService.assign(importedSeries.id, imported.id)
+  }
   currentWorkflow = imported
   currentWorkflowDirty = true
   broadcastWorkflowUpdate()
@@ -1091,6 +1172,129 @@ ipcMain.handle('workflow:runNodes', async (event, workflowId, nodeNames) => {
   return currentWorkflow
 })
 
+ipcMain.handle('workflow:previewRerun', async (_event, workflowId, nodeName) => {
+  const workflow = resolveWorkflowById(workflowId, currentWorkflow, loadWorkflow)
+  if (!workflow) throw new Error('Workflow not found')
+  return buildRecoveryPlan(workflow, nodeName)
+})
+
+ipcMain.handle('workflow:rerunStage', async (_event, workflowId, nodeName) => {
+  if (!currentWorkflow || currentWorkflow.id !== workflowId) {
+    throw new Error('Open the episode before rerunning a stage')
+  }
+  if (currentWorkflow.status === 'running') throw new Error('Workflow is already running')
+  const plan = buildRecoveryPlan(currentWorkflow, nodeName)
+  applyRecoveryPlan(currentWorkflow, plan)
+  currentWorkflow.status = 'running'
+  currentWorkflow.currentNode = null
+  currentWorkflow.state.logs = currentWorkflow.state.logs || []
+  currentWorkflow.state.logs.push(`[Recovery] Rerun confirmed from ${nodeName}; cleared=${plan.clearFields.join(',')}`)
+  currentWorkflowDirty = true
+  saveWorkflow(currentWorkflow)
+  broadcastWorkflowUpdate()
+  await workflowRunner.run(workflowId, null, plan.rerunNodes)
+  saveWorkflow(currentWorkflow)
+  currentWorkflowDirty = false
+  return currentWorkflow
+})
+
+ipcMain.handle('workflow:updatePlayback', async (_event, workflowId, patch) => {
+  const workflow = resolveWorkflowById(workflowId, currentWorkflow, loadWorkflow)
+  if (!workflow) throw new Error('Workflow not found')
+  const previous = playbackService.get(workflow.id) || workflow.state.playback || {}
+  const playback = playbackService.set(workflow.id, patch, previous)
+  if (currentWorkflow?.id === workflow.id) {
+    currentWorkflow.state.playback = playback
+    broadcastWorkflowUpdate()
+  }
+  return playback
+})
+
+function isPathInside(rootPath, targetPath) {
+  const relative = path.relative(path.resolve(rootPath), path.resolve(targetPath))
+  return relative !== '' && !relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative)
+}
+
+function authorizeAudioPath(audioPath) {
+  const resolved = path.resolve(String(audioPath || ''))
+  const ownedRoots = [
+    path.join(PROJECT_ROOT, 'out'),
+    path.join(PROJECT_ROOT, 'dist'),
+    path.join(PROJECT_ROOT, 'examples', 'demo-news'),
+  ]
+  if (!AUDIO_EXTENSIONS.has(path.extname(resolved).toLocaleLowerCase())) {
+    throw new Error('Unsupported episode audio format')
+  }
+  if (!ownedRoots.some(root => isPathInside(root, resolved))) {
+    throw new Error('Episode audio is outside PodFlow Studio managed storage')
+  }
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+    throw new Error('Episode has no readable final audio')
+  }
+  return resolved
+}
+
+ipcMain.handle('media:getUrl', async (_event, workflowId) => {
+  const workflow = resolveWorkflowById(workflowId, currentWorkflow, loadWorkflow)
+  if (!workflow) throw new Error('Workflow not found')
+  const audioPath = String(workflow.state.audio_outputs?.final_audio_path || workflow.state.publish_outputs?.audio_path || '')
+  const resolvedAudioPath = authorizeAudioPath(audioPath)
+  const now = Date.now()
+  for (const [key, record] of mediaTokens) {
+    if (record.expiresAt <= now) mediaTokens.delete(key)
+  }
+  const token = randomBytes(24).toString('hex')
+  mediaTokens.set(token, { path: resolvedAudioPath, expiresAt: now + MEDIA_TOKEN_TTL_MS })
+  return { url: `podflow-media://audio/${encodeURIComponent(token)}` }
+})
+
+ipcMain.handle('series:list', async () => seriesService.list())
+
+ipcMain.handle('series:upsert', async (_event, input) => {
+  const value = seriesService.upsert(input)
+  for (const summary of listSavedWorkflows()) {
+    const workflow = resolveWorkflowById(summary.id, currentWorkflow, loadWorkflow)
+    if (!workflow || workflow.state.series?.id !== value.id) continue
+    workflow.state.series = toSeriesSnapshot(value)
+    if (currentWorkflow?.id === workflow.id) {
+      currentWorkflow = workflow
+      currentWorkflowDirty = true
+    } else {
+      saveWorkflow(workflow)
+    }
+  }
+  broadcastWorkflowUpdate()
+  return value
+})
+
+ipcMain.handle('series:assignEpisode', async (_event, seriesId, workflowId) => {
+  const value = seriesService.assign(String(seriesId), String(workflowId))
+  const workflow = resolveWorkflowById(workflowId, currentWorkflow, loadWorkflow)
+  if (!workflow) throw new Error('Workflow not found')
+  workflow.state.series = toSeriesSnapshot(value)
+  if (currentWorkflow?.id === workflow.id) {
+    currentWorkflow = workflow
+    currentWorkflowDirty = true
+  } else {
+    saveWorkflow(workflow)
+  }
+  broadcastWorkflowUpdate()
+  return { series: value, workflow }
+})
+
+ipcMain.handle('series:reorderEpisodes', async (_event, seriesId, episodeIds) => {
+  return seriesService.reorder(String(seriesId), Array.isArray(episodeIds) ? episodeIds : [])
+})
+
+ipcMain.handle('series:generateFeed', async (_event, seriesId) => {
+  const series = seriesService.list().find(item => item.id === String(seriesId))
+  if (!series) throw new Error('Series not found')
+  const workflows = series.episodeIds
+    .map(id => resolveWorkflowById(id, currentWorkflow, loadWorkflow))
+    .filter(Boolean)
+  return seriesFeedService.generate(series, workflows)
+})
+
 ipcMain.handle('recording:save', async (event, payload) => {
   return fileService.saveRecording(payload)
 })
@@ -1101,6 +1305,13 @@ ipcMain.handle('file:openPath', async (event, targetPath) => {
 
 ipcMain.handle('file:showItemInFolder', async (event, targetPath) => {
   return fileService.showItemInFolder(targetPath)
+})
+
+ipcMain.handle('file:openExternal', async (_event, targetUrl) => {
+  const url = new URL(String(targetUrl || ''))
+  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Only HTTP and HTTPS links are supported')
+  await shell.openExternal(url.toString())
+  return { success: true }
 })
 
 ipcMain.handle('file:readImageAsDataUrl', async (event, targetPath) => {
@@ -1352,6 +1563,15 @@ ipcMain.handle('fetch:getSources', async (event) => {
 })
 
 app.whenReady().then(() => {
+  protocol.handle('podflow-media', (request) => {
+    const token = decodeURIComponent(new URL(request.url).pathname.replace(/^\//, ''))
+    const record = mediaTokens.get(token)
+    if (!record || record.expiresAt <= Date.now()) {
+      mediaTokens.delete(token)
+      throw new Error('Media token not found or expired')
+    }
+    return net.fetch(pathToFileURL(record.path).toString(), { headers: request.headers })
+  })
   if (process.platform !== 'darwin') {
     Menu.setApplicationMenu(null)
   }

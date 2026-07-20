@@ -92,6 +92,52 @@ def test_episode_run_accepts_versioned_production_plan():
     assert schema_errors == []
 
 
+def test_episode_run_accepts_series_and_playback_contracts():
+    state = create_base_state()
+    state["series"] = {
+        "id": "daily-tech",
+        "title": "每日科技",
+        "description": "科技新闻",
+        "coverPath": "cover.png",
+        "cadence": "daily",
+        "defaults": {
+            "language": "zh-CN",
+            "targetDurationMinutes": 18,
+            "author": "编辑部",
+            "hostName": "小流",
+            "defaultVoice": "voice-a",
+            "enabledPlatforms": ["local", "rss"],
+            "templateVariant": "quick_9_plus_deep_1",
+        },
+    }
+    state["playback"] = {
+        "positionSeconds": 30,
+        "durationSeconds": 120,
+        "completed": False,
+        "speed": 1.25,
+        "playCount": 1,
+        "updatedAt": "2026-07-20T00:00:00Z",
+    }
+
+    ok, errors = validate_episode_run_payload(state)
+    schema_errors = list(Draft202012Validator(_episode_run_schema()).iter_errors(state))
+
+    assert ok, errors
+    assert schema_errors == []
+
+
+def test_episode_run_rejects_partial_active_series():
+    state = create_base_state()
+    state["series"] = {"id": "daily-tech"}
+
+    ok, errors = validate_episode_run_payload(state)
+    schema_errors = list(Draft202012Validator(_episode_run_schema()).iter_errors(state))
+
+    assert ok is False
+    assert errors
+    assert schema_errors
+
+
 def test_episode_run_accepts_legacy_publish_platform_metadata():
     state = create_base_state()
     state["publish_outputs"]["enabled_platforms"] = ["rss", "apple"]

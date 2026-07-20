@@ -221,6 +221,46 @@ class RunReportModel(BaseModel):
     warnings: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class SeriesDefaultsModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    language: str = "zh-CN"
+    targetDurationMinutes: int = Field(default=22, ge=1, le=240)
+    author: str = "PodFlow Studio"
+    hostName: str = ""
+    defaultVoice: str = ""
+    enabledPlatforms: list[str] = Field(default_factory=lambda: ["local", "rss"])
+    templateVariant: Literal["quick_9_plus_deep_1"] = "quick_9_plus_deep_1"
+
+
+class SeriesSnapshotModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = ""
+    title: str = ""
+    description: str = ""
+    coverPath: str = ""
+    cadence: Literal["daily", "weekly"] = "daily"
+    defaults: SeriesDefaultsModel | None = None
+
+    @model_validator(mode="after")
+    def require_complete_active_series(self) -> "SeriesSnapshotModel":
+        if self.model_fields_set and (not self.id or not self.title or self.defaults is None):
+            raise ValueError("series requires id, title, and defaults")
+        return self
+
+
+class PlaybackModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    positionSeconds: float = Field(default=0.0, ge=0.0)
+    durationSeconds: float = Field(default=0.0, ge=0.0)
+    completed: bool = False
+    speed: float = Field(default=1.0, ge=0.5, le=3.0)
+    playCount: int = Field(default=0, ge=0)
+    updatedAt: str = ""
+
+
 class EpisodeRunModel(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -261,6 +301,8 @@ class EpisodeRunModel(BaseModel):
     organize_ui: dict[str, Any] = Field(default_factory=dict)
     episode_brief: dict[str, Any] = Field(default_factory=dict)
     writing_meta: dict[str, Any] = Field(default_factory=dict)
+    series: SeriesSnapshotModel = Field(default_factory=SeriesSnapshotModel)
+    playback: PlaybackModel = Field(default_factory=PlaybackModel)
     manifest: dict[str, Any] = Field(default_factory=dict, alias="_manifest")
 
 
