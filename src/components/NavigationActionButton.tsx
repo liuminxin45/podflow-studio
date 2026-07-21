@@ -22,7 +22,7 @@ export default function NavigationActionButton({
 }: NavigationActionButtonProps) {
   return (
     <Button
-      className="navigation-action-button"
+      className={`navigation-action-button${floating ? ' is-floating' : ''}`}
       type={borderless ? 'text' : 'default'}
       title={title}
       icon={icon}
@@ -38,7 +38,7 @@ export default function NavigationActionButton({
         padding: compact ? 0 : '0 10px',
         fontSize: 13,
         ...(floating
-          ? { position: 'fixed' as const, left: 12, bottom: 12, zIndex: 30 }
+          ? { position: 'absolute' as const, left: 12, bottom: 12, zIndex: 30 }
           : {}),
       }}
     >

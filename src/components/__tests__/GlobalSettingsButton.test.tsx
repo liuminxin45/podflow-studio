@@ -11,6 +11,7 @@ describe('GlobalSettingsButton', () => {
 
     const button = screen.getByRole('button', { name: '设置' })
     expect(button.classList.contains('ant-btn-text')).toBe(true)
-    expect(button.style.position).toBe(floating ? 'fixed' : '')
+    expect(button.classList.contains('is-floating')).toBe(floating)
+    expect(button.style.position).toBe(floating ? 'absolute' : '')
   })
 })

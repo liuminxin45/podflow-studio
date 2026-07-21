@@ -896,12 +896,13 @@ function App() {
     >
       {messageContextHolder}
       {modalContextHolder}
-      <Layout style={{ height: '100vh', background: 'var(--bg-primary)' }}>
-        <Layout style={{ background: 'transparent' }}>
+      <Layout className="app-shell" style={{ height: '100dvh', background: 'var(--bg-primary)', overflow: 'hidden' }}>
+        <Layout className="app-workspace" style={{ position: 'relative', minHeight: 0, background: 'transparent' }}>
           <Content style={{ 
             position: 'relative', 
             overflow: 'hidden', 
-            height: '100vh',
+            height: '100%',
+            minHeight: 0,
             display: 'flex',
             flexDirection: 'row',
             transition: 'height 0.3s ease'
@@ -950,10 +951,10 @@ function App() {
               )}
             </main>
           </Content>
+          {!showWorkflowSidebar && !settingsVisible && (
+            <GlobalSettingsButton onOpen={openSettings} floating />
+          )}
         </Layout>
-        {!showWorkflowSidebar && !settingsVisible && (
-          <GlobalSettingsButton onOpen={openSettings} floating />
-        )}
 
         <GlobalPlayer
           episode={playingEpisode}
