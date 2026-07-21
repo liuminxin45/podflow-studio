@@ -238,7 +238,7 @@ export default function EpisodeManager({
           <h1>节目库</h1>
           <p>继续收听、恢复生产，或按栏目组织发布。</p>
         </div>
-        <Space size="small">
+        <Space className="episode-library-header-actions" size="small" wrap>
           <GlobalSettingsButton onOpen={onOpenSettings} compact />
           <Button icon={<Rows />} onClick={() => { setSeriesVisible(true); if (!activeSeriesId && series[0]) selectSeries(series[0].id) }}>
             栏目管理

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import EpisodeManager from '../EpisodeManager'
 import GlobalPlayer from '../GlobalPlayer'
@@ -89,6 +89,8 @@ describe('节目库与播放器', () => {
     expect(onPlay).toHaveBeenCalledWith('ep-1')
     expect(onRerun).toHaveBeenCalledWith('ep-1')
     expect(onOpenSettings).toHaveBeenCalledOnce()
+    const headerActions = document.querySelector('.episode-library-header-actions') as HTMLElement
+    expect(headerActions.style.flexWrap).toBe('wrap')
   })
 
   it('links the current script segment to its fact source', async () => {
@@ -144,6 +146,7 @@ describe('节目库与播放器', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '播放' }))
     await waitFor(() => expect(play).toHaveBeenCalledTimes(2))
+    fireEvent.play(container.querySelector('audio') as HTMLAudioElement)
     await waitFor(() => expect(screen.queryByText(/音频播放失败：/)).toBeNull())
 
     unmount()
@@ -168,6 +171,47 @@ describe('节目库与播放器', () => {
     unmount()
     await waitFor(() => expect(window.electronAPI.updatePlayback).toHaveBeenCalledWith(
       'ep-1',
+      expect.objectContaining({ playCount: 1 }),
+    ))
+  })
+
+  it('ignores a stale play rejection after switching episodes', async () => {
+    let rejectPlay!: (reason: unknown) => void
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockReturnValueOnce(new Promise((_resolve, reject) => {
+      rejectPlay = reject
+    }))
+    const secondEpisode = { ...episode, id: 'ep-2', episodeId: 'episode-2', title: '第二期' }
+    const { rerender } = render(
+      <GlobalPlayer episode={episode} workflow={null} onClose={vi.fn()} onPlaybackPersisted={vi.fn()} onEnded={vi.fn()} />,
+    )
+    await waitFor(() => expect(screen.getByRole('button', { name: '播放' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: '播放' }))
+
+    rerender(<GlobalPlayer episode={secondEpisode} workflow={null} onClose={vi.fn()} onPlaybackPersisted={vi.fn()} onEnded={vi.fn()} />)
+    await act(async () => rejectPlay(new DOMException('旧节目播放失败', 'NotSupportedError')))
+
+    expect(screen.queryByText(/旧节目播放失败/)).toBeNull()
+    expect(screen.getByText('第二期')).toBeTruthy()
+  })
+
+  it('does not count a stale play resolution for the replacement episode', async () => {
+    let resolvePlay!: () => void
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockReturnValueOnce(new Promise(resolve => {
+      resolvePlay = resolve
+    }))
+    const secondEpisode = { ...episode, id: 'ep-2', episodeId: 'episode-2', title: '第二期' }
+    const { rerender, unmount } = render(
+      <GlobalPlayer episode={episode} workflow={null} onClose={vi.fn()} onPlaybackPersisted={vi.fn()} onEnded={vi.fn()} />,
+    )
+    await waitFor(() => expect(screen.getByRole('button', { name: '播放' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: '播放' }))
+
+    rerender(<GlobalPlayer episode={secondEpisode} workflow={null} onClose={vi.fn()} onPlaybackPersisted={vi.fn()} onEnded={vi.fn()} />)
+    await act(async () => resolvePlay())
+    unmount()
+
+    await waitFor(() => expect(window.electronAPI.updatePlayback).toHaveBeenCalledWith(
+      'ep-2',
       expect.objectContaining({ playCount: 1 }),
     ))
   })

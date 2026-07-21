@@ -158,13 +158,14 @@ export default function GlobalPlayer({ episode, workflow, onClose, onPlaybackPer
 
   const togglePlaying = async () => {
     const audio = audioRef.current
-    if (!audio) return
+    const targetEpisodeId = loadedEpisodeIdRef.current
+    if (!audio || !targetEpisodeId) return
     if (audio.paused) {
       setError('')
       try {
         await audio.play()
-        if (!countedPlayRef.current) countedPlayRef.current = true
       } catch (reason) {
+        if (audioRef.current !== audio || loadedEpisodeIdRef.current !== targetEpisodeId) return
         setPlaying(false)
         const message = reason instanceof Error ? reason.message : String(reason)
         setError(`音频播放失败：${message}`)
@@ -192,7 +193,11 @@ export default function GlobalPlayer({ episode, workflow, onClose, onPlaybackPer
             setPosition(restored)
             setDuration(audio.duration || 0)
           }}
-          onPlay={() => setPlaying(true)}
+          onPlay={event => {
+            if (audioRef.current !== event.currentTarget || loadedEpisodeIdRef.current !== episodeId) return
+            countedPlayRef.current = true
+            setPlaying(true)
+          }}
           onPause={() => { setPlaying(false); persist(true) }}
           onEnded={() => { setPlaying(false); persist(true); onEnded() }}
           onTimeUpdate={event => {

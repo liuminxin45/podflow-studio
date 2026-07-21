@@ -649,13 +649,13 @@ describe('OrganizePanel research tolerance', () => {
     fireEvent.click(screen.getByRole('button', { name: '自动补全资料' }))
     fireEvent.click(await screen.findByRole('button', { name: '停止补全' }))
     fireEvent.click(await screen.findByRole('button', { name: '自动补全资料' }))
-    await waitFor(() => expect(screen.getByText('当前阶段：联网核验')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('当前阶段：联网搜索')).toBeTruthy())
 
     await act(async () => {
       resolveFirstPlan({ choices: [{ message: { content: JSON.stringify(researchPlan(['旧请求事实', '旧请求背景'])) } }] })
     })
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /研究记录/ }).textContent).toMatch(/联网核验 \/ [1-9]\d* 秒/), { timeout: 2500 })
+    await waitFor(() => expect(screen.getByRole('button', { name: /研究记录/ }).textContent).toMatch(/联网搜索 \/ [1-9]\d* 秒/), { timeout: 2500 })
     fireEvent.click(screen.getByRole('button', { name: '停止补全' }))
   }, 15_000)
 
@@ -684,7 +684,7 @@ describe('OrganizePanel research tolerance', () => {
       expect(searchSignal?.aborted).toBe(false)
       await act(async () => { await vi.advanceTimersByTimeAsync(1) })
       expect(searchSignal?.aborted).toBe(true)
-      expect((searchSignal?.reason as Error)?.message).toContain('联网核验阶段超时（180秒）')
+      expect((searchSignal?.reason as Error)?.message).toContain('联网搜索阶段超时（180秒）')
     } finally {
       view?.unmount()
       vi.useRealTimers()

@@ -3957,6 +3957,10 @@ body {
   gap: 18px;
 }
 
+.episode-library-header-actions {
+  max-width: 100%;
+}
+
 .episode-library-header h1 {
   margin: 0;
   color: var(--text-primary);
@@ -4375,6 +4379,10 @@ body {
 }
 
 @media (max-width: 860px) {
+  .episode-library-header-actions {
+    width: 100%;
+  }
+
   .episode-library-filters,
   .series-manager,
   .global-player-evidence {
