@@ -52,6 +52,7 @@ describe('节目库与播放器', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     ;(window as any).electronAPI = originalElectronAPI
   })
 
@@ -121,5 +122,49 @@ describe('节目库与播放器', () => {
       expect.objectContaining({ positionSeconds: 42, durationSeconds: 100 }),
     ))
     expect(window.electronAPI.updatePlayback).not.toHaveBeenCalledWith('ep-2', expect.anything())
+  })
+
+  it('allows retrying a rejected media play and counts only the successful attempt', async () => {
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play')
+      .mockRejectedValueOnce(new DOMException('The element has no supported sources.', 'NotSupportedError'))
+      .mockResolvedValueOnce(undefined)
+    const { container, unmount } = render(
+      <GlobalPlayer episode={episode} workflow={null} onClose={vi.fn()} onPlaybackPersisted={vi.fn()} onEnded={vi.fn()} />,
+    )
+
+    await waitFor(() => expect(container.querySelector('audio')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: '播放' }))
+
+    expect(await screen.findByText(/音频播放失败：.*The element has no supported sources\./)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '播放' }).hasAttribute('disabled')).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', { name: '播放' }))
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByText(/音频播放失败：/)).toBeNull())
+
+    unmount()
+    await waitFor(() => expect(window.electronAPI.updatePlayback).toHaveBeenCalledWith(
+      'ep-1',
+      expect.objectContaining({ playCount: 2 }),
+    ))
+  })
+
+  it('does not count a rejected media play', async () => {
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockRejectedValueOnce(
+      new DOMException('The element has no supported sources.', 'NotSupportedError'),
+    )
+    const { container, unmount } = render(
+      <GlobalPlayer episode={episode} workflow={null} onClose={vi.fn()} onPlaybackPersisted={vi.fn()} onEnded={vi.fn()} />,
+    )
+
+    await waitFor(() => expect(container.querySelector('audio')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: '播放' }))
+    await screen.findByText(/音频播放失败：.*The element has no supported sources\./)
+
+    unmount()
+    await waitFor(() => expect(window.electronAPI.updatePlayback).toHaveBeenCalledWith(
+      'ep-1',
+      expect.objectContaining({ playCount: 1 }),
+    ))
   })
 })

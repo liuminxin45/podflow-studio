@@ -160,8 +160,15 @@ export default function GlobalPlayer({ episode, workflow, onClose, onPlaybackPer
     const audio = audioRef.current
     if (!audio) return
     if (audio.paused) {
-      if (!countedPlayRef.current) countedPlayRef.current = true
-      await audio.play()
+      setError('')
+      try {
+        await audio.play()
+        if (!countedPlayRef.current) countedPlayRef.current = true
+      } catch (reason) {
+        setPlaying(false)
+        const message = reason instanceof Error ? reason.message : String(reason)
+        setError(`音频播放失败：${message}`)
+      }
     } else {
       audio.pause()
     }
@@ -205,7 +212,7 @@ export default function GlobalPlayer({ episode, workflow, onClose, onPlaybackPer
           shape="circle"
           icon={loading ? <Spin size="small" /> : playing ? <Pause weight="fill" /> : <Play weight="fill" />}
           onClick={() => void togglePlaying()}
-          disabled={loading || Boolean(error) || !mediaUrl}
+          disabled={loading || !mediaUrl}
           aria-label={playing ? '暂停' : '播放'}
         />
         <div className="global-player-title">
