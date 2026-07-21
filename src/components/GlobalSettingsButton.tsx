@@ -3,17 +3,17 @@ import NavigationActionButton from './NavigationActionButton'
 
 interface GlobalSettingsButtonProps {
   onOpen: () => void
-  floating?: boolean
+  compact?: boolean
 }
 
-export default function GlobalSettingsButton({ onOpen, floating = false }: GlobalSettingsButtonProps) {
+export default function GlobalSettingsButton({ onOpen, compact = false }: GlobalSettingsButtonProps) {
   return (
     <NavigationActionButton
       label="设置"
       title="设置"
       icon={<SettingOutlined style={{ fontSize: 14 }} />}
       onClick={onOpen}
-      floating={floating}
+      compact={compact}
       borderless
     />
   )

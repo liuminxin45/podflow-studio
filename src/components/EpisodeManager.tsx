@@ -17,6 +17,7 @@ import {
   Trash,
 } from '@phosphor-icons/react'
 import type { Series, WorkflowSummary } from '../types/workflow'
+import GlobalSettingsButton from './GlobalSettingsButton'
 
 interface EpisodeMetaPatch {
   title: string
@@ -44,6 +45,7 @@ interface Props {
   onAssignSeries: (seriesId: string, workflowId: string) => Promise<void>
   onReorderSeries: (seriesId: string, episodeIds: string[]) => Promise<void>
   onGenerateSeriesFeed: (seriesId: string) => Promise<void>
+  onOpenSettings: () => void
 }
 
 function formatDate(value?: string) {
@@ -80,6 +82,7 @@ export default function EpisodeManager({
   onAssignSeries,
   onReorderSeries,
   onGenerateSeriesFeed,
+  onOpenSettings,
 }: Props) {
   const [editing, setEditing] = useState<WorkflowSummary | null>(null)
   const [editTitle, setEditTitle] = useState('')
@@ -236,6 +239,7 @@ export default function EpisodeManager({
           <p>继续收听、恢复生产，或按栏目组织发布。</p>
         </div>
         <Space size="small">
+          <GlobalSettingsButton onOpen={onOpenSettings} compact />
           <Button icon={<Rows />} onClick={() => { setSeriesVisible(true); if (!activeSeriesId && series[0]) selectSeries(series[0].id) }}>
             栏目管理
           </Button>

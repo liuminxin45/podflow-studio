@@ -10,7 +10,6 @@ import SettingsPage from './components/SettingsPage'
 import WorkflowSidebar from './components/WorkflowSidebar'
 import EpisodeManager from './components/EpisodeManager'
 import GlobalPlayer from './components/GlobalPlayer'
-import GlobalSettingsButton from './components/GlobalSettingsButton'
 import { STAGES } from './components/workflowStages'
 import { detectAndPersistLocalAgentsOnStartup } from './services/settings/localAgentDetection'
 import { llmConfigResolver } from './services/settings/llmConfigResolver'
@@ -947,13 +946,11 @@ function App() {
                   onAssignSeries={handleAssignSeries}
                   onReorderSeries={handleReorderSeries}
                   onGenerateSeriesFeed={handleGenerateSeriesFeed}
+                  onOpenSettings={openSettings}
                 />
               )}
             </main>
           </Content>
-          {!showWorkflowSidebar && !settingsVisible && (
-            <GlobalSettingsButton onOpen={openSettings} floating />
-          )}
         </Layout>
 
         <GlobalPlayer

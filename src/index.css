@@ -3953,6 +3953,7 @@ body {
 
 .episode-library-header {
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 18px;
 }
 
@@ -3974,6 +3975,22 @@ body {
   gap: 10px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border-color);
+}
+
+.episode-library-filters .ant-input-affix-wrapper {
+  align-items: center;
+}
+
+.episode-library-filters .ant-input-affix-wrapper > .ant-input {
+  min-height: 0;
+  height: auto;
+  padding: 0 !important;
+  background: transparent !important;
+  line-height: 21px;
+}
+
+.episode-library-filters .ant-input-affix-wrapper > .ant-input::placeholder {
+  line-height: 21px;
 }
 
 .episode-library-grid {

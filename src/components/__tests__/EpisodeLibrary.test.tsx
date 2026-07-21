@@ -59,6 +59,7 @@ describe('节目库与播放器', () => {
   it('filters continue-listening episodes and exposes play and recovery actions', async () => {
     const onPlay = vi.fn()
     const onRerun = vi.fn()
+    const onOpenSettings = vi.fn()
     render(<EpisodeManager
       episodes={[episode]}
       loading={false}
@@ -76,6 +77,7 @@ describe('节目库与播放器', () => {
       onAssignSeries={vi.fn()}
       onReorderSeries={vi.fn()}
       onGenerateSeriesFeed={vi.fn()}
+      onOpenSettings={onOpenSettings}
     />)
 
     await waitFor(() => expect(screen.getByText('芯片新闻')).toBeTruthy())
@@ -83,8 +85,10 @@ describe('节目库与播放器', () => {
     expect(screen.getByText('芯片新闻')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '继续' }))
     fireEvent.click(screen.getByRole('button', { name: '重跑' }))
+    fireEvent.click(screen.getByRole('button', { name: '设置' }))
     expect(onPlay).toHaveBeenCalledWith('ep-1')
     expect(onRerun).toHaveBeenCalledWith('ep-1')
+    expect(onOpenSettings).toHaveBeenCalledOnce()
   })
 
   it('links the current script segment to its fact source', async () => {
