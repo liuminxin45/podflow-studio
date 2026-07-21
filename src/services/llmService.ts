@@ -81,11 +81,14 @@ class LLMService {
     }
     await this.rateLimiter.acquire()
 
-    const cacheKey = getCacheKey(options)
-    const cached = this.cache.get(cacheKey)
-    if (cached) {
-      console.log('[LLMService] Cache hit')
-      return cached
+    const useCache = adjustedOptions.cacheMode !== 'bypass'
+    const cacheKey = getCacheKey(adjustedOptions)
+    if (useCache) {
+      const cached = this.cache.get(cacheKey)
+      if (cached) {
+        console.log('[LLMService] Cache hit')
+        return cached
+      }
     }
 
     const startTime = Date.now()
@@ -122,7 +125,7 @@ class LLMService {
 
       const duration = Date.now() - startTime
       this.metricsCollector.recordCall(duration, true)
-      this.cache.set(cacheKey, response)
+      if (useCache) this.cache.set(cacheKey, response)
       console.info('[LLMService] call success', { model, duration })
 
       return response

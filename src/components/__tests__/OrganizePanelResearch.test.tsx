@@ -384,6 +384,31 @@ describe('OrganizePanel research tolerance', () => {
     expect(screen.queryByText(/Unexpected token/)).toBeNull()
   })
 
+  it('retries completion immediately with the same model after a parse failure', async () => {
+    vi.mocked(llmService.call)
+      .mockResolvedValueOnce({ choices: [{ message: { content: 'invalid response' } }] } as any)
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(researchPlan(['重试问题一', '重试问题二'])) } }] } as any)
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(evidenceAssessments(2)) } }] } as any)
+    vi.mocked(searchForOrganize).mockImplementation(async query => ({
+      provider: 'tavily',
+      query,
+      results: [{ id: query, title: `${query}来源`, url: `https://example.com/${encodeURIComponent(query)}`, excerpt: '重试核验内容', provider: 'tavily' }],
+    }) as any)
+
+    render(<OrganizePanel visible onClose={vi.fn()} contents={[{ title: '原始新闻', content: '原始内容', source: '来源甲' }]} />)
+    const completionButton = screen.getByRole('button', { name: '自动补全资料' })
+    fireEvent.click(completionButton)
+    await waitFor(() => expect(screen.getAllByText(/制定搜索问题失败：AI 未返回有效 JSON/).length).toBeGreaterThan(0))
+    await waitFor(() => expect(completionButton.hasAttribute('disabled')).toBe(false))
+
+    fireEvent.click(completionButton)
+
+    await waitFor(() => expect(llmService.call).toHaveBeenCalledTimes(3))
+    expect(searchForOrganize).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(completionButton.hasAttribute('disabled')).toBe(false))
+    expect(vi.mocked(llmService.call).mock.calls.every(([options]) => options.cacheMode === 'bypass')).toBe(true)
+  })
+
   it('rejects Markdown-wrapped JSON instead of extracting it', async () => {
     vi.mocked(llmService.call).mockResolvedValue({
       choices: [{ message: { content: `\`\`\`json\n${JSON.stringify(researchPlan(['问题一', '问题二']))}\n\`\`\`` } }],

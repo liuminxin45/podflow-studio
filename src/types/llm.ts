@@ -19,6 +19,7 @@ export interface LLMCallOptions {
   maxTokens?: number
   timeout?: number
   signal?: AbortSignal
+  cacheMode?: 'default' | 'bypass'
 }
 
 export interface LLMResponse {

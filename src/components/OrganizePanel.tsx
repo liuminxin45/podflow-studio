@@ -735,6 +735,7 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
       if (mode === 'web_only' && !searchStatus.ready) throw new Error(searchStatus.reason)
       const originalSources = [unitSnapshot, ...(unitSnapshot._references || [])]
       const planningResponse = await llmService.call(createLLMCallOptions(config, {
+        cacheMode: 'bypass',
         temperature: config.temperature ?? 0.25,
         maxTokens: isDeepDive ? 2600 : 1800,
         timeout: phaseTimeouts.planning,
@@ -789,6 +790,7 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
           { id: 'knowledge', label: '扩展 AI 自身知识', status: 'running' },
         ])
         const knowledgeResponse = await llmService.call(createLLMCallOptions(config, {
+          cacheMode: 'bypass',
           temperature: config.temperature ?? 0.25,
           maxTokens: isDeepDive ? 3000 : 2000,
           timeout: phaseTimeouts.knowledge,
@@ -1040,6 +1042,7 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
           : item))
         writeProcessLog(`EVIDENCE_BATCH_START request=${requestId} batch=${batchIndex + 1}/${screeningBatches.length} count=${batch.length}`)
         const assessmentResponse = await llmService.call(createLLMCallOptions(config, {
+          cacheMode: 'bypass',
           temperature: 0,
           maxTokens: isDeepDive ? 2400 : 1800,
           timeout: phaseTimeouts.screening,
@@ -1304,6 +1307,7 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
     setSynthesisRunning(true)
     try {
       const synthesisResponse = await llmService.call(createLLMCallOptions(config, {
+        cacheMode: 'bypass',
         temperature: config.temperature ?? 0.2,
         maxTokens: isDeepDive ? 4200 : 2200,
         timeout: synthesisTimeout,
@@ -1538,6 +1542,7 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
       )
       if (response.results.length === 0) throw new Error('搜索没有返回可核验来源')
       const assessmentResponse = await llmService.call(createLLMCallOptions(config, {
+        cacheMode: 'bypass',
         temperature: 0,
         maxTokens: 1000,
         signal: abortController.signal,

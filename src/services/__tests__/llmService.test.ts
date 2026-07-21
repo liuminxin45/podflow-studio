@@ -76,6 +76,55 @@ describe('LLMService', () => {
       expect(result.choices[0].message.content).toBe('Hello')
     })
 
+    it('bypasses cached responses when a caller needs a fresh retry', async () => {
+      const mockElectronAPI = {
+        llmCall: vi.fn()
+          .mockResolvedValueOnce({
+            id: 'first', object: 'chat.completion', created: Date.now(), model: 'gpt-4',
+            choices: [{ index: 0, message: { role: 'assistant', content: 'invalid response' }, finish_reason: 'stop' }],
+          })
+          .mockResolvedValueOnce({
+            id: 'second', object: 'chat.completion', created: Date.now(), model: 'gpt-4',
+            choices: [{ index: 0, message: { role: 'assistant', content: 'fresh response' }, finish_reason: 'stop' }],
+          }),
+      }
+      ;(global.window as any).electronAPI = mockElectronAPI
+      const options = {
+        apiBase: 'https://api.openai.com/v1',
+        apiKey: 'test-key',
+        model: 'gpt-4',
+        messages: [{ role: 'user' as const, content: 'retry me' }],
+        cacheMode: 'bypass' as const,
+      }
+
+      const first = await llmService.call(options)
+      const second = await llmService.call(options)
+
+      expect(first.choices[0].message.content).toBe('invalid response')
+      expect(second.choices[0].message.content).toBe('fresh response')
+      expect(mockElectronAPI.llmCall).toHaveBeenCalledTimes(2)
+    })
+
+    it('keeps default response caching for callers that do not bypass it', async () => {
+      const response = {
+        id: 'cached', object: 'chat.completion', created: Date.now(), model: 'gpt-4',
+        choices: [{ index: 0, message: { role: 'assistant', content: 'cached response' }, finish_reason: 'stop' }],
+      }
+      const mockElectronAPI = { llmCall: vi.fn().mockResolvedValue(response) }
+      ;(global.window as any).electronAPI = mockElectronAPI
+      const options = {
+        apiBase: 'https://api.openai.com/v1',
+        apiKey: 'test-key',
+        model: 'gpt-4',
+        messages: [{ role: 'user' as const, content: 'cache me' }],
+      }
+
+      await llmService.call(options)
+      await llmService.call(options)
+
+      expect(mockElectronAPI.llmCall).toHaveBeenCalledTimes(1)
+    })
+
     it('should call local agent targets without API credentials', async () => {
       const mockElectronAPI = {
         llmCall: vi.fn().mockResolvedValue({
