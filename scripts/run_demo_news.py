@@ -37,6 +37,37 @@ from protocol.episode_models import validate_episode_run_payload
 DEMO_DIR = ROOT / "examples" / "demo-news"
 DEFAULT_OUTPUT_DIR = DEMO_DIR / "output"
 DEFAULT_EPISODE_ID = "demo_morning_news_001"
+PACK_MANIFEST_PATH = DEMO_DIR / "input" / "pack-manifest.json"
+
+
+def load_demo_pack_manifest() -> list[dict[str, Any]]:
+    manifest = json.loads(PACK_MANIFEST_PATH.read_text(encoding="utf-8"))
+    if not isinstance(manifest, list) or not manifest:
+        raise ValueError("Demo pack manifest must be a non-empty array")
+    ids = [str(item.get("id") or "") for item in manifest if isinstance(item, dict)]
+    if len(ids) != len(manifest) or any(not pack_id for pack_id in ids):
+        raise ValueError("Every demo pack manifest entry must include an id")
+    if len(ids) != len(set(ids)):
+        raise ValueError("Demo pack ids must be unique")
+    return manifest
+
+
+def load_demo_pack(pack_id: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    manifest = load_demo_pack_manifest()
+    pack = next((item for item in manifest if item["id"] == pack_id), None)
+    if pack is None:
+        available = ", ".join(item["id"] for item in manifest)
+        raise ValueError(f"Unknown demo pack {pack_id!r}; choose one of: {available}")
+    relative_path = Path(str(pack.get("file") or ""))
+    if not relative_path.parts or relative_path.is_absolute() or ".." in relative_path.parts:
+        raise ValueError(f"Demo pack {pack_id!r} has an invalid file path")
+    pack_path = DEMO_DIR / "input" / relative_path
+    items = json.loads(pack_path.read_text(encoding="utf-8"))
+    if not isinstance(items, list) or not items:
+        raise ValueError(f"Demo pack {pack_id!r} must contain a non-empty array")
+    if not all(isinstance(item, dict) for item in items):
+        raise ValueError(f"Demo pack {pack_id!r} contains a non-object item")
+    return pack, items
 
 
 def run_demo_news(
@@ -44,14 +75,17 @@ def run_demo_news(
     output_dir: Path = DEFAULT_OUTPUT_DIR,
     episode_id: str = DEFAULT_EPISODE_ID,
     source_items: list[dict[str, Any]] | None = None,
+    pack_id: str = "mixed",
 ) -> dict[str, Any]:
     input_dir = DEMO_DIR / "input"
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "voice_segments").mkdir(parents=True, exist_ok=True)
 
-    items = source_items
-    if items is None:
-        items = json.loads((input_dir / "sample-items.json").read_text(encoding="utf-8"))
+    if source_items is None:
+        pack, items = load_demo_pack(pack_id)
+    else:
+        pack = next(item for item in load_demo_pack_manifest() if item["id"] == "mixed")
+        items = source_items
     items = [{**item, "_status": "ready"} for item in items]
     manual_notes = (input_dir / "manual-notes.md").read_text(encoding="utf-8").strip()
     preset = get_default_preset()
@@ -66,9 +100,9 @@ def run_demo_news(
         "researched_contents": items,
         "facts": [],
         "selected_topic": {
-            "title": "通勤早咖啡：今日新闻简报",
-            "description": "面向通勤场景的单人新闻早报 demo",
-            "keywords": ["通勤", "早报", "新闻"],
+            "title": pack["episode_title"],
+            "description": pack["topic_description"],
+            "keywords": pack["keywords"],
         },
         "selected_topics": [],
         "selected_materials": items,
@@ -99,7 +133,7 @@ def run_demo_news(
         facts,
         preset,
         episode_id=episode_id,
-        title="通勤早咖啡：今日新闻简报",
+        title=pack["episode_title"],
     )
     edited_script = apply_manual_notes(generated_script, manual_notes)
     state["script"] = generated_script
@@ -203,14 +237,25 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run offline PodFlow Studio morning news demo.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT_DIR), help="Output directory")
     parser.add_argument("--episode-id", default=DEFAULT_EPISODE_ID, help="Episode id")
+    parser.add_argument(
+        "--pack",
+        default="mixed",
+        choices=[item["id"] for item in load_demo_pack_manifest()],
+        help="Offline fact-card pack",
+    )
     args = parser.parse_args()
 
-    state = run_demo_news(output_dir=Path(args.output), episode_id=args.episode_id)
+    state = run_demo_news(
+        output_dir=Path(args.output),
+        episode_id=args.episode_id,
+        pack_id=args.pack,
+    )
     report = state.get("run_report", {})
     final_audio = state.get("audio_outputs", {}).get("final_audio_path", "")
     rss_path = state.get("publish_outputs", {}).get("feed_xml", "")
     print("PodFlow Studio demo-news completed")
     print(f"episode_id: {state.get('episode_id')}")
+    print(f"pack: {args.pack}")
     print(f"facts: {report.get('facts', {}).get('total', 0)}")
     print(f"segments: {report.get('script', {}).get('segments', 0)}")
     print(f"audio: {final_audio}")

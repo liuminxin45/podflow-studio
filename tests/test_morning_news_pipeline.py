@@ -17,7 +17,7 @@ from nodes.tts.config import TTSConfig
 from nodes.tts.node import run as tts_run
 from protocol.morning_news import build_fact_cards, generate_deterministic_script, resolve_morning_news_structure
 from protocol.presets import get_default_preset
-from scripts.run_demo_news import run_demo_news
+from scripts.run_demo_news import load_demo_pack, load_demo_pack_manifest, run_demo_news
 from tests.mock_data import create_base_state, create_mock_fetch_contents
 
 
@@ -533,6 +533,32 @@ def test_demo_news_e2e_runs_without_external_api_keys(tmp_path: Path):
     assert state["audio_outputs"]["contains_mock_audio"] is True
     assert state["publish_outputs"]["rss_validation"]["ok"] is True
     assert state["publish_outputs"]["local_preview_only"] is True
+
+
+def test_source_verified_demo_packs_are_complete_and_runnable(tmp_path: Path):
+    manifest = {item["id"]: item for item in load_demo_pack_manifest()}
+    assert {"mixed", "lifestyle-consumer", "ai-technology"} <= set(manifest)
+
+    for pack_id in ("lifestyle-consumer", "ai-technology"):
+        pack, items = load_demo_pack(pack_id)
+        assert pack["source_policy"] == "verified_primary_sources"
+        assert len(items) == 7
+        assert len({item["title"] for item in items}) == 7
+        assert all(str(item["url"]).startswith("https://") for item in items)
+        assert all(item.get("source") and item.get("published") for item in items)
+        assert sum(bool(item.get("_isDeepDive")) for item in items) == 1
+
+        state = run_demo_news(
+            output_dir=tmp_path / pack_id,
+            episode_id=f"test_{pack_id.replace('-', '_')}",
+            pack_id=pack_id,
+        )
+        assert state["errors"] == []
+        assert state["selected_topic"]["title"] == pack["episode_title"]
+        assert state["run_report"]["facts"]["total"] == 7
+        assert state["run_report"]["script"]["quick_news_count"] == 6
+        assert state["run_report"]["script"]["deep_dive_count"] == 1
+        assert state["run_report"]["schema_validation"]["ok"] is True
 
 
 def test_demo_news_accepts_a_sparse_custom_eight_item_run(tmp_path: Path):

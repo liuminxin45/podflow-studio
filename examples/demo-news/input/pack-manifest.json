@@ -1,0 +1,35 @@
+[
+  {
+    "id": "mixed",
+    "label": "综合早报（虚构素材）",
+    "description": "原有的无网络综合演示素材，用于稳定回归测试。",
+    "file": "sample-items.json",
+    "episode_title": "通勤早咖啡：今日新闻简报",
+    "topic_description": "面向通勤场景的单人新闻早报 demo",
+    "keywords": ["通勤", "早报", "新闻"],
+    "as_of": "2026-07-01",
+    "source_policy": "fictional"
+  },
+  {
+    "id": "lifestyle-consumer",
+    "label": "生活消费资讯",
+    "description": "食品安全、医保、通信消费、隐私和退税等近期公共服务资讯。",
+    "file": "packs/lifestyle-consumer.json",
+    "episode_title": "生活消费早报：办事、权益与安全提醒",
+    "topic_description": "面向普通消费者的近期生活政策与服务变化",
+    "keywords": ["生活", "消费", "权益", "公共服务"],
+    "as_of": "2026-07-23",
+    "source_policy": "verified_primary_sources"
+  },
+  {
+    "id": "ai-technology",
+    "label": "AI 科技资讯",
+    "description": "近期模型、AI 产品、算力基础设施和端侧智能动态。",
+    "file": "packs/ai-technology.json",
+    "episode_title": "AI 科技早报：模型、产品与基础设施",
+    "topic_description": "关注近期 AI 产品能力、开放范围和现实使用边界",
+    "keywords": ["AI", "科技", "模型", "产品"],
+    "as_of": "2026-07-23",
+    "source_policy": "verified_primary_sources"
+  }
+]

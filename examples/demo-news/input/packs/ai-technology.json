@@ -1,0 +1,59 @@
+[
+  {
+    "title": "OpenAI 推出企业语音与聊天智能体产品 Presence",
+    "summary": "OpenAI 发布 Presence，帮助企业部署可执行获准操作、遵守规则并在需要时转接人工的语音和聊天智能体。",
+    "content": "OpenAI 在 2026 年 7 月 22 日介绍 Presence，这是一项面向企业的语音和聊天智能体产品。企业可以把政策、护栏、获准执行的操作和人工升级路径配置到智能体中，用于客户服务等场景。OpenAI 称其内部部署已解决 75% 的入站问题，但这是厂商披露的自身使用结果，不代表其他企业会得到同样效果。产品目前是有限度的一般可用，并非任何个人用户都能自助开通；实际成效还取决于企业系统接入、规则设计和人工兜底。",
+    "url": "https://openai.com/index/introducing-openai-presence/",
+    "published": "2026-07-22T18:00:00+08:00",
+    "source": "OpenAI"
+  },
+  {
+    "title": "微软扩大 Azure 中的 AMD AI 与高性能计算基础设施",
+    "summary": "微软宣布扩展与 AMD 的合作，在 Azure 中部署新一代 AI 加速器和高性能计算实例。",
+    "content": "微软 2026 年 7 月 20 日宣布扩大 Azure 的 AMD AI 和高性能计算基础设施。官方列出的新配置包括面向高性能计算的 Azure HDv2、HXv2，以及采用 AMD Instinct MI455X GPU 的 ND MI455X v7。新闻重点是云端算力供给和产品路线扩展，不等于这些实例已经在所有区域、所有客户层级立即可用。企业用户需要进一步核对区域、预览或正式可用状态、价格和软件兼容性。",
+    "url": "https://blogs.microsoft.com/blog/2026/07/20/microsoft-expands-azure-ai-and-hpc-infrastructure-with-amd/",
+    "published": "2026-07-20T18:00:00+08:00",
+    "source": "Microsoft"
+  },
+  {
+    "title": "OpenAI 发布 GPT-5.6 系列",
+    "summary": "GPT-5.6 Sol、Terra 和 Luna 在有限预览后进入一般可用阶段，分别面向旗舰能力、平衡型任务和成本敏感场景。",
+    "content": "OpenAI 2026 年 7 月 9 日宣布 GPT-5.6 系列一般可用，包括 Sol、Terra 和 Luna。官方将 Sol 定位为旗舰模型，Terra 强调能力、速度和成本的平衡，Luna 面向成本更敏感的工作负载。不同模型的可用入口、价格、上下文能力和速率限制需要以对应产品页面为准。发布信息能够证明产品定位和开放阶段，但模型在具体业务中的准确率、速度和总成本仍需用真实任务评测，不能仅凭厂商描述下结论。",
+    "url": "https://openai.com/index/gpt-5-6/",
+    "published": "2026-07-09T18:00:00+08:00",
+    "source": "OpenAI",
+    "_isDeepDive": true
+  },
+  {
+    "title": "Meta 发布图像生成模型 Muse Image",
+    "summary": "Muse Image 已在 Meta AI 中推出，支持从文字或现有照片生成、组合和直接标注修改图像。",
+    "content": "Meta 2026 年 7 月 7 日发布 Muse Image，这是 Meta Superintelligence Labs 的首个图像生成模型，已进入 Meta AI。它支持理解复杂提示、组合多张照片、使用预设提示，并允许用户在图像上圈画或标注修改。相关能力也用于 Instagram Stories 和 WhatsApp 的部分创作体验，但地区和入口有限，Facebook、Messenger 及更多广告工具支持仍是后续计划。Meta 在 7 月 10 日更新文章，撤下了通过提及公开 Instagram 账号来引用其内容的功能，说明产品边界仍在调整。",
+    "url": "https://about.fb.com/news/2026/07/introducing-muse-image-meta-ai/",
+    "published": "2026-07-07T18:00:00+08:00",
+    "source": "Meta"
+  },
+  {
+    "title": "Google 为 Gemini Live API 加入实时翻译能力",
+    "summary": "Google 在 6 月 AI 更新中介绍 Gemini 3.5 Live Translate，可检测并实时翻译 70 多种语言，正在多个开发者入口推出。",
+    "content": "Google 2026 年 7 月 1 日汇总 6 月 AI 更新时介绍 Gemini 3.5 Live Translate。官方称其可检测并实时翻译 70 多种语言，并正向 Gemini Live API、Google AI Studio 和 Google Translate 等入口推出。这里的“70 多种语言”是厂商公布的覆盖范围，并不等于每个语言对、口音、专业术语和嘈杂环境下都具有相同质量。开发者需要在实际语音、延迟、成本和隐私要求下测试，普通用户也要以所在地区和产品入口的实际开放情况为准。",
+    "url": "https://blog.google/innovation-and-ai/technology/ai/google-ai-updates-june-2026/",
+    "published": "2026-07-01T18:00:00+08:00",
+    "source": "Google"
+  },
+  {
+    "title": "Anthropic 恢复 Fable 5 的全球服务",
+    "summary": "Anthropic 表示，在相关出口限制解除后，Fable 5 已重新向全球 Claude Platform、Claude.ai、Claude Code 和 Cowork 用户开放。",
+    "content": "Anthropic 2026 年 6 月 30 日更新称，随着相关出口限制解除，Fable 5 已重新部署，并恢复面向全球 Claude Platform、Claude.ai、Claude Code 和 Cowork 用户的服务。公司同时说明使用了新的分类器和安全措施。该消息能确认服务恢复及官方描述的防护方向，但不同产品入口、套餐和地区的具体可用性仍应以账户页面为准，也不能把“恢复服务”等同于模型在所有任务上的能力或安全性已经得到独立验证。",
+    "url": "https://www.anthropic.com/news/redeploying-fable-5",
+    "published": "2026-06-30T18:00:00+08:00",
+    "source": "Anthropic"
+  },
+  {
+    "title": "苹果公布下一阶段 Apple Intelligence 功能",
+    "summary": "苹果预告新的 Siri AI 能力、端侧与 Private Cloud Compute 路线，并向开发者开放测试，面向用户的部分能力计划秋季推出。",
+    "content": "苹果 2026 年 6 月 8 日公布下一阶段 Apple Intelligence 能力，包括新的 Siri AI 测试、面向应用和系统体验的智能功能，以及继续采用设备端处理和 Private Cloud Compute 的隐私路线。官方说明部分能力先供开发者测试，面向用户的功能计划在秋季陆续提供。因此，这是一组发布和时间表信息，不能写成所有支持设备已经当天获得完整能力。用户还需核对设备型号、系统版本、语言、地区和具体功能的上线状态。",
+    "url": "https://www.apple.com/newsroom/2026/06/apple-intelligence-brings-powerful-ai-capabilities-into-everyday-experiences/",
+    "published": "2026-06-08T18:00:00+08:00",
+    "source": "Apple"
+  }
+]
