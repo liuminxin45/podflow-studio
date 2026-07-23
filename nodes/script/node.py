@@ -5,7 +5,17 @@ from datetime import datetime, timezone
 from typing import Any
 
 from nodes.script.config import ScriptConfig
+from nodes.script.editorial_plan import (
+    EDITORIAL_PLAN_SYSTEM_PROMPT,
+    build_editorial_plan_prompt,
+    validate_editorial_plan,
+)
 from nodes.script.prompts import EPISODE_SCRIPT_SYSTEM_PROMPT, build_episode_script_prompt
+from nodes.script.quality import (
+    apply_segment_repairs,
+    assess_script_quality,
+    build_script_repair_prompt,
+)
 from protocol.llm_runtime import create_llm_runtime, has_llm_runtime_config, resolve_llm_target
 from protocol.morning_news import (
     build_run_report,
@@ -128,8 +138,9 @@ def _build_news_brief_prompt(
     config: ScriptConfig,
     facts: list[dict[str, Any]],
     structure: dict[str, Any],
+    editorial_plan: dict[str, Any] | None = None,
 ) -> str:
-    return build_episode_script_prompt(topic, config, facts, structure)
+    return build_episode_script_prompt(topic, config, facts, structure, editorial_plan)
 
 
 def _normalize_script(
@@ -137,6 +148,7 @@ def _normalize_script(
     topic: dict[str, Any],
     facts: list[dict[str, Any]],
     config: ScriptConfig,
+    editorial_plan: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not isinstance(raw_script, dict):
         raw_script = {}
@@ -192,9 +204,17 @@ def _normalize_script(
         )
 
     structure = _resolve_script_structure(facts, _preset_from_config(config))
-    expected_news_types = ["quick_news"] * int(structure["actual_quick_news_count"]) + [
-        "deep_dive"
-    ] * int(structure["actual_deep_dive_count"])
+    planned_items = editorial_plan.get("items", []) if editorial_plan else []
+    expected_news_types = (
+        [
+            "deep_dive" if item["role"] == "deep_dive" else "quick_news"
+            for item in planned_items
+        ]
+        if planned_items
+        else ["quick_news"] * int(structure["actual_quick_news_count"]) + [
+            "deep_dive"
+        ] * int(structure["actual_deep_dive_count"])
+    )
     actual_news_segments = [
         segment for segment in normalized_segments if segment["type"] in NEWS_SEGMENT_TYPES
     ]
@@ -228,12 +248,20 @@ def _normalize_script(
             )
         )
     )
+    planned_bindings_are_valid = (
+        not planned_items
+        or [
+            segment["source_fact_ids"]
+            for segment in actual_news_segments
+        ] == [[item["fact_id"]] for item in planned_items]
+    )
     if (
         [segment["type"] for segment in actual_news_segments] != expected_news_types
         or used_news_fact_ids != fact_ids
         or not has_opening
         or not has_closing
         or not marked_deep_binding_is_valid
+        or not planned_bindings_are_valid
     ):
         return generate_deterministic_script(
             facts,
@@ -372,39 +400,113 @@ def _generate_script(
             title=topic.get("title", "通勤早咖啡：今日新闻简报"),
         )
 
-    prompt = _build_news_brief_prompt(
-        topic,
-        config,
-        facts,
-        _resolve_script_structure(facts, preset),
-    )
-    messages = [
-        {
-            "role": "system",
-            "content": EPISODE_SCRIPT_SYSTEM_PROMPT,
-        },
-        {"role": "user", "content": prompt},
-    ]
-
     with create_llm_runtime(config, debug_mode=ctx.debug_mode) as client:
-        ctx.log(f"LLM调用: {target.masked_summary()}, timeout={config.timeout}s")
-        response = client.call(messages, timeout=config.timeout, logs=ctx.logs)
+        ctx.log(f"LLM编排调用: {target.masked_summary()}, timeout={config.timeout}s")
+        plan_response = client.call(
+            [
+                {"role": "system", "content": EDITORIAL_PLAN_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": build_editorial_plan_prompt(
+                        facts,
+                        target_chars_min=config.episode_chars_min,
+                        target_chars_max=config.episode_chars_max,
+                    ),
+                },
+            ],
+            timeout=config.timeout,
+            logs=ctx.logs,
+        )
+        plan_content = client.extract_content(plan_response)
+        editorial_plan = validate_editorial_plan(_parse_json_object(plan_content, "成稿编排"), facts)
+        ctx.log(
+            f"成稿编排完成: items={len(editorial_plan['items'])}, "
+            f"order={[item['fact_id'] for item in editorial_plan['items']]}"
+        )
+        prompt = _build_news_brief_prompt(
+            topic,
+            config,
+            facts,
+            _resolve_script_structure(facts, preset),
+            editorial_plan,
+        )
+        ctx.log(f"LLM成稿调用: {target.masked_summary()}, timeout={config.timeout}s")
+        response = client.call(
+            [
+                {"role": "system", "content": EPISODE_SCRIPT_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            timeout=config.timeout,
+            logs=ctx.logs,
+        )
         content = client.extract_content(response)
 
-    json_match = re.search(r"\{.*\}", content, re.DOTALL)
-    if json_match:
-        try:
-            parsed = json.loads(json_match.group())
-            normalized = _normalize_script(parsed, topic, facts, config)
-            if require_llm and normalized.get("generated_by") == "deterministic_mock":
+    try:
+        parsed = _parse_json_object(content, "成稿")
+        normalized = _normalize_script(parsed, topic, facts, config, editorial_plan)
+        if normalized.get("generated_by") == "deterministic_mock":
+            if require_llm:
                 raise RuntimeError(
                     "成稿 AI 返回的段落结构、新闻数量或事实绑定无效，未使用本地模板覆盖初稿"
                 )
             return normalized
-        except json.JSONDecodeError:
+        quality = assess_script_quality(normalized, facts, editorial_plan)
+        repairable_issues = [
+            issue for issue in [*quality["hard"], *quality["soft"]] if issue.get("segment_id")
+        ]
+        if repairable_issues:
+            repair_ids = {issue["segment_id"] for issue in repairable_issues}
+            try:
+                ctx.log(f"成稿定向修复调用: segments={sorted(repair_ids)}")
+                with create_llm_runtime(config, debug_mode=ctx.debug_mode) as repair_client:
+                    repair_response = repair_client.call(
+                        [
+                            {
+                                "role": "system",
+                                "content": "你是中文资讯播客的事实约束修稿编辑。只返回有效 JSON。",
+                            },
+                            {
+                                "role": "user",
+                                "content": build_script_repair_prompt(
+                                    normalized, facts, repairable_issues
+                                ),
+                            },
+                        ],
+                        timeout=config.timeout,
+                        logs=ctx.logs,
+                    )
+                    repair_content = repair_client.extract_content(repair_response)
+                repaired = apply_segment_repairs(
+                    normalized,
+                    _parse_json_object(repair_content, "成稿修复"),
+                    repair_ids,
+                )
+                normalized = _normalize_script(repaired, topic, facts, config, editorial_plan)
+                if normalized.get("generated_by") == "deterministic_mock":
+                    raise ValueError("成稿修复改变了段落结构或事实绑定")
+                quality = assess_script_quality(normalized, facts, editorial_plan)
+            except Exception as repair_error:
+                if quality["hard"]:
+                    raise
+                ctx.log(f"成稿软问题定向修复未采用: {repair_error}")
+        if quality["hard"]:
+            details = "；".join(issue["detail"] for issue in quality["hard"])
             if require_llm:
-                raise RuntimeError("成稿 AI 未返回有效 JSON，未使用本地模板覆盖初稿")
-            ctx.log("JSON解析失败，使用 deterministic 降级输出")
+                raise RuntimeError(f"成稿 AI 未通过事实质检：{details}")
+            ctx.log(f"成稿事实质检失败，使用 deterministic 降级输出: {details}")
+            return generate_deterministic_script(
+                facts, preset, episode_id="", title=topic.get("title", "通勤早咖啡：今日新闻简报")
+            )
+        if quality["soft"]:
+            ctx.log(
+                "成稿听感提示: "
+                + "；".join(f"{issue['code']}:{issue['detail']}" for issue in quality["soft"])
+            )
+        return normalized
+    except (ValueError, json.JSONDecodeError) as error:
+        if require_llm:
+            raise RuntimeError(f"成稿 AI 返回无效：{error}，未使用本地模板覆盖初稿") from error
+        ctx.log(f"成稿解析或校验失败，使用 deterministic 降级输出: {error}")
 
     if require_llm:
         raise RuntimeError("成稿 AI 未返回可读取的脚本对象，未使用本地模板覆盖初稿")
@@ -414,6 +516,19 @@ def _generate_script(
         episode_id="",
         title=topic.get("title", "通勤早咖啡：今日新闻简报"),
     )
+
+
+def _parse_json_object(content: str, label: str) -> dict[str, Any]:
+    json_match = re.search(r"\{.*\}", content, re.DOTALL)
+    if not json_match:
+        raise ValueError(f"{label} AI 未返回 JSON 对象")
+    try:
+        parsed = json.loads(json_match.group())
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{label} AI 未返回有效 JSON") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(f"{label} AI 必须返回 JSON 对象")
+    return parsed
 
 
 def _preset_from_config(config: ScriptConfig) -> dict[str, Any]:
