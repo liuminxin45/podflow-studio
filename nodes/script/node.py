@@ -401,6 +401,7 @@ def _generate_script(
         )
 
     with create_llm_runtime(config, debug_mode=ctx.debug_mode) as client:
+        structure = _resolve_script_structure(facts, preset)
         ctx.log(f"LLM编排调用: {target.masked_summary()}, timeout={config.timeout}s")
         plan_response = client.call(
             [
@@ -411,6 +412,7 @@ def _generate_script(
                         facts,
                         target_chars_min=config.episode_chars_min,
                         target_chars_max=config.episode_chars_max,
+                        deep_dive_count=int(structure["actual_deep_dive_count"]),
                     ),
                 },
             ],
@@ -418,7 +420,11 @@ def _generate_script(
             logs=ctx.logs,
         )
         plan_content = client.extract_content(plan_response)
-        editorial_plan = validate_editorial_plan(_parse_json_object(plan_content, "成稿编排"), facts)
+        editorial_plan = validate_editorial_plan(
+            _parse_json_object(plan_content, "成稿编排"),
+            facts,
+            expected_deep_dive_count=int(structure["actual_deep_dive_count"]),
+        )
         ctx.log(
             f"成稿编排完成: items={len(editorial_plan['items'])}, "
             f"order={[item['fact_id'] for item in editorial_plan['items']]}"
@@ -427,7 +433,7 @@ def _generate_script(
             topic,
             config,
             facts,
-            _resolve_script_structure(facts, preset),
+            structure,
             editorial_plan,
         )
         ctx.log(f"LLM成稿调用: {target.masked_summary()}, timeout={config.timeout}s")

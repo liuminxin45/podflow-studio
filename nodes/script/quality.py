@@ -91,6 +91,27 @@ def assess_script_quality(
         if min(window) >= 100 and max(window) - min(window) <= max(window) * 0.1:
             soft.append(_issue("UNIFORM_PACING", "连续三段篇幅过于接近", news[index + 1]))
 
+    planned_total = (
+        int(editorial_plan.get("opening", {}).get("target_chars") or 0)
+        + sum(int(item.get("target_chars") or 0) for item in planned_items)
+        + int(editorial_plan.get("closing", {}).get("target_chars") or 0)
+    )
+    actual_total = sum(len(str(segment.get("text") or "")) for segment in segments)
+    if planned_total and actual_total < planned_total * 0.8:
+        soft.append(
+            _issue(
+                "EPISODE_UNDER_PLAN",
+                f"实际正文 {actual_total} 字，低于编排目标 {planned_total} 字；素材不足时可保留短稿",
+            )
+        )
+    elif planned_total and actual_total > planned_total * 1.2:
+        soft.append(
+            _issue(
+                "EPISODE_OVER_PLAN",
+                f"实际正文 {actual_total} 字，超过编排目标 {planned_total} 字",
+            )
+        )
+
     return {"hard": hard, "soft": soft}
 
 

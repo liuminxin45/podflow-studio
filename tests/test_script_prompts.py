@@ -143,7 +143,7 @@ def test_editorial_plan_requires_exact_fact_coverage_and_places_deep_dive_inside
     ]
     plan = validate_editorial_plan(
         {
-            "opening": {"fact_ids": ["fact_001"], "listener_question": "门槛是什么？", "target_chars": 140},
+            "opening": {"fact_ids": ["fact_001", "fact_002"], "listener_question": "门槛是什么？", "target_chars": 140},
             "items": [
                 {"fact_id": "fact_001", "role": "headline", "target_chars": 160, "listener_value": "最新变化", "transition": "direct"},
                 {"fact_id": "fact_002", "role": "deep_dive", "target_chars": 1800, "listener_value": "解释限制", "transition": "resolve"},
@@ -165,6 +165,29 @@ def test_editorial_plan_requires_exact_fact_coverage_and_places_deep_dive_inside
         validate_editorial_plan(invalid, facts)
 
 
+def test_editorial_plan_selects_a_profile_deep_dive_when_none_is_preselected():
+    facts = [
+        {"id": "fact_001", "title": "头条"},
+        {"id": "fact_002", "title": "适合深挖"},
+        {"id": "fact_003", "title": "轻资讯"},
+    ]
+    plan = validate_editorial_plan(
+        {
+            "opening": {"fact_ids": ["fact_001", "fact_002"], "listener_question": "限制是什么？", "target_chars": 140},
+            "items": [
+                {"fact_id": "fact_001", "role": "headline", "target_chars": 160},
+                {"fact_id": "fact_002", "role": "deep_dive", "target_chars": 1800},
+                {"fact_id": "fact_003", "role": "light", "target_chars": 180},
+            ],
+            "closing": {"target_chars": 80},
+        },
+        facts,
+        expected_deep_dive_count=1,
+    )
+
+    assert plan["items"][1]["role"] == "deep_dive"
+
+
 def test_episode_prompt_follows_validated_plan_order_and_short_opening():
     facts = [
         {"id": "fact_001", "title": "快讯"},
@@ -173,7 +196,7 @@ def test_episode_prompt_follows_validated_plan_order_and_short_opening():
     ]
     plan = validate_editorial_plan(
         {
-            "opening": {"fact_ids": ["fact_001"], "listener_question": "", "target_chars": 120},
+            "opening": {"fact_ids": ["fact_001", "fact_002"], "listener_question": "限制是什么？", "target_chars": 120},
             "items": [
                 {"fact_id": "fact_001", "role": "headline", "target_chars": 150, "listener_value": "变化", "transition": "direct"},
                 {"fact_id": "fact_002", "role": "deep_dive", "target_chars": 1800, "listener_value": "解释", "transition": "resolve"},
@@ -224,6 +247,7 @@ def test_quality_gate_rejects_unbound_numbers_and_warns_on_long_opening():
 
     assert [issue["code"] for issue in report["hard"]] == ["UNSUPPORTED_NUMBER"]
     assert "OPENING_TOO_LONG" in [issue["code"] for issue in report["soft"]]
+    assert "EPISODE_UNDER_PLAN" in [issue["code"] for issue in report["soft"]]
 
 
 def test_script_normalization_accepts_a_valid_middle_deep_dive_plan():

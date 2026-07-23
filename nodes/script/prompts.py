@@ -133,7 +133,11 @@ def build_episode_script_prompt(
             "type": "opening",
             "title": "开场",
             "text": "可直接录制的口播文本",
-            "source_fact_ids": fact_ids[: min(3, len(fact_ids))],
+            "source_fact_ids": (
+                editorial_plan.get("opening", {}).get("fact_ids", [])
+                if editorial_plan
+                else fact_ids[: min(3, len(fact_ids))]
+            ),
             "estimated_seconds": 30,
         }
     ]

@@ -26,6 +26,7 @@ def build_editorial_plan_prompt(
     *,
     target_chars_min: int,
     target_chars_max: int,
+    deep_dive_count: int = 0,
 ) -> str:
     fact_ids = [str(fact.get("id") or "") for fact in facts]
     marked_deep_id = next(
@@ -57,14 +58,17 @@ def build_editorial_plan_prompt(
 1. items 必须恰好使用以下事实 ID 各一次，不得遗漏、重复或创造 ID：
 {json.dumps(fact_ids, ensure_ascii=False)}
 2. role 只能是 headline、standard、practical、explainer、comparison、light、deep_dive。
-3. 指定深度事实 ID 为 {json.dumps(marked_deep_id, ensure_ascii=False)}。非空时它必须且只能使用 deep_dive；为空时不要使用 deep_dive。
+3. 指定深度事实 ID 为 {json.dumps(marked_deep_id, ensure_ascii=False)}。
+   非空时它必须且只能使用 deep_dive；为空且本期 deep_dive 数量为 {deep_dive_count} 时，
+   从材料最完整、最能回答连续现实问题的事实卡中选择相应数量。
 4. 新闻不少于 3 条时，deep_dive 不能是第一条或最后一条。
 5. 同一 role 不得连续出现 3 次。
 6. opening.target_chars 为 100 至 180，closing.target_chars 为 50 至 100。
 7. headline 为 120 至 200 字，light 为 140 至 220 字，standard 为 220 至 340 字，
    practical 为 280 至 420 字，explainer/comparison 为 340 至 520 字，
    deep_dive 为 1600 至 2300 字。素材不足时取下限，不用套话填充。
-8. opening 最多引用两个事实 ID；listener_question 最多一个，并且必须能由所引用事实卡回答。
+8. opening 最多引用两个事实 ID；存在 deep_dive 时必须包含该事实 ID。
+   listener_question 最多一个，存在 deep_dive 时必须围绕它提出，并能由该事实卡回答。
 9. listener_value 只描述该段对听众的用途，不得写新的事实结论。
 10. opening、全部 items、closing 的目标字数总和尽量落在 {target_chars_min} 至 {target_chars_max} 字；
     若事实卡不足以支撑，允许低于下限，绝不能靠重复或补造填充。
@@ -92,6 +96,8 @@ def build_editorial_plan_prompt(
 def validate_editorial_plan(
     raw_plan: dict[str, Any],
     facts: list[dict[str, Any]],
+    *,
+    expected_deep_dive_count: int = 0,
 ) -> dict[str, Any]:
     if not isinstance(raw_plan, dict):
         raise ValueError("成稿编排格式错误：必须返回 JSON 对象")
@@ -157,8 +163,12 @@ def validate_editorial_plan(
         deep_index = normalized_items.index(deep_items[0])
         if len(normalized_items) >= 3 and deep_index in {0, len(normalized_items) - 1}:
             raise ValueError("成稿编排格式错误：深度稿不能位于新闻首尾")
-    elif deep_items:
-        raise ValueError("成稿编排格式错误：本期未指定深度稿")
+    elif len(deep_items) != expected_deep_dive_count:
+        raise ValueError(
+            f"成稿编排格式错误：本期必须包含 {expected_deep_dive_count} 条深度稿"
+        )
+    if deep_items and deep_items[0]["fact_id"] not in opening_fact_ids:
+        raise ValueError("成稿编排格式错误：开场必须绑定并预告本期深度事实")
 
     return {
         "opening": {
