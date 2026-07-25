@@ -80,6 +80,15 @@ def assess_script_quality(
             )
         prefix = next((value for value in REPETITIVE_OPENINGS if text.startswith(value)), "")
         opening_prefixes.append(prefix)
+        listener_question = str(planned.get("listener_question") or "")
+        if listener_question and not (_question_terms(listener_question) & _question_terms(text)):
+            soft.append(
+                _issue(
+                    "LISTENER_QUESTION_UNCLEAR",
+                    f"正文未明显覆盖编排问题：{listener_question}",
+                    segment,
+                )
+            )
         if opening_text and _overlap_ratio(opening_text, text) >= 0.55:
             soft.append(_issue("OPENING_BODY_REPETITION", "开场与正文存在明显重复", segment))
 
@@ -202,3 +211,16 @@ def _overlap_ratio(left: str, right: str) -> float:
 
 def _number_tokens(value: str) -> set[str]:
     return {re.sub(r"\s+", "", token) for token in NUMBER_TOKEN.findall(value)}
+
+
+def _question_terms(value: str) -> set[str]:
+    cleaned = re.sub(r"[？?，。！!、；：:“”‘’（）()\s]", "", value)
+    latin = {token.lower() for token in re.findall(r"[A-Za-z0-9]{3,}", cleaned)}
+    chinese = "".join(re.findall(r"[\u4e00-\u9fff]", cleaned))
+    stop = {"什么", "怎么", "怎样", "为何", "为什么", "是否", "哪些", "如何", "还有"}
+    pairs = {
+        chinese[index : index + 2]
+        for index in range(max(0, len(chinese) - 1))
+        if chinese[index : index + 2] not in stop
+    }
+    return latin | pairs

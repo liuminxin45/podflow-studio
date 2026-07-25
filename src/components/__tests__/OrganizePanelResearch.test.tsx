@@ -34,6 +34,7 @@ import { DEFAULT_SETTINGS } from '../../types/settings'
 import { settingsRepository } from '../../services/settings/repository'
 
 function researchPlan(queries: string[], reportType: 'event' | 'explanatory' | 'trend' = 'event') {
+  const roles = ['direct_fact', 'consumer_experience', 'mechanism', 'counter_evidence'] as const
   return {
     coreSubject: '原始新闻核心主体',
     reportType,
@@ -41,7 +42,7 @@ function researchPlan(queries: string[], reportType: 'event' | 'explanatory' | '
       id: `task_${index + 1}`,
       question: `研究问题 ${index + 1}`,
       purpose: `核验维度 ${index + 1}`,
-      role: index === 0 ? 'direct_fact' : 'historical_context',
+      role: roles[Math.min(index, roles.length - 1)],
       freshness: index === 0 ? 'year' : 'any',
       queries: [query],
     })),
@@ -49,11 +50,12 @@ function researchPlan(queries: string[], reportType: 'event' | 'explanatory' | '
 }
 
 function evidenceAssessments(count: number) {
+  const roles = ['direct_fact', 'consumer_experience', 'mechanism', 'counter_evidence'] as const
   return {
     assessments: Array.from({ length: count }, (_, index) => ({
       index,
       accepted: true,
-      role: index === 0 ? 'direct_fact' : 'historical_context',
+      role: roles[Math.min(index, roles.length - 1)],
       taskId: `task_${index + 1}`,
       relation: `支撑研究问题 ${index + 1}`,
     })),
@@ -167,6 +169,8 @@ describe('OrganizePanel research tolerance', () => {
       background: '补充背景',
       impact: '补充影响',
       perspectives: 'AI 推演（未联网核验）：仍需观察后续变化',
+      listenerQuestions: '现有用户下一步应该找谁处理？由原服务渠道继续承接。',
+      practicalValue: '先保留购买凭证并关注正式操作入口；材料不足以判断长期安排。',
       anchorSupported: true,
       usedSourceIndexes: [0, 1],
     }) } }] } as any)
@@ -216,6 +220,9 @@ describe('OrganizePanel research tolerance', () => {
     const options = vi.mocked(llmService.call).mock.calls[0]?.[0] as { messages?: Array<{ role: string; content: string }> }
     expect(options.messages?.[0]?.content).toContain('结构化的 AI 知识与推演候选')
     expect(options.messages?.[0]?.content).toContain('不能计入 usedSourceIndexes')
+    expect(options.messages?.[0]?.content).toContain('售后/退款/迁移')
+    await waitFor(() => expect(screen.getByDisplayValue('现有用户下一步应该找谁处理？由原服务渠道继续承接。')).toBeTruthy())
+    expect(screen.getByDisplayValue('先保留购买凭证并关注正式操作入口；材料不足以判断长期安排。')).toBeTruthy()
   })
 
   it('flushes current references and research evidence when an explicit save is requested', async () => {
@@ -698,7 +705,7 @@ describe('OrganizePanel research tolerance', () => {
         reportType: 'explanatory',
         researchTasks: [
           { id: 'facts', question: '火爆是否成立', purpose: '核验现象', role: 'direct_fact', freshness: 'year', queries: ['米村拌饭 排队'] },
-          { id: 'history', question: '如何扩张', purpose: '补充历史', role: 'historical_context', freshness: 'any', queries: ['米村拌饭 发展史'] },
+          { id: 'history', question: '如何扩张，消费者受到什么影响', purpose: '补充历史和消费者影响', role: 'historical_context', freshness: 'any', queries: ['米村拌饭 发展史'] },
           { id: 'comparison', question: '同类品牌有何差异', purpose: '建立对照', role: 'comparison', freshness: 'any', queries: ['中式快餐 门店 对比'] },
           { id: 'counter', question: '有哪些反例', purpose: '检验结论', role: 'counter_evidence', freshness: 'any', queries: ['米悦 米线 门店'] },
         ],

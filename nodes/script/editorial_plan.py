@@ -15,6 +15,7 @@ PLAN_ROLES = {
     "light",
     "deep_dive",
 }
+TRANSITION_TYPES = {"direct", "related", "resolve", "reset"}
 
 EDITORIAL_PLAN_SYSTEM_PROMPT = """你是中文早间资讯播客的编排编辑。
 只根据给定事实卡规划整期顺序、每段任务和篇幅，不写口播稿，不补充事实。
@@ -67,10 +68,16 @@ def build_editorial_plan_prompt(
 7. headline 为 120 至 200 字，light 为 140 至 220 字，standard 为 220 至 340 字，
    practical 为 280 至 420 字，explainer/comparison 为 340 至 520 字，
    deep_dive 为 1600 至 2300 字。素材不足时取下限，不用套话填充。
-8. opening 最多引用两个事实 ID；存在 deep_dive 时必须包含该事实 ID。
-   listener_question 最多一个，存在 deep_dive 时必须围绕它提出，并能由该事实卡回答。
-9. listener_value 只描述该段对听众的用途，不得写新的事实结论。
-10. opening、全部 items、closing 的目标字数总和尽量落在 {target_chars_min} 至 {target_chars_max} 字；
+8. opening 最多引用两个事实 ID。listener_question 最多一个；非空时 promise_fact_id
+   必须是 opening.fact_ids 之一，且对应正文必须明确回答，不能只制造悬念。存在 deep_dive 时必须预告该事实。
+9. 每个 item 的 listener_question 必须是这段要用事实卡回答的一个具体问题；
+   listener_value 只描述该段对听众的用途，不得写新的事实结论。
+10. transition 只能是 direct、related、resolve、reset。只有共同人群、产业链、原因结果、
+    风险与行动或同一听众问题时才使用 related/resolve，并在 transition_reason 说明关系；
+    仅有宽泛关键词重合时必须 reset。
+11. 排序优先级是公共安全与时效、普遍生活影响、消费与科技、轻资讯；在不损害优先级时，
+    把真正相关的新闻相邻排列。经济账、售后、退款、迁移、资格、时间和风险等用户后续优先使用 practical。
+12. opening、全部 items、closing 的目标字数总和尽量落在 {target_chars_min} 至 {target_chars_max} 字；
     若事实卡不足以支撑，允许低于下限，绝不能靠重复或补造填充。
 
 只返回：
@@ -78,6 +85,7 @@ def build_editorial_plan_prompt(
   "opening": {{
     "fact_ids": ["fact_001"],
     "listener_question": "本期会回答的一个具体问题，或空字符串",
+    "promise_fact_id": "fact_001，listener_question 为空时也为空",
     "target_chars": 140
   }},
   "items": [
@@ -85,8 +93,10 @@ def build_editorial_plan_prompt(
       "fact_id": "fact_001",
       "role": "headline",
       "target_chars": 160,
+      "listener_question": "这段要回答的一个具体听众问题",
       "listener_value": "听众为什么需要知道",
-      "transition": "direct"
+      "transition": "direct",
+      "transition_reason": "与上一条的真实关系；首条或 reset 可为空"
     }}
   ],
   "closing": {{ "target_chars": 80 }}
@@ -126,6 +136,12 @@ def validate_editorial_plan(
         raise ValueError("成稿编排格式错误：开场最多引用两个有效事实 ID")
     opening_chars = _bounded_int(opening.get("target_chars"), 100, 180, "opening.target_chars")
     closing_chars = _bounded_int(closing.get("target_chars"), 50, 100, "closing.target_chars")
+    opening_question = str(opening.get("listener_question") or "").strip()
+    promise_fact_id = str(opening.get("promise_fact_id") or "").strip()
+    if bool(opening_question) != bool(promise_fact_id):
+        raise ValueError("成稿编排格式错误：开场问题和 promise_fact_id 必须同时提供或同时为空")
+    if promise_fact_id and promise_fact_id not in opening_fact_ids:
+        raise ValueError("成稿编排格式错误：promise_fact_id 必须属于 opening.fact_ids")
 
     normalized_items: list[dict[str, Any]] = []
     role_runs: list[str] = []
@@ -137,6 +153,20 @@ def validate_editorial_plan(
         if role not in PLAN_ROLES:
             raise ValueError(f"成稿编排格式错误：不支持 role={role}")
         minimum, maximum = _role_char_range(role)
+        listener_question = str(item.get("listener_question") or "").strip()
+        listener_value = str(item.get("listener_value") or "").strip()
+        transition = str(item.get("transition") or "").strip()
+        transition_reason = str(item.get("transition_reason") or "").strip()
+        if not listener_question or not listener_value:
+            raise ValueError(f"成稿编排格式错误：items[{index}] 必须说明听众问题和听众价值")
+        if transition not in TRANSITION_TYPES:
+            raise ValueError(f"成稿编排格式错误：items[{index}].transition 无效")
+        if index == 0 and transition == "related":
+            raise ValueError("成稿编排格式错误：首条新闻不能使用 related")
+        if transition in {"related", "resolve"} and not transition_reason:
+            raise ValueError(f"成稿编排格式错误：items[{index}] 必须说明相邻关系")
+        if transition == "resolve" and fact_id != promise_fact_id:
+            raise ValueError("成稿编排格式错误：resolve 必须绑定开场问题的兑现事实")
         normalized_items.append(
             {
                 "fact_id": fact_id,
@@ -144,8 +174,10 @@ def validate_editorial_plan(
                 "target_chars": _bounded_int(
                     item.get("target_chars"), minimum, maximum, f"items[{index}].target_chars"
                 ),
-                "listener_value": str(item.get("listener_value") or "").strip(),
-                "transition": str(item.get("transition") or "direct").strip() or "direct",
+                "listener_question": listener_question,
+                "listener_value": listener_value,
+                "transition": transition,
+                "transition_reason": transition_reason,
             }
         )
         role_runs.append(role)
@@ -153,6 +185,12 @@ def validate_editorial_plan(
     planned_ids = [item["fact_id"] for item in normalized_items]
     if len(planned_ids) != len(fact_ids) or set(planned_ids) != set(fact_ids):
         raise ValueError("成稿编排格式错误：事实 ID 必须恰好使用一次")
+    if promise_fact_id:
+        promise_item = next(item for item in normalized_items if item["fact_id"] == promise_fact_id)
+        if promise_item["listener_question"] != opening_question:
+            raise ValueError("成稿编排格式错误：开场问题必须与兑现段的听众问题一致")
+        if promise_item["transition"] != "resolve":
+            raise ValueError("成稿编排格式错误：兑现开场问题的段落必须使用 resolve")
     if any(role_runs[index : index + 3] == [role_runs[index]] * 3 for index in range(max(0, len(role_runs) - 2))):
         raise ValueError("成稿编排格式错误：同一角色不得连续出现三次")
 
@@ -173,7 +211,8 @@ def validate_editorial_plan(
     return {
         "opening": {
             "fact_ids": opening_fact_ids,
-            "listener_question": str(opening.get("listener_question") or "").strip(),
+            "listener_question": opening_question,
+            "promise_fact_id": promise_fact_id,
             "target_chars": opening_chars,
         },
         "items": normalized_items,

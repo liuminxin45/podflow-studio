@@ -143,11 +143,11 @@ def test_editorial_plan_requires_exact_fact_coverage_and_places_deep_dive_inside
     ]
     plan = validate_editorial_plan(
         {
-            "opening": {"fact_ids": ["fact_001", "fact_002"], "listener_question": "门槛是什么？", "target_chars": 140},
+            "opening": {"fact_ids": ["fact_001", "fact_002"], "listener_question": "门槛是什么？", "promise_fact_id": "fact_002", "target_chars": 140},
             "items": [
-                {"fact_id": "fact_001", "role": "headline", "target_chars": 160, "listener_value": "最新变化", "transition": "direct"},
-                {"fact_id": "fact_002", "role": "deep_dive", "target_chars": 1800, "listener_value": "解释限制", "transition": "resolve"},
-                {"fact_id": "fact_003", "role": "light", "target_chars": 180, "listener_value": "节奏缓冲", "transition": "reset"},
+                {"fact_id": "fact_001", "role": "headline", "target_chars": 160, "listener_question": "发生了什么？", "listener_value": "最新变化", "transition": "direct", "transition_reason": ""},
+                {"fact_id": "fact_002", "role": "deep_dive", "target_chars": 1800, "listener_question": "门槛是什么？", "listener_value": "解释限制", "transition": "resolve", "transition_reason": "兑现开场问题"},
+                {"fact_id": "fact_003", "role": "light", "target_chars": 180, "listener_question": "还有什么变化？", "listener_value": "节奏缓冲", "transition": "reset", "transition_reason": ""},
             ],
             "closing": {"target_chars": 80},
         },
@@ -156,13 +156,56 @@ def test_editorial_plan_requires_exact_fact_coverage_and_places_deep_dive_inside
 
     assert [item["fact_id"] for item in plan["items"]] == ["fact_001", "fact_002", "fact_003"]
     assert plan["items"][1]["role"] == "deep_dive"
+    assert plan["opening"]["promise_fact_id"] == "fact_002"
     prompt = build_editorial_plan_prompt(facts, target_chars_min=2000, target_chars_max=2800)
     assert "不写口播稿" not in prompt
     assert "事实 ID 各一次" in prompt
 
-    invalid = {**plan, "items": [plan["items"][1], plan["items"][0], plan["items"][2]]}
+    invalid = {**plan, "items": [plan["items"][0], plan["items"][2], plan["items"][1]]}
     with pytest.raises(ValueError, match="深度稿不能位于新闻首尾"):
         validate_editorial_plan(invalid, facts)
+
+    missing_listener_value = {
+        **plan,
+        "items": [{**plan["items"][0], "listener_question": ""}, *plan["items"][1:]],
+    }
+    with pytest.raises(ValueError, match="听众问题和听众价值"):
+        validate_editorial_plan(missing_listener_value, facts)
+
+    unrelated_without_reason = {
+        **plan,
+        "items": [*plan["items"][:2], {**plan["items"][2], "transition": "related"}],
+    }
+    with pytest.raises(ValueError, match="说明相邻关系"):
+        validate_editorial_plan(unrelated_without_reason, facts)
+
+    changed_promise = {
+        **plan,
+        "items": [plan["items"][0], {**plan["items"][1], "listener_question": "另一个问题？"}, plan["items"][2]],
+    }
+    with pytest.raises(ValueError, match="开场问题必须与兑现段"):
+        validate_editorial_plan(changed_promise, facts)
+
+    invalid_first_transition = {
+        **plan,
+        "items": [{**plan["items"][0], "transition": "related", "transition_reason": "不存在的上一条"}, *plan["items"][1:]],
+    }
+    with pytest.raises(ValueError, match="首条新闻"):
+        validate_editorial_plan(invalid_first_transition, facts)
+
+    single = validate_editorial_plan(
+        {
+            "opening": {"fact_ids": ["fact_001"], "listener_question": "价格是多少？", "promise_fact_id": "fact_001", "target_chars": 120},
+            "items": [{
+                "fact_id": "fact_001", "role": "headline", "target_chars": 150,
+                "listener_question": "价格是多少？", "listener_value": "确认价格",
+                "transition": "resolve", "transition_reason": "紧接开场兑现问题",
+            }],
+            "closing": {"target_chars": 70},
+        },
+        [{"id": "fact_001", "title": "价格新闻"}],
+    )
+    assert single["items"][0]["transition"] == "resolve"
 
 
 def test_editorial_plan_selects_a_profile_deep_dive_when_none_is_preselected():
@@ -173,11 +216,11 @@ def test_editorial_plan_selects_a_profile_deep_dive_when_none_is_preselected():
     ]
     plan = validate_editorial_plan(
         {
-            "opening": {"fact_ids": ["fact_001", "fact_002"], "listener_question": "限制是什么？", "target_chars": 140},
+            "opening": {"fact_ids": ["fact_001", "fact_002"], "listener_question": "限制是什么？", "promise_fact_id": "fact_002", "target_chars": 140},
             "items": [
-                {"fact_id": "fact_001", "role": "headline", "target_chars": 160},
-                {"fact_id": "fact_002", "role": "deep_dive", "target_chars": 1800},
-                {"fact_id": "fact_003", "role": "light", "target_chars": 180},
+                {"fact_id": "fact_001", "role": "headline", "target_chars": 160, "listener_question": "发生了什么？", "listener_value": "了解变化", "transition": "direct"},
+                {"fact_id": "fact_002", "role": "deep_dive", "target_chars": 1800, "listener_question": "限制是什么？", "listener_value": "理解限制", "transition": "resolve", "transition_reason": "兑现开场问题"},
+                {"fact_id": "fact_003", "role": "light", "target_chars": 180, "listener_question": "还有什么变化？", "listener_value": "补充变化", "transition": "reset"},
             ],
             "closing": {"target_chars": 80},
         },
@@ -196,11 +239,11 @@ def test_episode_prompt_follows_validated_plan_order_and_short_opening():
     ]
     plan = validate_editorial_plan(
         {
-            "opening": {"fact_ids": ["fact_001", "fact_002"], "listener_question": "限制是什么？", "target_chars": 120},
+            "opening": {"fact_ids": ["fact_001", "fact_002"], "listener_question": "限制是什么？", "promise_fact_id": "fact_002", "target_chars": 120},
             "items": [
-                {"fact_id": "fact_001", "role": "headline", "target_chars": 150, "listener_value": "变化", "transition": "direct"},
-                {"fact_id": "fact_002", "role": "deep_dive", "target_chars": 1800, "listener_value": "解释", "transition": "resolve"},
-                {"fact_id": "fact_003", "role": "practical", "target_chars": 300, "listener_value": "行动", "transition": "reset"},
+                {"fact_id": "fact_001", "role": "headline", "target_chars": 150, "listener_question": "发生了什么？", "listener_value": "变化", "transition": "direct"},
+                {"fact_id": "fact_002", "role": "deep_dive", "target_chars": 1800, "listener_question": "限制是什么？", "listener_value": "解释", "transition": "resolve", "transition_reason": "兑现开场问题"},
+                {"fact_id": "fact_003", "role": "practical", "target_chars": 300, "listener_question": "现在能做什么？", "listener_value": "行动", "transition": "reset"},
             ],
             "closing": {"target_chars": 70},
         },
@@ -230,7 +273,7 @@ def test_quality_gate_rejects_unbound_numbers_and_warns_on_long_opening():
     facts = [{"id": "fact_001", "title": "价格调整", "summary": "价格调整为 20 元。"}]
     plan = {
         "opening": {"fact_ids": ["fact_001"], "listener_question": "", "target_chars": 120},
-        "items": [{"fact_id": "fact_001", "role": "headline", "target_chars": 150}],
+        "items": [{"fact_id": "fact_001", "role": "headline", "target_chars": 150, "listener_question": "价格调整到多少？", "listener_value": "确认价格"}],
         "closing": {"target_chars": 70},
     }
     report = assess_script_quality(
@@ -248,6 +291,7 @@ def test_quality_gate_rejects_unbound_numbers_and_warns_on_long_opening():
     assert [issue["code"] for issue in report["hard"]] == ["UNSUPPORTED_NUMBER"]
     assert "OPENING_TOO_LONG" in [issue["code"] for issue in report["soft"]]
     assert "EPISODE_UNDER_PLAN" in [issue["code"] for issue in report["soft"]]
+    assert "LISTENER_QUESTION_UNCLEAR" not in [issue["code"] for issue in report["soft"]]
 
 
 def test_script_normalization_accepts_a_valid_middle_deep_dive_plan():
