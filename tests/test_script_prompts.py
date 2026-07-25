@@ -199,13 +199,13 @@ def test_editorial_plan_requires_exact_fact_coverage_and_places_deep_dive_inside
             "items": [{
                 "fact_id": "fact_001", "role": "headline", "target_chars": 150,
                 "listener_question": "价格是多少？", "listener_value": "确认价格",
-                "transition": "resolve", "transition_reason": "紧接开场兑现问题",
+                "transition": "direct", "transition_reason": "",
             }],
             "closing": {"target_chars": 70},
         },
         [{"id": "fact_001", "title": "价格新闻"}],
     )
-    assert single["items"][0]["transition"] == "resolve"
+    assert single["items"][0]["transition"] == "direct"
 
 
 def test_editorial_plan_selects_a_profile_deep_dive_when_none_is_preselected():

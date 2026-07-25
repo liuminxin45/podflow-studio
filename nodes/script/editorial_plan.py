@@ -70,6 +70,7 @@ def build_editorial_plan_prompt(
    deep_dive 为 1600 至 2300 字。素材不足时取下限，不用套话填充。
 8. opening 最多引用两个事实 ID。listener_question 最多一个；非空时 promise_fact_id
    必须是 opening.fact_ids 之一，且对应正文必须明确回答，不能只制造悬念。存在 deep_dive 时必须预告该事实。
+   兑现段可以使用 direct 或 resolve；使用 resolve 时必须绑定 promise_fact_id。
 9. 每个 item 的 listener_question 必须是这段要用事实卡回答的一个具体问题；
    listener_value 只描述该段对听众的用途，不得写新的事实结论。
 10. transition 只能是 direct、related、resolve、reset。只有共同人群、产业链、原因结果、
@@ -189,8 +190,6 @@ def validate_editorial_plan(
         promise_item = next(item for item in normalized_items if item["fact_id"] == promise_fact_id)
         if promise_item["listener_question"] != opening_question:
             raise ValueError("成稿编排格式错误：开场问题必须与兑现段的听众问题一致")
-        if promise_item["transition"] != "resolve":
-            raise ValueError("成稿编排格式错误：兑现开场问题的段落必须使用 resolve")
     if any(role_runs[index : index + 3] == [role_runs[index]] * 3 for index in range(max(0, len(role_runs) - 2))):
         raise ValueError("成稿编排格式错误：同一角色不得连续出现三次")
 
