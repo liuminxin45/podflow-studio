@@ -294,6 +294,93 @@ def test_quality_gate_rejects_unbound_numbers_and_warns_on_long_opening():
     assert "LISTENER_QUESTION_UNCLEAR" not in [issue["code"] for issue in report["soft"]]
 
 
+def test_quality_gate_rejects_garbled_text_and_editorial_checklists():
+    facts = [{"id": "fact_001", "title": "招生新闻", "summary": "学生已经完成注册。"}]
+    plan = {
+        "opening": {"fact_ids": [], "listener_question": "", "target_chars": 100},
+        "items": [{"fact_id": "fact_001", "role": "practical", "target_chars": 280, "listener_question": "是否完成注册？", "listener_value": "确认注册状态"}],
+        "closing": {"target_chars": 50},
+    }
+    report = assess_script_quality(
+        {
+            "segments": [
+                {"id": "opening", "type": "opening", "text": "以下是本期早报。", "source_fact_ids": []},
+                {
+                    "id": "news",
+                    "type": "quick_news",
+                    "title": "支持他��被录取",
+                    "text": "您可能更关心怎么选择。准备报考的家庭应查看招生简章并逐项核对条件。",
+                    "source_fact_ids": ["fact_001"],
+                },
+                {"id": "closing", "type": "closing", "text": "以上是本期内容。", "source_fact_ids": []},
+            ]
+        },
+        facts,
+        plan,
+    )
+
+    codes = [issue["code"] for issue in report["hard"]]
+    assert "INVALID_TEXT_ENCODING" in codes
+    assert "EDITORIAL_INSTRUCTION" in codes
+
+
+def test_quality_gate_checks_closing_encoding_and_allows_sourced_official_actions():
+    facts = [{
+        "id": "fact_001",
+        "title": "报名通知",
+        "summary": "官方通知要求考生在截止时间前登录系统确认报名。",
+    }]
+    plan = {
+        "opening": {"fact_ids": [], "listener_question": "", "target_chars": 100},
+        "items": [{"fact_id": "fact_001", "role": "practical", "target_chars": 280, "listener_question": "何时截止？", "listener_value": "确认截止时间"}],
+        "closing": {"target_chars": 50},
+    }
+    report = assess_script_quality(
+        {
+            "segments": [
+                {"id": "opening", "type": "opening", "text": "以下是本期早报。", "source_fact_ids": []},
+                {
+                    "id": "news",
+                    "type": "quick_news",
+                    "text": "官方通知要求，考生应在截止时间前登录系统确认报名。",
+                    "source_fact_ids": ["fact_001"],
+                },
+                {"id": "closing", "type": "closing", "text": "以上是本期内�。", "source_fact_ids": []},
+            ]
+        },
+        facts,
+        plan,
+    )
+
+    assert [issue["code"] for issue in report["hard"]] == ["INVALID_TEXT_ENCODING"]
+
+
+def test_quality_gate_does_not_treat_loose_keyword_overlap_as_official_instruction():
+    facts = [{
+        "id": "fact_001",
+        "title": "产品新闻",
+        "summary": "官方发布新产品，应用下载量增长，但市场仍存在风险。",
+    }]
+    plan = {
+        "opening": {"fact_ids": [], "listener_question": "", "target_chars": 100},
+        "items": [{"fact_id": "fact_001", "role": "practical", "target_chars": 280, "listener_question": "发生了什么？", "listener_value": "确认变化"}],
+        "closing": {"target_chars": 50},
+    }
+    report = assess_script_quality(
+        {
+            "segments": [
+                {"id": "opening", "type": "opening", "text": "以下是本期早报。", "source_fact_ids": []},
+                {"id": "news", "type": "quick_news", "text": "用户应该下载应用，消费者需要删除旧账户。", "source_fact_ids": ["fact_001"]},
+                {"id": "closing", "type": "closing", "text": "以上是本期内容。", "source_fact_ids": []},
+            ]
+        },
+        facts,
+        plan,
+    )
+
+    assert "EDITORIAL_INSTRUCTION" in [issue["code"] for issue in report["hard"]]
+
+
 def test_script_normalization_accepts_a_valid_middle_deep_dive_plan():
     facts = [
         {"id": "fact_001", "title": "头条", "summary": "事实一"},

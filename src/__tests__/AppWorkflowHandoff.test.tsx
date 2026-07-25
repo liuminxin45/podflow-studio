@@ -100,7 +100,14 @@ vi.mock('../components/OrganizePanel', async () => {
 })
 vi.mock('../components/EpisodeDraftStudio', () => ({
   default: (props: any) => props.visible ? (
-    <div>成稿收到：{props.rawContents.map((item: any) => item.title).join('、')}</div>
+    <div>
+      成稿收到：{props.rawContents.map((item: any) => item.title).join('、')}
+      <button type="button" onClick={() => props.onDraftPatchChange({
+        edited_script: { title: '新编辑稿', segments: [{ id: 'seg', text: '新正文' }] },
+      })}>
+        编辑口播
+      </button>
+    </div>
   ) : null,
 }))
 
@@ -176,6 +183,41 @@ describe('App discover-to-draft handoff', () => {
     await waitFor(() => {
       expect(currentWorkflow.state.selected_materials.map(item => item.title)).toEqual(['实习新闻', '股市新闻'])
       expect(currentWorkflow.state.discover_ui?.selectedItems?.map(item => item.title)).toEqual(['实习新闻', '股市新闻', '痴迷'])
+    })
+  })
+
+  it('invalidates produced artifacts when the edited script changes', async () => {
+    currentWorkflow = {
+      ...currentWorkflow,
+      state: {
+        ...currentWorkflow.state,
+        voice_segments: [{ segment_id: 'old', path: 'old.mp3', text: '旧正文' }],
+        production_plan: { clips: [{ id: 'old' }] },
+        audio_outputs: { final_audio_path: 'old-final.mp3' },
+        cover_path: 'old-cover.png',
+        review_summary: { status: 'passed' },
+        publish_outputs: { rss_path: 'old.xml' },
+        subtitle_path: 'old.srt',
+        run_report: { status: 'ok' },
+      },
+    } as unknown as Workflow
+
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
+    fireEvent.click(await screen.findByRole('button', { name: '进入整理' }))
+    fireEvent.click(await screen.findByRole('button', { name: '使用 ready 新闻成稿' }))
+    fireEvent.click(await screen.findByRole('button', { name: '编辑口播' }))
+
+    await waitFor(() => {
+      expect(currentWorkflow.state.edited_script).toEqual(expect.objectContaining({ title: '新编辑稿' }))
+      expect(currentWorkflow.state.voice_segments).toEqual([])
+      expect(currentWorkflow.state.production_plan).toEqual({})
+      expect(currentWorkflow.state.audio_outputs).toEqual({})
+      expect(currentWorkflow.state.cover_path).toBe('')
+      expect(currentWorkflow.state.review_summary).toEqual({})
+      expect(currentWorkflow.state.publish_outputs).toEqual({})
+      expect(currentWorkflow.state.subtitle_path).toBe('')
+      expect(currentWorkflow.state.run_report).toEqual({})
     })
   })
 

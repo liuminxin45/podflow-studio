@@ -50,6 +50,7 @@ describe('quick news optimizer', () => {
     expect(prompt).toContain('fact-1')
     expect(prompt).toContain('240–360')
     expect(prompt).toContain('自然人味体系')
+    expect(prompt).toContain('不对听众下指令')
     expect(prompt).not.toContain('fact-unrelated')
     expect(prompt).not.toContain('不得进入当前提示词')
   })
@@ -85,5 +86,52 @@ describe('quick news optimizer', () => {
       raw.replace('fact-1', 'fact-unrelated'),
       ['fact-1'],
     )).toThrow('改变了快讯绑定的事实卡')
+  })
+
+  it('rejects garbled text and editorial checklists', () => {
+    const result = (suggestedText: string, title = '正常标题') => JSON.stringify({
+      title,
+      suggested_text: suggestedText,
+      source_fact_ids: ['fact-1'],
+      change_summary: [],
+      unsupported_or_uncertain: [],
+    })
+
+    expect(() => parseQuickNewsOptimizationResult(
+      result('现有材料支持他��已经注册。'),
+      ['fact-1'],
+    )).toThrow('包含乱码')
+    expect(() => parseQuickNewsOptimizationResult(
+      result('您可能更关心怎么判断，准备报考的家庭应查看招生简章。'),
+      ['fact-1'],
+    )).toThrow('资料核验清单')
+    expect(() => parseQuickNewsOptimizationResult(
+      result('用户应该安装插件，消费者需要删除账户，听众请订阅服务。'),
+      ['fact-1'],
+      factCards,
+    )).toThrow('资料核验清单')
+  })
+
+  it('allows a sourced official deadline action', () => {
+    const officialFact: FactCard = {
+      ...factCards[0],
+      id: 'fact-official',
+      title: '官方报名通知',
+      summary: '官方通知要求考生在截止时间前登录系统确认报名。',
+      claim: '考生应在截止时间前登录系统确认报名。',
+    }
+    const raw = JSON.stringify({
+      title: '报名即将截止',
+      suggested_text: '官方通知要求，考生应在截止时间前登录系统确认报名。',
+      source_fact_ids: ['fact-official'],
+      change_summary: [],
+      unsupported_or_uncertain: [],
+    })
+
+    expect(parseQuickNewsOptimizationResult(
+      raw,
+      ['fact-official'],
+      [officialFact],
+    ).suggestedText).toContain('登录系统')
   })
 })

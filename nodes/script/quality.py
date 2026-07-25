@@ -11,6 +11,14 @@ NUMBER_TOKEN = re.compile(
     r"(?<![\w.])(?:\d{4}年(?:\d{1,2}月(?:\d{1,2}日)?)?|\d+(?:\.\d+)?%|[¥￥$]\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?\s*(?:元|美元|万元|亿元))(?!\w)"
 )
 REPETITIVE_OPENINGS = ("我们再看", "接下来关注", "值得关注的是", "这意味着")
+LISTENER_COMMAND_PATTERN = re.compile(
+    r"(?:(?:您|你|大家|听众|家庭|家长|考生|用户|消费者|居民|旅客).{0,12}"
+    r"(?:应当|应该|应(?=[\u4e00-\u9fff])|需要|建议|必须|请)"
+    r"|(?:应当|应该|建议|必须|请)(?:先|立即|及时)?(?=[\u4e00-\u9fff]))"
+)
+ATTRIBUTED_OFFICIAL_ACTION = re.compile(
+    r"(?:官方|有关部门|主管部门|公告|通知|指南).{0,24}(?:要求|提醒|建议|规定)"
+)
 
 
 def assess_script_quality(
@@ -41,6 +49,7 @@ def assess_script_quality(
         for fact_id in planned_opening_ids
         if fact_id in facts_by_id
     )
+    _assess_text_integrity(opening, opening_text, opening_fact_text, hard)
     unsupported_opening_numbers = sorted(_number_tokens(opening_text) - _number_tokens(opening_fact_text))
     if unsupported_opening_numbers:
         hard.append(
@@ -54,6 +63,7 @@ def assess_script_quality(
         soft.append(_issue("OPENING_TOO_LONG", f"开场 {len(opening_text)} 字，目标不超过 180 字", opening))
     if len(str(closing.get("text") or "")) > 120:
         soft.append(_issue("CLOSING_TOO_LONG", "收尾偏长，可能重复本期内容", closing))
+    _assess_text_integrity(closing, str(closing.get("text") or ""), "", hard)
 
     planned_items = editorial_plan.get("items", [])
     if len(news) != len(planned_items):
@@ -72,6 +82,12 @@ def assess_script_quality(
         fact_text = " ".join(
             str(facts_by_id[planned["fact_id"]].get(field) or "")
             for field in ("title", "summary", "claim", "published_at")
+        )
+        _assess_text_integrity(
+            segment,
+            f"{segment.get('title') or ''} {text}",
+            fact_text,
+            hard,
         )
         unsupported = sorted(_number_tokens(text) - _number_tokens(fact_text))
         if unsupported:
@@ -145,6 +161,7 @@ def build_script_repair_prompt(
     ]
     return f"""只修复下列口播段落，不改段落 ID、类型、顺序或事实绑定。
 事实卡是唯一事实来源；删除无来源数字，不补造背景、因果或评价。
+删除“您可能更关心”、查阅或核对资料清单、对听众下指令的编辑说明腔。遇到 � 等乱码时依据事实卡改回可确认的文字；无法确认就删除乱码所在表述。
 
 <问题_JSON>
 {json.dumps(issues, ensure_ascii=False, indent=2)}
@@ -211,6 +228,35 @@ def _overlap_ratio(left: str, right: str) -> float:
 
 def _number_tokens(value: str) -> set[str]:
     return {re.sub(r"\s+", "", token) for token in NUMBER_TOKEN.findall(value)}
+
+
+def _assess_text_integrity(
+    segment: dict[str, Any],
+    text: str,
+    supported_text: str,
+    hard: list[dict[str, str]],
+) -> None:
+    if "\ufffd" in text:
+        hard.append(_issue("INVALID_TEXT_ENCODING", "口播包含无法解码的替换字符“�”", segment))
+    command_sentences = [
+        sentence
+        for sentence in re.split(r"(?<=[。！？!?])", text)
+        if LISTENER_COMMAND_PATTERN.search(sentence)
+    ]
+    unsupported_commands = [
+        sentence
+        for sentence in command_sentences
+        if not ATTRIBUTED_OFFICIAL_ACTION.search(sentence)
+        or _overlap_ratio(sentence, supported_text) < 0.2
+    ]
+    if "您可能更关心" in text or unsupported_commands:
+        hard.append(
+            _issue(
+                "EDITORIAL_INSTRUCTION",
+                "口播包含面向听众的资料核验清单或编辑说明，应改写为事件本身的影响",
+                segment,
+            )
+        )
 
 
 def _question_terms(value: str) -> set[str]:

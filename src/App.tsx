@@ -129,6 +129,19 @@ function buildOrganizeSelectionChangeResetPatch(): Record<string, any> {
   }
 }
 
+function buildWritingChangeResetPatch(): Record<string, any> {
+  return {
+    voice_segments: [],
+    production_plan: {},
+    audio_outputs: {},
+    cover_path: '',
+    review_summary: {},
+    publish_outputs: {},
+    subtitle_path: '',
+    run_report: {},
+  }
+}
+
 function App() {
   const [modal, modalContextHolder] = Modal.useModal()
   const [messageApi, messageContextHolder] = message.useMessage()
@@ -264,7 +277,14 @@ function App() {
     })
     if (signature === persistedSignature || signature === pendingDraftPatchRef.current?.signature) return
 
-    pendingDraftPatchRef.current = { workflowId: workflow.id, patch, signature }
+    pendingDraftPatchRef.current = {
+      workflowId: workflow.id,
+      patch: {
+        ...patch,
+        ...buildWritingChangeResetPatch(),
+      },
+      signature,
+    }
     setHasUnsavedChanges(true)
     if (draftPatchTimerRef.current) clearTimeout(draftPatchTimerRef.current)
     draftPatchTimerRef.current = setTimeout(() => {
