@@ -54,11 +54,12 @@ describe('workflowStageStatus', () => {
     expect(statuses.discover.status).toBe('pending')
     expect(statuses.organize.status).toBe('stale')
     expect(statuses.organize.completed).toBe(false)
-    expect(statuses.organize.canEnter).toBe(false)
+    expect(statuses.organize.canEnter).toBe(true)
     expect(statuses.draft.status).toBe('stale')
+    expect(statuses.draft.canEnter).toBe(true)
   })
 
-  it('unlocks only the next unfinished stage in strict serial order', () => {
+  it('keeps stale downstream work accessible while the next stage is unfinished', () => {
     const statuses = deriveWorkflowStageStatusMap(createWorkflow({
       fetch_contents: [{ title: 'raw' }],
       cleaned_contents: [],
@@ -71,7 +72,19 @@ describe('workflowStageStatus', () => {
     expect(statuses.organize.status).toBe('pending')
     expect(statuses.organize.canEnter).toBe(true)
     expect(statuses.draft.status).toBe('stale')
-    expect(statuses.draft.canEnter).toBe(false)
+    expect(statuses.draft.canEnter).toBe(true)
+  })
+
+  it('treats a persisted discovery selection as valid discovery output', () => {
+    const statuses = deriveWorkflowStageStatusMap(createWorkflow({
+      discover_ui: {
+        selectedCount: 1,
+        selectedItems: [{ title: 'persisted selection' }],
+      },
+    }))
+
+    expect(statuses.discover.status).toBe('completed')
+    expect(statuses.organize.canEnter).toBe(true)
   })
 
   it('does not unlock draft merely because organize contains unfinished candidates', () => {

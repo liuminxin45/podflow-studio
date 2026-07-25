@@ -51,6 +51,10 @@ function hasReadyItems(value: unknown): boolean {
   return countReadyItems(value) > 0
 }
 
+function hasDiscoverySelection(state: PodcastState): boolean {
+  return hasItems((state.discover_ui as any)?.selectedItems)
+}
+
 function hasDraftFactsAndStructure(state: PodcastState): boolean {
   return Boolean(state.selected_topic?.title || state.selected_topic?.description) &&
     (hasItems(state.facts) || hasItems(state.selected_topics) || hasObjectData(state.episode_brief))
@@ -64,7 +68,9 @@ function hasDraftScript(state: PodcastState): boolean {
 function completedByState(stage: StageDefinition, state: PodcastState): boolean {
   switch (stage.id) {
     case 'discover':
-      return hasItems(state.selected_materials) || hasItems(state.fetch_contents)
+      return hasItems(state.selected_materials) ||
+        hasItems(state.fetch_contents) ||
+        hasDiscoverySelection(state)
     case 'organize':
       return hasReadyItems((state.organize_ui as any)?.candidates) ||
         hasReadyItems(state.selected_materials)
@@ -82,7 +88,9 @@ function completedByState(stage: StageDefinition, state: PodcastState): boolean 
 function hasStageArtifacts(stage: StageDefinition, state: PodcastState): boolean {
   switch (stage.id) {
     case 'discover':
-      return hasItems(state.selected_materials) || hasItems(state.fetch_contents)
+      return hasItems(state.selected_materials) ||
+        hasItems(state.fetch_contents) ||
+        hasDiscoverySelection(state)
     case 'organize':
       return hasItems(state.cleaned_contents) || hasItems((state.organize_ui as any)?.candidates)
     case 'draft':
@@ -229,7 +237,9 @@ export function deriveWorkflowStageStatuses(workflow: Workflow | null): DerivedS
     }
 
     const completed = status === 'completed'
-    const canEnter = !dependencyBlocked
+    // A stage with persisted work remains reviewable even when an earlier
+    // stage is currently incomplete. "stale" is a warning, not data loss.
+    const canEnter = !dependencyBlocked || ownArtifacts
     const contract: StageContract = {
       stage_id: stage.id,
       schema_version: 1,

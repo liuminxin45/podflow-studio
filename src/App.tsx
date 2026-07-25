@@ -397,15 +397,6 @@ function App() {
     return null
   }, [discoverVisible, draftVisible, organizeVisible, publishVisible, soundStudioVisible])
 
-  useEffect(() => {
-    const currentStageId = getCurrentStageId()
-    if (!navigationWorkflow || !currentStageId || canEnterStage(navigationWorkflow, currentStageId)) return
-    closeAllPanels()
-    setHomePage('blank')
-    setDiscoverVisible(true)
-    showNotice('warning', '上游数据已失效，已返回发现层重新确认数据流')
-  }, [closeAllPanels, getCurrentStageId, navigationWorkflow, showNotice])
-
   const openSettings = () => {
     setSettingsReturnTarget({
       homePage,
