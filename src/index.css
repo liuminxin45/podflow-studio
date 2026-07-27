@@ -4031,17 +4031,17 @@ body {
 .episode-library-table td {
   height: 72px;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--border-color);
   color: var(--text-secondary);
   vertical-align: middle;
 }
 
-.episode-library-table tbody tr:last-child td {
-  border-bottom: 0;
+.episode-library-table tbody tr {
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 120ms ease;
 }
 
-.episode-library-table tbody tr {
-  transition: background-color 120ms ease;
+.episode-library-table tbody tr:last-child {
+  border-bottom: 0;
 }
 
 .episode-library-table tbody tr:hover {
