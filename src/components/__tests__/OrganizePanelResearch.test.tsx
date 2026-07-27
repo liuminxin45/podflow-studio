@@ -281,6 +281,8 @@ describe('OrganizePanel research tolerance', () => {
       .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(evidenceAssessments(1)) } }] } as any)
       .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({
         title: '补全后的新闻', lead: '最新导语', coreFacts: '已核验事实', background: '背景', impact: '影响', perspectives: '仍有不确定性',
+        listenerQuestions: '这项变化会直接影响哪些用户？',
+        practicalValue: '现阶段影响既有用户，后续安排仍待确认。',
         hasConflict: true,
         anchorSupported: true,
         usedSourceIndexes: [0, 1, 2],
@@ -520,7 +522,7 @@ describe('OrganizePanel research tolerance', () => {
         perspectives: '反方证据与未知边界',
         listenerQuestions: '普通人最关心的四个问题及回答',
         explanatoryAngles: '机制、参与者、场景与限制',
-        practicalValue: { action: '当前能做什么', boundary: '不能下什么结论' },
+        practicalValue: { impact: '直接影响现有用户', boundary: '不能据此判断长期安排' },
         hasConflict: false,
         topicSupported: true,
         usedSourceIndexes: [0, 1, 2],
@@ -572,9 +574,9 @@ describe('OrganizePanel research tolerance', () => {
     expect(synthesisOptions.messages?.[0]?.content).toContain('listenerQuestions')
     expect(screen.getByDisplayValue('普通人最关心的四个问题及回答')).toBeTruthy()
     expect(screen.getByDisplayValue('机制、参与者、场景与限制')).toBeTruthy()
-    const practicalValue = (screen.getByLabelText('现实价值与结论边界') as HTMLTextAreaElement).value
-    expect(practicalValue).toContain('当前能做什么')
-    expect(practicalValue).toContain('不能下什么结论')
+    const practicalValue = (screen.getByLabelText('现实影响与结论边界') as HTMLTextAreaElement).value
+    expect(practicalValue).toContain('直接影响现有用户')
+    expect(practicalValue).toContain('不能据此判断长期安排')
   }, 15_000)
 
   it('screens a large deep-dive result set in bounded batches', async () => {

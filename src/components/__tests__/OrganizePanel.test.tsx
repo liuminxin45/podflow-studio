@@ -76,6 +76,8 @@ describe('OrganizePanel news unit editor', () => {
     fireEvent.change(screen.getByLabelText('背景脉络'), { target: { value: '此前的发展背景' } })
     fireEvent.change(screen.getByLabelText('影响与意义'), { target: { value: '对行业产生的影响' } })
     fireEvent.change(screen.getByLabelText('各方观点与不确定性'), { target: { value: '官方与第三方观点仍有差异' } })
+    fireEvent.change(screen.getByLabelText('听众真正关心的问题'), { target: { value: '这项变化会直接影响哪些人？' } })
+    fireEvent.change(screen.getByLabelText('现实影响与结论边界'), { target: { value: '现阶段影响既有用户，长期安排仍待确认。' } })
 
     expect(screen.queryByLabelText('整理完成')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '标记为整理完成' }))
