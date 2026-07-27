@@ -778,46 +778,18 @@ export default function SettingsPage({ visible, workflow, onClose, onClearLogs }
   // Main Render
   // ============================================================
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      right: 0,
-      bottom: 0,
-      left: 0,
-      zIndex: 1000,
-      background: 'var(--bg-primary)',
-      display: 'flex',
-      flexDirection: 'column',
-      animation: 'settingsPageIn 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-    }}>
-      {/* Top Bar */}
-      <div style={{
-        height: 52,
-        minHeight: 52,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 20px',
-        borderBottom: '1px solid var(--border-color)',
-        background: 'var(--bg-secondary)',
-        boxShadow: 'var(--shadow-sm)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <SettingOutlined style={{ fontSize: 16, color: 'var(--accent-primary)' }} />
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>设置</span>
+    <div className="settings-page-shell">
+      <header className="settings-page-header">
+        <div className="settings-page-title">
+          <SettingOutlined />
+          <div><strong>设置</strong><span>偏好、智能能力与执行记录</span></div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="settings-page-actions">
           <Button
             title="恢复默认设置"
             size="small"
             icon={<UndoOutlined />}
             onClick={handleReset}
-            style={{
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-secondary)',
-              fontSize: 12,
-              height: 30,
-            }}
           >
             恢复默认
           </Button>
@@ -828,133 +800,46 @@ export default function SettingsPage({ visible, workflow, onClose, onClearLogs }
             loading={saving}
             disabled={!hasChanges}
             onClick={handleSave}
-            style={{
-              background: saveSuccess ? 'var(--success-color)' : hasChanges ? 'var(--accent-primary)' : undefined,
-              borderColor: saveSuccess ? 'var(--success-color)' : hasChanges ? 'var(--accent-primary)' : undefined,
-              fontSize: 12,
-              height: 30,
-              minWidth: 72,
-              transition: 'all 0.3s ease',
-            }}
+            className={saveSuccess ? 'is-saved' : ''}
           >
             {saveSuccess ? '已保存' : '保存设置'}
           </Button>
-          <div style={{ width: 1, height: 20, background: 'var(--border-color)', margin: '0 4px' }} />
-            <Button
-              title="关闭设置"
-              type="text"
-              icon={<CloseOutlined />}
-              onClick={onClose}
-              style={{ color: 'var(--text-secondary)', width: 30, height: 30 }}
-            />
+          <Button title="关闭设置" type="text" icon={<CloseOutlined />} onClick={onClose} />
         </div>
-      </div>
+      </header>
 
-      {/* Body */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Left Navigation */}
-        <div style={{
-          width: 220,
-          minWidth: 220,
-          borderRight: '1px solid var(--border-color)',
-          background: 'var(--bg-secondary)',
-          padding: '16px 10px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2,
-        }}>
+      <div className="settings-page-body">
+        <nav className="settings-page-nav" aria-label="设置分类">
           {NAV_ITEMS.map(item => {
             const active = activeSection === item.key
             const disabled = Boolean(item.disabled)
             return (
               <div key={item.key}>
-                {item.dividerBefore && (
-                  <div style={{ height: 1, background: 'var(--border-color)', margin: '8px 12px' }} />
-                )}
-                <div
+                {item.dividerBefore && <div className="settings-page-nav-divider" />}
+                <button
+                  type="button"
                   aria-disabled={disabled}
+                  disabled={disabled}
                   onClick={disabled ? undefined : () => setActiveSection(item.key)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                    background: active ? 'var(--accent-light)' : 'transparent',
-                    opacity: disabled ? 0.48 : 1,
-                    transition: 'all 0.15s ease',
-                  }}
-                  className={active || disabled ? '' : 'settings-nav-item'}
+                  className={active ? 'is-active' : ''}
                 >
-                  <span style={{
-                    fontSize: 15,
-                    color: active ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                    width: 20,
-                    textAlign: 'center',
-                    transition: 'color 0.15s ease',
-                  }}>
-                    {item.icon}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 13,
-                      fontWeight: active ? 600 : 500,
-                      color: active ? 'var(--accent-primary)' : 'var(--text-primary)',
-                      transition: 'color 0.15s ease',
-                    }}>
-                      {item.label}
-                    </div>
-                    <div style={{
-                      fontSize: 11,
-                      color: active ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                      opacity: active ? 0.7 : 1,
-                      marginTop: 1,
-                    }}>
-                      {item.desc}
-                    </div>
+                  <span className="settings-page-nav-icon">{item.icon}</span>
+                  <div className="settings-page-nav-copy">
+                    <strong>{item.label}</strong>
+                    <span>{item.desc}</span>
                   </div>
-                  {item.badge && (
-                    <span style={{
-                      marginLeft: 'auto',
-                      fontSize: 10,
-                      fontWeight: 500,
-                      color: 'var(--text-tertiary)',
-                      background: 'var(--bg-tertiary)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 6,
-                      padding: '1px 6px',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      {item.badge}
-                    </span>
-                  )}
-                </div>
+                  {item.badge && <span className="settings-page-nav-badge">{item.badge}</span>}
+                </button>
               </div>
             )
           })}
-        </div>
+        </nav>
 
-        {/* Right Content */}
-        <div style={{
-          flex: 1,
-          overflow: 'auto',
-          scrollbarGutter: 'stable',
-          padding: '28px 36px 60px 36px',
-          background: 'var(--bg-primary)',
-        }}>
-          <div style={{ maxWidth: 960, width: '100%', margin: '0 auto' }}>
-            <div
-              key={activeSection}
-              style={{
-                width: '100%',
-                animation: 'settingsContentIn 0.3s ease',
-              }}
-            >
-              {renderContent()}
-            </div>
+        <main className="settings-page-main">
+          <div className="settings-page-content" key={activeSection}>
+            {renderContent()}
           </div>
-        </div>
+        </main>
       </div>
     </div>
   )

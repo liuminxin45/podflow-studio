@@ -1,8 +1,7 @@
-import { CheckCircle } from '@phosphor-icons/react'
+import { CheckCircle, GearSix, House, Plus, Radio } from '@phosphor-icons/react'
 import { CloseOutlined } from '../icons/antdCompat'
 import type { Workflow } from '../types/workflow'
-import { deriveWorkflowStageStatuses, type DerivedStageStatus, type EffectiveStageStatus } from '../services/workflowStageStatus'
-import GlobalSettingsButton from './GlobalSettingsButton'
+import { deriveWorkflowStageStatuses, type DerivedStageStatus } from '../services/workflowStageStatus'
 import NavigationActionButton from './NavigationActionButton'
 import WorkflowSaveButton from './WorkflowSaveButton'
 import WorkflowFailureNotice, { latestWorkflowFailure } from './WorkflowFailureNotice'
@@ -15,6 +14,11 @@ interface Props {
   hasUnsavedChanges: boolean
   onSave: () => Promise<unknown> | unknown
   onClose: () => void
+  homeActive?: boolean
+  settingsActive?: boolean
+  hasElectronBackend?: boolean
+  onHome?: () => void
+  onCreate?: () => void
 }
 
 function WorkflowStep({ derived, active, onStageClick }: {
@@ -22,124 +26,25 @@ function WorkflowStep({ derived, active, onStageClick }: {
   active: boolean
   onStageClick: (stageId: string) => void
 }) {
-  const { stage, status, label, canEnter, locked } = derived
+  const { stage, status, label, canEnter } = derived
   const completed = status === 'completed'
-  const borderColor = active ? 'var(--accent-primary)' : getStepBorderColor(status, stage.color)
-  const background = active ? 'var(--accent-light)' : 'var(--bg-secondary)'
 
   return (
     <button
       type="button"
+      className={`workflow-stage-button ${active ? 'is-active' : ''} is-${status}`}
       disabled={!canEnter}
       onClick={() => {
         if (canEnter) onStageClick(stage.id)
       }}
-      style={{
-        width: '100%',
-        border: `1px solid ${borderColor}`,
-        background,
-        borderRadius: 6,
-        padding: '8px 10px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 7,
-        minHeight: 40,
-        position: 'relative',
-        textAlign: 'left',
-        cursor: canEnter ? 'pointer' : 'not-allowed',
-        opacity: locked ? 0.62 : 1,
-        boxShadow: 'none',
-        transition: 'border-color 0.16s ease, background 0.16s ease',
-      }}
       title={`${stage.label}：${label}。${derived.contract.reason}`}
     >
-      {active && (
-        <span style={{
-          position: 'absolute',
-          left: 4,
-          top: 9,
-          bottom: 9,
-          width: 2,
-          borderRadius: 2,
-          background: 'var(--accent-primary)',
-        }} />
-      )}
-      {completed && (
-        <CheckCircle
-          size={16}
-          weight="fill"
-          color="var(--success-color)"
-          style={{ flexShrink: 0 }}
-        />
-      )}
-      <div
-        className={`workflow-step-label ${active ? 'is-active' : ''}`}
-        style={{
-        minWidth: 0,
-        flex: 1,
-        fontSize: 13,
-        fontWeight: active ? 600 : 500,
-        color: locked ? 'var(--text-tertiary)' : 'var(--text-primary)',
-        lineHeight: 1.2,
-        }}
-      >
-        {stage.label}
-      </div>
+      <span className="workflow-stage-state" aria-hidden="true">
+        {completed ? <CheckCircle size={14} weight="fill" /> : <i />}
+      </span>
+      <span className={`workflow-step-label ${active ? 'is-active' : ''}`}>{stage.label}</span>
+      <small>{label}</small>
     </button>
-  )
-}
-
-function getStepBorderColor(status: EffectiveStageStatus, stageColor: string) {
-  switch (status) {
-    case 'completed':
-      return 'var(--border-color)'
-    case 'running':
-      return stageColor
-    case 'failed':
-      return 'var(--error-color)'
-    case 'waiting_approval':
-      return 'var(--warning-color)'
-    case 'stale':
-      return '#ead9a4'
-    case 'locked':
-      return 'var(--border-light)'
-    default:
-      return 'var(--border-color)'
-  }
-}
-
-function WorkflowConnector({ completed }: { completed: boolean }) {
-  const color = completed ? 'var(--success-color)' : 'var(--text-tertiary)'
-  const lineColor = completed ? '#bed5c0' : 'var(--border-color)'
-
-  return (
-    <div
-      aria-hidden="true"
-      style={{
-        height: 18,
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'relative',
-      }}
-    >
-      <div style={{
-        width: 1,
-        height: 18,
-        background: lineColor,
-        opacity: completed ? 0.8 : 0.55,
-      }} />
-      <div style={{
-        position: 'absolute',
-        bottom: 2,
-        width: 7,
-        height: 7,
-        borderRight: `1.5px solid ${color}`,
-        borderBottom: `1.5px solid ${color}`,
-        transform: 'rotate(45deg)',
-        opacity: completed ? 0.95 : 0.75,
-      }} />
-    </div>
   )
 }
 
@@ -151,42 +56,65 @@ export default function WorkflowSidebar({
   hasUnsavedChanges,
   onSave,
   onClose,
+  homeActive = false,
+  settingsActive = false,
+  hasElectronBackend = false,
+  onHome = () => undefined,
+  onCreate = () => undefined,
 }: Props) {
   const statuses = deriveWorkflowStageStatuses(workflow)
   const failure = latestWorkflowFailure(workflow)
 
   return (
     <aside className="workflow-sidebar">
-      <header className="workflow-sidebar-header">
-        <span>当前节目</span>
-        <strong>{workflow?.state?.selected_topic?.title || workflow?.state?.script?.title || '未命名节目'}</strong>
+      <header className="workflow-sidebar-brand">
+        <span aria-hidden="true"><Radio weight="fill" /></span>
+        <div><strong>PodFlow</strong><small>Studio</small></div>
       </header>
-      <div style={{ padding: 12, display: 'flex', flexDirection: 'column', overflow: 'auto', flex: 1, minHeight: 0 }}>
-        {statuses.map((derived, index) => (
-          <div key={derived.stage.id}>
-            <WorkflowStep
-              derived={derived}
-              active={activeStageId === derived.stage.id}
-              onStageClick={onStageClick}
-            />
-            {index < statuses.length - 1 && (
-              <WorkflowConnector completed={derived.connectorCompleted} />
-            )}
+
+      <nav className="workflow-primary-nav" aria-label="主导航">
+        <button type="button" className={homeActive ? 'is-active' : ''} aria-current={homeActive ? 'page' : undefined} onClick={onHome}>
+          <House weight={homeActive ? 'fill' : 'regular'} /><span>节目库</span>
+        </button>
+        <button type="button" disabled={!hasElectronBackend} onClick={onCreate}>
+          <Plus /><span>新建节目</span>
+        </button>
+      </nav>
+
+      {workflow && (
+        <>
+          <header className="workflow-sidebar-header">
+            <span>当前节目</span>
+            <strong>{workflow.state?.selected_topic?.title || workflow.state?.script?.title || '未命名节目'}</strong>
+          </header>
+          <div className="workflow-stage-list">
+            {statuses.map((derived) => (
+              <div key={derived.stage.id}>
+                <WorkflowStep derived={derived} active={activeStageId === derived.stage.id} onStageClick={onStageClick} />
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <div style={{ padding: 12, borderTop: '1px solid var(--border-light)', display: 'grid', gap: 4 }}>
-        {failure && <WorkflowFailureNotice compact workflow={workflow} failure={failure} />}
-        <WorkflowSaveButton hasUnsavedChanges={hasUnsavedChanges} onSave={onSave} fullWidth />
-        <NavigationActionButton
-          label="关闭节目"
-          title="关闭节目"
-          icon={<CloseOutlined style={{ fontSize: 14 }} />}
-          onClick={onClose}
-          borderless
-        />
-        <div style={{ height: 1, background: 'var(--border-light)', margin: '4px 0' }} />
-        <GlobalSettingsButton onOpen={onOpenSettings} />
+        </>
+      )}
+
+      {!workflow && (
+        <div className="workflow-sidebar-empty">
+          <span>从一次素材发现开始</span>
+          <button type="button" disabled={!hasElectronBackend} onClick={onCreate}>创建节目</button>
+        </div>
+      )}
+
+      <div className="workflow-sidebar-footer">
+        {workflow && (
+          <>
+            {failure && <WorkflowFailureNotice compact workflow={workflow} failure={failure} />}
+            <WorkflowSaveButton hasUnsavedChanges={hasUnsavedChanges} onSave={onSave} fullWidth />
+            <NavigationActionButton label="关闭节目" title="关闭节目" icon={<CloseOutlined style={{ fontSize: 14 }} />} onClick={onClose} borderless />
+          </>
+        )}
+        <button type="button" className={`workflow-settings-link ${settingsActive ? 'is-active' : ''}`} aria-current={settingsActive ? 'page' : undefined} onClick={onOpenSettings}>
+          <GearSix /><span>设置</span>
+        </button>
       </div>
     </aside>
   )

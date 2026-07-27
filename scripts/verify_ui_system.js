@@ -40,7 +40,7 @@ for (const token of [
   '--radius-sm: 6px;',
   '--radius-md: 9px;',
   '--radius-lg: 14px;',
-  '--app-rail-width: 72px;',
+  '--stage-nav-width: 224px;',
 ]) {
   expectIncludes(quietPass, token, 'Quiet workbench token', failures)
 }

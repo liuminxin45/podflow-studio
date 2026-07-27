@@ -10,7 +10,6 @@ import SettingsPage from './components/SettingsPage'
 import WorkflowSidebar from './components/WorkflowSidebar'
 import EpisodeManager from './components/EpisodeManager'
 import GlobalPlayer from './components/GlobalPlayer'
-import AppRail from './components/AppRail'
 import { STAGES } from './components/workflowStages'
 import { detectAndPersistLocalAgentsOnStartup } from './services/settings/localAgentDetection'
 import { llmConfigResolver } from './services/settings/llmConfigResolver'
@@ -858,7 +857,6 @@ function App() {
 
   const activeStageId =
     settingsVisible ? null : getCurrentStageId()
-  const showWorkflowSidebar = Boolean(navigationWorkflow && activeStageId)
   const savedOrganizeCandidates = useMemo(
     () => toCandidateItems(workflow?.state?.organize_ui?.candidates),
     [workflow?.state?.organize_ui?.candidates],
@@ -909,26 +907,21 @@ function App() {
       {modalContextHolder}
       <Layout className="app-shell">
         <Layout className="app-workspace">
-          <AppRail
-            homeActive={homePage === 'episodes' && !activeStageId}
-            workflowActive={showWorkflowSidebar}
-            hasElectronBackend={hasElectronBackend}
-            onHome={handleCloseWorkflow}
-            onCreate={() => void handleStart()}
-            onSettings={openSettings}
-          />
           <Content className="app-content">
-            {showWorkflowSidebar && (
-              <WorkflowSidebar
-                workflow={navigationWorkflow}
-                activeStageId={activeStageId}
-                onStageClick={openStage}
-                onOpenSettings={openSettings}
-                hasUnsavedChanges={hasUnsavedChanges}
-                onSave={saveActiveWorkflow}
-                onClose={handleCloseWorkflow}
-              />
-            )}
+            <WorkflowSidebar
+              workflow={navigationWorkflow}
+              activeStageId={activeStageId}
+              onStageClick={openStage}
+              onOpenSettings={openSettings}
+              hasUnsavedChanges={hasUnsavedChanges}
+              onSave={saveActiveWorkflow}
+              onClose={handleCloseWorkflow}
+              homeActive={homePage === 'episodes' && !settingsVisible}
+              settingsActive={settingsVisible}
+              hasElectronBackend={hasElectronBackend}
+              onHome={handleCloseWorkflow}
+              onCreate={() => void handleStart()}
+            />
             <main className={`app-main ${homePage === 'episodes' ? 'is-library' : 'is-stage'}`}>
               {homePage === 'episodes' && (
                 <EpisodeManager

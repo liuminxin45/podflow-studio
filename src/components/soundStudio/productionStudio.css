@@ -4,7 +4,7 @@
 
 .produce-layout {
   display: grid;
-  grid-template-columns: 248px minmax(420px, 1fr) 320px;
+  grid-template-columns: 238px minmax(480px, 1fr) 304px;
   min-height: 0;
   flex: 1;
   overflow: hidden;
@@ -376,7 +376,7 @@
   padding: 15px;
   border: 1px solid var(--border-color);
   border-radius: 13px;
-  background: var(--bg-primary);
+  background: #fff;
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
@@ -752,7 +752,7 @@
 
 @media (max-width: 1180px) {
   .produce-layout {
-    grid-template-columns: 220px minmax(380px, 1fr) 280px;
+    grid-template-columns: 218px minmax(420px, 1fr) 272px;
   }
 
   .produce-main {

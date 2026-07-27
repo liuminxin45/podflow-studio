@@ -12,7 +12,7 @@
   display: grid;
   min-height: 0;
   flex: 1;
-  grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-columns: 272px minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -114,14 +114,12 @@
 .publish-main {
   min-width: 0;
   overflow: auto;
-  background:
-    linear-gradient(90deg, transparent 0 47px, color-mix(in srgb, var(--border-light) 46%, transparent) 48px, transparent 49px),
-    var(--bg-primary);
+  background: #fff;
 }
 
 .publish-ready-view,
 .publish-result-view {
-  width: min(920px, calc(100% - 72px));
+  width: min(860px, calc(100% - 64px));
   margin: 0 auto;
   padding: 48px 0 64px;
 }
