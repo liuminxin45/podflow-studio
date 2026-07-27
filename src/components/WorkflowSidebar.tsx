@@ -5,6 +5,7 @@ import { deriveWorkflowStageStatuses, type DerivedStageStatus, type EffectiveSta
 import GlobalSettingsButton from './GlobalSettingsButton'
 import NavigationActionButton from './NavigationActionButton'
 import WorkflowSaveButton from './WorkflowSaveButton'
+import WorkflowFailureNotice, { latestWorkflowFailure } from './WorkflowFailureNotice'
 
 interface Props {
   workflow: Workflow | null
@@ -152,6 +153,7 @@ export default function WorkflowSidebar({
   onClose,
 }: Props) {
   const statuses = deriveWorkflowStageStatuses(workflow)
+  const failure = latestWorkflowFailure(workflow)
 
   return (
     <aside style={{
@@ -180,6 +182,7 @@ export default function WorkflowSidebar({
         ))}
       </div>
       <div style={{ padding: 12, borderTop: '1px solid var(--border-light)', display: 'grid', gap: 4 }}>
+        {failure && <WorkflowFailureNotice compact workflow={workflow} failure={failure} />}
         <WorkflowSaveButton hasUnsavedChanges={hasUnsavedChanges} onSave={onSave} fullWidth />
         <NavigationActionButton
           label="关闭节目"

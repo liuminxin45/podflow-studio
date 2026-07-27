@@ -4219,6 +4219,215 @@ body {
   padding: 32px;
 }
 
+.workflow-failure-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--error-color) 34%, var(--border-color));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--error-color) 5%, var(--bg-secondary));
+}
+
+.workflow-failure-notice-icon {
+  margin-top: 2px;
+  color: var(--error-color);
+  font-size: 16px;
+}
+
+.workflow-failure-notice-copy {
+  min-width: 0;
+}
+
+.workflow-failure-notice-copy strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.workflow-failure-notice-copy p {
+  margin: 3px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.workflow-failure-notice-copy small {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.workflow-failure-notice-actions {
+  display: flex;
+  max-width: 360px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.creation-generate-section .workflow-failure-notice {
+  grid-template-columns: auto minmax(0, 1fr);
+  margin-top: 10px;
+}
+
+.creation-generate-section .workflow-failure-notice-actions {
+  grid-column: 1 / -1;
+  max-width: none;
+  justify-content: flex-start;
+}
+
+.workflow-failure-compact {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+  padding: 8px 9px;
+  border: 1px solid color-mix(in srgb, var(--error-color) 32%, var(--border-color));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--error-color) 5%, var(--bg-secondary));
+  color: var(--error-color);
+  cursor: pointer;
+  text-align: left;
+}
+
+.workflow-failure-compact:hover {
+  border-color: color-mix(in srgb, var(--error-color) 58%, var(--border-color));
+  background: color-mix(in srgb, var(--error-color) 8%, var(--bg-secondary));
+}
+
+.workflow-failure-compact > span {
+  min-width: 0;
+}
+
+.workflow-failure-compact strong,
+.workflow-failure-compact small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflow-failure-compact strong {
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.workflow-failure-compact small {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.workflow-failure-drawer {
+  display: grid;
+  gap: 24px;
+}
+
+.workflow-failure-drawer section > h3 {
+  margin: 0 0 10px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.workflow-failure-drawer-summary {
+  padding: 14px;
+  border-left: 3px solid var(--error-color);
+  background: var(--bg-tertiary);
+}
+
+.workflow-failure-drawer-summary > span,
+.workflow-failure-drawer-summary > strong,
+.workflow-failure-drawer-summary > small {
+  display: block;
+}
+
+.workflow-failure-drawer-summary > span {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.workflow-failure-drawer-summary > strong {
+  margin-top: 5px;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.workflow-failure-drawer-summary > small {
+  margin-top: 8px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.workflow-failure-drawer pre,
+.workflow-failure-error-entry pre {
+  max-height: 180px;
+  margin: 10px 0 0;
+  overflow: auto;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.workflow-failure-error-entry {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+}
+
+.workflow-failure-error-entry + .workflow-failure-error-entry {
+  margin-top: 8px;
+}
+
+.workflow-failure-error-entry strong {
+  color: var(--error-color);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.workflow-failure-error-entry p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.workflow-failure-log-list {
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.workflow-failure-log-list > div {
+  padding: 5px 9px;
+  overflow-wrap: anywhere;
+}
+
+.workflow-failure-log-list > div + div {
+  border-top: 1px solid var(--border-light);
+}
+
 .ui-form-stack,
 .ui-field {
   display: grid;

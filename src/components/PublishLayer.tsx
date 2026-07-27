@@ -17,6 +17,7 @@ import {
 import { formatDuration } from '../utils'
 import type { Workflow } from '../types/workflow'
 import StageHeader from './StageHeader'
+import WorkflowFailureNotice from './WorkflowFailureNotice'
 import './publish/publish.css'
 
 type PublishView = 'ready' | 'publishing' | 'result'
@@ -239,7 +240,13 @@ export default function PublishLayer({
               </header>
 
               {errorMessage && (
-                <Alert className="publish-error" type="error" showIcon message="发布未完成" description={errorMessage} />
+                <WorkflowFailureNotice
+                  workflow={workflow}
+                  failure={{ node: 'publish', message: errorMessage }}
+                  title="发布未完成"
+                  onRetry={() => void publishEpisode()}
+                  onDismiss={() => setErrorMessage('')}
+                />
               )}
 
               <section className="publish-manifest" aria-label="发布产物清单">

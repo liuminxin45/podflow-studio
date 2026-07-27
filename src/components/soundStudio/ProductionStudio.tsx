@@ -22,6 +22,7 @@ import type {
   Workflow,
 } from '../../types/workflow'
 import StageHeader from '../StageHeader'
+import WorkflowFailureNotice from '../WorkflowFailureNotice'
 import { verifiedFinalAudioPath } from '../../services/productionArtifactStatus'
 import {
   AUDIO_PROVIDERS,
@@ -1283,7 +1284,16 @@ export default function ProductionStudio({
             />
           )}
           {runState.status === 'failed' && (
-            <Alert className="produce-alert" type="error" showIcon message="本次制作未完成" description={runState.error} />
+            <WorkflowFailureNotice
+              workflow={workflow}
+              failure={{
+                node: workflow?.currentNode || 'audio_postprocess',
+                message: runState.error,
+              }}
+              title="本次制作未完成"
+              onRetry={() => void handleGenerate()}
+              onDismiss={() => setRunState(IDLE_RUN)}
+            />
           )}
           {audioOutputs.degraded && finalAudioPath && (
             <Alert

@@ -13,6 +13,7 @@ import { persistCurrentWritingNodeConfigs } from '../services/settings/writingNo
 import { readyCandidatesForDraft } from '../utils/workflowDraftGuards'
 import { resolveMorningNewsProfile } from '../services/writing/morningNewsProfile'
 import WritingLayer from './writing'
+import WorkflowFailureNotice, { type WorkflowFailure } from './WorkflowFailureNotice'
 
 type MaterialItem = ContentItem & { _source_channel?: 'auto'; _isDeepDive?: boolean }
 const EMPTY_MATERIALS: MaterialItem[] = []
@@ -78,6 +79,7 @@ export default function EpisodeDraftStudio({
   const [generationRunning, setGenerationRunning] = useState(false)
   const [generationPhase, setGenerationPhase] = useState<DraftGenerationPhase>('preparing')
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0)
+  const [generationFailure, setGenerationFailure] = useState<WorkflowFailure | null>(null)
   const [savedSettings, setSavedSettings] = useState(() => settingsRepository.load())
   const [modalApi, modalContextHolder] = Modal.useModal()
   const [messageApi, messageContextHolder] = message.useMessage()
@@ -246,7 +248,9 @@ export default function EpisodeDraftStudio({
       if (!shouldReplace) return
     }
 
+    let activeNode: 'facts' | 'script' | undefined
     try {
+      setGenerationFailure(null)
       setGenerationRunning(true)
       setGenerationPhase('preparing')
       await persistCurrentWritingNodeConfigs()
@@ -256,6 +260,7 @@ export default function EpisodeDraftStudio({
       await onStateChange?.(structure)
       await onPrepareGeneration?.(isRegeneration ? 'regenerate' : 'initial', draftPatchRef.current)
       setGenerationPhase('facts')
+      activeNode = 'facts'
       const factsWorkflow = await onRunNodes?.(['facts'])
       const factsError = [...(factsWorkflow?.state?.errors || [])]
         .reverse()
@@ -265,6 +270,7 @@ export default function EpisodeDraftStudio({
       }
 
       setGenerationPhase('script')
+      activeNode = 'script'
       const generatedWorkflow = await onRunNodes?.(['script'])
       setGenerationPhase('validation')
       const scriptError = [...(generatedWorkflow?.state?.errors || [])]
@@ -281,9 +287,12 @@ export default function EpisodeDraftStudio({
         throw new Error('成稿 AI 未实际运行，本次本地模板结果未写入初稿')
       }
       const actualCount = generatedWorkflow?.state?.generation_meta?.actual_news_item_count ?? selectedFacts.length
+      setGenerationFailure(null)
       messageApi.success(`初稿已生成：按实际素材编排 ${actualCount} 条新闻`)
     } catch (error: any) {
-      messageApi.error(`生成初稿失败：${error?.message || String(error)}`)
+      const messageText = error?.message || String(error)
+      setGenerationFailure({ node: activeNode, message: messageText })
+      messageApi.error(`生成初稿失败：${messageText}`)
     } finally {
       setGenerationRunning(false)
     }
@@ -337,6 +346,15 @@ export default function EpisodeDraftStudio({
                       ))}
                     </div>
                   </div>
+                )}
+                {generationFailure && !generationRunning && (
+                  <WorkflowFailureNotice
+                    workflow={workflow}
+                    failure={generationFailure}
+                    title="初稿生成失败"
+                    onRetry={() => void generateScript()}
+                    onDismiss={() => setGenerationFailure(null)}
+                  />
                 )}
                 <div className="creation-generation-profile" role="status">
                   <strong>按已保存偏好生成</strong>

@@ -184,6 +184,42 @@ describe('morning-news writing surfaces', () => {
     expect(onRunNodes).toHaveBeenNthCalledWith(2, ['script'])
   })
 
+  it('keeps an initial-draft failure visible after the toast disappears', async () => {
+    const failedWorkflow = createWorkflow({
+      errors: [{ node: 'facts', message: '事实卡服务请求超时' }],
+    })
+    failedWorkflow.status = 'failed'
+    failedWorkflow.currentNode = 'facts'
+    failedWorkflow.nodeExecutions = {
+      facts: { status: 'failed', error: '事实卡服务请求超时' },
+    }
+    const onRunNodes = vi.fn().mockResolvedValue(failedWorkflow)
+
+    render(
+      <EpisodeDraftStudio
+        visible
+        onClose={vi.fn()}
+        rawContents={[{
+          title: facts[0].title,
+          summary: facts[0].summary,
+          url: facts[0].source_url,
+          source: facts[0].source_title,
+        }]}
+        initialFacts={[facts[0]]}
+        workflow={createWorkflow({ facts: [facts[0]] })}
+        onRunNodes={onRunNodes}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '生成初稿' }))
+
+    const persistentFailure = await screen.findByRole('alert')
+    expect(persistentFailure.textContent).toContain('初稿生成失败')
+    expect(persistentFailure.textContent).toContain('事实卡服务请求超时')
+    expect(within(persistentFailure).getByRole('button', { name: '重试' })).toBeTruthy()
+    expect(within(persistentFailure).getByRole('button', { name: '查看相关日志' })).toBeTruthy()
+  })
+
   it('keeps the organize-page deep dive as the final news slot in the draft structure', async () => {
     const onStateChange = vi.fn()
     render(
