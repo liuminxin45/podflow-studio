@@ -315,7 +315,13 @@ export default function EpisodeManager({
                       {episode.series?.title && <Tag bordered={false}>{episode.series.title}</Tag>}
                       {episode.failedNode && <Tag color="error">{episode.failedNode} 失败</Tag>}
                     </span>
-                    <button type="button" className="episode-library-title-button" onClick={() => void onOpen(episode.id)} title={episode.title}>
+                    <button
+                      type="button"
+                      className="episode-library-title-button"
+                      onClick={() => void onOpen(episode.id)}
+                      title={episode.title}
+                      aria-label={`打开节目：${episode.title || '未命名节目'}`}
+                    >
                       {episode.title || '未命名节目'}
                     </button>
                     <small>{episode.description || '暂无节目简介'}</small>

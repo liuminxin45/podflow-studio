@@ -29,17 +29,18 @@ if (quietPassStart === -1) {
 const quietPass = quietPassStart === -1 ? '' : css.slice(quietPassStart)
 
 for (const token of [
-  '--bg-primary: #ffffff;',
-  '--bg-secondary: #ffffff;',
-  '--bg-tertiary: #f6f6f5;',
-  '--text-primary: #242629;',
-  '--text-secondary: #686a6d;',
-  '--border-color: #e6e7e7;',
-  '--accent-primary: #303438;',
-  '--accent-light: #f0f1f1;',
-  '--radius-sm: 5px;',
-  '--radius-md: 7px;',
-  '--radius-lg: 10px;',
+  '--bg-primary: #f5f4f0;',
+  '--bg-secondary: #fbfaf7;',
+  '--bg-tertiary: #eeede8;',
+  '--text-primary: #262521;',
+  '--text-secondary: #6d6a63;',
+  '--border-color: #dddbd3;',
+  '--accent-primary: #292823;',
+  '--accent-light: #e7e5de;',
+  '--radius-sm: 6px;',
+  '--radius-md: 9px;',
+  '--radius-lg: 14px;',
+  '--app-rail-width: 72px;',
 ]) {
   expectIncludes(quietPass, token, 'Quiet workbench token', failures)
 }
@@ -63,13 +64,13 @@ if (quietPass && /font-weight:\s*(?:6[5-9]\d|[7-9]\d\d)\s*!important/.test(quiet
 }
 
 for (const token of [
-  "colorPrimary: '#303438'",
-  "colorText: '#242629'",
-  "colorBgLayout: '#ffffff'",
-  "colorBorder: '#e6e7e7'",
+  "colorPrimary: '#292823'",
+  "colorText: '#262521'",
+  "colorBgLayout: '#f5f4f0'",
+  "colorBorder: '#dddbd3'",
   'fontWeightStrong: 600',
   'controlHeight: 32',
-  'borderRadius: 6',
+  'borderRadius: 9',
 ]) {
   expectIncludes(app, token, 'Ant Design token', failures)
 }

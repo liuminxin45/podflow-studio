@@ -156,17 +156,11 @@ export default function WorkflowSidebar({
   const failure = latestWorkflowFailure(workflow)
 
   return (
-    <aside style={{
-      width: 'var(--stage-nav-width)',
-      flexShrink: 0,
-      height: '100%',
-      borderRight: '1px solid var(--border-color)',
-      background: 'var(--bg-secondary)',
-      display: 'flex',
-      flexDirection: 'column',
-      position: 'relative',
-      zIndex: 1,
-    }}>
+    <aside className="workflow-sidebar">
+      <header className="workflow-sidebar-header">
+        <span>当前节目</span>
+        <strong>{workflow?.state?.selected_topic?.title || workflow?.state?.script?.title || '未命名节目'}</strong>
+      </header>
       <div style={{ padding: 12, display: 'flex', flexDirection: 'column', overflow: 'auto', flex: 1, minHeight: 0 }}>
         {statuses.map((derived, index) => (
           <div key={derived.stage.id}>

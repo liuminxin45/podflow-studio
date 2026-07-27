@@ -10,6 +10,7 @@ import SettingsPage from './components/SettingsPage'
 import WorkflowSidebar from './components/WorkflowSidebar'
 import EpisodeManager from './components/EpisodeManager'
 import GlobalPlayer from './components/GlobalPlayer'
+import AppRail from './components/AppRail'
 import { STAGES } from './components/workflowStages'
 import { detectAndPersistLocalAgentsOnStartup } from './services/settings/localAgentDetection'
 import { llmConfigResolver } from './services/settings/llmConfigResolver'
@@ -877,46 +878,46 @@ function App() {
       theme={{
         algorithm: theme.defaultAlgorithm,
         token: {
-          colorPrimary: '#303438',
-          colorPrimaryHover: '#202326',
-          colorPrimaryActive: '#17191b',
-          colorText: '#242629',
-          colorTextSecondary: '#686a6d',
-          colorBgBase: '#ffffff',
+          colorPrimary: '#292823',
+          colorPrimaryHover: '#171713',
+          colorPrimaryActive: '#0e0e0c',
+          colorText: '#262521',
+          colorTextSecondary: '#6d6a63',
+          colorBgBase: '#f5f4f0',
           colorBgContainer: '#ffffff',
           colorBgElevated: '#ffffff',
-          colorBgLayout: '#ffffff',
-          colorBgTextHover: '#f0f1f1',
-          colorFillAlter: '#f6f6f5',
-          colorBorder: '#e6e7e7',
-          colorBorderSecondary: '#f0f1f1',
+          colorBgLayout: '#f5f4f0',
+          colorBgTextHover: '#e7e5de',
+          colorFillAlter: '#eeede8',
+          colorBorder: '#dddbd3',
+          colorBorderSecondary: '#e9e7e0',
           fontFamily: "var(--font-ui)",
           fontSize: 13,
           fontSizeSM: 12,
           fontWeightStrong: 600,
           controlHeight: 32,
           controlHeightSM: 28,
-          borderRadius: 6,
-          borderRadiusSM: 5,
-          borderRadiusLG: 10,
-          boxShadow: '0 1px 2px rgba(20, 23, 25, 0.025)',
-          boxShadowSecondary: '0 1px 2px rgba(20, 23, 25, 0.025)',
+          borderRadius: 9,
+          borderRadiusSM: 6,
+          borderRadiusLG: 14,
+          boxShadow: '0 1px 2px rgba(54, 49, 39, 0.04)',
+          boxShadowSecondary: '0 1px 2px rgba(54, 49, 39, 0.04)',
         },
       }}
     >
       {messageContextHolder}
       {modalContextHolder}
-      <Layout className="app-shell" style={{ height: '100dvh', background: 'var(--bg-primary)', overflow: 'hidden' }}>
-        <Layout className="app-workspace" style={{ position: 'relative', minHeight: 0, background: 'transparent' }}>
-          <Content style={{ 
-            position: 'relative', 
-            overflow: 'hidden', 
-            height: '100%',
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'row',
-            transition: 'height 0.3s ease'
-          }}>
+      <Layout className="app-shell">
+        <Layout className="app-workspace">
+          <AppRail
+            homeActive={homePage === 'episodes' && !activeStageId}
+            workflowActive={showWorkflowSidebar}
+            hasElectronBackend={hasElectronBackend}
+            onHome={handleCloseWorkflow}
+            onCreate={() => void handleStart()}
+            onSettings={openSettings}
+          />
+          <Content className="app-content">
             {showWorkflowSidebar && (
               <WorkflowSidebar
                 workflow={navigationWorkflow}
@@ -928,14 +929,7 @@ function App() {
                 onClose={handleCloseWorkflow}
               />
             )}
-            <main style={{
-              flex: 1,
-              minWidth: 0,
-              height: '100%',
-              overflow: 'auto',
-              background: 'var(--bg-primary)',
-              padding: homePage === 'episodes' ? '28px 32px' : 0,
-            }}>
+            <main className={`app-main ${homePage === 'episodes' ? 'is-library' : 'is-stage'}`}>
               {homePage === 'episodes' && (
                 <EpisodeManager
                   episodes={workflowSummaries}
