@@ -3997,54 +3997,75 @@ body {
   line-height: 21px;
 }
 
-.episode-library-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 390px), 1fr));
-  gap: 10px;
-}
-
-.episode-library-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  min-width: 0;
+.episode-library-table-wrap {
+  overflow-x: auto;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   background: var(--bg-secondary);
-  overflow: hidden;
 }
 
-.episode-library-item.is-active {
-  border-color: var(--accent-primary);
+.episode-library-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  table-layout: fixed;
 }
 
-.episode-library-item:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--border-active);
-}
-
-.episode-library-open {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  min-width: 0;
-  gap: 12px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  padding: 12px 6px 12px 12px;
+.episode-library-table th {
+  height: 38px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   text-align: left;
 }
 
-.episode-library-open:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: -2px;
+.episode-library-table th:nth-child(1) { width: 34%; }
+.episode-library-table th:nth-child(2) { width: 10%; }
+.episode-library-table th:nth-child(3) { width: 15%; }
+.episode-library-table th:nth-child(4) { width: 14%; }
+.episode-library-table th:nth-child(5) { width: 27%; }
+
+.episode-library-table td {
+  height: 72px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.episode-library-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.episode-library-table tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.episode-library-table tbody tr:hover {
+  background: var(--bg-tertiary);
+}
+
+.episode-library-table tbody tr.is-active {
+  box-shadow: inset 3px 0 0 var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-secondary));
+}
+
+.episode-library-title-cell {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 11px;
 }
 
 .episode-library-cover {
   position: relative;
   display: grid;
-  width: 72px;
-  height: 72px;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
   place-items: center;
   border-radius: var(--radius-md);
   background: var(--bg-muted);
@@ -4060,8 +4081,8 @@ body {
 
 .episode-library-cover svg {
   position: absolute;
-  width: 30px;
-  height: 30px;
+  width: 22px;
+  height: 22px;
   opacity: 0.16;
 }
 
@@ -4078,23 +4099,47 @@ body {
   justify-content: center;
 }
 
-.episode-library-copy > strong {
+.episode-library-title-button {
+  width: fit-content;
+  max-width: 100%;
   overflow: hidden;
+  border: 0;
+  background: transparent;
   color: var(--text-primary);
-  font-size: 14px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0;
+  text-align: left;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.episode-library-title-button:hover {
+  color: var(--accent-primary);
+}
+
+.episode-library-title-button:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 .episode-library-copy > small {
-  margin-top: 5px;
+  max-width: 44ch;
+  margin-top: 3px;
+  overflow: hidden;
   color: var(--text-tertiary);
   font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .episode-library-meta {
   display: flex;
-  min-height: 21px;
+  min-height: 17px;
   align-items: center;
   gap: 4px;
 }
@@ -4102,12 +4147,31 @@ body {
 .episode-library-meta .ant-tag {
   margin: 0;
   font-size: 10px;
-  line-height: 18px;
+  line-height: 16px;
+}
+
+.episode-library-audio {
+  display: grid;
+  gap: 3px;
+}
+
+.episode-library-audio > span:first-child {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.episode-library-audio small {
+  color: var(--text-tertiary);
+  font-size: 10px;
 }
 
 .episode-library-progress {
+  display: block;
+  width: 88px;
   height: 2px;
-  margin-top: 10px;
+  margin-top: 3px;
   border-radius: 2px;
   background: var(--border-color);
   overflow: hidden;
@@ -4120,13 +4184,32 @@ body {
 }
 
 .episode-library-actions {
-  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 4px;
-  padding: 12px 10px 12px 4px;
+  white-space: nowrap;
 }
 
 .episode-library-actions .ant-btn > span:not(.ant-btn-icon) {
   white-space: nowrap;
+}
+
+.episode-library-date {
+  color: var(--text-tertiary) !important;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
 }
 
 .episode-library-empty {
@@ -4389,9 +4472,8 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .episode-library-actions {
-    grid-column: 1 / -1;
-    padding: 0 12px 12px;
+  .episode-library-table {
+    min-width: 860px;
   }
 
   .series-manager-nav {

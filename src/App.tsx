@@ -947,6 +947,10 @@ function App() {
                   onCreate={handleStart}
                   onOpen={handleOpenWorkflow}
                   onPlay={handlePlayEpisode}
+                  onShowArtifact={async targetPath => {
+                    const result = await window.electronAPI.showItemInFolder(targetPath)
+                    if (!result.success) showNotice('error', `无法打开产物目录：${result.error || '未知错误'}`)
+                  }}
                   onRerun={handleOpenRecovery}
                   onDelete={handleDeleteWorkflow}
                   onDuplicate={handleDuplicateWorkflow}

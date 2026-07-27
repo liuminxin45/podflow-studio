@@ -8,6 +8,7 @@ import {
   DownloadSimple,
   Export,
   FileImage,
+  FolderSimple,
   FolderOpen,
   ListPlus,
   DotsThree,
@@ -35,6 +36,7 @@ interface Props {
   onCreate: (seriesId?: string) => Promise<void> | void
   onOpen: (workflowId: string) => Promise<void> | void
   onPlay: (workflowId: string) => Promise<void> | void
+  onShowArtifact: (targetPath: string) => Promise<void> | void
   onRerun: (workflowId: string) => Promise<void> | void
   onDelete: (workflowId: string) => Promise<void> | void
   onDuplicate?: (workflowId: string) => Promise<void> | void
@@ -63,6 +65,20 @@ function playbackPercent(episode: WorkflowSummary) {
   return Math.max(0, Math.min(100, (Number(episode.playback?.positionSeconds || 0) / duration) * 100))
 }
 
+function formatDuration(value?: number) {
+  const seconds = Math.max(0, Math.round(Number(value || 0)))
+  if (!seconds) return '未知时长'
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+function productionStatus(episode: WorkflowSummary) {
+  if (episode.failedNode || episode.status === 'failed') return { label: '失败', tone: 'error' }
+  if (episode.audioPath) return { label: '已成片', tone: 'success' }
+  if (episode.status === 'running' || episode.status === 'waiting_approval') return { label: '制作中', tone: 'processing' }
+  if (episode.status === 'completed') return { label: '待成片', tone: 'warning' }
+  return { label: '草稿', tone: 'default' }
+}
+
 export default function EpisodeManager({
   episodes,
   loading,
@@ -72,6 +88,7 @@ export default function EpisodeManager({
   onCreate,
   onOpen,
   onPlay,
+  onShowArtifact,
   onRerun,
   onDelete,
   onDuplicate,
@@ -270,14 +287,26 @@ export default function EpisodeManager({
           <Empty description={episodes.length === 0 ? '还没有节目，从一次新闻发现开始。' : '没有符合当前筛选条件的节目。'} />
         </div>
       ) : (
-        <div className="episode-library-grid">
+        <div className="episode-library-table-wrap">
+          <table className="episode-library-table">
+            <thead>
+              <tr>
+                <th scope="col">节目</th>
+                <th scope="col">制作状态</th>
+                <th scope="col">成片与收听</th>
+                <th scope="col">更新时间</th>
+                <th scope="col"><span className="sr-only">操作</span></th>
+              </tr>
+            </thead>
+            <tbody>
           {visibleEpisodes.map(episode => {
             const active = episode.id === activeWorkflowId || episode.isCurrent
             const previewSrc = previewSources[episode.id] || ''
             const percent = playbackPercent(episode)
+            const status = productionStatus(episode)
             return (
-              <article key={episode.id} className={`episode-library-item ${active ? 'is-active' : ''}`}>
-                <button type="button" className="episode-library-open" onClick={() => void onOpen(episode.id)} aria-label={`打开节目：${episode.title}`}>
+              <tr key={episode.id} className={active ? 'is-active' : ''}>
+                <td className="episode-library-title-cell">
                   <span className="episode-library-cover">
                     {previewSrc ? <img src={previewSrc} alt={`${episode.title} 预览图`} /> : <><FileImage aria-hidden="true" /><b>{(episode.title || '节').slice(0, 1)}</b></>}
                   </span>
@@ -286,16 +315,30 @@ export default function EpisodeManager({
                       {episode.series?.title && <Tag bordered={false}>{episode.series.title}</Tag>}
                       {episode.failedNode && <Tag color="error">{episode.failedNode} 失败</Tag>}
                     </span>
-                    <strong title={episode.title}>{episode.title || '未命名节目'}</strong>
-                    <small>更新于 {formatDate(episode.updatedAt)}</small>
-                    {percent > 0 && (
-                      <span className="episode-library-progress" aria-label={`收听进度 ${Math.round(percent)}%`}>
-                        <i style={{ width: `${percent}%` }} />
-                      </span>
-                    )}
+                    <button type="button" className="episode-library-title-button" onClick={() => void onOpen(episode.id)} title={episode.title}>
+                      {episode.title || '未命名节目'}
+                    </button>
+                    <small>{episode.description || '暂无节目简介'}</small>
                   </span>
-                </button>
-                <div className="episode-library-actions">
+                </td>
+                <td data-label="制作状态">
+                  <Tag bordered={false} color={status.tone}>{status.label}</Tag>
+                </td>
+                <td data-label="成片与收听">
+                  <div className="episode-library-audio">
+                    <span>{episode.audioPath ? formatDuration(episode.durationSeconds) : '暂无成片'}</span>
+                    {episode.audioPath && (
+                      <>
+                        <small>{percent >= 100 ? '已听完' : percent > 0 ? `已听 ${Math.round(percent)}%` : '未收听'}</small>
+                        <span className="episode-library-progress" aria-label={`收听进度 ${Math.round(percent)}%`}>
+                          <i style={{ width: `${percent}%` }} />
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </td>
+                <td className="episode-library-date" data-label="更新时间">{formatDate(episode.updatedAt)}</td>
+                <td className="episode-library-actions">
                   <Button
                     type={episode.audioPath ? 'primary' : 'default'}
                     icon={<Play weight="fill" />}
@@ -304,7 +347,14 @@ export default function EpisodeManager({
                   >
                     {percent > 0 && percent < 100 ? '继续' : '播放'}
                   </Button>
-                  <Button icon={<ArrowClockwise />} onClick={() => void onRerun(episode.id)}>重跑</Button>
+                  <Button
+                    icon={<FolderSimple />}
+                    disabled={!episode.audioPath}
+                    onClick={() => episode.audioPath && void onShowArtifact(episode.audioPath)}
+                  >
+                    打开目录
+                  </Button>
+                  <Button onClick={() => void onOpen(episode.id)}>继续制作</Button>
                   <Dropdown
                     trigger={['click']}
                     menu={{
@@ -312,6 +362,7 @@ export default function EpisodeManager({
                         { key: 'assign', icon: <ListPlus />, label: '加入栏目', disabled: series.length === 0 },
                         { key: 'duplicate', icon: <Copy />, label: '复制节目', disabled: !onDuplicate },
                         { key: 'edit', icon: <FolderOpen />, label: '编辑信息' },
+                        { key: 'rerun', icon: <ArrowClockwise />, label: '重跑工作流' },
                         { key: 'export', icon: <Export />, label: '导出 .pfs' },
                         { type: 'divider' },
                         { key: 'delete', icon: <Trash />, label: '删除节目', danger: true },
@@ -320,6 +371,7 @@ export default function EpisodeManager({
                         if (key === 'assign') { setAssigning(episode); setAssignSeriesId(episode.series?.id || series[0]?.id || ''); setAssignError('') }
                         if (key === 'duplicate') void onDuplicate?.(episode.id)
                         if (key === 'edit') openEdit(episode)
+                        if (key === 'rerun') void onRerun(episode.id)
                         if (key === 'export') void onExport(episode.id)
                         if (key === 'delete') Modal.confirm({ title: '删除节目', content: '确认删除这个本地节目？', okText: '删除', cancelText: '取消', okButtonProps: { danger: true }, onOk: () => onDelete(episode.id) })
                       },
@@ -327,10 +379,12 @@ export default function EpisodeManager({
                   >
                     <Button type="text" icon={<DotsThree />} aria-label={`更多操作：${episode.title}`} />
                   </Dropdown>
-                </div>
-              </article>
+                </td>
+              </tr>
             )
           })}
+            </tbody>
+          </table>
         </div>
       )}
 

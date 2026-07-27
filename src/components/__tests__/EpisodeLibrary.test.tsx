@@ -56,8 +56,9 @@ describe('节目库与播放器', () => {
     ;(window as any).electronAPI = originalElectronAPI
   })
 
-  it('filters continue-listening episodes and exposes play and recovery actions', async () => {
+  it('renders the production table and exposes playback and artifact actions', async () => {
     const onPlay = vi.fn()
+    const onShowArtifact = vi.fn()
     const onRerun = vi.fn()
     const onOpenSettings = vi.fn()
     render(<EpisodeManager
@@ -68,6 +69,7 @@ describe('节目库与播放器', () => {
       onCreate={vi.fn()}
       onOpen={vi.fn()}
       onPlay={onPlay}
+      onShowArtifact={onShowArtifact}
       onRerun={onRerun}
       onDelete={vi.fn()}
       onImport={vi.fn()}
@@ -84,10 +86,12 @@ describe('节目库与播放器', () => {
     fireEvent.click(screen.getByText('继续收听'))
     expect(screen.getByText('芯片新闻')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '继续' }))
-    fireEvent.click(screen.getByRole('button', { name: '重跑' }))
+    fireEvent.click(screen.getByRole('button', { name: '打开目录' }))
     fireEvent.click(screen.getByRole('button', { name: '设置' }))
     expect(onPlay).toHaveBeenCalledWith('ep-1')
-    expect(onRerun).toHaveBeenCalledWith('ep-1')
+    expect(onShowArtifact).toHaveBeenCalledWith('final.mp3')
+    expect(screen.getByRole('table')).toBeTruthy()
+    expect(screen.getByText('已成片')).toBeTruthy()
     expect(onOpenSettings).toHaveBeenCalledOnce()
     const headerActions = document.querySelector('.episode-library-header-actions') as HTMLElement
     expect(headerActions.style.flexWrap).toBe('wrap')
