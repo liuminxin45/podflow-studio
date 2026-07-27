@@ -97,13 +97,6 @@ export default function WorkflowSidebar({
         </>
       )}
 
-      {!workflow && (
-        <div className="workflow-sidebar-empty">
-          <span>从一次素材发现开始</span>
-          <button type="button" disabled={!hasElectronBackend} onClick={onCreate}>创建节目</button>
-        </div>
-      )}
-
       <div className="workflow-sidebar-footer">
         {workflow && (
           <>

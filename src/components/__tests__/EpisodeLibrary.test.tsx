@@ -60,7 +60,6 @@ describe('节目库与播放器', () => {
     const onPlay = vi.fn()
     const onShowArtifact = vi.fn()
     const onRerun = vi.fn()
-    const onOpenSettings = vi.fn()
     render(<EpisodeManager
       episodes={[episode]}
       loading={false}
@@ -79,7 +78,6 @@ describe('节目库与播放器', () => {
       onAssignSeries={vi.fn()}
       onReorderSeries={vi.fn()}
       onGenerateSeriesFeed={vi.fn()}
-      onOpenSettings={onOpenSettings}
     />)
 
     await waitFor(() => expect(screen.getByText('芯片新闻')).toBeTruthy())
@@ -88,13 +86,13 @@ describe('节目库与播放器', () => {
     fireEvent.click(screen.getByRole('button', { name: '继续收听' }))
     fireEvent.click(screen.getByRole('button', { name: /更多操作/ }))
     fireEvent.click(await screen.findByText('打开成片目录'))
-    fireEvent.click(screen.getByRole('button', { name: '设置' }))
     expect(onPlay).toHaveBeenCalledWith('ep-1')
     expect(onShowArtifact).toHaveBeenCalledWith('final.mp3')
     expect(screen.getByRole('table')).toBeTruthy()
     expect(screen.getByText('已成片')).toBeTruthy()
-    expect(onOpenSettings).toHaveBeenCalledOnce()
     expect(document.querySelector('.episode-library-header-actions')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '新建节目' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '设置' })).toBeNull()
   })
 
   it('uses the redesigned creation and series workspaces', async () => {
@@ -117,10 +115,8 @@ describe('节目库与播放器', () => {
       onAssignSeries={vi.fn()}
       onReorderSeries={vi.fn()}
       onGenerateSeriesFeed={vi.fn()}
-      onOpenSettings={vi.fn()}
+      createRequestKey={1}
     />)
-
-    fireEvent.click(screen.getByRole('button', { name: '新建节目' }))
     expect(screen.getByRole('heading', { name: '开始一期新节目' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /每日科技/ }))
     fireEvent.click(screen.getByRole('button', { name: '创建并进入发现' }))

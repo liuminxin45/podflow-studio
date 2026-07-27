@@ -955,7 +955,6 @@ function App() {
                   onAssignSeries={handleAssignSeries}
                   onReorderSeries={handleReorderSeries}
                   onGenerateSeriesFeed={handleGenerateSeriesFeed}
-                  onOpenSettings={openSettings}
                   createRequestKey={createRequestKey}
                 />
               )}

@@ -18,7 +18,6 @@ import {
   Trash,
 } from '@phosphor-icons/react'
 import type { Series, WorkflowSummary } from '../types/workflow'
-import GlobalSettingsButton from './GlobalSettingsButton'
 
 interface EpisodeMetaPatch {
   title: string
@@ -47,7 +46,6 @@ interface Props {
   onAssignSeries: (seriesId: string, workflowId: string) => Promise<void>
   onReorderSeries: (seriesId: string, episodeIds: string[]) => Promise<void>
   onGenerateSeriesFeed: (seriesId: string) => Promise<void>
-  onOpenSettings: () => void
   createRequestKey?: number
 }
 
@@ -100,7 +98,6 @@ export default function EpisodeManager({
   onAssignSeries,
   onReorderSeries,
   onGenerateSeriesFeed,
-  onOpenSettings,
   createRequestKey = 0,
 }: Props) {
   const [editing, setEditing] = useState<WorkflowSummary | null>(null)
@@ -266,8 +263,6 @@ export default function EpisodeManager({
             栏目
           </Button>
           <Button type="text" icon={<DownloadSimple />} disabled={!hasElectronBackend} onClick={onImport}>导入</Button>
-          <GlobalSettingsButton onOpen={onOpenSettings} compact />
-          <Button type="primary" icon={<Plus />} disabled={!hasElectronBackend} onClick={() => setCreateVisible(true)}>新建节目</Button>
         </div>
       </header>
 

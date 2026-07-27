@@ -3837,8 +3837,7 @@ body {
 }
 
 .workflow-primary-nav button,
-.workflow-settings-link,
-.workflow-sidebar-empty button {
+.workflow-settings-link {
   display: flex;
   width: 100%;
   min-height: 34px;
@@ -3907,28 +3906,10 @@ body {
   padding: 6px 10px 12px;
 }
 
-.workflow-sidebar-empty {
-  display: grid;
-  flex: 1;
-  place-content: center;
-  justify-items: center;
-  gap: 10px;
-  padding: 24px;
-  color: var(--text-tertiary);
-  font-size: 11px;
-  text-align: center;
-}
-
-.workflow-sidebar-empty button {
-  width: auto;
-  min-height: 30px;
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-}
-
 .workflow-sidebar-footer {
   display: grid;
   gap: 4px;
+  margin-top: auto;
   padding: 10px;
   border-top: 1px solid var(--border-light);
 }
@@ -4668,10 +4649,6 @@ body {
   align-items: center;
   gap: 2px;
   max-width: 100%;
-}
-
-.episode-library-header-actions > .ant-btn-primary {
-  margin-left: 8px;
 }
 
 .episode-library-header h1 {

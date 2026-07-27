@@ -24,6 +24,7 @@ describe('WorkflowSidebar navigation treatment', () => {
     expect(screen.getByRole('navigation', { name: '主导航' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '节目库' }).getAttribute('aria-current')).toBe('page')
     expect((screen.getByRole('button', { name: '新建节目' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.getAllByRole('button', { name: '新建节目' })).toHaveLength(1)
     expect((screen.getByRole('button', { name: '设置' }) as HTMLButtonElement).disabled).toBe(false)
     expect(screen.queryByRole('button', { name: '保存节目' })).toBeNull()
     expect(screen.queryByRole('button', { name: '关闭节目' })).toBeNull()
