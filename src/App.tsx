@@ -153,6 +153,7 @@ function App() {
   const [playingWorkflow, setPlayingWorkflow] = useState<Workflow | null>(null)
   const [recovery, setRecovery] = useState<{ workflowId: string; plan: RecoveryPlan; running: boolean } | null>(null)
   const [homePage, setHomePage] = useState<'blank' | 'episodes'>('episodes')
+  const [createRequestKey, setCreateRequestKey] = useState(0)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [approvalVisible, setApprovalVisible] = useState(false)
   const [approvalData, setApprovalData] = useState<any>(null)
@@ -450,6 +451,12 @@ function App() {
     closeAllPanels()
     setHomePage('episodes')
     void loadWorkflowSummaries()
+  }
+
+  const openCreateEpisode = () => {
+    closeAllPanels()
+    setHomePage('episodes')
+    setCreateRequestKey(value => value + 1)
   }
 
   useEffect(() => {
@@ -920,7 +927,7 @@ function App() {
               settingsActive={settingsVisible}
               hasElectronBackend={hasElectronBackend}
               onHome={handleCloseWorkflow}
-              onCreate={() => void handleStart()}
+              onCreate={openCreateEpisode}
             />
             <main className={`app-main ${homePage === 'episodes' ? 'is-library' : 'is-stage'}`}>
               {homePage === 'episodes' && (
@@ -949,6 +956,7 @@ function App() {
                   onReorderSeries={handleReorderSeries}
                   onGenerateSeriesFeed={handleGenerateSeriesFeed}
                   onOpenSettings={openSettings}
+                  createRequestKey={createRequestKey}
                 />
               )}
             </main>

@@ -83,18 +83,53 @@ describe('节目库与播放器', () => {
     />)
 
     await waitFor(() => expect(screen.getByText('芯片新闻')).toBeTruthy())
-    fireEvent.click(screen.getByText('继续收听'))
+    fireEvent.click(screen.getByTitle('继续收听'))
     expect(screen.getByText('芯片新闻')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '继续' }))
-    fireEvent.click(screen.getByRole('button', { name: '打开目录' }))
+    fireEvent.click(screen.getByRole('button', { name: '继续收听' }))
+    fireEvent.click(screen.getByRole('button', { name: /更多操作/ }))
+    fireEvent.click(await screen.findByText('打开成片目录'))
     fireEvent.click(screen.getByRole('button', { name: '设置' }))
     expect(onPlay).toHaveBeenCalledWith('ep-1')
     expect(onShowArtifact).toHaveBeenCalledWith('final.mp3')
     expect(screen.getByRole('table')).toBeTruthy()
     expect(screen.getByText('已成片')).toBeTruthy()
     expect(onOpenSettings).toHaveBeenCalledOnce()
-    const headerActions = document.querySelector('.episode-library-header-actions') as HTMLElement
-    expect(headerActions.style.flexWrap).toBe('wrap')
+    expect(document.querySelector('.episode-library-header-actions')).toBeTruthy()
+  })
+
+  it('uses the redesigned creation and series workspaces', async () => {
+    const onCreate = vi.fn()
+    render(<EpisodeManager
+      episodes={[episode]}
+      loading={false}
+      series={[series]}
+      hasElectronBackend
+      onCreate={onCreate}
+      onOpen={vi.fn()}
+      onPlay={vi.fn()}
+      onShowArtifact={vi.fn()}
+      onRerun={vi.fn()}
+      onDelete={vi.fn()}
+      onImport={vi.fn()}
+      onExport={vi.fn()}
+      onEdit={vi.fn()}
+      onUpsertSeries={vi.fn(async () => series)}
+      onAssignSeries={vi.fn()}
+      onReorderSeries={vi.fn()}
+      onGenerateSeriesFeed={vi.fn()}
+      onOpenSettings={vi.fn()}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: '新建节目' }))
+    expect(screen.getByRole('heading', { name: '开始一期新节目' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /每日科技/ }))
+    fireEvent.click(screen.getByRole('button', { name: '创建并进入发现' }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith('daily'))
+
+    fireEvent.click(screen.getByRole('button', { name: '栏目' }))
+    expect(screen.getByRole('navigation', { name: '栏目列表' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '每日科技' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '生成 RSS' })).toBeTruthy()
   })
 
   it('links the current script segment to its fact source', async () => {

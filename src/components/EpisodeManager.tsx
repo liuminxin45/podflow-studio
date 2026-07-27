@@ -48,6 +48,7 @@ interface Props {
   onReorderSeries: (seriesId: string, episodeIds: string[]) => Promise<void>
   onGenerateSeriesFeed: (seriesId: string) => Promise<void>
   onOpenSettings: () => void
+  createRequestKey?: number
 }
 
 function formatDate(value?: string) {
@@ -100,6 +101,7 @@ export default function EpisodeManager({
   onReorderSeries,
   onGenerateSeriesFeed,
   onOpenSettings,
+  createRequestKey = 0,
 }: Props) {
   const [editing, setEditing] = useState<WorkflowSummary | null>(null)
   const [editTitle, setEditTitle] = useState('')
@@ -145,6 +147,10 @@ export default function EpisodeManager({
     void loadPreviewSources()
     return () => { disposed = true }
   }, [episodes])
+
+  useEffect(() => {
+    if (createRequestKey > 0) setCreateVisible(true)
+  }, [createRequestKey])
 
   const visibleEpisodes = useMemo(() => episodes.filter(episode => {
     const text = `${episode.title} ${episode.description || ''} ${episode.series?.title || ''}`.toLocaleLowerCase()
@@ -255,14 +261,14 @@ export default function EpisodeManager({
           <h1>节目库</h1>
           <p>继续收听、恢复生产，或按栏目组织发布。</p>
         </div>
-        <Space className="episode-library-header-actions" size="small" wrap>
-          <GlobalSettingsButton onOpen={onOpenSettings} compact />
-          <Button icon={<Rows />} onClick={() => { setSeriesVisible(true); if (!activeSeriesId && series[0]) selectSeries(series[0].id) }}>
-            栏目管理
+        <div className="episode-library-header-actions">
+          <Button type="text" icon={<Rows />} onClick={() => { setSeriesVisible(true); if (!activeSeriesId && series[0]) selectSeries(series[0].id) }}>
+            栏目
           </Button>
-          <Button icon={<DownloadSimple />} disabled={!hasElectronBackend} onClick={onImport}>导入 .pfs</Button>
-          <Button type="primary" icon={<Plus />} disabled={!hasElectronBackend} onClick={() => setCreateVisible(true)}>新增节目</Button>
-        </Space>
+          <Button type="text" icon={<DownloadSimple />} disabled={!hasElectronBackend} onClick={onImport}>导入</Button>
+          <GlobalSettingsButton onOpen={onOpenSettings} compact />
+          <Button type="primary" icon={<Plus />} disabled={!hasElectronBackend} onClick={() => setCreateVisible(true)}>新建节目</Button>
+        </div>
       </header>
 
       <div className="episode-library-filters">
@@ -345,28 +351,19 @@ export default function EpisodeManager({
                 </td>
                 <td className="episode-library-date" data-label="更新时间">{formatDate(episode.updatedAt)}</td>
                 <td className="episode-library-actions">
-                  <Button
-                    type={episode.audioPath ? 'primary' : 'default'}
-                    icon={<Play weight="fill" />}
-                    disabled={!episode.audioPath}
-                    onClick={() => void onPlay(episode.id)}
-                  >
-                    {percent > 0 && percent < 100 ? '继续' : '播放'}
-                  </Button>
-                  <Button
-                    icon={<FolderSimple />}
-                    disabled={!episode.audioPath}
-                    onClick={() => episode.audioPath && void onShowArtifact(episode.audioPath)}
-                  >
-                    打开目录
-                  </Button>
-                  <Button onClick={() => void onOpen(episode.id)}>继续制作</Button>
+                  {episode.audioPath && (
+                    <Button type="text" icon={<Play weight="fill" />} onClick={() => void onPlay(episode.id)}>
+                      {percent > 0 && percent < 100 ? '继续收听' : '播放'}
+                    </Button>
+                  )}
+                  <Button type="primary" onClick={() => void onOpen(episode.id)}>继续制作</Button>
                   <Dropdown
                     trigger={['click']}
                     menu={{
                       items: [
                         { key: 'assign', icon: <ListPlus />, label: '加入栏目', disabled: series.length === 0 },
                         { key: 'duplicate', icon: <Copy />, label: '复制节目', disabled: !onDuplicate },
+                        { key: 'directory', icon: <FolderSimple />, label: '打开成片目录', disabled: !episode.audioPath },
                         { key: 'edit', icon: <FolderOpen />, label: '编辑信息' },
                         { key: 'rerun', icon: <ArrowClockwise />, label: '重跑工作流' },
                         { key: 'export', icon: <Export />, label: '导出 .pfs' },
@@ -376,6 +373,7 @@ export default function EpisodeManager({
                       onClick: ({ key }) => {
                         if (key === 'assign') { setAssigning(episode); setAssignSeriesId(episode.series?.id || series[0]?.id || ''); setAssignError('') }
                         if (key === 'duplicate') void onDuplicate?.(episode.id)
+                        if (key === 'directory' && episode.audioPath) void onShowArtifact(episode.audioPath)
                         if (key === 'edit') openEdit(episode)
                         if (key === 'rerun') void onRerun(episode.id)
                         if (key === 'export') void onExport(episode.id)
@@ -394,8 +392,39 @@ export default function EpisodeManager({
         </div>
       )}
 
-      <Modal title="新增节目" open={createVisible} onCancel={() => setCreateVisible(false)} onOk={async () => { await onCreate(createSeriesId || undefined); setCreateVisible(false) }} okText="创建并发现" cancelText="取消">
-        <label className="ui-field"><span>所属栏目</span><Select allowClear value={createSeriesId || undefined} onChange={value => setCreateSeriesId(value || '')} placeholder="暂不加入栏目" options={series.map(item => ({ value: item.id, label: `${item.title}（继承 ${item.defaults.targetDurationMinutes} 分钟配置）` }))} /></label>
+      <Modal
+        className="create-episode-modal"
+        width={560}
+        title={null}
+        open={createVisible}
+        onCancel={() => setCreateVisible(false)}
+        footer={null}
+      >
+        <div className="create-episode">
+          <header>
+            <span className="create-episode-kicker">NEW EPISODE</span>
+            <h2>开始一期新节目</h2>
+            <p>从素材发现开始。选择栏目后，将继承它的时长、主持人与发布设置。</p>
+          </header>
+          <div className="create-episode-choice">
+            <button type="button" className={!createSeriesId ? 'is-selected' : ''} onClick={() => setCreateSeriesId('')}>
+              <span className="create-episode-choice-mark"><Plus /></span>
+              <span><strong>独立节目</strong><small>稍后再归入栏目</small></span>
+            </button>
+            {series.map(item => (
+              <button type="button" className={createSeriesId === item.id ? 'is-selected' : ''} key={item.id} onClick={() => setCreateSeriesId(item.id)}>
+                <span className="create-episode-choice-mark">{item.title.slice(0, 1)}</span>
+                <span><strong>{item.title}</strong><small>{item.defaults.targetDurationMinutes} 分钟 · {item.cadence === 'daily' ? '每日' : '每周'}</small></span>
+              </button>
+            ))}
+          </div>
+          <footer>
+            <Button type="text" onClick={() => setCreateVisible(false)}>取消</Button>
+            <Button type="primary" icon={<Plus />} onClick={async () => { await onCreate(createSeriesId || undefined); setCreateVisible(false) }}>
+              创建并进入发现
+            </Button>
+          </footer>
+        </div>
       </Modal>
 
       <Modal title="编辑节目信息" open={Boolean(editing)} onOk={async () => { if (!editing) return; await onEdit(editing.id, { title: editTitle.trim() || '未命名节目', description: editDescription.trim(), previewPath: editPreviewPath.trim() }); setEditing(null) }} onCancel={() => setEditing(null)} okText="保存" cancelText="取消">
@@ -413,13 +442,18 @@ export default function EpisodeManager({
         </div>
       </Modal>
 
-      <Modal className="series-manager-modal" width={860} title="栏目管理" open={seriesVisible} onCancel={() => setSeriesVisible(false)} footer={null}>
+      <Modal className="series-manager-modal" width={960} title={null} open={seriesVisible} onCancel={() => setSeriesVisible(false)} footer={null}>
         <div className="series-manager">
           <nav className="series-manager-nav" aria-label="栏目列表">
-            <Button icon={<Plus />} onClick={() => populateSeries()}>新建栏目</Button>
+            <header><span>LIBRARY</span><h2>栏目</h2><p>统一管理节目的连续发布设置。</p></header>
+            <Button type="primary" icon={<Plus />} onClick={() => populateSeries()}>新建栏目</Button>
             {series.map(item => <button type="button" className={item.id === activeSeriesId ? 'is-active' : ''} key={item.id} onClick={() => selectSeries(item.id)}><strong>{item.title}</strong><small>{item.episodeIds.length} 期</small></button>)}
           </nav>
           <div className="series-manager-content">
+            <header className="series-manager-heading">
+              <div><span>{activeSeries ? 'SERIES SETTINGS' : 'NEW SERIES'}</span><h2>{activeSeries?.title || '创建栏目'}</h2></div>
+              {activeSeries && <Button onClick={() => void onGenerateSeriesFeed(activeSeries.id)}>生成 RSS</Button>}
+            </header>
             <div className="ui-form-stack">
               <label className="ui-field"><span>栏目名称</span><Input value={seriesTitle} onChange={event => setSeriesTitle(event.target.value)} /></label>
               <label className="ui-field"><span>栏目简介</span><Input.TextArea value={seriesDescription} onChange={event => setSeriesDescription(event.target.value)} autoSize={{ minRows: 2, maxRows: 4 }} /></label>
@@ -435,7 +469,7 @@ export default function EpisodeManager({
                 <label className="ui-field"><span>发布目标</span><Input value={seriesPlatforms} onChange={event => setSeriesPlatforms(event.target.value)} /></label>
               </div>
               {seriesError && <div className="series-manager-error" role="alert">{seriesError}</div>}
-              <Space><Button type="primary" loading={seriesSaving} disabled={!seriesTitle.trim()} onClick={() => void saveSeries()}>保存栏目</Button>{activeSeries && <Button onClick={() => void onGenerateSeriesFeed(activeSeries.id)}>生成栏目 RSS</Button>}</Space>
+              <div className="series-manager-save"><Button type="primary" loading={seriesSaving} disabled={!seriesTitle.trim()} onClick={() => void saveSeries()}>保存栏目</Button></div>
             </div>
             {activeSeries && (
               <div className="series-manager-order">
