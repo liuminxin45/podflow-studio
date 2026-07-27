@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Input, Button } from 'antd'
 import {
-  CheckCircleFilled,
   CheckCircleOutlined,
   DownOutlined,
   UpOutlined,
@@ -27,7 +26,6 @@ interface SegmentCardProps {
   onLabelChange: (label: string) => void
   onContentChange: (content: string) => void
   onToneChange: (tone: SegmentTone) => void
-  onCompletionChange: (isCompleted: boolean) => void
   onCollapse: () => void
 }
 
@@ -43,7 +41,6 @@ export default function SegmentCard({
   onLabelChange,
   onContentChange,
   onToneChange,
-  onCompletionChange,
   onCollapse,
 }: SegmentCardProps) {
   const PLACEHOLDER_BY_TYPE: Partial<Record<WritingSegment['type'], string>> = {
@@ -118,20 +115,6 @@ export default function SegmentCard({
           <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
             约 {formatDuration(segment.estimatedSeconds)}
           </span>
-          <button
-            type="button"
-            className={`writing-completion-button ${segment.isCompleted ? 'is-completed' : ''}`}
-            disabled={!segment.content.trim()}
-            title={segment.content.trim() ? (segment.isCompleted ? '取消完成标记' : '标记完成') : '先写入内容后再标记完成'}
-            aria-label={segment.isCompleted ? '取消完成标记' : '标记完成'}
-            onClick={(event) => {
-              event.stopPropagation()
-              onCompletionChange(!segment.isCompleted)
-            }}
-          >
-            {segment.isCompleted ? <CheckCircleFilled /> : <CheckCircleOutlined />}
-            <span>{segment.isCompleted ? '已完成' : '标记完成'}</span>
-          </button>
           <Button
             type="text" size="small"
             icon={segment.collapsed ? <DownOutlined /> : <UpOutlined />}

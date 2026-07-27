@@ -1,4 +1,4 @@
-import { CheckCircle, WarningCircle } from '@phosphor-icons/react'
+import { CheckCircle } from '@phosphor-icons/react'
 import { CloseOutlined } from '../icons/antdCompat'
 import type { Workflow } from '../types/workflow'
 import { deriveWorkflowStageStatuses, type DerivedStageStatus, type EffectiveStageStatus } from '../services/workflowStageStatus'
@@ -21,7 +21,7 @@ function WorkflowStep({ derived, active, onStageClick }: {
   active: boolean
   onStageClick: (stageId: string) => void
 }) {
-  const { stage, status, label, canEnter, locked, stale } = derived
+  const { stage, status, label, canEnter, locked } = derived
   const completed = status === 'completed'
   const borderColor = active ? 'var(--accent-primary)' : getStepBorderColor(status, stage.color)
   const background = active ? 'var(--accent-light)' : 'var(--bg-secondary)'
@@ -71,14 +71,6 @@ function WorkflowStep({ derived, active, onStageClick }: {
           style={{ flexShrink: 0 }}
         />
       )}
-      {stale && (
-        <WarningCircle
-          size={16}
-          weight="fill"
-          color="var(--warning-color)"
-          style={{ flexShrink: 0 }}
-        />
-      )}
       <div
         className={`workflow-step-label ${active ? 'is-active' : ''}`}
         style={{
@@ -86,7 +78,7 @@ function WorkflowStep({ derived, active, onStageClick }: {
         flex: 1,
         fontSize: 13,
         fontWeight: active ? 600 : 500,
-        color: locked ? 'var(--text-tertiary)' : stale ? 'var(--warning-color)' : 'var(--text-primary)',
+        color: locked ? 'var(--text-tertiary)' : 'var(--text-primary)',
         lineHeight: 1.2,
         }}
       >

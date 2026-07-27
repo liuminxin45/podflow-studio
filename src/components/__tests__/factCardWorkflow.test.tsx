@@ -467,9 +467,9 @@ describe('morning-news writing surfaces', () => {
     expect(screen.queryByRole('combobox')).toBeNull()
     expect(screen.getByText('约 1秒')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '标记完成' }))
     expect(screen.getByLabelText('已完成')).toBeTruthy()
-    expect(screen.getByText('1/1 段已完成')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '标记完成' })).toBeNull()
+    expect(screen.getByText('1/1 段已有内容')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '生成初稿' }))
     expect((await screen.findAllByText('重新生成初稿？')).length).toBeGreaterThan(0)

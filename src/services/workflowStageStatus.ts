@@ -1,5 +1,6 @@
 import { STAGES, type StageDefinition, type StageStatus } from '../components/workflowStages'
 import type { PodcastState, Workflow } from '../types/workflow'
+import { verifiedFinalAudioPath } from './productionArtifactStatus'
 
 export type WorkflowStageId = StageDefinition['id']
 export type StageValidity = 'empty' | 'valid' | 'invalid' | 'stale' | 'running' | 'failed' | 'waiting_approval'
@@ -55,14 +56,12 @@ function hasDiscoverySelection(state: PodcastState): boolean {
   return hasItems((state.discover_ui as any)?.selectedItems)
 }
 
-function hasDraftFactsAndStructure(state: PodcastState): boolean {
-  return Boolean(state.selected_topic?.title || state.selected_topic?.description) &&
-    (hasItems(state.facts) || hasItems(state.selected_topics) || hasObjectData(state.episode_brief))
-}
-
 function hasDraftScript(state: PodcastState): boolean {
-  return hasItems(state.edited_script?.segments) ||
-    hasItems(state.script?.segments)
+  const segments = hasItems(state.edited_script?.segments)
+    ? state.edited_script?.segments
+    : state.script?.segments
+  return Array.isArray(segments) &&
+    segments.some(segment => String(segment?.text || '').trim().length > 0)
 }
 
 function completedByState(stage: StageDefinition, state: PodcastState): boolean {
@@ -75,9 +74,9 @@ function completedByState(stage: StageDefinition, state: PodcastState): boolean 
       return hasReadyItems((state.organize_ui as any)?.candidates) ||
         hasReadyItems(state.selected_materials)
     case 'draft':
-      return hasDraftFactsAndStructure(state) && hasDraftScript(state)
+      return hasDraftScript(state)
     case 'produce':
-      return Boolean(state.audio_outputs?.final_audio_path) || hasItems(state.voice_segments)
+      return Boolean(verifiedFinalAudioPath(state))
     case 'publish':
       return hasObjectData(state.publish_outputs)
     default:
@@ -100,7 +99,7 @@ function hasStageArtifacts(stage: StageDefinition, state: PodcastState): boolean
         Boolean(state.selected_topic?.title || state.selected_topic?.description) ||
         hasDraftScript(state)
     case 'produce':
-      return Boolean(state.audio_outputs?.final_audio_path) || hasItems(state.voice_segments)
+      return Boolean(verifiedFinalAudioPath(state)) || hasItems(state.voice_segments)
     case 'publish':
       return hasObjectData(state.publish_outputs)
     default:
@@ -199,23 +198,24 @@ export function deriveWorkflowStageStatuses(workflow: Workflow | null): DerivedS
     })
   }
 
-  let previousValid = true
-  let blockingStage: StageDefinition | null = null
+  let previousCompleted = false
 
-  return STAGES.map(stage => {
+  return STAGES.map((stage, index) => {
     const executionStatus = stageExecutionStatus(stage, workflow)
     const ownCompleted = completedByState(stage, workflow.state)
     const ownArtifacts = hasStageArtifacts(stage, workflow.state)
     const outputs = stageOutputs(stage, workflow.state)
-    const dependencyBlocked = !previousValid
     let status: EffectiveStageStatus
     let validity: StageValidity
     let reason = ownReason(stage, ownCompleted)
 
-    if (dependencyBlocked) {
-      status = ownArtifacts ? 'stale' : 'locked'
-      validity = ownArtifacts ? 'stale' : 'invalid'
-      reason = `请先完成${blockingStage?.label || '前序'}层`
+    if (executionStatus === 'running') {
+      status = 'running'
+      validity = 'running'
+      reason = `${stage.label}层正在运行`
+    } else if (ownCompleted) {
+      status = 'completed'
+      validity = 'valid'
     } else if (executionStatus === 'failed') {
       status = 'failed'
       validity = 'failed'
@@ -224,22 +224,16 @@ export function deriveWorkflowStageStatuses(workflow: Workflow | null): DerivedS
       status = 'waiting_approval'
       validity = 'waiting_approval'
       reason = `${stage.label}层等待确认`
-    } else if (executionStatus === 'running') {
-      status = 'running'
-      validity = 'running'
-      reason = `${stage.label}层正在运行`
-    } else if (ownCompleted) {
-      status = 'completed'
-      validity = 'valid'
     } else {
       status = 'pending'
       validity = 'empty'
     }
 
     const completed = status === 'completed'
-    // A stage with persisted work remains reviewable even when an earlier
-    // stage is currently incomplete. "stale" is a warning, not data loss.
-    const canEnter = !dependencyBlocked || ownArtifacts
+    // Navigation follows the same boundary as the page's "next" action:
+    // the first stage is always available, a completed previous stage unlocks
+    // the next one, and persisted work always remains reviewable after reload.
+    const canEnter = index === 0 || previousCompleted || ownArtifacts
     const contract: StageContract = {
       stage_id: stage.id,
       schema_version: 1,
@@ -247,7 +241,6 @@ export function deriveWorkflowStageStatuses(workflow: Workflow | null): DerivedS
       completed,
       can_enter: canEnter,
       updated_at: workflow.state.discover_meta?.generated_at as string | undefined,
-      blocked_by_stage_id: dependencyBlocked ? blockingStage?.id : undefined,
       reason,
       outputs,
     }
@@ -259,15 +252,12 @@ export function deriveWorkflowStageStatuses(workflow: Workflow | null): DerivedS
       label: statusLabel(status),
       completed,
       canEnter,
-      locked: status === 'locked',
-      stale: status === 'stale',
+      locked: false,
+      stale: false,
       connectorCompleted: completed,
     }
 
-    if (!completed && previousValid) {
-      previousValid = false
-      blockingStage = stage
-    }
+    previousCompleted = completed
 
     return derived
   })

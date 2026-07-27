@@ -44,7 +44,7 @@ function createWorkflow(statePatch: Partial<PodcastState> = {}): Workflow {
 }
 
 describe('workflowStageStatus', () => {
-  it('locks every downstream stage until discover has valid output', () => {
+  it('keeps persisted downstream work accessible without marking it stale', () => {
     const statuses = deriveWorkflowStageStatusMap(createWorkflow({
       cleaned_contents: [{ title: 'old organized item' }],
       facts: [{ id: 'f1', title: 'Fact', summary: 'Summary', source_title: 'Source', source_url: 'https://example.com', published_at: '', claim: 'Claim', confidence: 'high' }],
@@ -52,14 +52,14 @@ describe('workflowStageStatus', () => {
     }))
 
     expect(statuses.discover.status).toBe('pending')
-    expect(statuses.organize.status).toBe('stale')
+    expect(statuses.organize.status).toBe('pending')
     expect(statuses.organize.completed).toBe(false)
     expect(statuses.organize.canEnter).toBe(true)
-    expect(statuses.draft.status).toBe('stale')
+    expect(statuses.draft.status).toBe('pending')
     expect(statuses.draft.canEnter).toBe(true)
   })
 
-  it('keeps stale downstream work accessible while the next stage is unfinished', () => {
+  it('keeps downstream work accessible while the next stage is unfinished', () => {
     const statuses = deriveWorkflowStageStatusMap(createWorkflow({
       fetch_contents: [{ title: 'raw' }],
       cleaned_contents: [],
@@ -71,7 +71,7 @@ describe('workflowStageStatus', () => {
     expect(statuses.discover.completed).toBe(true)
     expect(statuses.organize.status).toBe('pending')
     expect(statuses.organize.canEnter).toBe(true)
-    expect(statuses.draft.status).toBe('stale')
+    expect(statuses.draft.status).toBe('pending')
     expect(statuses.draft.canEnter).toBe(true)
   })
 
@@ -154,7 +154,76 @@ describe('workflowStageStatus', () => {
       'completed',
       'completed',
       'pending',
-      'locked',
+      'pending',
     ])
+  })
+
+  it('marks a generated script complete without per-segment completion flags', () => {
+    const statuses = deriveWorkflowStageStatusMap(createWorkflow({
+      fetch_contents: [{ title: 'raw' }],
+      selected_materials: [{ title: 'ready', _status: 'ready' } as any],
+      script: {
+        segments: [{
+          id: 's1',
+          type: 'quick_news',
+          title: 'Segment',
+          text: 'Generated text',
+          source_fact_ids: [],
+          estimated_seconds: 10,
+        }],
+      },
+    }))
+
+    expect(statuses.draft.status).toBe('completed')
+    expect(statuses.produce.canEnter).toBe(true)
+  })
+
+  it('does not complete draft for blank generated segments', () => {
+    const statuses = deriveWorkflowStageStatusMap(createWorkflow({
+      script: {
+        segments: [{
+          id: 's1',
+          type: 'quick_news',
+          title: 'Segment',
+          text: '   ',
+          source_fact_ids: [],
+          estimated_seconds: 0,
+        }],
+      },
+    }))
+
+    expect(statuses.draft.completed).toBe(false)
+  })
+
+  it('prefers generated production artifacts over an old failed execution', () => {
+    const workflow = createWorkflow({
+      voice_segments: [{ segment_id: 's1', path: 'out/voice.mp3' } as any],
+      audio_outputs: {
+        final_audio_path: 'out/final.mp3',
+        status: 'ok',
+        format: 'mp3',
+        file_size: 1024,
+        duration_seconds: 30,
+        segments_count: 1,
+      },
+    })
+    workflow.nodeExecutions = {
+      tts: { status: 'failed', startedAt: '', completedAt: '', error: 'old failure' },
+    }
+
+    const statuses = deriveWorkflowStageStatusMap(workflow)
+
+    expect(statuses.produce.status).toBe('completed')
+    expect(statuses.publish.canEnter).toBe(true)
+  })
+
+  it('does not unlock publish for an unverified audio path or loose voice segments', () => {
+    const statuses = deriveWorkflowStageStatusMap(createWorkflow({
+      voice_segments: [{ segment_id: 's1', path: 'out/voice.mp3' } as any],
+      audio_outputs: { final_audio_path: 'out/final.mp3' },
+    }))
+
+    expect(statuses.produce.completed).toBe(false)
+    expect(statuses.publish.canEnter).toBe(false)
   })
 })

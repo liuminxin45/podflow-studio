@@ -22,6 +22,7 @@ import type {
   Workflow,
 } from '../../types/workflow'
 import StageHeader from '../StageHeader'
+import { verifiedFinalAudioPath } from '../../services/productionArtifactStatus'
 import {
   AUDIO_PROVIDERS,
   OUTPUT_FORMATS,
@@ -192,18 +193,6 @@ function scriptSegments(state: Workflow['state'] | undefined): {
       }
     }),
   }
-}
-
-function verifiedFinalAudioPath(state: Workflow['state'] | undefined): string {
-  const outputs = state?.audio_outputs || {}
-  const statePath = text(outputs.final_audio_path)
-  if (!isAllowedArtifactPath(statePath, 'audio') || text(outputs.status) !== 'ok') return ''
-  const outputFormat = text(outputs.format).toLowerCase().replace(/^\./, '')
-  if (!outputFormat || artifactExtension(statePath) !== `.${outputFormat}`) return ''
-  if (finiteNumber(outputs.file_size, 0) <= 0) return ''
-  if (finiteNumber(outputs.duration_seconds, 0) <= 0) return ''
-  if (finiteNumber(outputs.segments_count, 0) <= 0) return ''
-  return statePath
 }
 
 function savedRecordings(items: VoiceSegment[] | undefined): Record<string, StudioRecording> {

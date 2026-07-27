@@ -122,7 +122,6 @@ export default function WritingLayer({
 
   // Computed values
   const totalSeconds = useMemo(() => segments.reduce((sum, s) => sum + estimateReadingSeconds(s.content), 0), [segments])
-  const completedCount = useMemo(() => segments.filter(segment => segment.isCompleted).length, [segments])
   const factCards = useMemo(() => (
     Array.isArray(workflow?.state?.facts) ? workflow.state.facts : []
   ), [workflow?.state?.facts])
@@ -168,7 +167,7 @@ export default function WritingLayer({
       source_fact_ids: explicitSourceFactIds(segment),
       estimated_seconds: estimateReadingSeconds(segment.content),
       speaker: 'Host A',
-      is_completed: segment.isCompleted,
+      is_completed: true,
     }))
     return {
       selected_topic: {
@@ -216,7 +215,7 @@ export default function WritingLayer({
           content: String(segment.text || ''),
           sourceFactIds: Array.isArray(segment.source_fact_ids) ? segment.source_fact_ids : [],
           estimatedSeconds: estimateReadingSeconds(String(segment.text || '')),
-          isCompleted: Boolean(segment.is_completed),
+          isCompleted: Boolean(String(segment.text || '').trim()),
         }))
       : generatedSegments.length > 0
         ? generatedSegments.map((segment: any, index: number) => ({
@@ -226,7 +225,7 @@ export default function WritingLayer({
             content: String(segment.text || ''),
             sourceFactIds: Array.isArray(segment.source_fact_ids) ? segment.source_fact_ids : [],
             estimatedSeconds: estimateReadingSeconds(String(segment.text || '')),
-            isCompleted: Boolean(segment.is_completed),
+            isCompleted: Boolean(String(segment.text || '').trim()),
           }))
         : []
 
@@ -241,7 +240,7 @@ export default function WritingLayer({
           sourceFactIds: item.sourceFactIds || [],
           tone: 'default',
           estimatedSeconds: item.estimatedSeconds,
-          isCompleted: Boolean(item.isCompleted),
+          isCompleted: Boolean(item.content.trim()),
           collapsed: false,
         }
       }))
@@ -273,7 +272,7 @@ export default function WritingLayer({
           ...s,
           content,
           estimatedSeconds: estimateReadingSeconds(content),
-          isCompleted: false,
+          isCompleted: Boolean(content.trim()),
         }
       }
       return s
@@ -286,10 +285,6 @@ export default function WritingLayer({
 
   const updateSegmentLabel = useCallback((id: string, label: string) => {
     setSegments(prev => prev.map(s => s.id === id ? { ...s, label } : s))
-  }, [])
-
-  const updateSegmentCompletion = useCallback((id: string, isCompleted: boolean) => {
-    setSegments(prev => prev.map(s => s.id === id ? { ...s, isCompleted } : s))
   }, [])
 
   const handleOptimizeQuickNews = useCallback(async (id: string) => {
@@ -340,7 +335,7 @@ export default function WritingLayer({
               content: result.suggestedText,
               sourceFactIds: result.sourceFactIds,
               estimatedSeconds: estimateReadingSeconds(result.suggestedText),
-              isCompleted: false,
+              isCompleted: Boolean(result.suggestedText.trim()),
             }
           : item)
       })
@@ -530,7 +525,7 @@ export default function WritingLayer({
           <div className="writing-duration-summary">
             <span>预计时长</span>
             <strong>{formatDuration(totalSeconds)}</strong>
-            <small>{completedCount}/{segments.length} 段已完成</small>
+            <small>{segments.filter(segment => segment.content.trim()).length}/{segments.length} 段已有内容</small>
           </div>
         </aside>
 
@@ -560,7 +555,6 @@ export default function WritingLayer({
                 onLabelChange={(label) => updateSegmentLabel(seg.id, label)}
                 onContentChange={(content) => updateSegmentContent(seg.id, content)}
                 onToneChange={(tone) => updateSegmentTone(seg.id, tone)}
-                onCompletionChange={(isCompleted) => updateSegmentCompletion(seg.id, isCompleted)}
                 onCollapse={() => toggleCollapse(seg.id)}
               />
             ))}
