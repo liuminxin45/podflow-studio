@@ -19,12 +19,16 @@ class TTSConfig:
     output_dir: str = "out/voice_segments"
     rate: str = "+0%"
     volume: str = "+0%"
+    performance_prompt: str = "自然、可信的中文新闻播客主播"
     doubao_app_id: str = ""
     doubao_access_token: str = ""
     doubao_cluster: str = "volcano_tts"
     doubao_voice_type: str = "zh_female_shuangkuaisisi_moon_bigtts"
     doubao_endpoint: str = "https://openspeech.bytedance.com/api/v1/tts"
     doubao_resource_id: str = "volc.service_type.10029"
+    azure_speech_key: str = ""
+    azure_speech_region: str = ""
+    cosyvoice_endpoint: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TTSConfig":
@@ -42,6 +46,7 @@ class TTSConfig:
             "output_dir": "out/voice_segments",
             "rate": "+0%",
             "volume": "+0%",
+            "performance_prompt": "自然、可信的中文新闻播客主播",
             "voice_mapping": {
                 "Host A": "zh-CN-XiaoxiaoNeural",
             },
@@ -51,6 +56,9 @@ class TTSConfig:
             "doubao_voice_type": "zh_female_shuangkuaisisi_moon_bigtts",
             "doubao_endpoint": "https://openspeech.bytedance.com/api/v1/tts",
             "doubao_resource_id": "volc.service_type.10029",
+            "azure_speech_key": "",
+            "azure_speech_region": "",
+            "cosyvoice_endpoint": "",
         }
         merged = {**defaults, **data}
         return cls(**merged)

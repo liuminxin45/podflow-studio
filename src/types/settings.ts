@@ -375,7 +375,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
       audioApiKeySet: false,
       audioApiKeyMasked: '',
       audioApiBase: '',
-      audioApiModel: 'tts-1',
+      audioApiModel: 'gpt-4o-mini-tts',
       audioProvider: 'edge-tts',
       audioConnectionStatus: 'untested',
       audioDoubaoAppId: '',

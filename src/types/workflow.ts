@@ -245,6 +245,12 @@ export interface VoiceSegment {
   updated_at?: string
   parent_segment_id?: string
   generation_key?: string
+  prosody_quality?: {
+    status: 'ok' | 'review'
+    chars_per_second: number
+    energy_range_db: number
+    issues: string[]
+  }
 }
 
 export type ProductionClipSource = 'tts' | 'recording' | 'local'
@@ -255,6 +261,18 @@ export interface ProductionClip {
   segment_type: ScriptSegment['type']
   segment_title: string
   text: string
+  context_before: string
+  context_after: string
+  direction: {
+    intent: string
+    emotion: string
+    energy: number
+    pace: number
+    pitch: number
+    pause_before_ms: number
+    pause_after_ms: number
+    emphasis: string[]
+  }
   speaker: string
   source_fact_ids: string[]
   source: ProductionClipSource
@@ -281,7 +299,7 @@ export interface ProductionMusicSlot {
 }
 
 export interface ProductionPlan {
-  version: 1
+  version: 2
   script_hash: string
   clips: ProductionClip[]
   joins: ProductionJoin[]

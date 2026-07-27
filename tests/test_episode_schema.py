@@ -47,7 +47,7 @@ def test_episode_run_payload_validates_with_model():
 def test_episode_run_accepts_versioned_production_plan():
     state = create_base_state()
     state["production_plan"] = {
-        "version": 1,
+        "version": 2,
         "script_hash": "script-hash",
         "clips": [{
             "id": "seg_001__001",
@@ -55,6 +55,18 @@ def test_episode_run_accepts_versioned_production_plan():
             "segment_type": "opening",
             "segment_title": "开场",
             "text": "欢迎收听。",
+            "context_before": "",
+            "context_after": "",
+            "direction": {
+                "intent": "opening_warm",
+                "emotion": "warm",
+                "energy": 0.72,
+                "pace": 0.96,
+                "pitch": 0.03,
+                "pause_before_ms": 0,
+                "pause_after_ms": 650,
+                "emphasis": [],
+            },
             "speaker": "Host A",
             "source_fact_ids": [],
             "source": "tts",
@@ -90,6 +102,18 @@ def test_episode_run_accepts_versioned_production_plan():
 
     assert ok, errors
     assert schema_errors == []
+
+
+def test_episode_run_rejects_unversioned_non_empty_production_plan():
+    state = create_base_state()
+    state["production_plan"] = {"clips": []}
+
+    ok, errors = validate_episode_run_payload(state)
+    schema_errors = list(Draft202012Validator(_episode_run_schema()).iter_errors(state))
+
+    assert not ok
+    assert "version is required" in "\n".join(errors)
+    assert schema_errors
 
 
 def test_episode_run_accepts_series_and_playback_contracts():

@@ -65,7 +65,40 @@ describe('production plan', () => {
     ])
     const beforeDeep = plan.joins.find(join => join.after_clip_id === plan.clips.at(-2)?.id)
 
-    expect(plan.joins.some(join => join.duration_ms === 150)).toBe(true)
+    expect(plan.joins.some(join => join.duration_ms === 450)).toBe(true)
     expect(beforeDeep?.duration_ms).toBe(1200)
+  })
+
+  it('adds scene context and deterministic speech direction', () => {
+    const plan = reconcileProductionPlan([
+      segment({ text: '第一句。第二句包含 42%。第三句。'.repeat(6) }),
+    ])
+
+    expect(plan.version).toBe(2)
+    expect(plan.clips.length).toBeGreaterThan(1)
+    expect(plan.clips[0].context_after).not.toBe('')
+    expect(plan.clips[1].context_before).not.toBe('')
+    expect(plan.clips[0].direction).toEqual(expect.objectContaining({
+      intent: 'quick_news',
+      emotion: 'focused',
+      emphasis: ['42%'],
+    }))
+  })
+
+  it('rejects an old production plan instead of silently migrating it', () => {
+    expect(() => reconcileProductionPlan(
+      [segment()],
+      { version: 1 } as unknown as Parameters<typeof reconcileProductionPlan>[1],
+    )).toThrow('当前版本为 2')
+  })
+
+  it('carries context across script segment boundaries', () => {
+    const plan = reconcileProductionPlan([
+      segment({ id: 'first', text: '第一段只有一句。' }),
+      segment({ id: 'second', text: '第二段也只有一句。' }),
+    ])
+
+    expect(plan.clips[0].context_after).toBe('第二段也只有一句。')
+    expect(plan.clips[1].context_before).toBe('第一段只有一句。')
   })
 })

@@ -107,7 +107,7 @@ def _build_tts_config(engine: str, voice_dir: Path) -> TTSConfig:
     if engine == "openai-compatible":
         api_key = os.environ.get("PODFLOW_TTS_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
         api_base = os.environ.get("PODFLOW_TTS_API_BASE") or os.environ.get("OPENAI_API_BASE", "")
-        model = os.environ.get("PODFLOW_TTS_MODEL", "tts-1")
+        model = os.environ.get("PODFLOW_TTS_MODEL", "gpt-4o-mini-tts")
         if not api_key or not api_base or not model:
             raise RuntimeError("OpenAI-compatible live TTS requires PODFLOW_TTS_API_KEY/API_BASE/MODEL or OPENAI_API_KEY/API_BASE")
         return TTSConfig(

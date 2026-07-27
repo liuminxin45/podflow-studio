@@ -294,8 +294,16 @@
     "productionPlan": {
       "type": "object",
       "additionalProperties": false,
+      "anyOf": [
+        { "maxProperties": 0 },
+        {
+          "required": [
+            "version", "script_hash", "clips", "joins", "music", "render", "updated_at"
+          ]
+        }
+      ],
       "properties": {
-        "version": { "const": 1 },
+        "version": { "const": 2 },
         "script_hash": { "type": "string" },
         "clips": {
           "type": "array",
@@ -303,7 +311,8 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "id", "parent_segment_id", "segment_type", "segment_title", "text", "speaker",
+              "id", "parent_segment_id", "segment_type", "segment_title", "text",
+              "context_before", "context_after", "direction", "speaker",
               "source_fact_ids", "source", "path", "duration_seconds", "trim_start_ms",
               "trim_end_ms", "generation_key"
             ],
@@ -313,6 +322,30 @@
               "segment_type": { "enum": ["opening", "quick_news", "deep_dive", "closing", "custom"] },
               "segment_title": { "type": "string" },
               "text": { "type": "string", "minLength": 1 },
+              "context_before": { "type": "string" },
+              "context_after": { "type": "string" },
+              "direction": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "intent", "emotion", "energy", "pace", "pitch",
+                  "pause_before_ms", "pause_after_ms", "emphasis"
+                ],
+                "properties": {
+                  "intent": { "type": "string", "minLength": 1 },
+                  "emotion": { "type": "string", "minLength": 1 },
+                  "energy": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "pace": { "type": "number", "minimum": 0.5, "maximum": 1.5 },
+                  "pitch": { "type": "number", "minimum": -0.5, "maximum": 0.5 },
+                  "pause_before_ms": { "type": "integer", "minimum": 0, "maximum": 5000 },
+                  "pause_after_ms": { "type": "integer", "minimum": 0, "maximum": 5000 },
+                  "emphasis": {
+                    "type": "array",
+                    "maxItems": 2,
+                    "items": { "type": "string", "minLength": 1 }
+                  }
+                }
+              },
               "speaker": { "type": "string" },
               "source_fact_ids": { "type": "array", "items": { "type": "string" } },
               "source": { "enum": ["tts", "recording", "local"] },

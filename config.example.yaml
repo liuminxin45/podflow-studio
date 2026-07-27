@@ -100,6 +100,13 @@ tts:
   output_format: "wav"
   rate: "+0%"
   volume: "+0%"
+  # 表演导演的基础角色描述；句级意图、情绪、重点和上下文由 production_plan v2 提供。
+  performance_prompt: "自然、可信的中文新闻播客主播"
+  # Azure Speech（engine: azure_speech）
+  azure_speech_key: ""
+  azure_speech_region: ""
+  # 独立部署的 CosyVoice HTTP 服务（engine: cosyvoice）
+  cosyvoice_endpoint: ""
 
 audio_postprocess:
   output_dir: "out/episodes"

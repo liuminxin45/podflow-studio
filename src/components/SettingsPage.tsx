@@ -62,7 +62,7 @@ const CAPABILITY_TO_GLOBAL_PREFIX: Record<NodeCapabilityType, 'text' | 'audio'> 
 
 const DEFAULT_MODEL_BY_PREFIX: Record<'text' | 'audio', string> = {
   text: 'gpt-4o-mini',
-  audio: 'tts-1',
+  audio: 'gpt-4o-mini-tts',
 }
 
 const VOICE_TO_EDGE_VOICE: Record<string, string> = {
@@ -230,7 +230,7 @@ export function buildNodeConfigs(settings: AppSettings): Record<string, Record<s
       engine: audioProvider,
       api_key: audioProvider === 'openai-compatible' ? audioConfig.api_key : '',
       api_base: audioProvider === 'openai-compatible' ? audioConfig.api_base : '',
-      model: audioProvider === 'openai-compatible' ? audioConfig.llm_model : 'tts-1',
+      model: audioProvider === 'openai-compatible' ? audioConfig.llm_model : 'gpt-4o-mini-tts',
       default_voice: defaultVoice,
       voice_mapping: {
         'Host A': defaultVoice,

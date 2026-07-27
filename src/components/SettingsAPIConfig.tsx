@@ -1162,7 +1162,7 @@ function AudioProviderSettings({
                 aria-label="语音模型"
                 value={global.audioApiModel}
                 onChange={event => updateGlobal({ audioApiModel: event.target.value, ...resetStatus })}
-                placeholder="tts-1"
+                placeholder="gpt-4o-mini-tts"
                 style={inputStyle}
               />
             </label>

@@ -18,7 +18,11 @@ from nodes.publish.config import PublishConfig
 from nodes.publish.node import run as publish_run
 from nodes.tts.config import TTSConfig
 from nodes.tts.node import _safe_path_part as tts_safe_path_part
-from nodes.tts.node import _synthesize_openai_compatible
+from nodes.tts.node import (
+    _synthesize_azure,
+    _synthesize_cosyvoice,
+    _synthesize_openai_compatible,
+)
 from nodes.tts.node import run as tts_run
 from protocol.artifact_utils import file_fingerprint
 from tests.mock_data import create_base_state
@@ -155,7 +159,7 @@ def test_audio_postprocess_renders_clip_trims_and_individual_joins(tmp_path: Pat
         {"segment_id": "clip_2", "path": str(second), "engine": "mock"},
     ]
     state["production_plan"] = {
-        "version": 1,
+        "version": 2,
         "clips": [
             {
                 "id": "clip_1",
@@ -177,7 +181,7 @@ def test_audio_postprocess_renders_clip_trims_and_individual_joins(tmp_path: Pat
 
     assert result["audio_outputs"]["status"] == "ok"
     assert result["audio_outputs"]["source_engines"] == ["mock", "recording"]
-    assert "production_plan_v1" in result["audio_outputs"]["operations"]
+    assert "production_plan_v2" in result["audio_outputs"]["operations"]
     assert "trim_clip_clip_1" in result["audio_outputs"]["operations"]
     assert "pause_clip_1_100ms" in result["audio_outputs"]["operations"]
     assert result["audio_outputs"]["duration_seconds"] == 0.5
@@ -199,7 +203,7 @@ def test_audio_postprocess_renders_intro_transition_bed_and_outro(tmp_path: Path
         "fade_out_ms": 10,
     }
     state["production_plan"] = {
-        "version": 1,
+        "version": 2,
         "clips": [{"id": "clip_1", "path": str(voice), "trim_start_ms": 0, "trim_end_ms": 0}],
         "joins": [],
         "music": {"intro": slot, "transition": slot, "bed": slot, "outro": slot},
@@ -324,6 +328,116 @@ def test_openai_compatible_tts_sends_audio_speech_request_and_writes_response(
         "response_format": "mp3",
     }
     assert output_path.read_bytes() == b"real-audio-response"
+
+
+def test_openai_expressive_tts_compiles_direction_and_context(tmp_path: Path, monkeypatch):
+    captured = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        @staticmethod
+        def read():
+            return b"expressive-audio"
+
+    def fake_urlopen(request, timeout):
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        return Response()
+
+    monkeypatch.setattr("nodes.tts.node.urllib.request.urlopen", fake_urlopen)
+    config = TTSConfig(
+        engine="openai-compatible",
+        api_key="test-key",
+        api_base="https://tts.example.test/v1",
+        model="gpt-4o-mini-tts",
+    )
+    clip = {
+        "context_before": "上一句。",
+        "context_after": "下一句。",
+        "direction": {
+            "intent": "deep_dive",
+            "emotion": "thoughtful",
+            "energy": 0.55,
+            "pace": 0.9,
+            "pitch": -0.02,
+            "pause_before_ms": 0,
+            "pause_after_ms": 650,
+            "emphasis": ["关键结论"],
+        },
+    }
+
+    _synthesize_openai_compatible("这是关键结论。", "alloy", str(tmp_path / "speech.mp3"), config, clip)
+
+    assert captured["payload"]["speed"] == 0.9
+    assert "关键结论" in captured["payload"]["instructions"]
+    assert "不要朗读上文" in captured["payload"]["instructions"]
+
+
+def test_azure_tts_compiles_escaped_ssml(tmp_path: Path, monkeypatch):
+    captured = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        @staticmethod
+        def read():
+            return b"azure-audio"
+
+    def fake_urlopen(request, timeout):
+        captured["request"] = request
+        return Response()
+
+    monkeypatch.setattr("nodes.tts.node.urllib.request.urlopen", fake_urlopen)
+    config = TTSConfig(azure_speech_key="key", azure_speech_region="eastasia")
+    clip = {"direction": {"pace": 0.9, "pitch": -0.02, "emphasis": ["关键&结论"]}}
+
+    _synthesize_azure("这是关键&结论。", "zh-CN-XiaoxiaoNeural", str(tmp_path / "speech.mp3"), config, clip)
+
+    request = captured["request"]
+    ssml = request.data.decode("utf-8")
+    assert request.full_url.startswith("https://eastasia.tts.speech.microsoft.com/")
+    assert '<emphasis level="moderate">关键&amp;结论</emphasis>' in ssml
+    assert 'rate="-10%"' in ssml
+
+
+def test_cosyvoice_tts_sends_instruct_payload(tmp_path: Path, monkeypatch):
+    captured = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        @staticmethod
+        def read():
+            return b"cosyvoice-audio"
+
+    def fake_urlopen(request, timeout):
+        captured["request"] = request
+        return Response()
+
+    monkeypatch.setattr("nodes.tts.node.urllib.request.urlopen", fake_urlopen)
+    config = TTSConfig(cosyvoice_endpoint="http://127.0.0.1:50000/")
+    clip = {"direction": {"intent": "opening_warm", "emotion": "warm", "pace": 0.96, "emphasis": []}}
+
+    _synthesize_cosyvoice("欢迎收听。", "中文女", str(tmp_path / "speech.mp3"), config, clip)
+
+    request = captured["request"]
+    payload = json.loads(request.data.decode("utf-8"))
+    assert request.full_url == "http://127.0.0.1:50000/v1/audio/speech"
+    assert payload["speaker"] == "中文女"
+    assert payload["speed"] == 0.96
+    assert "opening_warm" in payload["instruct_text"]
 
 
 def test_produce_path_sanitizers_preserve_unicode_and_block_windows_reserved_names():

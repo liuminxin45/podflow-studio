@@ -10,8 +10,17 @@ import re
 from typing import Any
 
 
-PRODUCTION_PLAN_VERSION = 1
-MAX_TTS_CHARS = 180
+PRODUCTION_PLAN_VERSION = 2
+MAX_TTS_CHARS = 320
+MAX_TTS_SENTENCES = 5
+
+_DIRECTION_PROFILES: dict[str, dict[str, Any]] = {
+    "opening": {"intent": "opening_warm", "emotion": "warm", "energy": 0.72, "pace": 0.96, "pitch": 0.03},
+    "quick_news": {"intent": "quick_news", "emotion": "focused", "energy": 0.68, "pace": 1.03, "pitch": 0.0},
+    "deep_dive": {"intent": "deep_dive", "emotion": "thoughtful", "energy": 0.55, "pace": 0.92, "pitch": -0.02},
+    "closing": {"intent": "closing_relaxed", "emotion": "warm", "energy": 0.48, "pace": 0.9, "pitch": -0.03},
+    "custom": {"intent": "natural_narration", "emotion": "neutral", "energy": 0.58, "pace": 0.97, "pitch": 0.0},
+}
 
 
 def _now_iso() -> str:
@@ -52,8 +61,12 @@ def default_render() -> dict[str, Any]:
     }
 
 
-def split_script_text(text: str, max_chars: int = MAX_TTS_CHARS) -> list[str]:
-    """Split narration at paragraph/sentence boundaries without tiny fragments."""
+def split_script_text(
+    text: str,
+    max_chars: int = MAX_TTS_CHARS,
+    max_sentences: int = MAX_TTS_SENTENCES,
+) -> list[str]:
+    """Create semantic TTS scenes while preserving sentence-level continuity."""
 
     normalized = re.sub(r"[ \t]+", " ", str(text or "")).strip()
     if not normalized:
@@ -71,19 +84,26 @@ def split_script_text(text: str, max_chars: int = MAX_TTS_CHARS) -> list[str]:
             sentences = [paragraph]
 
         current = ""
+        sentence_count = 0
         for sentence in sentences:
             oversized = [
                 sentence[index : index + max_chars]
                 for index in range(0, len(sentence), max_chars)
             ]
             for part in oversized:
-                if current and len(current) + len(part) > max_chars:
+                if current and (
+                    len(current) + len(part) > max_chars
+                    or sentence_count >= max_sentences
+                ):
                     units.append(current)
                     current = ""
+                    sentence_count = 0
                 current += part
+                sentence_count += 1
                 if len(current) >= max_chars:
                     units.append(current)
                     current = ""
+                    sentence_count = 0
         if current:
             units.append(current)
 
@@ -112,6 +132,12 @@ def voice_generation_key(
     voice: str,
     rate: str,
     volume: str,
+    direction: dict[str, Any],
+    context_before: str,
+    context_after: str,
+    model: str,
+    output_format: str,
+    performance_prompt: str,
 ) -> str:
     payload = {
         "text": text,
@@ -119,6 +145,12 @@ def voice_generation_key(
         "voice": voice,
         "rate": rate,
         "volume": volume,
+        "direction": direction,
+        "context_before": context_before,
+        "context_after": context_after,
+        "model": model,
+        "output_format": output_format,
+        "performance_prompt": performance_prompt,
     }
     return hashlib.sha256(
         json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
@@ -134,12 +166,46 @@ def _clip_id(parent_segment_id: str, index: int, count: int) -> str:
     return parent_segment_id if count == 1 else f"{parent_segment_id}__{index + 1:03d}"
 
 
+def _emphasis_terms(text: str) -> list[str]:
+    terms: list[str] = []
+    for match in re.findall(r"“([^”]{2,12})”|([A-Za-z][A-Za-z0-9.-]{1,15})|(\d+(?:\.\d+)?%?)", text):
+        term = next((item for item in match if item), "")
+        if term and term not in terms:
+            terms.append(term)
+        if len(terms) == 2:
+            break
+    return terms
+
+
+def direction_for_segment(segment_type: str, text: str) -> dict[str, Any]:
+    profile = deepcopy(_DIRECTION_PROFILES.get(segment_type, _DIRECTION_PROFILES["custom"]))
+    profile.update(
+        {
+            "pause_before_ms": 0,
+            "pause_after_ms": 450 if segment_type == "quick_news" else 650,
+            "emphasis": _emphasis_terms(text),
+        }
+    )
+    if any(marker in text for marker in ("但是", "不过", "然而", "值得注意")):
+        profile["emotion"] = "concerned"
+        profile["pace"] = round(max(0.75, float(profile["pace"]) - 0.05), 2)
+    if "？" in text or "?" in text:
+        profile["intent"] = "rhetorical_question"
+    return profile
+
+
 def _default_join(
     clip: dict[str, Any],
     next_clip: dict[str, Any],
 ) -> dict[str, Any]:
     same_segment = clip["parent_segment_id"] == next_clip["parent_segment_id"]
-    duration_ms = 150 if same_segment else 1200 if next_clip["segment_type"] == "deep_dive" else 600
+    direction = clip.get("direction") if isinstance(clip.get("direction"), dict) else {}
+    directed_pause = int(direction.get("pause_after_ms") or 0)
+    duration_ms = (
+        min(450, directed_pause)
+        if same_segment
+        else max(directed_pause, 1200 if next_clip["segment_type"] == "deep_dive" else 600)
+    )
     return {"after_clip_id": clip["id"], "type": "pause", "duration_ms": duration_ms}
 
 
@@ -150,6 +216,11 @@ def build_production_plan(
     """Reconcile a saved plan with the current edited script."""
 
     existing = existing if isinstance(existing, dict) else {}
+    if existing and existing.get("version") != PRODUCTION_PLAN_VERSION:
+        raise ValueError(
+            f"Unsupported production_plan version {existing.get('version')}; "
+            f"expected {PRODUCTION_PLAN_VERSION}. Regenerate the production plan."
+        )
     existing_clips = {
         str(item.get("id")): item
         for item in existing.get("clips", [])
@@ -179,6 +250,11 @@ def build_production_plan(
                     "segment_type": str(segment.get("type") or "custom"),
                     "segment_title": str(segment.get("title") or f"第 {segment_index + 1} 段"),
                     "text": part,
+                    "context_before": "",
+                    "context_after": "",
+                    "direction": deepcopy(previous.get("direction"))
+                    if text_matches and isinstance(previous.get("direction"), dict)
+                    else direction_for_segment(str(segment.get("type") or "custom"), part),
                     "speaker": str(segment.get("speaker") or "Host A"),
                     "source_fact_ids": list(segment.get("source_fact_ids") or []),
                     "source": source,
@@ -189,6 +265,10 @@ def build_production_plan(
                     "generation_key": str(previous.get("generation_key") or "") if text_matches else "",
                 }
             )
+
+    for index, clip in enumerate(clips):
+        clip["context_before"] = clips[index - 1]["text"][-120:] if index else ""
+        clip["context_after"] = clips[index + 1]["text"][:120] if index + 1 < len(clips) else ""
 
     saved_joins = {
         str(item.get("after_clip_id")): item

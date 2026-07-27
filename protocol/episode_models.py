@@ -106,6 +106,19 @@ class AudioOutputsModel(BaseModel):
     message: str = ""
 
 
+class SpeechDirectionModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    intent: str
+    emotion: str
+    energy: float = Field(ge=0.0, le=1.0)
+    pace: float = Field(ge=0.5, le=1.5)
+    pitch: float = Field(ge=-0.5, le=0.5)
+    pause_before_ms: int = Field(ge=0, le=5000)
+    pause_after_ms: int = Field(ge=0, le=5000)
+    emphasis: list[str] = Field(default_factory=list, max_length=2)
+
+
 class ProductionClipModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -114,6 +127,9 @@ class ProductionClipModel(BaseModel):
     segment_type: str = "custom"
     segment_title: str = ""
     text: str
+    context_before: str = ""
+    context_after: str = ""
+    direction: SpeechDirectionModel
     speaker: str = "Host A"
     source_fact_ids: list[str] = Field(default_factory=list)
     source: Literal["tts", "recording", "local"] = "tts"
@@ -166,13 +182,20 @@ class ProductionRenderModel(BaseModel):
 class ProductionPlanModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: Literal[1] = 1
+    version: Literal[2] = 2
     script_hash: str = ""
     clips: list[ProductionClipModel] = Field(default_factory=list)
     joins: list[ProductionJoinModel] = Field(default_factory=list)
     music: ProductionMusicModel = Field(default_factory=ProductionMusicModel)
     render: ProductionRenderModel = Field(default_factory=ProductionRenderModel)
     updated_at: str = ""
+
+    @model_validator(mode="after")
+    def require_explicit_version_for_non_empty_plan(self) -> "ProductionPlanModel":
+        non_version_fields = self.model_fields_set - {"version"}
+        if non_version_fields and "version" not in self.model_fields_set:
+            raise ValueError("production_plan.version is required for a non-empty plan")
+        return self
 
 
 class RssValidationModel(BaseModel):

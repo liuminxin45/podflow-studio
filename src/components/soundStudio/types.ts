@@ -1,6 +1,12 @@
 export type StudioMode = 'ai' | 'recording'
 
-export type AudioProvider = 'edge-tts' | 'openai-compatible' | 'doubao_tts' | 'voice_clone'
+export type AudioProvider =
+  | 'edge-tts'
+  | 'openai-compatible'
+  | 'doubao_tts'
+  | 'voice_clone'
+  | 'azure_speech'
+  | 'cosyvoice'
 
 export type OutputFormat = 'mp3' | 'wav' | 'opus'
 

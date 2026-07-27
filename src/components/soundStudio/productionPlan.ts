@@ -7,7 +7,8 @@ import type {
   VoiceSegment,
 } from '../../types/workflow'
 
-const MAX_TTS_CHARS = 180
+const MAX_TTS_CHARS = 320
+const MAX_TTS_SENTENCES = 5
 
 function musicSlot(overrides: Partial<ProductionMusicSlot> = {}): ProductionMusicSlot {
   return {
@@ -31,20 +32,24 @@ export function splitScriptText(input: string, maxChars = MAX_TTS_CHARS): string
     const sentences = paragraph.match(/.*?(?:[。！？!?；;]+|$)/g)?.map(item => item.trim()).filter(Boolean)
       || [paragraph]
     let current = ''
+    let sentenceCount = 0
     for (const sentence of sentences) {
       const oversized = Array.from(
         { length: Math.ceil(sentence.length / maxChars) },
         (_, index) => sentence.slice(index * maxChars, (index + 1) * maxChars),
       )
       for (const part of oversized) {
-        if (current && current.length + part.length > maxChars) {
+        if (current && (current.length + part.length > maxChars || sentenceCount >= MAX_TTS_SENTENCES)) {
           units.push(current)
           current = ''
+          sentenceCount = 0
         }
         current += part
+        sentenceCount += 1
         if (current.length >= maxChars) {
           units.push(current)
           current = ''
+          sentenceCount = 0
         }
       }
     }
@@ -79,7 +84,34 @@ function defaultJoin(clip: ProductionClip, nextClip: ProductionClip): Production
   return {
     after_clip_id: clip.id,
     type: 'pause',
-    duration_ms: sameSegment ? 150 : nextClip.segment_type === 'deep_dive' ? 1200 : 600,
+    duration_ms: sameSegment
+      ? Math.min(450, clip.direction.pause_after_ms)
+      : Math.max(clip.direction.pause_after_ms, nextClip.segment_type === 'deep_dive' ? 1200 : 600),
+  }
+}
+
+const DIRECTION_PROFILES = {
+  opening: { intent: 'opening_warm', emotion: 'warm', energy: 0.72, pace: 0.96, pitch: 0.03 },
+  quick_news: { intent: 'quick_news', emotion: 'focused', energy: 0.68, pace: 1.03, pitch: 0 },
+  deep_dive: { intent: 'deep_dive', emotion: 'thoughtful', energy: 0.55, pace: 0.92, pitch: -0.02 },
+  closing: { intent: 'closing_relaxed', emotion: 'warm', energy: 0.48, pace: 0.9, pitch: -0.03 },
+  custom: { intent: 'natural_narration', emotion: 'neutral', energy: 0.58, pace: 0.97, pitch: 0 },
+} as const
+
+function speechDirection(type: WorkflowScriptSegment['type'], value: string): ProductionClip['direction'] {
+  const profile = DIRECTION_PROFILES[type] || DIRECTION_PROFILES.custom
+  const emphasis = [...value.matchAll(/“([^”]{2,12})”|([A-Za-z][A-Za-z0-9.-]{1,15})|(\d+(?:\.\d+)?%?)/g)]
+    .map(match => match[1] || match[2] || match[3])
+    .filter((item, index, all) => Boolean(item) && all.indexOf(item) === index)
+    .slice(0, 2)
+  return {
+    ...profile,
+    intent: /[？?]/.test(value) ? 'rhetorical_question' : profile.intent,
+    emotion: /(但是|不过|然而|值得注意)/.test(value) ? 'concerned' : profile.emotion,
+    pace: /(但是|不过|然而|值得注意)/.test(value) ? Math.max(0.75, profile.pace - 0.05) : profile.pace,
+    pause_before_ms: 0,
+    pause_after_ms: type === 'quick_news' ? 450 : 650,
+    emphasis,
   }
 }
 
@@ -88,6 +120,9 @@ export function reconcileProductionPlan(
   existing?: Partial<ProductionPlan> | null,
   voices: VoiceSegment[] = [],
 ): ProductionPlan {
+  if (existing?.version != null && existing.version !== 2) {
+    throw new Error(`不支持制作计划版本 ${existing.version}，当前版本为 2，请重新生成制作计划。`)
+  }
   const previousClips = new Map((existing?.clips || []).map(clip => [clip.id, clip]))
   const voiceById = new Map(voices.map(voice => [voice.segment_id, voice]))
   const clips: ProductionClip[] = []
@@ -109,6 +144,11 @@ export function reconcileProductionPlan(
         segment_type: segment.type || 'custom',
         segment_title: segment.title || `第 ${segmentIndex + 1} 段`,
         text: part,
+        context_before: '',
+        context_after: '',
+        direction: textMatches && previous?.direction
+          ? previous.direction
+          : speechDirection(segment.type || 'custom', part),
         speaker: segment.speaker || 'Host A',
         source_fact_ids: segment.source_fact_ids || [],
         source,
@@ -123,6 +163,11 @@ export function reconcileProductionPlan(
     })
   })
 
+  clips.forEach((clip, index) => {
+    clip.context_before = index > 0 ? clips[index - 1].text.slice(-120) : ''
+    clip.context_after = index + 1 < clips.length ? clips[index + 1].text.slice(0, 120) : ''
+  })
+
   const previousJoins = new Map((existing?.joins || []).map(join => [join.after_clip_id, join]))
   const joins = clips.slice(0, -1).map((clip, index) => {
     const fallback = defaultJoin(clip, clips[index + 1])
@@ -135,7 +180,7 @@ export function reconcileProductionPlan(
   })
 
   return {
-    version: 1,
+    version: 2,
     script_hash: scriptHash(segments),
     clips,
     joins,

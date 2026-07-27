@@ -7,6 +7,7 @@ import struct
 import urllib.request
 import uuid
 import wave
+from xml.sax.saxutils import escape, quoteattr
 from pathlib import Path
 from typing import Any
 
@@ -81,6 +82,8 @@ async def _synthesize_plan(
         "openai-compatible",
         "doubao_tts",
         "voice_clone",
+        "azure_speech",
+        "cosyvoice",
     }
     clips = [clip for clip in production_plan.get("clips", []) if isinstance(clip, dict)]
     if any(clip.get("source", "tts") == "tts" for clip in clips) and engine not in supported_engines:
@@ -119,6 +122,12 @@ async def _synthesize_plan(
                 voice=voice,
                 rate=config.rate,
                 volume=config.volume,
+                direction=clip.get("direction", {}),
+                context_before=str(clip.get("context_before") or ""),
+                context_after=str(clip.get("context_after") or ""),
+                model=config.model,
+                output_format=config.output_format,
+                performance_prompt=config.performance_prompt,
             )
             previous_path = str(previous.get("path") or "")
             if (
@@ -130,7 +139,13 @@ async def _synthesize_plan(
                 duration_seconds = float(previous.get("duration_seconds") or _audio_duration_seconds(filepath))
                 reused_count += 1
             else:
-                output_format = "wav" if engine == "mock" else _normalize_output_format(config.output_format)
+                output_format = (
+                    "wav"
+                    if engine == "mock"
+                    else "mp3"
+                    if engine == "azure_speech"
+                    else _normalize_output_format(config.output_format)
+                )
                 safe_clip_id = _safe_path_part(clip_id, f"clip_{clip_index:03d}")
                 filepath = os.path.join(config.output_dir, f"{episode_id}_{safe_clip_id}.{output_format}")
                 if engine == "mock":
@@ -138,9 +153,13 @@ async def _synthesize_plan(
                 elif engine == "edge-tts":
                     await _synthesize_edge_tts(text, voice, filepath, config)
                 elif engine == "openai-compatible":
-                    _synthesize_openai_compatible(text, voice, filepath, config)
+                    _synthesize_openai_compatible(text, voice, filepath, config, clip)
                 elif engine in {"doubao_tts", "voice_clone"}:
-                    _synthesize_doubao(text, voice, filepath, config)
+                    _synthesize_doubao(text, voice, filepath, config, clip)
+                elif engine == "azure_speech":
+                    _synthesize_azure(text, voice, filepath, config, clip)
+                elif engine == "cosyvoice":
+                    _synthesize_cosyvoice(text, voice, filepath, config, clip)
                 duration_seconds = _audio_duration_seconds(filepath)
             segment_engine = engine
 
@@ -177,6 +196,12 @@ def _voice_segment(
     duration_seconds: float = 0.0,
     generation_key: str = "",
 ) -> dict[str, Any]:
+    prosody_quality = _analyze_prosody(
+        filepath,
+        str(segment.get("text") or ""),
+        _direction(segment),
+        duration_seconds,
+    )
     return {
         "segment_id": segment.get("id") or f"seg_{segment_index:03d}",
         "parent_segment_id": segment.get("parent_segment_id") or segment.get("id") or "",
@@ -188,6 +213,44 @@ def _voice_segment(
         "voice": voice,
         "duration_seconds": duration_seconds,
         "generation_key": generation_key,
+        "prosody_quality": prosody_quality,
+    }
+
+
+def _analyze_prosody(
+    filepath: str,
+    text: str,
+    direction: dict[str, Any],
+    duration_seconds: float,
+) -> dict[str, Any]:
+    chars_per_second = round(len(text) / duration_seconds, 2) if duration_seconds > 0 else 0.0
+    energy_range_db = 0.0
+    try:
+        from pydub import AudioSegment
+
+        audio = AudioSegment.from_file(filepath)
+        samples = [
+            audio[start : start + 200].dBFS
+            for start in range(0, len(audio), 200)
+            if audio[start : start + 200].dBFS != float("-inf")
+        ]
+        if samples:
+            energy_range_db = round(max(samples) - min(samples), 2)
+    except Exception:
+        pass
+    target_pace = float(direction.get("pace", 1.0))
+    expected_min = 2.5 * target_pace
+    expected_max = 6.5 * target_pace
+    issues: list[str] = []
+    if chars_per_second and not expected_min <= chars_per_second <= expected_max:
+        issues.append("speech_rate_out_of_range")
+    if energy_range_db and energy_range_db < 3.0 and len(text) >= 20:
+        issues.append("low_energy_variation")
+    return {
+        "status": "review" if issues else "ok",
+        "chars_per_second": chars_per_second,
+        "energy_range_db": energy_range_db,
+        "issues": issues,
     }
 
 
@@ -216,7 +279,47 @@ async def _synthesize_edge_tts(text: str, voice: str, filepath: str, config: TTS
     await communicate.save(filepath)
 
 
-def _synthesize_openai_compatible(text: str, voice: str, filepath: str, config: TTSConfig) -> None:
+def _direction(clip: dict[str, Any] | None) -> dict[str, Any]:
+    clip = clip or {}
+    value = clip.get("direction")
+    return value if isinstance(value, dict) else {}
+
+
+def _performance_instructions(config: TTSConfig, clip: dict[str, Any] | None) -> str:
+    clip = clip or {}
+    direction = _direction(clip)
+    emphasis = "、".join(str(item) for item in direction.get("emphasis", []) if item)
+    context_before = str(clip.get("context_before") or "")
+    context_after = str(clip.get("context_after") or "")
+    parts = [
+        config.performance_prompt,
+        f"表达意图：{direction.get('intent', 'natural_narration')}；情绪：{direction.get('emotion', 'neutral')}；"
+        f"能量：{direction.get('energy', 0.58)}；语速：{direction.get('pace', 0.97)}。",
+        "保持自然呼吸、信息层级和句间节奏，不要逐字匀速朗读。",
+    ]
+    if emphasis:
+        parts.append(f"自然强调：{emphasis}。每句不要强调过多内容。")
+    if context_before:
+        parts.append(f"承接上文语气（不要朗读上文）：{context_before}")
+    if context_after:
+        parts.append(f"为下文留出自然衔接（不要朗读下文）：{context_after}")
+    return "\n".join(parts)
+
+
+def _clip_speed(config: TTSConfig, clip: dict[str, Any] | None) -> float:
+    return round(
+        min(2.0, max(0.25, _doubao_speed_ratio(config.rate) * float(_direction(clip).get("pace", 1.0)))),
+        2,
+    )
+
+
+def _synthesize_openai_compatible(
+    text: str,
+    voice: str,
+    filepath: str,
+    config: TTSConfig,
+    clip: dict[str, Any] | None = None,
+) -> None:
     api_key = (config.api_key or "").strip()
     api_base = (config.api_base or "").strip().rstrip("/")
     model = (config.model or "").strip()
@@ -230,6 +333,9 @@ def _synthesize_openai_compatible(text: str, voice: str, filepath: str, config: 
         "input": text,
         "response_format": output_format,
     }
+    if model.lower().startswith(("gpt-4o-mini-tts", "gpt-4o-audio")):
+        payload["instructions"] = _performance_instructions(config, clip)
+        payload["speed"] = _clip_speed(config, clip)
     req = urllib.request.Request(
         f"{api_base}/audio/speech",
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
@@ -244,7 +350,13 @@ def _synthesize_openai_compatible(text: str, voice: str, filepath: str, config: 
     Path(filepath).write_bytes(body)
 
 
-def _synthesize_doubao(text: str, voice: str, filepath: str, config: TTSConfig) -> None:
+def _synthesize_doubao(
+    text: str,
+    voice: str,
+    filepath: str,
+    config: TTSConfig,
+    clip: dict[str, Any] | None = None,
+) -> None:
     app_id = (config.doubao_app_id or "").strip()
     access_token = (config.doubao_access_token or "").strip()
     cluster = (config.doubao_cluster or "").strip()
@@ -272,7 +384,7 @@ def _synthesize_doubao(text: str, voice: str, filepath: str, config: TTSConfig) 
         "audio": {
             "voice_type": voice_type,
             "encoding": encoding,
-            "speed_ratio": _doubao_speed_ratio(config.rate),
+            "speed_ratio": _clip_speed(config, clip or {}),
         },
         "request": {
             "reqid": str(uuid.uuid4()),
@@ -312,6 +424,72 @@ def _synthesize_doubao(text: str, voice: str, filepath: str, config: TTSConfig) 
     if not decoded_audio:
         raise ValueError("Doubao TTS returned empty audio data")
     Path(filepath).write_bytes(decoded_audio)
+
+
+def _synthesize_azure(
+    text: str,
+    voice: str,
+    filepath: str,
+    config: TTSConfig,
+    clip: dict[str, Any],
+) -> None:
+    key = config.azure_speech_key.strip()
+    region = config.azure_speech_region.strip()
+    if not key or not region:
+        raise ValueError("Azure Speech requires azure_speech_key and azure_speech_region")
+    direction = _direction(clip)
+    rate = int(round((_clip_speed(config, clip) - 1.0) * 100))
+    pitch = int(round(float(direction.get("pitch", 0.0)) * 100))
+    body = escape(text)
+    for term in direction.get("emphasis", []):
+        escaped_term = escape(str(term))
+        body = body.replace(escaped_term, f'<emphasis level="moderate">{escaped_term}</emphasis>', 1)
+    ssml = (
+        '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" '
+        'xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="zh-CN">'
+        f"<voice name={quoteattr(voice)}><prosody rate=\"{rate:+d}%\" pitch=\"{pitch:+d}%\">"
+        f"{body}</prosody></voice></speak>"
+    )
+    req = urllib.request.Request(
+        f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1",
+        data=ssml.encode("utf-8"),
+        headers={
+            "Ocp-Apim-Subscription-Key": key,
+            "Content-Type": "application/ssml+xml",
+            "X-Microsoft-OutputFormat": "audio-24khz-96kbitrate-mono-mp3",
+            "User-Agent": "PodFlow-Studio",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=config.timeout_seconds) as response:
+        Path(filepath).write_bytes(response.read())
+
+
+def _synthesize_cosyvoice(
+    text: str,
+    voice: str,
+    filepath: str,
+    config: TTSConfig,
+    clip: dict[str, Any],
+) -> None:
+    endpoint = config.cosyvoice_endpoint.strip().rstrip("/")
+    if not endpoint:
+        raise ValueError("CosyVoice requires cosyvoice_endpoint")
+    payload = {
+        "text": text,
+        "speaker": voice,
+        "instruct_text": _performance_instructions(config, clip),
+        "speed": _clip_speed(config, clip),
+        "response_format": _normalize_output_format(config.output_format),
+    }
+    req = urllib.request.Request(
+        f"{endpoint}/v1/audio/speech",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=config.timeout_seconds) as response:
+        Path(filepath).write_bytes(response.read())
 
 
 def _doubao_speed_ratio(rate: str) -> float:

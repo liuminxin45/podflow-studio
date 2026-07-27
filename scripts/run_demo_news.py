@@ -185,7 +185,7 @@ def _tts_config_from_env(output_dir: Path) -> TTSConfig:
         engine=engine,
         api_key=os.environ.get("PODFLOW_TTS_API_KEY") or os.environ.get("OPENAI_API_KEY", ""),
         api_base=os.environ.get("PODFLOW_TTS_API_BASE") or os.environ.get("OPENAI_API_BASE", ""),
-        model=os.environ.get("PODFLOW_TTS_MODEL", "tts-1"),
+        model=os.environ.get("PODFLOW_TTS_MODEL", "gpt-4o-mini-tts"),
         output_format="wav" if engine == "mock" else os.environ.get("PODFLOW_TTS_OUTPUT_FORMAT", "mp3"),
         output_dir=str(output_dir),
     )

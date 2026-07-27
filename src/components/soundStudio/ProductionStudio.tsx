@@ -130,6 +130,8 @@ function providerFromEngine(engine: string): AudioProvider | null {
   if (engine === 'openai-compatible') return 'openai-compatible'
   if (engine === 'doubao_tts') return 'doubao_tts'
   if (engine === 'voice_clone') return 'voice_clone'
+  if (engine === 'azure_speech') return 'azure_speech'
+  if (engine === 'cosyvoice') return 'cosyvoice'
   return null
 }
 
@@ -142,10 +144,20 @@ function configuredVoice(provider: AudioProvider, config: Record<string, any>): 
   return text(config.default_voice)
 }
 
-function isAudioProviderConfigured(provider: AudioProvider, config: Record<string, any>): boolean {
+function isAudioProviderConfigured(
+  provider: AudioProvider,
+  config: Record<string, any>,
+  selectedVoice = '',
+): boolean {
   if (provider === 'edge-tts') return true
   if (provider === 'openai-compatible') {
     return Boolean(text(config.api_key) && text(config.api_base) && text(config.model || config.api_model))
+  }
+  if (provider === 'azure_speech') {
+    return Boolean(text(config.azure_speech_key) && text(config.azure_speech_region) && text(selectedVoice || config.default_voice))
+  }
+  if (provider === 'cosyvoice') {
+    return Boolean(text(config.cosyvoice_endpoint) && text(selectedVoice || config.default_voice))
   }
   return Boolean(
     text(config.doubao_app_id)
@@ -325,14 +337,24 @@ export default function ProductionStudio({
   const storedCoverPath = text(workflow?.state?.cover_path)
   const audioReportPath = isAllowedArtifactPath(storedAudioReportPath, 'report') ? storedAudioReportPath : ''
   const coverPath = isAllowedArtifactPath(storedCoverPath, 'image') ? storedCoverPath : ''
-  const reconciledPlan = useMemo(
-    () => reconcileProductionPlan(
-      workflowScriptSegments,
-      savedProductionPlan,
-      voiceSegments,
-    ),
+  const reconciliation = useMemo(
+    () => {
+      try {
+        return {
+          plan: reconcileProductionPlan(workflowScriptSegments, savedProductionPlan, voiceSegments),
+          contractError: '',
+        }
+      } catch (error) {
+        return {
+          plan: reconcileProductionPlan(workflowScriptSegments, null, voiceSegments),
+          contractError: error instanceof Error ? error.message : String(error),
+        }
+      }
+    },
     [savedProductionPlan, voiceSegments, workflowScriptSegments],
   )
+  const reconciledPlan = reconciliation.plan
+  const planContractError = reconciliation.contractError
   const reconciledPlanSignature = planContentSignature(reconciledPlan)
   const [productionPlan, setProductionPlan] = useState<ProductionPlan>(reconciledPlan)
   const productionPlanRef = useRef(productionPlan)
@@ -346,7 +368,7 @@ export default function ProductionStudio({
   const activeRecording = activeClip ? recordings[activeClip.id] : undefined
   const scriptReady = segments.length > 0 && segments.every(segment => Boolean(segment.content))
   const ttsClipCount = productionPlan.clips.filter(clip => clip.source === 'tts').length
-  const providerConfigured = !unsupportedEngine && isAudioProviderConfigured(audioProvider, ttsConfig)
+  const providerConfigured = !unsupportedEngine && isAudioProviderConfigured(audioProvider, ttsConfig, voice)
   const visibleVoicePresets = useMemo(() => {
     const presets = VOICE_PRESETS[audioProvider]
     if (!voice || presets.some(item => item.id === voice)) return presets
@@ -868,7 +890,7 @@ export default function ProductionStudio({
       : {}),
     rate,
     volume: text(ttsConfig.volume) || '+0%',
-    output_format: audioProvider === 'openai-compatible'
+    output_format: ['openai-compatible', 'cosyvoice'].includes(audioProvider)
       ? (text(ttsConfig.output_format) || 'mp3')
       : 'mp3',
   }), [audioProvider, rate, ttsConfig, voice])
@@ -1381,6 +1403,43 @@ export default function ProductionStudio({
                             {clip.trim_start_ms + clip.trim_end_ms > 0 && <span>已裁剪 {(clip.trim_start_ms + clip.trim_end_ms) / 1000}s</span>}
                           </div>
                           <p>{clip.text}</p>
+                          {isSelected && clip.source === 'tts' && (
+                            <div className="produce-trim-row">
+                              <span>表演：{clip.direction.intent} · {clip.direction.emotion}</span>
+                              <Slider
+                                min={0.5}
+                                max={1.5}
+                                step={0.01}
+                                value={clip.direction.pace}
+                                tooltip={{ formatter: value => `语速 ${value}x` }}
+                                disabled={isBusy}
+                                onChange={value => previewClip(clip.id, {
+                                  direction: { ...clip.direction, pace: value },
+                                })}
+                                onChangeComplete={value => void updateClip(clip.id, {
+                                  direction: { ...clip.direction, pace: value },
+                                })}
+                              />
+                              <Input
+                                size="small"
+                                value={clip.direction.emphasis.join('、')}
+                                placeholder="重点词，最多两个，以顿号分隔"
+                                disabled={isBusy}
+                                onChange={event => previewClip(clip.id, {
+                                  direction: {
+                                    ...clip.direction,
+                                    emphasis: event.target.value.split(/[、,，]/).map(item => item.trim()).filter(Boolean).slice(0, 2),
+                                  },
+                                })}
+                                onBlur={event => void updateClip(clip.id, {
+                                  direction: {
+                                    ...clip.direction,
+                                    emphasis: event.target.value.split(/[、,，]/).map(item => item.trim()).filter(Boolean).slice(0, 2),
+                                  },
+                                })}
+                              />
+                            </div>
+                          )}
                           <div className="produce-waveform" aria-hidden="true">
                             {Array.from({ length: 32 }, (_, bar) => (
                               <i key={bar} style={{ height: `${24 + ((bar * 17 + clipIndex * 13) % 58)}%` }} />
@@ -1528,6 +1587,19 @@ export default function ProductionStudio({
         </main>
 
         <aside className="produce-settings" aria-label="制作设置">
+          {planContractError && (
+            <Alert
+              type="error"
+              showIcon
+              message="制作计划版本不兼容"
+              description={planContractError}
+              action={(
+                <Button size="small" danger onClick={() => void persistProductionPlan(reconciledPlan)}>
+                  明确重新生成 v2 计划
+                </Button>
+              )}
+            />
+          )}
           {configLoading ? (
             <div className="produce-settings-loading"><LoadingOutlined spin /> 正在读取节点配置</div>
           ) : !configReady ? (
@@ -1568,7 +1640,38 @@ export default function ProductionStudio({
                     />
                   )}
                   {audioProvider !== 'edge-tts' && !providerConfigured && (
-                    <Alert type="warning" showIcon message="请在设置页完善语音 API 配置" />
+                    <Alert type="warning" showIcon message="请完善当前语音服务配置" />
+                  )}
+                  {audioProvider === 'azure_speech' && (
+                    <>
+                      <label>
+                        <span>Azure Region</span>
+                        <Input
+                          value={text(ttsConfig.azure_speech_region)}
+                          disabled={isBusy}
+                          onChange={event => setTtsConfig(current => ({ ...current, azure_speech_region: event.target.value }))}
+                        />
+                      </label>
+                      <label>
+                        <span>Azure Speech Key</span>
+                        <Input.Password
+                          value={text(ttsConfig.azure_speech_key)}
+                          disabled={isBusy}
+                          onChange={event => setTtsConfig(current => ({ ...current, azure_speech_key: event.target.value }))}
+                        />
+                      </label>
+                    </>
+                  )}
+                  {audioProvider === 'cosyvoice' && (
+                    <label>
+                      <span>CosyVoice 服务地址</span>
+                      <Input
+                        value={text(ttsConfig.cosyvoice_endpoint)}
+                        placeholder="http://127.0.0.1:50000"
+                        disabled={isBusy}
+                        onChange={event => setTtsConfig(current => ({ ...current, cosyvoice_endpoint: event.target.value }))}
+                      />
+                    </label>
                   )}
                   {!unsupportedEngine && (
                     <div className="produce-voice-grid">
@@ -1586,6 +1689,12 @@ export default function ProductionStudio({
                         </button>
                       ))}
                     </div>
+                  )}
+                  {(audioProvider === 'azure_speech' || audioProvider === 'cosyvoice') && (
+                    <label>
+                      <span>音色 ID / Speaker</span>
+                      <Input value={voice} disabled={isBusy} onChange={event => setVoice(event.target.value)} />
+                    </label>
                   )}
                   <label>
                     <span>语速</span>

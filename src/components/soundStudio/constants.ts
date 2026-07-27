@@ -25,6 +25,16 @@ export const AUDIO_PROVIDERS: Array<{
     label: '豆包语音克隆',
     description: '使用设置页配置并已训练成功的豆包 Speaker ID。',
   },
+  {
+    id: 'azure_speech',
+    label: 'Azure Speech',
+    description: '使用 SSML 精确控制重音、语速、音高与停顿。',
+  },
+  {
+    id: 'cosyvoice',
+    label: 'CosyVoice',
+    description: '连接本地 CosyVoice 服务，以指令控制中文情绪与韵律。',
+  },
 ]
 
 export const VOICE_PRESETS: Record<AudioProvider, Array<{
@@ -49,6 +59,13 @@ export const VOICE_PRESETS: Record<AudioProvider, Array<{
     { id: 'zh_female_shuangkuaisisi_moon_bigtts', label: '爽快思思', description: '豆包默认预置音色' },
   ],
   voice_clone: [],
+  azure_speech: [
+    { id: 'zh-CN-XiaoxiaoNeural', label: '晓晓', description: 'Azure 中文自然女声' },
+    { id: 'zh-CN-YunxiNeural', label: '云希', description: 'Azure 中文自然男声' },
+  ],
+  cosyvoice: [
+    { id: '中文女', label: '本地中文女声', description: 'CosyVoice 服务中的 speaker 名称' },
+  ],
 }
 
 export const RATE_OPTIONS = [

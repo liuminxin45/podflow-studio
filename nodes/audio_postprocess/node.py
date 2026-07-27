@@ -21,7 +21,7 @@ def run(state: dict[str, Any], config: AudioPostprocessConfig = None) -> dict[st
 
     ctx.log_start(
         f"AudioAssembly starting | segments={len(segments)}, output={requested_format}, "
-        f"plan={'v1' if has_production_plan else 'legacy'}"
+        f"plan={'v2' if has_production_plan else 'legacy'}"
     )
 
     state["audio_outputs"] = {}
@@ -60,7 +60,7 @@ def run(state: dict[str, Any], config: AudioPostprocessConfig = None) -> dict[st
         degraded = False
         operations = ["merge_voice_segments"]
         if has_production_plan:
-            operations.append("production_plan_v1")
+            operations.append("production_plan_v2")
         else:
             operations.append(f"segment_pause_{config.segment_pause_ms}ms")
 
@@ -175,7 +175,7 @@ def _assemble_with_pydub(
     bgm_path: Path | None,
     production_plan: dict[str, Any] | None = None,
 ) -> tuple[Path, float]:
-    from pydub import AudioSegment, effects, silence
+    from pydub import AudioSegment, silence
 
     production_plan = production_plan if isinstance(production_plan, dict) else {}
     has_plan = bool(production_plan.get("clips"))
@@ -189,15 +189,19 @@ def _assemble_with_pydub(
         if isinstance(join, dict) and join.get("after_clip_id")
     }
     music = production_plan.get("music") if isinstance(production_plan.get("music"), dict) else {}
+    export_parameters: list[str] = []
 
     combined = AudioSegment.empty()
     for idx, segment in enumerate(segments):
         chunk = AudioSegment.from_file(segment["path"])
         if config.trim_silence:
-            chunks = silence.split_on_silence(chunk, silence_thresh=chunk.dBFS - 16)
-            if chunks:
-                chunk = sum(chunks, AudioSegment.empty())
-                operations.append("trim_silence")
+            threshold = chunk.dBFS - 16 if chunk.dBFS != float("-inf") else -50
+            leading = silence.detect_leading_silence(chunk, silence_threshold=threshold)
+            trailing = silence.detect_leading_silence(chunk.reverse(), silence_threshold=threshold)
+            if leading or trailing:
+                end_at = max(leading, len(chunk) - trailing)
+                chunk = chunk[leading:end_at]
+                operations.append("trim_boundary_silence")
         trim_start_ms = min(len(chunk), max(0, int(segment.get("trim_start_ms") or 0)))
         trim_end_ms = min(len(chunk) - trim_start_ms, max(0, int(segment.get("trim_end_ms") or 0)))
         if trim_start_ms or trim_end_ms:
@@ -209,8 +213,6 @@ def _assemble_with_pydub(
         micro_fade = min(10, max(0, len(chunk) // 4))
         if micro_fade:
             chunk = chunk.fade_in(micro_fade).fade_out(micro_fade)
-        if normalize_loudness:
-            chunk = effects.normalize(chunk)
         combined += chunk
         if idx < len(segments) - 1:
             join = joins.get(str(segment.get("segment_id"))) if has_plan else None
@@ -226,8 +228,14 @@ def _assemble_with_pydub(
                         operations.append(f"pause_{segment.get('segment_id')}_{pause_ms}ms")
 
     if normalize_loudness:
-        combined = effects.normalize(combined)
-        operations.append("normalize_loudness")
+        target_lufs = float(plan_render.get("target_lufs", -16.0) if has_plan else -16.0)
+        true_peak_db = float(plan_render.get("true_peak_db", -1.0) if has_plan else -1.0)
+        export_parameters = [
+            "-af",
+            f"loudnorm=I={target_lufs}:TP={true_peak_db}:LRA=11",
+        ]
+        operations.append(f"program_loudness_{target_lufs:g}lufs")
+        operations.append(f"true_peak_limit_{true_peak_db:g}db")
 
     if has_plan:
         bed_slot = music.get("bed") if isinstance(music.get("bed"), dict) else {}
@@ -268,7 +276,7 @@ def _assemble_with_pydub(
             ]
         )
 
-    combined.export(str(output_path), format=output_format)
+    combined.export(str(output_path), format=output_format, parameters=export_parameters)
     return output_path, len(combined) / 1000.0
 
 
