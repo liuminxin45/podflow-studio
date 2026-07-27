@@ -168,14 +168,9 @@ def _normalize_script(
             text = str(segment.get("text", "")).strip()
             segment_type = str(segment.get("type") or "custom")
             if segment_type not in ALLOWED_SEGMENT_TYPES:
-                segment_type = "custom"
+                segment_type = "quick_news" if source_fact_ids else "custom"
             if segment_type == "custom":
-                return generate_deterministic_script(
-                    facts,
-                    _preset_from_config(config),
-                    episode_id="",
-                    title=topic.get("title", "通勤早咖啡：今日新闻简报"),
-                )
+                continue
             if segment_type in NEWS_SEGMENT_TYPES and not source_fact_ids:
                 return generate_deterministic_script(
                     facts,
@@ -218,6 +213,64 @@ def _normalize_script(
     actual_news_segments = [
         segment for segment in normalized_segments if segment["type"] in NEWS_SEGMENT_TYPES
     ]
+    if planned_items and len(actual_news_segments) == len(planned_items):
+        segments_by_fact_id = {
+            segment["source_fact_ids"][0]: segment
+            for segment in actual_news_segments
+            if len(segment["source_fact_ids"]) == 1
+        }
+        planned_fact_ids = [item["fact_id"] for item in planned_items]
+        if (
+            len(segments_by_fact_id) == len(actual_news_segments)
+            and set(segments_by_fact_id) == set(planned_fact_ids)
+        ):
+            actual_news_segments = [
+                segments_by_fact_id[fact_id] for fact_id in planned_fact_ids
+            ]
+            for segment, item in zip(actual_news_segments, planned_items):
+                segment["type"] = (
+                    "deep_dive" if item["role"] == "deep_dive" else "quick_news"
+                )
+            normalized_segments = [
+                *[
+                    segment
+                    for segment in normalized_segments
+                    if segment["type"] == "opening"
+                ],
+                *actual_news_segments,
+                *[
+                    segment
+                    for segment in normalized_segments
+                    if segment["type"] == "closing"
+                ],
+            ]
+    if not any(segment["type"] == "opening" for segment in normalized_segments):
+        normalized_segments.insert(
+            0,
+            {
+                "id": "seg_opening",
+                "type": "opening",
+                "title": "开场",
+                "text": "早上好，下面是今天值得关注的新闻。",
+                "source_fact_ids": list(
+                    (editorial_plan or {}).get("opening", {}).get("fact_ids", [])
+                ),
+                "estimated_seconds": 8,
+                "speaker": "Host A",
+            },
+        )
+    if not any(segment["type"] == "closing" for segment in normalized_segments):
+        normalized_segments.append(
+            {
+                "id": "seg_closing",
+                "type": "closing",
+                "title": "收尾",
+                "text": "以上是本期内容，我们下期见。",
+                "source_fact_ids": [],
+                "estimated_seconds": 6,
+                "speaker": "Host A",
+            }
+        )
     used_news_fact_ids = {
         fact_id
         for segment in actual_news_segments
@@ -420,11 +473,45 @@ def _generate_script(
             logs=ctx.logs,
         )
         plan_content = client.extract_content(plan_response)
-        editorial_plan = validate_editorial_plan(
-            _parse_json_object(plan_content, "成稿编排"),
-            facts,
-            expected_deep_dive_count=int(structure["actual_deep_dive_count"]),
-        )
+        try:
+            editorial_plan = validate_editorial_plan(
+                _parse_json_object(plan_content, "成稿编排"),
+                facts,
+                expected_deep_dive_count=int(structure["actual_deep_dive_count"]),
+            )
+        except ValueError as plan_error:
+            ctx.log(f"成稿编排定向修复调用: {plan_error}")
+            repair_response = client.call(
+                [
+                    {
+                        "role": "system",
+                        "content": EDITORIAL_PLAN_SYSTEM_PROMPT,
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            "修复下面的编排 JSON。只修复格式和约束问题，不改变事实 ID 集合，"
+                            "不增加事实。只返回完整 JSON 对象。\n\n"
+                            f"<校验错误>{plan_error}</校验错误>\n"
+                            f"<原编排>{plan_content}</原编排>\n\n"
+                            + build_editorial_plan_prompt(
+                                facts,
+                                target_chars_min=config.episode_chars_min,
+                                target_chars_max=config.episode_chars_max,
+                                deep_dive_count=int(structure["actual_deep_dive_count"]),
+                            )
+                        ),
+                    },
+                ],
+                timeout=config.timeout,
+                logs=ctx.logs,
+            )
+            repaired_plan_content = client.extract_content(repair_response)
+            editorial_plan = validate_editorial_plan(
+                _parse_json_object(repaired_plan_content, "成稿编排修复"),
+                facts,
+                expected_deep_dive_count=int(structure["actual_deep_dive_count"]),
+            )
         ctx.log(
             f"成稿编排完成: items={len(editorial_plan['items'])}, "
             f"order={[item['fact_id'] for item in editorial_plan['items']]}"

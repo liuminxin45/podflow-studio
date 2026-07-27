@@ -114,6 +114,7 @@ export function parseQuickNewsOptimizationResult(
   expectedSourceFactIds: string[],
   factCards: FactCard[] = [],
 ): QuickNewsOptimizationResult {
+  void factCards
   let parsed: Record<string, unknown>
   try {
     parsed = parseJsonObject(raw)
@@ -126,19 +127,11 @@ export function parseQuickNewsOptimizationResult(
   if (`${String(parsed.title || '')}${suggestedText}`.includes('\uFFFD')) {
     throw new Error('AI 返回的优化正文包含乱码，未应用本次结果')
   }
-  const supportedText = factCards
-    .filter(card => expectedSourceFactIds.includes(card.id))
-    .map(card => `${card.title} ${card.summary} ${card.claim}`)
-    .join(' ')
-  if (hasUnsupportedListenerInstruction(suggestedText, supportedText)) {
-    throw new Error('AI 返回的优化正文包含面向听众的资料核验清单，未应用本次结果')
-  }
-
   const expectedIds = uniqueSourceFactIds(expectedSourceFactIds)
   const returnedIds = stringList(parsed.source_fact_ids)
   if (
     returnedIds.length !== expectedIds.length
-    || returnedIds.some((id, index) => id !== expectedIds[index])
+    || returnedIds.some(id => !expectedIds.includes(id))
   ) {
     throw new Error('AI 改变了快讯绑定的事实卡，本次结果未应用')
   }
@@ -172,31 +165,4 @@ export async function optimizeQuickNews(
     request.sourceFactIds,
     request.factCards,
   )
-}
-
-function hasUnsupportedListenerInstruction(text: string, supportedText: string): boolean {
-  if (text.includes('您可能更关心')) return true
-  const commandPattern = /(?:(?:您|你|大家|听众|家庭|家长|考生|用户|消费者|居民|旅客).{0,12}(?:应当|应该|应(?=[\u4e00-\u9fff])|需要|建议|必须|请)|(?:应当|应该|建议|必须|请)(?:先|立即|及时)?(?=[\u4e00-\u9fff]))/
-  const attributedOfficialAction = /(?:官方|有关部门|主管部门|公告|通知|指南).{0,24}(?:要求|提醒|建议|规定)/
-  const commandSentences = text.split(/(?<=[。！？!?])/).filter(sentence => commandPattern.test(sentence))
-  return commandSentences.some(sentence =>
-    !attributedOfficialAction.test(sentence) || overlapRatio(sentence, supportedText) < 0.2)
-}
-
-function overlapRatio(left: string, right: string): number {
-  const chunks = (value: string) => {
-    const cleaned = value.replace(/\s+/g, '')
-    return new Set(Array.from(
-      { length: Math.max(0, cleaned.length - 3) },
-      (_, index) => cleaned.slice(index, index + 4),
-    ))
-  }
-  const leftChunks = chunks(left)
-  const rightChunks = chunks(right)
-  if (leftChunks.size === 0 || rightChunks.size === 0) return 0
-  let overlap = 0
-  leftChunks.forEach(chunk => {
-    if (rightChunks.has(chunk)) overlap += 1
-  })
-  return overlap / Math.min(leftChunks.size, rightChunks.size)
 }

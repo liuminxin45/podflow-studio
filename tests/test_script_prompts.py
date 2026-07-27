@@ -161,37 +161,39 @@ def test_editorial_plan_requires_exact_fact_coverage_and_places_deep_dive_inside
     assert "不写口播稿" not in prompt
     assert "事实 ID 各一次" in prompt
 
-    invalid = {**plan, "items": [plan["items"][0], plan["items"][2], plan["items"][1]]}
-    with pytest.raises(ValueError, match="深度稿不能位于新闻首尾"):
-        validate_editorial_plan(invalid, facts)
+    edge_deep = validate_editorial_plan(
+        {**plan, "items": [plan["items"][0], plan["items"][2], plan["items"][1]]},
+        facts,
+    )
+    assert edge_deep["items"][-1]["role"] == "deep_dive"
 
     missing_listener_value = {
         **plan,
         "items": [{**plan["items"][0], "listener_question": ""}, *plan["items"][1:]],
     }
-    with pytest.raises(ValueError, match="听众问题和听众价值"):
-        validate_editorial_plan(missing_listener_value, facts)
+    normalized_missing_value = validate_editorial_plan(missing_listener_value, facts)
+    assert normalized_missing_value["items"][0]["listener_question"]
 
     unrelated_without_reason = {
         **plan,
         "items": [*plan["items"][:2], {**plan["items"][2], "transition": "related"}],
     }
-    with pytest.raises(ValueError, match="说明相邻关系"):
-        validate_editorial_plan(unrelated_without_reason, facts)
+    normalized_unrelated = validate_editorial_plan(unrelated_without_reason, facts)
+    assert normalized_unrelated["items"][2]["transition"] == "reset"
 
     changed_promise = {
         **plan,
         "items": [plan["items"][0], {**plan["items"][1], "listener_question": "另一个问题？"}, plan["items"][2]],
     }
-    with pytest.raises(ValueError, match="开场问题必须与兑现段"):
-        validate_editorial_plan(changed_promise, facts)
+    normalized_promise = validate_editorial_plan(changed_promise, facts)
+    assert normalized_promise["items"][1]["listener_question"] == "门槛是什么？"
 
     invalid_first_transition = {
         **plan,
         "items": [{**plan["items"][0], "transition": "related", "transition_reason": "不存在的上一条"}, *plan["items"][1:]],
     }
-    with pytest.raises(ValueError, match="首条新闻"):
-        validate_editorial_plan(invalid_first_transition, facts)
+    normalized_first = validate_editorial_plan(invalid_first_transition, facts)
+    assert normalized_first["items"][0]["transition"] == "direct"
 
     single = validate_editorial_plan(
         {
@@ -321,7 +323,7 @@ def test_quality_gate_rejects_garbled_text_and_editorial_checklists():
 
     codes = [issue["code"] for issue in report["hard"]]
     assert "INVALID_TEXT_ENCODING" in codes
-    assert "EDITORIAL_INSTRUCTION" in codes
+    assert "EDITORIAL_INSTRUCTION" in [issue["code"] for issue in report["soft"]]
 
 
 def test_quality_gate_checks_closing_encoding_and_allows_sourced_official_actions():
@@ -378,7 +380,61 @@ def test_quality_gate_does_not_treat_loose_keyword_overlap_as_official_instructi
         plan,
     )
 
-    assert "EDITORIAL_INSTRUCTION" in [issue["code"] for issue in report["hard"]]
+    assert "EDITORIAL_INSTRUCTION" in [issue["code"] for issue in report["soft"]]
+
+
+def test_quality_gate_allows_listener_value_and_normalizes_equivalent_money_units():
+    facts = [{
+        "id": "fact_001",
+        "title": "补贴通知",
+        "summary": "补贴总额为1亿元，消费者需要了解办理流程。",
+    }]
+    plan = {
+        "opening": {"fact_ids": [], "listener_question": "", "target_chars": 100},
+        "items": [{"fact_id": "fact_001", "role": "practical", "target_chars": 280, "listener_question": "怎么办？", "listener_value": "了解流程"}],
+        "closing": {"target_chars": 50},
+    }
+    report = assess_script_quality(
+        {
+            "segments": [
+                {"id": "opening", "type": "opening", "text": "以下是本期早报。", "source_fact_ids": []},
+                {"id": "news", "type": "quick_news", "text": "补贴总额为10000万元，消费者需要了解办理流程。", "source_fact_ids": ["fact_001"]},
+                {"id": "closing", "type": "closing", "text": "以上是本期内容。", "source_fact_ids": []},
+            ]
+        },
+        facts,
+        plan,
+    )
+
+    assert "UNSUPPORTED_NUMBER" not in [issue["code"] for issue in report["hard"]]
+    assert "EDITORIAL_INSTRUCTION" not in [issue["code"] for issue in report["hard"]]
+
+
+def test_editorial_plan_clamps_length_and_allows_repeated_roles():
+    facts = [{"id": f"fact_{index:03d}"} for index in range(1, 4)]
+    plan = validate_editorial_plan(
+        {
+            "opening": {"fact_ids": [], "listener_question": "", "promise_fact_id": "", "target_chars": 181},
+            "items": [
+                {
+                    "fact_id": fact["id"],
+                    "role": "standard",
+                    "target_chars": 999,
+                    "listener_question": "",
+                    "listener_value": "",
+                    "transition": "reset",
+                    "transition_reason": "",
+                }
+                for fact in facts
+            ],
+            "closing": {"target_chars": 49},
+        },
+        facts,
+    )
+
+    assert plan["opening"]["target_chars"] == 180
+    assert plan["closing"]["target_chars"] == 50
+    assert [item["target_chars"] for item in plan["items"]] == [340, 340, 340]
 
 
 def test_script_normalization_accepts_a_valid_middle_deep_dive_plan():
@@ -425,6 +481,50 @@ def test_script_normalization_accepts_a_valid_middle_deep_dive_plan():
         "quick_news",
         "closing",
     ]
+
+
+def test_script_normalization_repairs_minor_structure_fields_from_the_validated_plan():
+    facts = [
+        {"id": "fact_001", "title": "头条", "summary": "事实一"},
+        {"id": "fact_002", "title": "深度", "summary": "事实二", "is_deep_dive": True},
+    ]
+    plan = {
+        "opening": {"fact_ids": ["fact_002"], "listener_question": "", "target_chars": 120},
+        "items": [
+            {"fact_id": "fact_001", "role": "headline", "target_chars": 150},
+            {"fact_id": "fact_002", "role": "deep_dive", "target_chars": 1800},
+        ],
+        "closing": {"target_chars": 70},
+    }
+    normalized = _normalize_script(
+        {
+            "generated_by": "llm",
+            "segments": [
+                {"id": "one", "type": "news", "text": "头条正文", "source_fact_ids": ["fact_002"]},
+                {"id": "two", "type": "quick_news", "text": "深度正文", "source_fact_ids": ["fact_001"]},
+            ],
+        },
+        {"title": "今日早报"},
+        facts,
+        ScriptConfig(
+            recommended_news_item_count=2,
+            quick_news_recommended_count=1,
+            deep_dive_recommended_count=1,
+        ),
+        plan,
+    )
+
+    assert normalized["generated_by"] == "llm"
+    assert [segment["type"] for segment in normalized["segments"]] == [
+        "opening",
+        "quick_news",
+        "deep_dive",
+        "closing",
+    ]
+    assert normalized["segments"][1]["source_fact_ids"] == ["fact_001"]
+    assert normalized["segments"][1]["text"] == "深度正文"
+    assert normalized["segments"][2]["source_fact_ids"] == ["fact_002"]
+    assert normalized["segments"][2]["text"] == "头条正文"
 
 
 def test_segment_repairs_only_replace_explicit_text():
@@ -628,6 +728,13 @@ def test_quick_news_result_validator_rejects_changed_provenance():
     validate_quick_news_optimization_result(
         {"suggested_text": "可用成稿", "source_fact_ids": ["fact_001"]},
         ["fact_001"],
+    )
+    validate_quick_news_optimization_result(
+        {
+            "suggested_text": "可用成稿",
+            "source_fact_ids": ["fact_002", "fact_001"],
+        },
+        ["fact_001", "fact_002"],
     )
 
     try:

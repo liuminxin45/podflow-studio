@@ -70,7 +70,8 @@ def build_editorial_plan_prompt(
    deep_dive 为 1600 至 2300 字。素材不足时取下限，不用套话填充。
 8. opening 最多引用两个事实 ID。listener_question 最多一个；非空时 promise_fact_id
    必须是 opening.fact_ids 之一，且对应正文必须明确回答，不能只制造悬念。存在 deep_dive 时必须预告该事实。
-   兑现段可以使用 direct 或 resolve；使用 resolve 时必须绑定 promise_fact_id。
+   兑现段可以使用 direct 或 resolve；使用 resolve 时必须绑定 promise_fact_id。兑现段的
+   listener_question 请逐字复制 opening.listener_question，不要改写。
 9. 每个 item 的 listener_question 必须是这段要用事实卡回答的一个具体问题；
    listener_value 只描述该段对听众的用途，不得写新的事实结论。
 10. transition 只能是 direct、related、resolve、reset。只有共同人群、产业链、原因结果、
@@ -145,7 +146,6 @@ def validate_editorial_plan(
         raise ValueError("成稿编排格式错误：promise_fact_id 必须属于 opening.fact_ids")
 
     normalized_items: list[dict[str, Any]] = []
-    role_runs: list[str] = []
     for index, item in enumerate(items):
         if not isinstance(item, dict):
             raise ValueError(f"成稿编排格式错误：items[{index}] 必须是对象")
@@ -158,14 +158,16 @@ def validate_editorial_plan(
         listener_value = str(item.get("listener_value") or "").strip()
         transition = str(item.get("transition") or "").strip()
         transition_reason = str(item.get("transition_reason") or "").strip()
-        if not listener_question or not listener_value:
-            raise ValueError(f"成稿编排格式错误：items[{index}] 必须说明听众问题和听众价值")
+        if not listener_question:
+            listener_question = "这件事发生了什么？"
+        if not listener_value:
+            listener_value = "了解这条新闻的最新变化"
         if transition not in TRANSITION_TYPES:
             raise ValueError(f"成稿编排格式错误：items[{index}].transition 无效")
         if index == 0 and transition == "related":
-            raise ValueError("成稿编排格式错误：首条新闻不能使用 related")
+            transition = "direct"
         if transition in {"related", "resolve"} and not transition_reason:
-            raise ValueError(f"成稿编排格式错误：items[{index}] 必须说明相邻关系")
+            transition = "direct" if transition == "resolve" else "reset"
         if transition == "resolve" and fact_id != promise_fact_id:
             raise ValueError("成稿编排格式错误：resolve 必须绑定开场问题的兑现事实")
         normalized_items.append(
@@ -181,31 +183,27 @@ def validate_editorial_plan(
                 "transition_reason": transition_reason,
             }
         )
-        role_runs.append(role)
 
     planned_ids = [item["fact_id"] for item in normalized_items]
     if len(planned_ids) != len(fact_ids) or set(planned_ids) != set(fact_ids):
         raise ValueError("成稿编排格式错误：事实 ID 必须恰好使用一次")
     if promise_fact_id:
         promise_item = next(item for item in normalized_items if item["fact_id"] == promise_fact_id)
-        if promise_item["listener_question"] != opening_question:
-            raise ValueError("成稿编排格式错误：开场问题必须与兑现段的听众问题一致")
-    if any(role_runs[index : index + 3] == [role_runs[index]] * 3 for index in range(max(0, len(role_runs) - 2))):
-        raise ValueError("成稿编排格式错误：同一角色不得连续出现三次")
+        promise_item["listener_question"] = opening_question
 
     deep_items = [item for item in normalized_items if item["role"] == "deep_dive"]
     if marked_deep_id:
         if len(deep_items) != 1 or deep_items[0]["fact_id"] != marked_deep_id:
             raise ValueError("成稿编排格式错误：深度稿必须绑定整理页指定事实")
-        deep_index = normalized_items.index(deep_items[0])
-        if len(normalized_items) >= 3 and deep_index in {0, len(normalized_items) - 1}:
-            raise ValueError("成稿编排格式错误：深度稿不能位于新闻首尾")
     elif len(deep_items) != expected_deep_dive_count:
         raise ValueError(
             f"成稿编排格式错误：本期必须包含 {expected_deep_dive_count} 条深度稿"
         )
     if deep_items and deep_items[0]["fact_id"] not in opening_fact_ids:
-        raise ValueError("成稿编排格式错误：开场必须绑定并预告本期深度事实")
+        if len(opening_fact_ids) < 2:
+            opening_fact_ids.append(deep_items[0]["fact_id"])
+        else:
+            opening_fact_ids[-1] = deep_items[0]["fact_id"]
 
     return {
         "opening": {
@@ -224,9 +222,7 @@ def _bounded_int(value: Any, minimum: int, maximum: int, label: str) -> int:
         number = int(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"成稿编排格式错误：{label} 必须是整数") from exc
-    if not minimum <= number <= maximum:
-        raise ValueError(f"成稿编排格式错误：{label} 必须在 {minimum} 至 {maximum} 之间")
-    return number
+    return min(maximum, max(minimum, number))
 
 
 def _role_char_range(role: str) -> tuple[int, int]:

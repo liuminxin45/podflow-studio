@@ -400,5 +400,9 @@ def validate_quick_news_optimization_result(
         dict.fromkeys(str(fact_id) for fact_id in expected_source_fact_ids if fact_id)
     )
     returned_ids = result.get("source_fact_ids")
-    if returned_ids != expected_ids:
+    if (
+        not isinstance(returned_ids, list)
+        or len(returned_ids) != len(expected_ids)
+        or set(str(value) for value in returned_ids) != set(expected_ids)
+    ):
         raise ValueError("Optimizer result changed source_fact_ids")

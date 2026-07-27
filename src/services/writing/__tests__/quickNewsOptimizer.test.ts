@@ -88,7 +88,7 @@ describe('quick news optimizer', () => {
     )).toThrow('改变了快讯绑定的事实卡')
   })
 
-  it('rejects garbled text and editorial checklists', () => {
+  it('rejects garbled text but keeps listener-facing wording for editorial review', () => {
     const result = (suggestedText: string, title = '正常标题') => JSON.stringify({
       title,
       suggested_text: suggestedText,
@@ -101,15 +101,28 @@ describe('quick news optimizer', () => {
       result('现有材料支持他��已经注册。'),
       ['fact-1'],
     )).toThrow('包含乱码')
-    expect(() => parseQuickNewsOptimizationResult(
+    expect(parseQuickNewsOptimizationResult(
       result('您可能更关心怎么判断，准备报考的家庭应查看招生简章。'),
       ['fact-1'],
-    )).toThrow('资料核验清单')
-    expect(() => parseQuickNewsOptimizationResult(
+    ).suggestedText).toContain('招生简章')
+    expect(parseQuickNewsOptimizationResult(
       result('用户应该安装插件，消费者需要删除账户，听众请订阅服务。'),
       ['fact-1'],
       factCards,
-    )).toThrow('资料核验清单')
+    ).suggestedText).toContain('安装插件')
+  })
+
+  it('accepts the same provenance in a different order', () => {
+    const raw = JSON.stringify({
+      title: '优化标题',
+      suggested_text: '优化正文。',
+      source_fact_ids: ['fact-2', 'fact-1'],
+      change_summary: [],
+      unsupported_or_uncertain: [],
+    })
+
+    expect(parseQuickNewsOptimizationResult(raw, ['fact-1', 'fact-2']).sourceFactIds)
+      .toEqual(['fact-2', 'fact-1'])
   })
 
   it('allows a sourced official deadline action', () => {

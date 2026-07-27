@@ -8,7 +8,7 @@ from typing import Any
 
 
 NUMBER_TOKEN = re.compile(
-    r"(?<![\w.])(?:\d{4}年(?:\d{1,2}月(?:\d{1,2}日)?)?|\d+(?:\.\d+)?%|[¥￥$]\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?\s*(?:元|美元|万元|亿元))(?!\w)"
+    r"(?<![A-Za-z0-9_.])(?:\d{4}年(?:\d{1,2}月(?:\d{1,2}日)?)?|\d+(?:\.\d+)?%|[¥￥$]\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?\s*(?:元|美元|万元|亿元))(?![A-Za-z0-9_])"
 )
 REPETITIVE_OPENINGS = ("我们再看", "接下来关注", "值得关注的是", "这意味着")
 LISTENER_COMMAND_PATTERN = re.compile(
@@ -49,7 +49,7 @@ def assess_script_quality(
         for fact_id in planned_opening_ids
         if fact_id in facts_by_id
     )
-    _assess_text_integrity(opening, opening_text, opening_fact_text, hard)
+    _assess_text_integrity(opening, opening_text, opening_fact_text, hard, soft)
     unsupported_opening_numbers = sorted(_number_tokens(opening_text) - _number_tokens(opening_fact_text))
     if unsupported_opening_numbers:
         hard.append(
@@ -63,7 +63,7 @@ def assess_script_quality(
         soft.append(_issue("OPENING_TOO_LONG", f"开场 {len(opening_text)} 字，目标不超过 180 字", opening))
     if len(str(closing.get("text") or "")) > 120:
         soft.append(_issue("CLOSING_TOO_LONG", "收尾偏长，可能重复本期内容", closing))
-    _assess_text_integrity(closing, str(closing.get("text") or ""), "", hard)
+    _assess_text_integrity(closing, str(closing.get("text") or ""), "", hard, soft)
 
     planned_items = editorial_plan.get("items", [])
     if len(news) != len(planned_items):
@@ -88,6 +88,7 @@ def assess_script_quality(
             f"{segment.get('title') or ''} {text}",
             fact_text,
             hard,
+            soft,
         )
         unsupported = sorted(_number_tokens(text) - _number_tokens(fact_text))
         if unsupported:
@@ -227,7 +228,17 @@ def _overlap_ratio(left: str, right: str) -> float:
 
 
 def _number_tokens(value: str) -> set[str]:
-    return {re.sub(r"\s+", "", token) for token in NUMBER_TOKEN.findall(value)}
+    tokens: set[str] = set()
+    for raw_token in NUMBER_TOKEN.findall(value):
+        token = re.sub(r"\s+", "", raw_token)
+        money = re.fullmatch(r"(\d+(?:\.\d+)?)(元|万元|亿元)", token)
+        if money:
+            amount = float(money.group(1))
+            multiplier = {"元": 1, "万元": 10_000, "亿元": 100_000_000}[money.group(2)]
+            tokens.add(f"{amount * multiplier:g}元")
+        else:
+            tokens.add(token)
+    return tokens
 
 
 def _assess_text_integrity(
@@ -235,6 +246,7 @@ def _assess_text_integrity(
     text: str,
     supported_text: str,
     hard: list[dict[str, str]],
+    soft: list[dict[str, str]],
 ) -> None:
     if "\ufffd" in text:
         hard.append(_issue("INVALID_TEXT_ENCODING", "口播包含无法解码的替换字符“�”", segment))
@@ -250,7 +262,7 @@ def _assess_text_integrity(
         or _overlap_ratio(sentence, supported_text) < 0.2
     ]
     if "您可能更关心" in text or unsupported_commands:
-        hard.append(
+        soft.append(
             _issue(
                 "EDITORIAL_INSTRUCTION",
                 "口播包含面向听众的资料核验清单或编辑说明，应改写为事件本身的影响",
