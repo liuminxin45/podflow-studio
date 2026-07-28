@@ -188,6 +188,18 @@ declare global {
       query: string
       results: Array<{ id: string; title: string; url: string; excerpt: string; publishedAt?: string }>
     }>
+    doubaoSearch?: (params: {
+      requestId?: string
+      apiBase: string
+      apiKey: string
+      query: string
+      timeRange?: 'day' | 'week' | 'month' | 'year' | ''
+      maxResults?: number
+    }) => Promise<{
+      provider: 'doubao_search'
+      query: string
+      results: Array<{ id: string; title: string; url: string; excerpt: string; publishedAt?: string }>
+    }>
     searchCancel?: (requestId: string) => Promise<{ success: boolean }>
     onLLMStreamEvent: (callback: (event: LLMAgentStreamEvent) => void) => void
     onLLMStreamChunk: (callback: (chunk: string) => void) => void

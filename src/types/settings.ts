@@ -12,7 +12,7 @@ export type NodeCapabilityType = 'search' | 'text' | 'reasoning' | 'audio'
 export type NodeOverrideMode = 'global' | 'custom'
 export type APIConnectionStatus = 'untested' | 'testing' | 'connected' | 'failed'
 export type AudioProvider = 'edge-tts' | 'openai-compatible' | 'doubao_tts' | 'voice_clone'
-export type WebSearchProvider = 'tavily' | 'bocha'
+export type WebSearchProvider = 'tavily' | 'bocha' | 'doubao_search'
 export type AITargetKind = 'local_agent' | 'local_model' | 'api_model'
 export type LocalAgentId =
   | 'claude_code'
@@ -367,6 +367,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
           apiKeySet: false,
           apiKeyMasked: '',
           apiBase: 'https://api.bochaai.com',
+          connectionStatus: 'untested',
+        },
+        doubao_search: {
+          apiKey: '',
+          apiKeySet: false,
+          apiKeyMasked: '',
+          apiBase: 'https://open.feedcoopapi.com',
           connectionStatus: 'untested',
         },
       },

@@ -60,6 +60,65 @@ function normalizeBaseUrl(value, fallback) {
   return String(value || fallback).replace(/\/+$/, '')
 }
 
+function doubaoSearchEndpoint(apiBase) {
+  const base = normalizeBaseUrl(apiBase, 'https://open.feedcoopapi.com')
+  if (/\/search_api\/global_search$/i.test(base)) return base
+  if (/\/search_api$/i.test(base)) return `${base}/global_search`
+  return `${base}/search_api/global_search`
+}
+
+function normalizeDoubaoSearchResponse(body, query, maxResults = 5) {
+  const providerError = body?.ResponseMetadata?.Error
+  if (providerError) {
+    throw new Error(`豆包搜索失败: ${providerError.Message || providerError.Code || '未知服务错误'}`)
+  }
+  const documents = Array.isArray(body?.Result?.Documents) ? body.Result.Documents : []
+  return {
+    provider: 'doubao_search',
+    query: String(query || ''),
+    results: documents.slice(0, Math.min(20, Math.max(1, Number(maxResults) || 5))).map((item, index) => {
+      const snippets = Array.isArray(item.Snippet)
+        ? item.Snippet
+          .filter(part => part?.Type === 'text' && part.Text)
+          .map(part => String(part.Text).trim())
+          .filter(Boolean)
+        : []
+      return {
+        id: String(item.Id || item.DocId || `doubao-search-${Date.now()}-${index}`),
+        title: String(item.Title || item.Url || '未命名来源'),
+        url: String(item.Url || ''),
+        excerpt: snippets.join('\n'),
+        publishedAt: item.DocumentInfo?.PublishTime
+          ? String(item.DocumentInfo.PublishTime)
+          : undefined,
+      }
+    }).filter(item => /^https?:\/\//i.test(item.url) && item.excerpt.trim()),
+  }
+}
+
+async function searchDoubao({ apiBase, apiKey, query, maxResults = 5, signal }) {
+  const key = String(apiKey || '').trim()
+  if (!key) throw new Error('豆包搜索 API Key 未配置')
+  const count = Math.min(20, Math.max(1, Number(maxResults) || 5))
+  const response = await makeRequest({
+    url: doubaoSearchEndpoint(apiBase),
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${key}`,
+    },
+    body: {
+      query: String(query || '').trim(),
+      doc_count: count,
+      max_snippet_length: 1200,
+      max_image_count_per_doc: 0,
+    },
+    timeout: 45000,
+    signal,
+  })
+  return normalizeDoubaoSearchResponse(response.body || {}, query, count)
+}
+
 async function searchTavily({ apiBase, apiKey, query, topic = 'news', timeRange = 'week', maxResults = 5, signal }) {
   const key = String(apiKey || '').trim()
   if (!key) throw new Error('Tavily API Key 未配置')
@@ -171,8 +230,11 @@ module.exports = {
   bochaFreshness,
   bochaRetryDelay,
   createRequestLimiter,
+  doubaoSearchEndpoint,
   isBochaRateLimitError,
   normalizeBochaResponse,
+  normalizeDoubaoSearchResponse,
   searchBocha,
+  searchDoubao,
   searchTavily,
 }

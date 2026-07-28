@@ -151,7 +151,7 @@ export function isCurrentResearchSession(value: unknown): value is OrganizeResea
   })
   return (session.reportType === 'event' || session.reportType === 'explanatory' || session.reportType === 'trend')
     && typeof session.unitId === 'number' && Number.isFinite(session.unitId) && Number.isInteger(session.unitId) && session.unitId >= 0
-    && (session.provider === 'tavily' || session.provider === 'bocha' || session.provider === 'default_ai')
+    && (session.provider === 'tavily' || session.provider === 'bocha' || session.provider === 'doubao_search' || session.provider === 'default_ai')
     && (session.completionMode === undefined || session.completionMode === 'hybrid' || session.completionMode === 'web_only' || session.completionMode === 'ai_knowledge')
     && (session.status === 'searching' || session.status === 'completed' || session.status === 'partial' || session.status === 'failed')
     && typeof session.coreSubject === 'string' && session.coreSubject.trim().length > 0

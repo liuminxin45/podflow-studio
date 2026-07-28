@@ -143,6 +143,15 @@ export function getOrganizeSearchStatus() {
       reason: '请先在设置中配置博查 API Key',
     }
   }
+  if (provider === 'doubao_search') {
+    const searchConfig = global.webSearchProviders.doubao_search
+    return {
+      provider,
+      ready: Boolean(searchConfig.apiKeySet && searchConfig.apiKey),
+      label: '豆包搜索',
+      reason: '请先在设置中配置豆包搜索 API Key',
+    }
+  }
   return {
     provider,
     ready: global.defaultAISearchVerifiedTarget === global.defaultAITarget,
@@ -202,6 +211,26 @@ export async function searchForOrganize(
     }
     const response = await invokeSearchWithAbort(bochaSearch, {
       apiBase: searchConfig.apiBase || 'https://api.bochaai.com',
+      apiKey: searchConfig.apiKey,
+      query,
+      timeRange,
+      maxResults,
+    }, signal)
+    throwIfAborted(signal)
+    return {
+      provider,
+      query: response.query,
+      results: response.results.map(item => ({ ...item, provider })),
+    }
+  }
+  if (provider === 'doubao_search') {
+    const searchConfig = global.webSearchProviders.doubao_search
+    const doubaoSearch = window.electronAPI?.doubaoSearch
+    if (typeof doubaoSearch !== 'function') {
+      throw new Error('桌面搜索能力尚未加载，请完整退出并重新启动 Electron 应用')
+    }
+    const response = await invokeSearchWithAbort(doubaoSearch, {
+      apiBase: searchConfig.apiBase || 'https://open.feedcoopapi.com',
       apiKey: searchConfig.apiKey,
       query,
       timeRange,

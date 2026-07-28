@@ -6,7 +6,7 @@ const { randomBytes } = require('crypto')
 const { spawn } = require('child_process')
 const ConfigManager = require('./configManager')
 const { fetchModels, callLLM, stopLLMGateway } = require('./llmService')
-const { searchBocha, searchTavily } = require('./searchService')
+const { searchBocha, searchDoubao, searchTavily } = require('./searchService')
 const { stopLocalAgentProcesses } = require('./localAgentService')
 const { detectLocalAgents } = require('./aiTargetManager')
 const { listDoubaoVoices } = require('./services/doubaoVoiceService')
@@ -1394,6 +1394,7 @@ async function runCancellableSearch(params, search) {
 
 ipcMain.handle('search:tavily', async (_event, params) => runCancellableSearch(params, searchTavily))
 ipcMain.handle('search:bocha', async (_event, params) => runCancellableSearch(params, searchBocha))
+ipcMain.handle('search:doubao', async (_event, params) => runCancellableSearch(params, searchDoubao))
 ipcMain.handle('search:cancel', async (_event, requestId) => {
   const controller = activeSearchRequests.get(requestId)
   if (!controller) return { success: false }

@@ -29,7 +29,7 @@ export interface NewsEditorial {
   practicalValue: string
 }
 
-export type OrganizeSearchProvider = 'tavily' | 'bocha' | 'default_ai'
+export type OrganizeSearchProvider = 'tavily' | 'bocha' | 'doubao_search' | 'default_ai'
 export type OrganizeCompletionMode = 'hybrid' | 'web_only' | 'ai_knowledge'
 export type OrganizeReportType = 'event' | 'explanatory' | 'trend'
 export type EvidenceFreshness = 'latest' | 'year' | 'any'

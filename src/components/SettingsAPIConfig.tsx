@@ -41,6 +41,7 @@ import { verifyDefaultAISearchCapability } from '../services/organizeResearch'
 const SEARCH_API_BASES = {
   tavily: 'https://api.tavily.com',
   bocha: 'https://api.bochaai.com',
+  doubao_search: 'https://open.feedcoopapi.com',
 } as const
 
 const AGENT_ICON_SOURCES: Record<LocalAgentConfig['id'], string> = {
@@ -1452,14 +1453,16 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
     setTestingSearch(true)
     try {
       const provider = global.searchProvider || 'tavily'
-      if (provider === 'tavily' || provider === 'bocha') {
+      if (provider === 'tavily' || provider === 'bocha' || provider === 'doubao_search') {
         const searchConfig = global.webSearchProviders[provider]
         await updateSearchProviderConfig({ connectionStatus: 'testing' }, false)
-        const providerLabel = provider === 'bocha' ? '博查' : 'Tavily'
+        const providerLabel = provider === 'bocha' ? '博查' : provider === 'doubao_search' ? '豆包搜索' : 'Tavily'
         if (!searchConfig.apiKey) throw new Error(`请先填写 ${providerLabel} API Key`)
         const providerSearch = provider === 'bocha'
           ? window.electronAPI?.bochaSearch
-          : window.electronAPI?.tavilySearch
+          : provider === 'doubao_search'
+            ? window.electronAPI?.doubaoSearch
+            : window.electronAPI?.tavilySearch
         if (typeof providerSearch !== 'function') {
           throw new Error('桌面搜索能力尚未加载，请完整退出并重新启动 Electron 应用后再试')
         }
@@ -2048,15 +2051,16 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)', fontSize: 14, fontWeight: 650 }}>
               <SearchOutlined style={{ color: 'var(--accent-primary)' }} /> 网页搜索
             </div>
-            <div style={{ marginTop: 4, color: 'var(--text-tertiary)', fontSize: 11 }}>整理页自动补证使用；支持 Tavily、博查，或复用当前 AI 的联网搜索能力。</div>
+            <div style={{ marginTop: 4, color: 'var(--text-tertiary)', fontSize: 11 }}>整理页自动补证使用；支持 Tavily、博查、豆包搜索，或复用当前 AI 的联网搜索能力。</div>
           </div>
           <StatusBadge status={displayedSearchStatus} />
         </div>
 
-        <div className="search-provider-options" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 14 }}>
+        <div className="search-provider-options" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginBottom: 14 }}>
           {([
             ['tavily', 'Tavily API', '稳定返回结构化网页来源'],
             ['bocha', '博查 API', '中文语义搜索与结构化网页来源'],
+            ['doubao_search', '豆包搜索 API', '火山引擎面向 Agent 的联网搜索'],
             ['default_ai', '复用当前 AI 联网', '复用当前 AI，依赖其自身联网搜索能力'],
           ] as const).map(([value, label, desc]) => {
             const selected = selectedSearchProvider === value
