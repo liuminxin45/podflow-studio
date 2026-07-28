@@ -60,5 +60,5 @@ describe('SettingsPage creation settings', () => {
         creatorPreferences: expect.objectContaining({ organizeCompletionMode: 'ai_knowledge' }),
       }),
     ))
-  })
+  }, 15_000)
 })

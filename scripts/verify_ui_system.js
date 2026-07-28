@@ -16,10 +16,19 @@ function expectIncludes(source, expected, description, failures) {
   if (!source.includes(expected)) failures.push(`${description}: missing ${expected}`)
 }
 
+function collectUiFiles(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const target = path.join(directory, entry.name)
+    if (entry.isDirectory()) return collectUiFiles(target)
+    return /\.(?:css|tsx)$/.test(entry.name) ? [target] : []
+  })
+}
+
 const css = read(cssPath)
 const app = read(appPath)
 const guide = read(guidePath)
 const failures = []
+const uiFiles = collectUiFiles(path.join(root, 'src'))
 const quietPassStart = css.indexOf('/* OpenHuman light system:')
 
 if (quietPassStart === -1) {
@@ -49,9 +58,9 @@ for (const rule of [
   '#root :where([style*="font-weight"])',
   'font-weight: 500 !important;',
   ':where(h1, h2)',
-  'font-weight: 600 !important;',
-  ':where(h3, h4, h5, h6, strong, b)',
   'font-weight: 550 !important;',
+  ':where(h3, h4, h5, h6, strong, b)',
+  'font-weight: 500 !important;',
   '.ant-card,',
   'box-shadow: none !important;',
   '@media (prefers-reduced-motion: reduce)',
@@ -59,8 +68,15 @@ for (const rule of [
   expectIncludes(quietPass, rule, 'OpenHuman light hierarchy rule', failures)
 }
 
-if (quietPass && /font-weight:\s*(?:6[5-9]\d|[7-9]\d\d)\s*!important/.test(quietPass)) {
-  failures.push('OpenHuman light system contains a prohibited heavy font-weight')
+for (const filePath of uiFiles) {
+  const source = read(filePath)
+  const relativePath = path.relative(root, filePath)
+  if (/font-?weight(?:\s*:|["']?\s*:)\s*(?:6\d\d|[7-9]\d\d)/.test(source)) {
+    failures.push(`${relativePath} contains a prohibited heavy font-weight`)
+  }
+  if (/#(?:f4efe5|f7f6f3|f1eadf|f7f4ee|faf9f6|fbfaf7|eeede8|e7e5de|dddbd3)\b/i.test(source)) {
+    failures.push(`${relativePath} contains a retired warm-neutral color`)
+  }
 }
 
 for (const token of [
@@ -68,7 +84,7 @@ for (const token of [
   "colorText: '#202124'",
   "colorBgLayout: '#ffffff'",
   "colorBorder: '#e5e5e7'",
-  'fontWeightStrong: 600',
+  'fontWeightStrong: 550',
   'controlHeight: 32',
   'borderRadius: 8',
 ]) {

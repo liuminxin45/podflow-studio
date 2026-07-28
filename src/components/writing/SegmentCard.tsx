@@ -108,7 +108,7 @@ export default function SegmentCard({
             onBlur={() => {
               if (!segment.label.trim()) onLabelChange(cfg.label)
             }}
-            style={{ minWidth: 0, padding: 0, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}
+            style={{ minWidth: 0, padding: 0, fontSize: 13, fontWeight: 550, color: 'var(--text-primary)' }}
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

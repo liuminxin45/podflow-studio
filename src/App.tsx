@@ -899,7 +899,7 @@ function App() {
           fontFamily: "var(--font-ui)",
           fontSize: 13,
           fontSizeSM: 12,
-          fontWeightStrong: 600,
+          fontWeightStrong: 550,
           controlHeight: 32,
           controlHeightSM: 28,
           borderRadius: 8,

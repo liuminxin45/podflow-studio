@@ -189,7 +189,7 @@ export default function CreationStudio({
 
       <main className="stage-body creation-layout">
         <section className="creation-sidebar">
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>素材池</div>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>素材池</div>
           <Search placeholder="搜索标题或摘要" value={query} onChange={e => setQuery(e.target.value)} style={{ marginBottom: 12 }} />
           {filteredMaterials.length === 0 ? (
             <Empty description="暂无素材" />
@@ -201,7 +201,7 @@ export default function CreationStudio({
               borderRadius: 8,
               background: 'var(--bg-secondary)',
             }}>
-              <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>{item.title || '无标题'}</div>
+              <div style={{ fontSize: 13, fontWeight: 550, lineHeight: 1.4 }}>{item.title || '无标题'}</div>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>
                 {item.source || item.source_name || 'unknown source'}
               </div>
@@ -215,7 +215,7 @@ export default function CreationStudio({
         <section className="creation-main">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>事实卡片</div>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>事实卡片</div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>推荐 9 条快讯 + 1 条深度解读，允许任意数量</div>
             </div>
             <Tag bordered={false} color={selectedFacts.length > 0 ? 'green' : 'orange'}>
@@ -267,7 +267,7 @@ export default function CreationStudio({
         </section>
 
         <section className="creation-summary">
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>本期结构</div>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>本期结构</div>
           <Input value={topicTitle} onChange={e => setTopicTitle(e.target.value)} style={{ marginBottom: 8 }} />
           <Input.TextArea value={topicDesc} onChange={e => setTopicDesc(e.target.value)} autoSize={{ minRows: 2, maxRows: 4 }} style={{ marginBottom: 12 }} />
           {selectedFacts.map((fact, index) => (
@@ -279,7 +279,7 @@ export default function CreationStudio({
               marginBottom: 8,
             }}>
               <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{slotLabelForIndex(index, selectedFacts.length)}</div>
-              <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{fact.title}</div>
+              <div style={{ fontSize: 13, fontWeight: 550, marginTop: 2 }}>{fact.title}</div>
             </div>
           ))}
         </section>

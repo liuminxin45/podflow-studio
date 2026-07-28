@@ -203,11 +203,11 @@
 .creation-news-copy small {
   display: inline-block;
   margin-top: 3px;
-  border: 1px solid #9d8c71;
+  border: 1px solid var(--border-active);
   border-radius: 5px;
-  background: #f4efe5;
+  background: var(--bg-secondary);
   padding: 1px 5px;
-  color: #5f513d;
+  color: var(--text-secondary);
   font-size: 9px;
   line-height: 1.4;
 }
@@ -278,7 +278,7 @@
 .writing-structure-episode .ant-input:first-child {
   color: var(--text-primary);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .writing-structure-episode .ant-input:last-child {
@@ -486,22 +486,27 @@
 .writing-segment-card {
   width: 100%;
   max-width: 1080px;
+  border: 0 !important;
+  border-bottom: 1px solid var(--border-light) !important;
   margin-inline: auto;
-  border-radius: 10px !important;
+  border-radius: 0 !important;
+  background: #fff !important;
   box-shadow: none !important;
 }
 
 .writing-segment-card.is-active {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 15%, transparent) !important;
+  border-bottom-color: var(--border-active) !important;
+  box-shadow: inset 2px 0 0 var(--accent-primary) !important;
 }
 
 .writing-segment-header {
   min-height: 44px;
-  padding: 10px 14px !important;
+  padding: 14px 16px 10px !important;
+  background: #fff !important;
 }
 
 .writing-segment-body {
-  padding: 14px 16px !important;
+  padding: 10px 16px 18px !important;
 }
 
 .writing-segment-editor {
@@ -539,26 +544,26 @@
 
 .writing-quick-optimize {
   min-height: 26px;
-  border: 1px solid #d8d4cc;
+  border: 1px solid var(--border-color);
   border-radius: 6px;
-  background: #f7f6f3;
+  background: #fff;
   padding: 3px 10px;
-  color: #363430;
+  color: var(--text-secondary);
   font: inherit;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.4;
   cursor: pointer;
   transition: border-color 150ms ease, background 150ms ease;
 }
 
 .writing-quick-optimize:hover:not(:disabled) {
-  border-color: #8c877d;
-  background: #ffffff;
+  border-color: var(--border-active);
+  background: var(--bg-secondary);
 }
 
 .writing-quick-optimize:focus-visible {
-  outline: 2px solid #716b60;
+  outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
 

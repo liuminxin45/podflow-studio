@@ -595,7 +595,7 @@ function NodeOverrideCard({ stageId, settings, updateSettings }: {
       overflow: 'hidden',
       transition: 'box-shadow 0.2s ease',
     }}
-    className="settings-subsection"
+    className="settings-node-card"
     >
       {/* Header row */}
       <div
@@ -625,7 +625,7 @@ function NodeOverrideCard({ stageId, settings, updateSettings }: {
           {meta.icon}
         </span>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{meta.label}</div>
+          <div style={{ fontSize: 13, fontWeight: 550, color: 'var(--text-primary)' }}>{meta.label}</div>
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 1 }}>{meta.desc}</div>
         </div>
 
@@ -691,7 +691,7 @@ function NodeOverrideCard({ stageId, settings, updateSettings }: {
               >
                 <div style={{
                   fontSize: 13,
-                  fontWeight: 600,
+                  fontWeight: 550,
                   color: nodeConfig.overrideMode === opt.key ? 'var(--accent-primary)' : 'var(--text-primary)',
                   marginBottom: 2,
                 }}>
@@ -714,7 +714,7 @@ function NodeOverrideCard({ stageId, settings, updateSettings }: {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <CheckOutlined style={{ color: 'var(--success-color)' }} />
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    <span style={{ fontSize: 12, fontWeight: 550, color: 'var(--text-primary)' }}>
                       {localCopy.title}
                     </span>
                   </div>
@@ -878,7 +878,7 @@ function ProviderConfigFields({
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 0.9fr)', gap: 10 }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 650, color: 'var(--text-secondary)', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
             API Base URL
           </div>
           <Input
@@ -892,7 +892,7 @@ function ProviderConfigFields({
           />
         </div>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 650, color: 'var(--text-secondary)', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
             Model
           </div>
           <div data-testid="provider-model-row" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -994,7 +994,7 @@ function AudioProviderSettings({
     marginBottom: 6,
     color: 'var(--text-secondary)',
     fontSize: 11,
-    fontWeight: 650,
+    fontWeight: 500,
   } as const
   const inputStyle = { borderRadius: 8, fontSize: 12 }
   const resetStatus = { audioConnectionStatus: 'untested' as APIConnectionStatus }
@@ -1044,7 +1044,7 @@ function AudioProviderSettings({
   }))
 
   return (
-    <div className="settings-subsection" style={{
+    <div className="settings-api-section" style={{
       background: 'var(--bg-secondary)',
       border: '1px solid var(--border-color)',
       borderRadius: 12,
@@ -1053,7 +1053,7 @@ function AudioProviderSettings({
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)', fontSize: 14, fontWeight: 650 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)', fontSize: 14, fontWeight: 500 }}>
             <SoundOutlined style={{ color: 'var(--accent-primary)' }} /> 语音生成
           </div>
         </div>
@@ -1064,7 +1064,7 @@ function AudioProviderSettings({
           background: configured ? 'var(--success-bg)' : 'var(--error-bg)',
           color: configured ? 'var(--success-color)' : 'var(--error-color)',
           fontSize: 11,
-          fontWeight: 650,
+          fontWeight: 500,
         }}>
           {global.audioProvider === 'edge-tts' ? '无需配置' : configured ? '配置完整' : '待配置'}
         </span>
@@ -1108,7 +1108,7 @@ function AudioProviderSettings({
           borderRadius: 8,
           background: 'var(--bg-primary)',
         }}>
-          <div style={{ marginBottom: 10, color: 'var(--text-primary)', fontSize: 12, fontWeight: 650 }}>
+          <div style={{ marginBottom: 10, color: 'var(--text-primary)', fontSize: 12, fontWeight: 500 }}>
             音色列表管理凭据
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
@@ -1609,13 +1609,13 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
 
   return (
     <div>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-          <span style={{ fontSize: 16, color: 'var(--accent-primary)' }}><ThunderboltOutlined /></span>
-          <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>智能能力与接口配置</span>
+      <header className="settings-section-header">
+        <span className="settings-section-icon"><ThunderboltOutlined /></span>
+        <div>
+          <h1>智能能力与接口配置</h1>
+          <p>统一管理默认 AI、语音生成、网页搜索和节点级覆盖。</p>
         </div>
-      </div>
+      </header>
 
       <div
         style={{
@@ -1625,13 +1625,13 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
           padding: '18px 20px',
           marginBottom: 20,
         }}
-        className="settings-subsection"
+        className="settings-api-section"
       >
         <div style={{ marginBottom: 16 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <RobotOutlined style={{ color: 'var(--accent-primary)' }} />
-              <span style={{ fontSize: 14, fontWeight: 650, color: 'var(--text-primary)' }}>默认 AI 目标</span>
+              <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>默认 AI 目标</span>
             </div>
             <div style={{
               marginTop: 10,
@@ -1643,7 +1643,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
               background: 'var(--accent-light)',
               color: 'var(--accent-primary)',
               fontSize: 11,
-              fontWeight: 600,
+              fontWeight: 550,
             }}>
               <CheckOutlined />
               {selectedTargetLabel}
@@ -1683,7 +1683,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
                   {option.icon}
                 </span>
                 <span style={{ display: 'block' }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 650 }}>{option.label}</span>
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 500 }}>{option.label}</span>
                   <span style={{ display: 'block', marginTop: 2, fontSize: 11, color: 'var(--text-tertiary)' }}>
                     {option.desc}
                   </span>
@@ -1697,7 +1697,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 650, color: 'var(--text-primary)' }}>已识别的本地代理</div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>已识别的本地代理</div>
                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>选择已安装的 CLI 代理作为默认 AI。</div>
               </div>
               <Button
@@ -1760,7 +1760,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
                         />
                       </span>
                       <span style={{ minWidth: 0 }}>
-                        <span style={{ display: 'block', fontSize: 13, fontWeight: 650 }}>{agent.name}</span>
+                        <span style={{ display: 'block', fontSize: 13, fontWeight: 500 }}>{agent.name}</span>
                         <span style={{
                           display: 'block',
                           marginTop: 3,
@@ -1772,7 +1772,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
                       </span>
                     </div>
                     {selected && (
-                      <div style={{ marginTop: 10, fontSize: 11, color: 'var(--accent-primary)', fontWeight: 600 }}>
+                      <div style={{ marginTop: 10, fontSize: 11, color: 'var(--accent-primary)', fontWeight: 550 }}>
                         当前默认
                       </div>
                     )}
@@ -1785,7 +1785,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
 
         {activeTargetKind === 'local_model' && selectedLocalModelProvider && (
           <div>
-            <div style={{ fontSize: 13, fontWeight: 650, color: 'var(--text-primary)', marginBottom: 4 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
               本地模型服务
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10, marginBottom: 14 }}>
@@ -1813,7 +1813,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
                     }}
                     className="settings-option-card"
                   >
-                    <span style={{ display: 'block', fontSize: 13, fontWeight: 650 }}>{provider.name}</span>
+                    <span style={{ display: 'block', fontSize: 13, fontWeight: 500 }}>{provider.name}</span>
                     <span style={{ display: 'block', marginTop: 4, fontSize: 11, color: 'var(--text-tertiary)' }}>
                       {isProviderConfigured(provider) ? provider.model : '待配置'}
                     </span>
@@ -1841,7 +1841,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
 
         {activeTargetKind === 'api_model' && selectedApiModelProvider && (
           <div>
-            <div style={{ fontSize: 13, fontWeight: 650, color: 'var(--text-primary)', marginBottom: 4 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
               API 模型供应商
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 12 }}>配置并选择默认 API 模型。</div>
@@ -1872,7 +1872,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
                     }}
                     className="settings-option-card"
                   >
-                    <div style={{ fontSize: 13, fontWeight: 650, marginBottom: 8 }}>{provider.name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>{provider.name}</div>
                     <div style={{ fontSize: 10, color: 'var(--text-tertiary)', lineHeight: 1.4 }}>
                       {isProviderConfigured(provider) ? provider.model : '待配置'}
                     </div>
@@ -1889,7 +1889,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 650, color: 'var(--text-primary)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
                     {selectedApiModelProvider.name}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
@@ -1909,7 +1909,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
               />
 
               <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 650, color: 'var(--text-secondary)', marginBottom: 7 }}>
+                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 7 }}>
                   API 密钥保存
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
@@ -1938,7 +1938,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
                           cursor: 'pointer',
                         }}
                       >
-                        <span style={{ display: 'block', fontSize: 12, fontWeight: 650 }}>{option.label}</span>
+                        <span style={{ display: 'block', fontSize: 12, fontWeight: 500 }}>{option.label}</span>
                         <span style={{ display: 'block', marginTop: 3, fontSize: 10, color: 'var(--text-tertiary)' }}>
                           {option.desc}
                         </span>
@@ -1951,7 +1951,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
               {selectedApiModelProvider.apiKeyStorage === 'local' && (
                 <div data-testid="provider-key-row" style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginTop: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 650, color: 'var(--text-secondary)', marginBottom: 7 }}>
+                    <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 7 }}>
                       接入密钥
                     </div>
                     <APIKeyInput
@@ -1981,7 +1981,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
               {selectedApiModelProvider.apiKeyStorage === 'env' && (
                 <div data-testid="provider-key-row" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 12 }}>
                   <label style={{ display: 'block', flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 650, color: 'var(--text-secondary)', marginBottom: 7 }}>
+                    <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 7 }}>
                       环境变量名
                     </div>
                     <Input
@@ -2042,13 +2042,13 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
 
       <AudioProviderSettings global={global} updateGlobal={updateAudioGlobal} />
 
-      <div className="settings-subsection" style={{
+      <div className="settings-api-section" style={{
         background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 12,
         padding: '18px 20px', marginBottom: 20,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)', fontSize: 14, fontWeight: 650 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-primary)', fontSize: 14, fontWeight: 500 }}>
               <SearchOutlined style={{ color: 'var(--accent-primary)' }} /> 网页搜索
             </div>
             <div style={{ marginTop: 4, color: 'var(--text-tertiary)', fontSize: 11 }}>整理页自动补证使用；支持 Tavily、博查、豆包搜索，或复用当前 AI 的联网搜索能力。</div>
@@ -2073,8 +2073,8 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
 
         {selectedSearchProvider !== 'default_ai' ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, .8fr) minmax(280px, 1.2fr)', gap: 10 }}>
-            <label><span style={{ display: 'block', marginBottom: 6, color: 'var(--text-secondary)', fontSize: 11, fontWeight: 650 }}>API Base</span><Input value={selectedSearchConfig?.apiBase || SEARCH_API_BASES[selectedSearchProvider]} onChange={event => updateSearchProviderConfig({ apiBase: event.target.value, connectionStatus: 'untested' })} /></label>
-            <div><span style={{ display: 'block', marginBottom: 6, color: 'var(--text-secondary)', fontSize: 11, fontWeight: 650 }}>API Key</span><APIKeyInput value={selectedSearchConfig?.apiKeyMasked || ''} status={selectedSearchConfig?.connectionStatus || 'untested'} onSave={key => updateSearchProviderConfig({ apiKey: key, apiKeySet: true, apiKeyMasked: maskApiKey(key), connectionStatus: 'untested' })} onClear={() => updateSearchProviderConfig({ apiKey: '', apiKeySet: false, apiKeyMasked: '', connectionStatus: 'untested' })} /></div>
+            <label><span style={{ display: 'block', marginBottom: 6, color: 'var(--text-secondary)', fontSize: 11, fontWeight: 500 }}>API Base</span><Input value={selectedSearchConfig?.apiBase || SEARCH_API_BASES[selectedSearchProvider]} onChange={event => updateSearchProviderConfig({ apiBase: event.target.value, connectionStatus: 'untested' })} /></label>
+            <div><span style={{ display: 'block', marginBottom: 6, color: 'var(--text-secondary)', fontSize: 11, fontWeight: 500 }}>API Key</span><APIKeyInput value={selectedSearchConfig?.apiKeyMasked || ''} status={selectedSearchConfig?.connectionStatus || 'untested'} onSave={key => updateSearchProviderConfig({ apiKey: key, apiKeySet: true, apiKeyMasked: maskApiKey(key), connectionStatus: 'untested' })} onClear={() => updateSearchProviderConfig({ apiKey: '', apiKeySet: false, apiKeyMasked: '', connectionStatus: 'untested' })} /></div>
           </div>
         ) : (
           <div style={{ padding: '10px 12px', border: '1px solid var(--border-color)', borderRadius: 8, background: 'var(--bg-primary)', color: 'var(--text-secondary)', fontSize: 11, lineHeight: 1.6 }}>
@@ -2092,9 +2092,9 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
         padding: '18px 20px',
         marginBottom: 16,
       }}
-      className="settings-subsection"
+      className="settings-api-section"
       >
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+        <div style={{ fontSize: 14, fontWeight: 550, color: 'var(--text-primary)', marginBottom: 4 }}>
           高级：节点级文本 AI 覆盖
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 16 }}>

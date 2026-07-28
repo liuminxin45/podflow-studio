@@ -298,62 +298,24 @@ interface OptionCardProps {
 
 function OptionCard({ selected, onClick, title, desc, badge, disabled }: OptionCardProps) {
   return (
-    <div
+    <button
+      type="button"
       onClick={disabled ? undefined : onClick}
-      style={{
-        flex: 1,
-        minWidth: 140,
-        padding: '16px 14px 14px',
-        borderRadius: 12,
-        border: `1.5px solid ${selected ? 'var(--accent-primary)' : 'var(--border-color)'}`,
-        background: selected ? 'var(--accent-light)' : disabled ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1,
-        transition: 'all 0.2s ease',
-        position: 'relative',
-      }}
-      className="settings-option-card"
+      disabled={disabled}
+      aria-pressed={selected}
+      className={`settings-option-card ${selected ? 'is-selected' : ''}`}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        {selected && (
-          <span style={{
-            width: 16,
-            height: 16,
-            borderRadius: '50%',
-            background: 'var(--accent-primary)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <CheckOutlined style={{ fontSize: 9, color: '#fff' }} />
-          </span>
-        )}
-        <div style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: selected ? 'var(--accent-primary)' : 'var(--text-primary)',
-          minWidth: 0,
-        }}>
+      <span className="settings-option-indicator" aria-hidden="true">
+        {selected && <CheckOutlined />}
+      </span>
+      <span className="settings-option-copy">
+        <span className="settings-option-title">
           {title}
-        </div>
-        {badge && (
-          <span style={{
-            marginLeft: 'auto',
-            fontSize: 10,
-            padding: '1px 6px',
-            borderRadius: 4,
-            background: selected ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-            color: selected ? '#fff' : 'var(--text-tertiary)',
-            fontWeight: 500,
-            whiteSpace: 'nowrap',
-          }}>
-            {badge}
-          </span>
-        )}
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.4 }}>{desc}</div>
-    </div>
+          {badge && <small>{badge}</small>}
+        </span>
+        <span className="settings-option-description">{desc}</span>
+      </span>
+    </button>
   )
 }
 
@@ -363,13 +325,13 @@ function OptionCard({ selected, onClick, title, desc, badge, disabled }: OptionC
 
 function SectionHeader({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
-    <div style={{ marginBottom: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <span style={{ fontSize: 16, color: 'var(--accent-primary)' }}>{icon}</span>
-        <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</span>
+    <header className="settings-section-header">
+      <span className="settings-section-icon">{icon}</span>
+      <div>
+        <h1>{title}</h1>
+        <p>{desc}</p>
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text-tertiary)', paddingLeft: 24 }}>{desc}</div>
-    </div>
+    </header>
   )
 }
 
@@ -386,45 +348,25 @@ function SubsectionBlock({ title, desc, children, collapsible = false }: {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
-    <div style={{
-      background: 'var(--bg-secondary)',
-      border: '1px solid var(--border-color)',
-      borderRadius: 12,
-      padding: '18px 20px',
-      marginBottom: 16,
-      transition: 'box-shadow 0.2s ease',
-    }}
-    className="settings-subsection"
-    >
+    <section className="settings-subsection">
       <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          cursor: collapsible ? 'pointer' : 'default',
-          marginBottom: collapsed ? 0 : 14,
-        }}
+        className={`settings-subsection-heading ${collapsible ? 'is-collapsible' : ''}`}
         onClick={collapsible ? () => setCollapsed(!collapsed) : undefined}
       >
         <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</div>
-          {desc && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{desc}</div>}
+          <h2>{title}</h2>
+          {desc && <p>{desc}</p>}
         </div>
         {collapsible && (
-          <RightOutlined style={{
-            fontSize: 10,
-            color: 'var(--text-tertiary)',
-            transform: collapsed ? 'rotate(0deg)' : 'rotate(90deg)',
-            transition: 'transform 0.2s ease',
-          }} />
+          <RightOutlined className={collapsed ? '' : 'is-open'} />
         )}
       </div>
       {!collapsed && (
-        <div style={{ animation: 'settingsFadeIn 0.2s ease' }}>
+        <div className="settings-subsection-content">
           {children}
         </div>
       )}
-    </div>
+    </section>
   )
 }
 
