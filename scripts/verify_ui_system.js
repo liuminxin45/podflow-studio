@@ -20,29 +20,29 @@ const css = read(cssPath)
 const app = read(appPath)
 const guide = read(guidePath)
 const failures = []
-const quietPassStart = css.indexOf('/* Quiet workbench pass:')
+const quietPassStart = css.indexOf('/* OpenHuman light system:')
 
 if (quietPassStart === -1) {
-  failures.push('Quiet workbench pass is missing from src/index.css')
+  failures.push('OpenHuman light system is missing from src/index.css')
 }
 
 const quietPass = quietPassStart === -1 ? '' : css.slice(quietPassStart)
 
 for (const token of [
-  '--bg-primary: #f5f4f0;',
-  '--bg-secondary: #fbfaf7;',
-  '--bg-tertiary: #eeede8;',
-  '--text-primary: #262521;',
-  '--text-secondary: #6d6a63;',
-  '--border-color: #dddbd3;',
-  '--accent-primary: #292823;',
-  '--accent-light: #e7e5de;',
+  '--bg-primary: #ffffff;',
+  '--bg-secondary: #fafafa;',
+  '--bg-tertiary: #f4f4f5;',
+  '--text-primary: #202124;',
+  '--text-secondary: #62646a;',
+  '--border-color: #e5e5e7;',
+  '--accent-primary: #242529;',
+  '--accent-light: #f0f0f1;',
   '--radius-sm: 6px;',
-  '--radius-md: 9px;',
-  '--radius-lg: 14px;',
-  '--stage-nav-width: 224px;',
+  '--radius-md: 8px;',
+  '--radius-lg: 12px;',
+  '--stage-nav-width: 216px;',
 ]) {
-  expectIncludes(quietPass, token, 'Quiet workbench token', failures)
+  expectIncludes(quietPass, token, 'OpenHuman light token', failures)
 }
 
 for (const rule of [
@@ -56,21 +56,21 @@ for (const rule of [
   'box-shadow: none !important;',
   '@media (prefers-reduced-motion: reduce)',
 ]) {
-  expectIncludes(quietPass, rule, 'Quiet workbench hierarchy rule', failures)
+  expectIncludes(quietPass, rule, 'OpenHuman light hierarchy rule', failures)
 }
 
 if (quietPass && /font-weight:\s*(?:6[5-9]\d|[7-9]\d\d)\s*!important/.test(quietPass)) {
-  failures.push('Quiet workbench pass contains a prohibited heavy font-weight')
+  failures.push('OpenHuman light system contains a prohibited heavy font-weight')
 }
 
 for (const token of [
-  "colorPrimary: '#292823'",
-  "colorText: '#262521'",
-  "colorBgLayout: '#f5f4f0'",
-  "colorBorder: '#dddbd3'",
+  "colorPrimary: '#242529'",
+  "colorText: '#202124'",
+  "colorBgLayout: '#ffffff'",
+  "colorBorder: '#e5e5e7'",
   'fontWeightStrong: 600',
   'controlHeight: 32',
-  'borderRadius: 9',
+  'borderRadius: 8',
 ]) {
   expectIncludes(app, token, 'Ant Design token', failures)
 }
@@ -90,4 +90,4 @@ if (failures.length > 0) {
   process.exit(1)
 }
 
-console.log('[verify:ui-system] PASS: quiet workbench tokens and guardrails are intact')
+console.log('[verify:ui-system] PASS: OpenHuman light tokens and guardrails are intact')

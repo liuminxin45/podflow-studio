@@ -3,12 +3,12 @@
 状态：**生效中**
 
 适用范围：Electron / React 工作台
-最后更新：2026-07-15
+最后更新：2026-07-28
 
 ## 设计基线
 
-PodFlow Studio 是高密度的创作工作台。整体布局采用 OpenWorker 式的
-“常驻产品轨道 + 当前任务导航 + 内容工作面”三层结构。界面层级应由
+PodFlow Studio 是高密度的创作工作台。视觉语言参考 OpenHuman 的轻量
+白色桌面：常驻单一导航、纯白工作面、极浅冷灰反馈和克制的分隔线。界面层级应由
 布局、留白、色彩和位置建立，而不是反复使用粗体、重阴影或高对比色块。
 
 - 默认采用 **400** 字重；普通标签、导航与次级操作采用 **500**。
@@ -16,27 +16,28 @@ PodFlow Studio 是高密度的创作工作台。整体布局采用 OpenWorker �
 - 页面标题和唯一的主操作采用 **600**；不使用 650、700、750、800
   作为常规界面强调。
 - 选中态使用浅灰底色或细描边；不要同时叠加重描边、阴影和位移动画。
-- 容器优先使用白底、`1px` 细描边和 `5–10px` 圆角；常规容器不使用阴影。
+- 主画布和主要工作区使用纯白；辅助栏也优先纯白，仅用边线区隔。
+- 容器优先使用白底、`1px` 冷灰细描边和 `6–12px` 圆角；常规容器不使用阴影。
 - 颜色表达语义，而非装饰：仅成功、警告、错误和主操作使用语义色。
 
 ## 令牌
 
-`src/index.css` 的 **Quiet workbench pass** 和 `src/App.tsx` 的
+`src/index.css` 的 **OpenHuman light system** 和 `src/App.tsx` 的
 Ant Design `ConfigProvider` 是运行时令牌的唯一来源。新增界面必须使用
 这些变量或对应的 Ant Design token，不能另建一套颜色、圆角或阴影体系。
 
 | 类别 | 令牌 | 值 / 用途 |
 | --- | --- | --- |
-| 画布 | `--bg-primary` | `#f5f4f0`，暖灰桌面底色 |
-| 容器 | `--bg-secondary` | `#fbfaf7`，导航与次级内容面 |
-| 悬停 | `--bg-tertiary` | `#eeede8`，弱反馈 |
-| 选中 | `--accent-light` | `#e7e5de`，非破坏性选中态 |
-| 文本 | `--text-primary` | `#262521`，主内容 |
-| 次文本 | `--text-secondary` | `#6d6a63`，说明与次要信息 |
-| 边框 | `--border-color` | `#dddbd3`，常规分隔 |
-| 活动边框 | `--border-active` | `#bebbb1`，焦点/选中辅助反馈 |
-| 主操作 | `--accent-primary` | `#292823`，唯一主按钮与关键状态 |
-| 圆角 | `--radius-sm/md/lg` | `6px / 9px / 14px` |
+| 画布 | `--bg-primary` | `#ffffff`，纯白桌面底色 |
+| 容器 | `--bg-secondary` | `#fafafa`，仅用于弱分组 |
+| 悬停 | `--bg-tertiary` | `#f4f4f5`，冷灰弱反馈 |
+| 选中 | `--accent-light` | `#f0f0f1`，非破坏性选中态 |
+| 文本 | `--text-primary` | `#202124`，主内容 |
+| 次文本 | `--text-secondary` | `#62646a`，说明与次要信息 |
+| 边框 | `--border-color` | `#e5e5e7`，常规分隔 |
+| 活动边框 | `--border-active` | `#c7c8cc`，焦点/选中辅助反馈 |
+| 主操作 | `--accent-primary` | `#242529`，唯一主按钮与关键状态 |
+| 圆角 | `--radius-sm/md/lg` | `6px / 8px / 12px` |
 | 阴影 | `--shadow-soft` | 仅极弱层次；普通容器为 `none` |
 
 ## 组件规则
@@ -81,11 +82,11 @@ Ant Design `ConfigProvider` 是运行时令牌的唯一来源。新增界面必�
 
 ## 防漂移流程
 
-1. 新增/修改 UI 前，先阅读本文件和 `src/index.css` 的 Quiet workbench
-   pass。
+1. 新增/修改 UI 前，先阅读本文件和 `src/index.css` 的 OpenHuman light
+   system。
 2. 使用现有令牌；若确需新增令牌，同时更新本文件、`src/index.css`、
    `src/App.tsx` 的 Ant Design token，以及守卫脚本。
-3. 不要在 Quiet workbench pass 之后追加样式规则；需扩展时直接修改该
+3. 不要在 OpenHuman light system 之后追加样式规则；需扩展时直接修改该
    区块，使其始终保有最终覆盖权。
 4. 提交前运行 `npm run verify:ui-system`，再运行 `npm run build`。
 5. 涉及交互流程的页面，再运行 `npm run acceptance:cdp`。

@@ -3708,40 +3708,38 @@ pre {
   transform: translateY(0);
 }
 
-/* Quiet workbench pass: hierarchy comes from spacing, color and position,
-   not repeated heavy weights or elevated containers. */
+/* OpenHuman light system: one white workspace, cool neutral support surfaces,
+   and hierarchy built with spacing instead of heavy type or tinted cards. */
 :root {
-  --bg-primary: #f5f4f0;
-  --bg-secondary: #fbfaf7;
-  --bg-tertiary: #eeede8;
+  --bg-primary: #ffffff;
+  --bg-secondary: #fafafa;
+  --bg-tertiary: #f4f4f5;
   --bg-elevated: #ffffff;
-  --bg-muted: #e8e6df;
+  --bg-muted: #eeeeef;
 
-  --text-primary: #262521;
-  --text-secondary: #6d6a63;
-  --text-tertiary: #9a978f;
-  --accent-primary: #292823;
-  --accent-hover: #171713;
-  --accent-active: #0e0e0c;
-  --accent-light: #e7e5de;
+  --text-primary: #202124;
+  --text-secondary: #62646a;
+  --text-tertiary: #92949a;
+  --accent-primary: #242529;
+  --accent-hover: #151619;
+  --accent-active: #0d0e10;
+  --accent-light: #f0f0f1;
 
-  --border-color: #dddbd3;
-  --border-light: #e9e7e0;
-  --border-active: #bebbb1;
-  --shadow-soft: 0 1px 2px rgba(54, 49, 39, 0.04);
+  --border-color: #e5e5e7;
+  --border-light: #f0f0f1;
+  --border-active: #c7c8cc;
+  --shadow-soft: 0 1px 2px rgba(20, 21, 24, 0.035);
   --shadow-subtle: none;
   --radius-sm: 6px;
-  --radius-md: 9px;
-  --radius-lg: 14px;
-  --stage-nav-width: 224px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --stage-nav-width: 216px;
 }
 
 body {
   font-weight: 400;
   letter-spacing: 0.002em;
-  background:
-    radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.72), transparent 28rem),
-    var(--bg-primary);
+  background: var(--bg-primary);
 }
 
 .app-shell {
@@ -3788,7 +3786,7 @@ body {
   flex: 0 0 var(--stage-nav-width);
   flex-direction: column;
   border-right: 1px solid var(--border-color);
-  background: var(--bg-secondary);
+  background: #fff;
 }
 
 .workflow-sidebar-brand {
@@ -3820,6 +3818,7 @@ body {
 }
 
 .workflow-sidebar-brand strong {
+  font-weight: 500;
   font-size: 13px;
   letter-spacing: -0.015em;
 }
@@ -3999,8 +3998,8 @@ body {
 .stage-topbar {
   min-height: 58px;
   padding: 0 20px;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
 }
 
 .stage-header {
@@ -4034,7 +4033,7 @@ body {
 
 .discover-sidebar,
 .discover-summary {
-  background: var(--bg-secondary);
+  background: #fff;
   padding: 14px;
 }
 
@@ -4103,7 +4102,7 @@ body {
 
 .organize-unit-rail,
 .organize-source-pane {
-  background: var(--bg-secondary);
+  background: #fff;
 }
 
 .organize-story-editor {
@@ -4146,7 +4145,7 @@ body {
 .writing-structure-pane {
   width: 272px !important;
   min-width: 272px !important;
-  background: var(--bg-secondary) !important;
+  background: #fff !important;
 }
 
 .writing-editor-pane {
@@ -4180,7 +4179,7 @@ body {
 
 .produce-segments,
 .produce-settings {
-  background: var(--bg-secondary);
+  background: #fff;
 }
 
 .produce-main {
@@ -4218,7 +4217,7 @@ body {
 }
 
 .publish-summary {
-  background: var(--bg-secondary);
+  background: #fff;
 }
 
 .publish-main {
