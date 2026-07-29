@@ -24,6 +24,13 @@ function collectUiFiles(directory) {
   })
 }
 
+function lastCssBlock(source, selector) {
+  const start = source.lastIndexOf(`${selector} {`)
+  if (start === -1) return ''
+  const end = source.indexOf('}', start)
+  return end === -1 ? '' : source.slice(start, end + 1)
+}
+
 const css = read(cssPath)
 const app = read(appPath)
 const guide = read(guidePath)
@@ -36,6 +43,9 @@ if (quietPassStart === -1) {
 }
 
 const quietPass = quietPassStart === -1 ? '' : css.slice(quietPassStart)
+const discoverMainBlock = lastCssBlock(css, '.discover-main')
+const discoverToolbarBlock = lastCssBlock(css, '.discover-toolbar')
+const discoverListBlock = lastCssBlock(css, '.discover-list')
 
 for (const token of [
   '--bg-primary: #ffffff;',
@@ -66,6 +76,15 @@ for (const rule of [
   '@media (prefers-reduced-motion: reduce)',
 ]) {
   expectIncludes(quietPass, rule, 'OpenHuman light hierarchy rule', failures)
+}
+
+for (const [block, rule, description] of [
+  [discoverMainBlock, 'overflow-x: hidden;', 'Discover main overflow guard'],
+  [discoverToolbarBlock, 'margin: 0;', 'Discover toolbar width guard'],
+  [discoverListBlock, 'width: 100%;', 'Discover list width guard'],
+  [discoverListBlock, 'margin: 0;', 'Discover list margin guard'],
+]) {
+  expectIncludes(block, rule, description, failures)
 }
 
 for (const filePath of uiFiles) {
