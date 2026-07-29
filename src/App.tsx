@@ -894,6 +894,9 @@ function App() {
           colorBgLayout: '#ffffff',
           colorBgTextHover: '#f0f0f1',
           colorFillAlter: '#f4f4f5',
+          controlItemBgHover: '#f4f4f5',
+          controlItemBgActive: '#f0f0f1',
+          controlItemBgActiveHover: '#e9e9eb',
           colorBorder: '#e5e5e7',
           colorBorderSecondary: '#f0f0f1',
           fontFamily: "var(--font-ui)",
@@ -907,6 +910,20 @@ function App() {
           borderRadiusLG: 12,
           boxShadow: '0 1px 2px rgba(20, 21, 24, 0.035)',
           boxShadowSecondary: '0 1px 2px rgba(20, 21, 24, 0.035)',
+        },
+        components: {
+          Select: {
+            optionActiveBg: '#f4f4f5',
+            optionSelectedBg: '#f0f0f1',
+            optionSelectedColor: '#202124',
+            optionSelectedFontWeight: 500,
+            multipleItemBg: '#f4f4f5',
+          },
+          Dropdown: {
+            controlItemBgHover: '#f4f4f5',
+            controlItemBgActive: '#f0f0f1',
+            controlItemBgActiveHover: '#e9e9eb',
+          },
         },
       }}
     >
