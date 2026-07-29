@@ -5862,9 +5862,9 @@ body {
   background: var(--accent-primary) !important;
 }
 
-.ant-btn-dangerous,
-.ant-btn-dangerous:hover,
-.ant-btn-dangerous:focus,
+.ant-btn-dangerous:not(.ant-btn-primary),
+.ant-btn-dangerous:not(.ant-btn-primary):hover,
+.ant-btn-dangerous:not(.ant-btn-primary):focus,
 .ant-dropdown-menu-item-danger,
 .ant-dropdown-menu-item-danger:hover,
 .ant-menu-item-danger,
@@ -5872,4 +5872,19 @@ body {
   border-color: var(--border-active) !important;
   background: var(--bg-primary) !important;
   color: var(--text-primary) !important;
+}
+
+.ant-btn-primary.ant-btn-dangerous,
+.ant-btn-primary.ant-btn-dangerous:hover,
+.ant-btn-primary.ant-btn-dangerous:focus {
+  border-color: var(--accent-primary) !important;
+  background: var(--accent-primary) !important;
+  color: var(--text-inverse) !important;
+}
+
+.ant-btn-primary.ant-btn-dangerous > span,
+.ant-btn-primary.ant-btn-dangerous .ant-btn-icon,
+.ant-btn-primary.ant-btn-dangerous .anticon,
+.ant-btn-primary.ant-btn-dangerous svg {
+  color: var(--text-inverse) !important;
 }

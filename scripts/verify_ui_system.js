@@ -94,6 +94,9 @@ for (const rule of [
   'font-weight: 500 !important;',
   '.ant-card,',
   'box-shadow: none !important;',
+  '.ant-btn-dangerous:not(.ant-btn-primary)',
+  '.ant-btn-primary.ant-btn-dangerous',
+  '.ant-btn-primary.ant-btn-dangerous > span',
   '@media (prefers-reduced-motion: reduce)',
 ]) {
   expectIncludes(quietPass, rule, 'OpenHuman light hierarchy rule', failures)
