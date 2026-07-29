@@ -46,7 +46,8 @@ interface Props {
   onAssignSeries: (seriesId: string, workflowId: string) => Promise<void>
   onReorderSeries: (seriesId: string, episodeIds: string[]) => Promise<void>
   onGenerateSeriesFeed: (seriesId: string) => Promise<void>
-  createRequestKey?: number
+  createRequested?: boolean
+  onCreateRequestHandled?: () => void
 }
 
 function formatDate(value?: string) {
@@ -98,7 +99,8 @@ export default function EpisodeManager({
   onAssignSeries,
   onReorderSeries,
   onGenerateSeriesFeed,
-  createRequestKey = 0,
+  createRequested = false,
+  onCreateRequestHandled = () => undefined,
 }: Props) {
   const [editing, setEditing] = useState<WorkflowSummary | null>(null)
   const [editTitle, setEditTitle] = useState('')
@@ -146,8 +148,10 @@ export default function EpisodeManager({
   }, [episodes])
 
   useEffect(() => {
-    if (createRequestKey > 0) setCreateVisible(true)
-  }, [createRequestKey])
+    if (!createRequested) return
+    setCreateVisible(true)
+    onCreateRequestHandled()
+  }, [createRequested, onCreateRequestHandled])
 
   const visibleEpisodes = useMemo(() => episodes.filter(episode => {
     const text = `${episode.title} ${episode.description || ''} ${episode.series?.title || ''}`.toLocaleLowerCase()

@@ -97,6 +97,7 @@ describe('节目库与播放器', () => {
 
   it('uses the redesigned creation and series workspaces', async () => {
     const onCreate = vi.fn()
+    const onCreateRequestHandled = vi.fn()
     render(<EpisodeManager
       episodes={[episode]}
       loading={false}
@@ -115,9 +116,11 @@ describe('节目库与播放器', () => {
       onAssignSeries={vi.fn()}
       onReorderSeries={vi.fn()}
       onGenerateSeriesFeed={vi.fn()}
-      createRequestKey={1}
+      createRequested
+      onCreateRequestHandled={onCreateRequestHandled}
     />)
     expect(screen.getByRole('heading', { name: '开始一期新节目' })).toBeTruthy()
+    expect(onCreateRequestHandled).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: /每日科技/ }))
     fireEvent.click(screen.getByRole('button', { name: '创建并进入发现' }))
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith('daily'))

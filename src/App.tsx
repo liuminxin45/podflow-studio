@@ -153,7 +153,7 @@ function App() {
   const [playingWorkflow, setPlayingWorkflow] = useState<Workflow | null>(null)
   const [recovery, setRecovery] = useState<{ workflowId: string; plan: RecoveryPlan; running: boolean } | null>(null)
   const [homePage, setHomePage] = useState<'blank' | 'episodes'>('episodes')
-  const [createRequestKey, setCreateRequestKey] = useState(0)
+  const [createEpisodeRequested, setCreateEpisodeRequested] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [approvalVisible, setApprovalVisible] = useState(false)
   const [approvalData, setApprovalData] = useState<any>(null)
@@ -456,7 +456,7 @@ function App() {
   const openCreateEpisode = () => {
     closeAllPanels()
     setHomePage('episodes')
-    setCreateRequestKey(value => value + 1)
+    setCreateEpisodeRequested(true)
   }
 
   useEffect(() => {
@@ -980,7 +980,8 @@ function App() {
                   onAssignSeries={handleAssignSeries}
                   onReorderSeries={handleReorderSeries}
                   onGenerateSeriesFeed={handleGenerateSeriesFeed}
-                  createRequestKey={createRequestKey}
+                  createRequested={createEpisodeRequested}
+                  onCreateRequestHandled={() => setCreateEpisodeRequested(false)}
                 />
               )}
             </main>
