@@ -16,6 +16,16 @@ vi.mock('antd', async importOriginal => {
   }
 })
 
+vi.mock('../../services/deepDiveSelection', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../services/deepDiveSelection')>()
+  return {
+    ...actual,
+    analyzeAndResearchDeepDive: vi.fn(),
+  }
+})
+
+import { analyzeAndResearchDeepDive } from '../../services/deepDiveSelection'
+
 const contents = [
   { title: '新闻一', content: '第一条新闻的核心事实', source: '来源甲', url: 'https://example.com/one' },
   { title: '新闻二', content: '第二条新闻补充了另一方观点', source: '来源乙', url: 'https://example.com/two' },
@@ -98,6 +108,7 @@ describe('OrganizePanel news unit editor', () => {
         expect.objectContaining({ title: '新闻一', _status: 'ready' }),
         expect.objectContaining({ title: '新闻二', _status: 'needs_context' }),
       ],
+      expect.objectContaining({ status: 'idle' }),
     )
   })
 
@@ -202,22 +213,85 @@ describe('OrganizePanel news unit editor', () => {
     expect(onRemoveFromMaterialPool).not.toHaveBeenCalled()
   })
 
-  it('keeps exactly one deep-dive selection and expands its editorial checklist', () => {
+  it('keeps exactly one evidence-backed deep-dive selection and expands its editorial checklist', async () => {
+    const selectionResult = (id: number, title: string) => ({
+      selectedUnit: {
+        _id: id,
+        _order: id,
+        _priority: 'important' as const,
+        _status: 'ready' as const,
+        _isDeepDive: true,
+        title,
+        content: `${title}的深度资料`,
+        _deepDiveBrief: {
+          version: 1 as const,
+          inputFingerprint: '1234abcd',
+          coreQuestion: '为什么值得深挖？',
+          whyNow: '现在需要解释。',
+          thesisBoundary: '只说明已有证据。',
+          sections: [
+            { title: '事实', question: '发生了什么？', listenerValue: '理解事实', claims: [{ text: '事实一', sourceUrls: ['https://a.test'], confidence: 'high' as const }] },
+            { title: '机制', question: '为什么发生？', listenerValue: '理解机制', claims: [{ text: '机制一', sourceUrls: ['https://b.test'], confidence: 'medium' as const }] },
+          ],
+          counterpoints: [{ text: '仍有边界', sourceUrls: ['https://c.test'], confidence: 'medium' as const }],
+          limitations: [],
+          sourceUrls: ['https://a.test', 'https://b.test', 'https://c.test'],
+          generatedAt: '2026-07-29T00:00:00.000Z',
+        },
+      },
+      researchSession: {
+        unitId: id,
+        provider: 'tavily' as const,
+        researchProfile: 'deep' as const,
+        inputFingerprint: '1234abcd',
+        completionMode: 'web_only' as const,
+        queries: ['事实', '机制', '反方', '影响'],
+        results: [
+          { id: 'a', title: '来源 A', url: 'https://a.test', excerpt: '事实', provider: 'tavily' as const, taskId: 'facts', evidenceRole: 'direct_fact' as const },
+          { id: 'b', title: '来源 B', url: 'https://b.test', excerpt: '机制', provider: 'tavily' as const, taskId: 'mechanism', evidenceRole: 'mechanism' as const },
+          { id: 'c', title: '来源 C', url: 'https://c.test', excerpt: '反方', provider: 'tavily' as const, taskId: 'counter', evidenceRole: 'counter_evidence' as const },
+        ],
+        status: 'completed' as const,
+        updatedAt: '2026-07-29T00:00:00.000Z',
+        reportType: 'explanatory' as const,
+        coreSubject: '深度问题',
+        tasks: [
+          { id: 'facts', question: '事实', purpose: '事实', role: 'direct_fact' as const, freshness: 'latest' as const, queries: ['事实'] },
+          { id: 'mechanism', question: '机制', purpose: '机制', role: 'mechanism' as const, freshness: 'any' as const, queries: ['机制'] },
+          { id: 'counter', question: '反方', purpose: '反方', role: 'counter_evidence' as const, freshness: 'any' as const, queries: ['反方'] },
+          { id: 'impact', question: '影响', purpose: '影响', role: 'consumer_experience' as const, freshness: 'year' as const, queries: ['影响'] },
+        ],
+        metrics: { retrieved: 3, accepted: 3, rejected: 0, uniqueDomains: 3, coveredTasks: 3, totalTasks: 4 },
+      },
+      state: {
+        version: 1 as const,
+        status: 'selected' as const,
+        inputFingerprint: '1234abcd',
+        source: 'manual' as const,
+        selectedUnitId: id,
+        candidates: [],
+        attemptedUnitIds: [id],
+        updatedAt: '2026-07-29T00:00:00.000Z',
+      },
+    })
+    vi.mocked(analyzeAndResearchDeepDive)
+      .mockResolvedValueOnce(selectionResult(0, '新闻一'))
+      .mockResolvedValueOnce(selectionResult(1, '新闻二'))
     renderPanel()
 
-    fireEvent.click(screen.getByRole('button', { name: '设为深度稿' }))
-    expect(screen.getByRole('button', { name: '已设为深度稿' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: '优先核验此条' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '已通过深度核验' }).getAttribute('aria-pressed')).toBe('true'))
     expect(screen.getByLabelText('深度稿扩展整理')).toBeTruthy()
     expect(screen.getByText('至少三个独立来源')).toBeTruthy()
     expect(screen.getByLabelText('深度稿')).toBeTruthy()
 
     fireEvent.click(screen.getByTitle('新闻二'))
-    expect(screen.getByRole('button', { name: '设为深度稿' }).getAttribute('aria-pressed')).toBe('false')
-    fireEvent.click(screen.getByRole('button', { name: '设为深度稿' }))
+    expect(screen.getByRole('button', { name: '优先核验此条' }).getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(screen.getByRole('button', { name: '优先核验此条' }))
 
-    expect(screen.getAllByLabelText('深度稿')).toHaveLength(1)
+    await waitFor(() => expect(screen.getAllByLabelText('深度稿')).toHaveLength(1))
     expect(screen.getByDisplayValue('新闻二')).toBeTruthy()
-  })
+  }, 15_000)
 
   it('replaces the workspace when discovery provides a new material set', async () => {
     const view = render(

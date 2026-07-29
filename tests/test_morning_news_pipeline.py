@@ -271,7 +271,7 @@ def test_duration_config_controls_quick_and_deep_structure():
     short_news = [segment for segment in short_result["script"]["segments"] if segment["type"] in {"quick_news", "deep_dive"}]
     long_news = [segment for segment in long_result["script"]["segments"] if segment["type"] in {"quick_news", "deep_dive"}]
     assert [segment["type"] for segment in short_news] == ["quick_news"] * 4
-    assert [segment["type"] for segment in long_news] == ["quick_news"] * 7 + ["deep_dive"]
+    assert [segment["type"] for segment in long_news] == ["quick_news"] * 8
 
 
 def test_script_node_places_the_user_selected_fact_in_the_deep_dive_slot():
@@ -328,6 +328,32 @@ def test_script_node_keeps_an_explicit_deep_dive_when_it_is_the_only_story():
         "claim": "唯一新闻已经发生。",
         "source_url": "https://example.com/only",
         "confidence": "high",
+        "is_deep_dive": True,
+        "deep_dive_brief": {
+            "version": 1,
+            "inputFingerprint": "1234abcd",
+            "coreQuestion": "为什么值得深挖？",
+            "whyNow": "现在需要解释。",
+            "thesisBoundary": "只说明已有证据。",
+            "sections": [
+                {
+                    "title": "事实",
+                    "question": "发生了什么？",
+                    "listenerValue": "理解事实",
+                    "claims": [{"text": "事实成立。", "sourceUrls": ["https://example.com/only"], "confidence": "high"}],
+                },
+                {
+                    "title": "影响",
+                    "question": "影响是什么？",
+                    "listenerValue": "理解影响",
+                    "claims": [{"text": "影响需要解释。", "sourceUrls": ["https://example.com/only"], "confidence": "medium"}],
+                },
+            ],
+            "counterpoints": [{"text": "仍有边界。", "sourceUrls": ["https://example.com/only"], "confidence": "medium"}],
+            "limitations": [],
+            "sourceUrls": ["https://example.com/only"],
+            "generatedAt": "2026-07-29T00:00:00.000Z",
+        },
     }
     state = create_base_state()
     state["facts"] = [fact]

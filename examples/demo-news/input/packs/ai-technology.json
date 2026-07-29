@@ -22,7 +22,50 @@
     "url": "https://openai.com/index/gpt-5-6/",
     "published": "2026-07-09T18:00:00+08:00",
     "source": "OpenAI",
-    "_isDeepDive": true
+    "_isDeepDive": true,
+    "_deepDiveBrief": {
+      "version": 1,
+      "inputFingerprint": "9b8c7d6e",
+      "coreQuestion": "GPT-5.6 系列的分层定位会怎样改变企业选型，而哪些性能判断仍需真实任务验证？",
+      "whyNow": "系列进入一般可用阶段后，关注点从发布本身转向不同模型的成本、速度与能力取舍。",
+      "thesisBoundary": "官方资料可以确认产品定位与开放阶段，不能替代具体业务中的准确率、延迟和总成本评测。",
+      "sections": [
+        {
+          "title": "产品分层",
+          "question": "三个模型分别服务什么工作负载？",
+          "listenerValue": "建立选型时最基本的能力与成本坐标。",
+          "claims": [
+            {
+              "text": "官方将 Sol 定位为旗舰模型，Terra 强调能力、速度与成本平衡，Luna 面向成本敏感工作负载。",
+              "sourceUrls": ["https://openai.com/index/gpt-5-6/"],
+              "confidence": "high"
+            }
+          ]
+        },
+        {
+          "title": "验证责任",
+          "question": "企业为什么仍需用自己的任务评测？",
+          "listenerValue": "避免把厂商定位直接当作采购结论。",
+          "claims": [
+            {
+              "text": "具体业务中的准确率、速度、上下文需求和总成本仍需结合真实任务验证。",
+              "sourceUrls": ["https://openai.com/index/gpt-5-6/"],
+              "confidence": "medium"
+            }
+          ]
+        }
+      ],
+      "counterpoints": [
+        {
+          "text": "一般可用和产品分层不能证明某个模型在所有企业任务中都具有相同优势。",
+          "sourceUrls": ["https://openai.com/index/gpt-5-6/"],
+          "confidence": "medium"
+        }
+      ],
+      "limitations": ["该离线示例只绑定一个官方发布来源，不用于证明多来源交叉核验已经完成。"],
+      "sourceUrls": ["https://openai.com/index/gpt-5-6/"],
+      "generatedAt": "2026-07-29T00:00:00.000Z"
+    }
   },
   {
     "title": "Meta 发布图像生成模型 Muse Image",

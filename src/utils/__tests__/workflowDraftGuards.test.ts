@@ -28,6 +28,8 @@ describe('buildOrganizeUiPatch', () => {
     const sessions = [{
       unitId: 0,
       provider: 'tavily' as const,
+      researchProfile: 'standard' as const,
+      inputFingerprint: '1234abcd',
       queries: ['核验发布时间', '历史背景'],
       results: [],
       status: 'completed' as const,

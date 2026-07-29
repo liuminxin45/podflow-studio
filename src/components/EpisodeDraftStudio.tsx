@@ -15,7 +15,11 @@ import { resolveMorningNewsProfile } from '../services/writing/morningNewsProfil
 import WritingLayer from './writing'
 import WorkflowFailureNotice, { type WorkflowFailure } from './WorkflowFailureNotice'
 
-type MaterialItem = ContentItem & { _source_channel?: 'auto'; _isDeepDive?: boolean }
+type MaterialItem = ContentItem & {
+  _source_channel?: 'auto'
+  _isDeepDive?: boolean
+  _deepDiveBrief?: NonNullable<FactCard['deep_dive_brief']>
+}
 const EMPTY_MATERIALS: MaterialItem[] = []
 const EMPTY_FACTS: FactCard[] = []
 const EMPTY_SELECTED_TOPICS: SelectedNewsTopic[] = []
@@ -124,25 +128,12 @@ export default function EpisodeDraftStudio({
     return ordered.length > 0 ? ordered : facts
   }, [facts, initialSelectedTopics])
   const deepDiveFactId = useMemo(() => {
-    const persisted = initialSelectedTopics.find(topic => topic.is_deep_dive)
-    const persistedId = String(persisted?.fact_id || persisted?.id || '')
-    if (persistedId && facts.some(fact => fact.id === persistedId)) return persistedId
-
-    const deepMaterial = materials.find(material => material._isDeepDive)
-    if (!deepMaterial) return ''
-    const deepMaterialUrl = deepMaterial.url || ''
-    return facts.find(fact => (
-      deepMaterialUrl
-        ? Boolean(fact.source_url && deepMaterialUrl === fact.source_url)
-        : Boolean(deepMaterial.title && fact.title && deepMaterial.title === fact.title)
-    ))?.id || ''
-  }, [facts, initialSelectedTopics, materials])
+    return facts.find(fact => fact.is_deep_dive && fact.deep_dive_brief)?.id || ''
+  }, [facts])
   const resolvedNewsCount = Math.min(curatedFacts.length, morningNewsProfile.recommendedNewsItemCount)
   const resolvedDeepDiveCount = deepDiveFactId && resolvedNewsCount > 0
     ? 1
-    : resolvedNewsCount >= 3
-      ? Math.min(morningNewsProfile.deepDiveRecommendedCount, 1)
-      : 0
+    : 0
   const resolvedQuickNewsCount = Math.max(0, resolvedNewsCount - resolvedDeepDiveCount)
   const selectedFacts = useMemo(() => {
     if (!deepDiveFactId || resolvedDeepDiveCount === 0) return curatedFacts.slice(0, resolvedNewsCount)
@@ -437,7 +428,7 @@ function deriveFacts(materials: MaterialItem[]): FactCard[] {
     .slice(0, 20)
     .map((item, index) => {
       const content = String(item.summary || item.content || '').replace(/\s+/g, ' ').trim()
-      return {
+      return applyVerifiedMaterialDepth({
         id: `fact_${String(index + 1).padStart(3, '0')}`,
         title: item.title || `事实 ${index + 1}`,
         summary: content.slice(0, 260),
@@ -447,8 +438,22 @@ function deriveFacts(materials: MaterialItem[]): FactCard[] {
         claim: firstSentence(content),
         confidence: (item.url && item.published ? 'high' : item.url ? 'medium' : 'low') as FactCard['confidence'],
         used_in_segments: [],
-      }
+      }, item)
     })
+}
+
+function applyVerifiedMaterialDepth(fact: FactCard, material: MaterialItem): FactCard {
+  const {
+    is_deep_dive: _staleDeepMarker,
+    deep_dive_brief: _staleDeepBrief,
+    ...currentFact
+  } = fact
+  if (!material._isDeepDive || !material._deepDiveBrief) return currentFact
+  return {
+    ...currentFact,
+    is_deep_dive: true,
+    deep_dive_brief: material._deepDiveBrief,
+  }
 }
 
 function factsForCurrentMaterials(initialFacts: FactCard[], materials: MaterialItem[]): FactCard[] {
@@ -462,7 +467,7 @@ function factsForCurrentMaterials(initialFacts: FactCard[], materials: MaterialI
   // Reuse persisted cards only when every current material has one. A partial
   // match indicates state from an earlier organize batch and must not leak in.
   return matchedFacts.every((fact): fact is FactCard => Boolean(fact))
-    ? matchedFacts
+    ? matchedFacts.map((fact, index) => applyVerifiedMaterialDepth(fact, materials[index]))
     : deriveFacts(materials)
 }
 

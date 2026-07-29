@@ -32,6 +32,7 @@ export interface NewsEditorial {
 export type OrganizeSearchProvider = 'tavily' | 'bocha' | 'doubao_search' | 'default_ai'
 export type OrganizeCompletionMode = 'hybrid' | 'web_only' | 'ai_knowledge'
 export type OrganizeReportType = 'event' | 'explanatory' | 'trend'
+export type OrganizeResearchProfile = 'standard' | 'deep'
 export type EvidenceFreshness = 'latest' | 'year' | 'any'
 export type EvidenceRole = 'direct_fact' | 'historical_context' | 'mechanism' | 'comparison' | 'counter_evidence' | 'consumer_experience' | 'expert_opinion' | 'data_benchmark'
 export type OrganizeKnowledgeRole = 'historical_context' | 'mechanism' | 'comparison' | 'counter_view' | 'stakeholder' | 'listener_question' | 'practical_implication'
@@ -89,6 +90,8 @@ export interface OrganizeResearchResult {
 export interface OrganizeResearchSession {
   unitId: number
   provider: OrganizeSearchProvider
+  researchProfile: OrganizeResearchProfile
+  inputFingerprint: string
   completionMode?: OrganizeCompletionMode
   queries: string[]
   results: OrganizeResearchResult[]
@@ -103,6 +106,70 @@ export interface OrganizeResearchSession {
   metrics: OrganizeEvidenceMetrics
 }
 
+export type DepthValueLevel = 'low' | 'medium' | 'high'
+export type DepthSelectionStatus = 'idle' | 'triaging' | 'probing' | 'researching' | 'selected' | 'provisional' | 'none' | 'failed'
+export type DepthSelectionSource = 'automatic' | 'manual'
+
+export interface DepthCandidateDimensions {
+  explanatoryDepth: DepthValueLevel
+  audienceImpact: DepthValueLevel
+  evidencePotential: DepthValueLevel
+  distinctiveness: DepthValueLevel
+}
+
+export interface DepthCandidateAssessment {
+  unitId: number
+  coreQuestion: string
+  whyInteresting: string
+  listenerValue: string
+  dimensions: DepthCandidateDimensions
+  probeTasks: OrganizeResearchTask[]
+  probeResults: OrganizeResearchResult[]
+  eligible: boolean
+  gateReasons: string[]
+  uniqueDomains: number
+}
+
+export interface DeepDiveClaim {
+  text: string
+  sourceUrls: string[]
+  confidence: 'low' | 'medium' | 'high'
+}
+
+export interface DeepDiveSection {
+  title: string
+  question: string
+  listenerValue: string
+  claims: DeepDiveClaim[]
+}
+
+export interface DeepDiveBrief {
+  version: 1
+  inputFingerprint: string
+  coreQuestion: string
+  whyNow: string
+  thesisBoundary: string
+  sections: DeepDiveSection[]
+  counterpoints: DeepDiveClaim[]
+  limitations: string[]
+  sourceUrls: string[]
+  generatedAt: string
+}
+
+export interface DepthSelectionState {
+  version: 1
+  status: DepthSelectionStatus
+  inputFingerprint: string
+  source?: DepthSelectionSource
+  selectedUnitId?: number
+  provisionalUnitId?: number
+  candidates: DepthCandidateAssessment[]
+  attemptedUnitIds: number[]
+  reason?: string
+  error?: string
+  updatedAt: string
+}
+
 export interface CandidateItem extends OrganizeItem {
   _priority: Priority
   _order: number
@@ -110,5 +177,6 @@ export interface CandidateItem extends OrganizeItem {
   _status?: NewsUnitStatus
   _references?: NewsReference[]
   _editorial?: NewsEditorial
+  _deepDiveBrief?: DeepDiveBrief
   _originKeys?: string[]
 }

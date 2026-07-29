@@ -12,6 +12,38 @@ from protocol.presets import get_default_preset
 SCHEMA_VERSION = 1
 
 
+class DeepDiveClaimModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str
+    sourceUrls: list[str] = Field(min_length=1)
+    confidence: Literal["high", "medium", "low"]
+
+
+class DeepDiveSectionModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    question: str
+    listenerValue: str
+    claims: list[DeepDiveClaimModel] = Field(min_length=1)
+
+
+class DeepDiveBriefModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Literal[1] = 1
+    inputFingerprint: str = Field(pattern=r"^[a-f0-9]{8}$")
+    coreQuestion: str
+    whyNow: str
+    thesisBoundary: str
+    sections: list[DeepDiveSectionModel] = Field(min_length=2, max_length=5)
+    counterpoints: list[DeepDiveClaimModel] = Field(min_length=1)
+    limitations: list[str] = Field(default_factory=list)
+    sourceUrls: list[str] = Field(min_length=1)
+    generatedAt: str
+
+
 class FactCardModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -26,7 +58,14 @@ class FactCardModel(BaseModel):
     source_titles: list[str] = Field(default_factory=list)
     source_urls: list[str] = Field(default_factory=list)
     is_deep_dive: bool = False
+    deep_dive_brief: DeepDiveBriefModel | None = None
     used_in_segments: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def require_brief_for_deep_dive(self) -> "FactCardModel":
+        if self.is_deep_dive and self.deep_dive_brief is None:
+            raise ValueError("deep_dive_brief is required when is_deep_dive=true")
+        return self
 
 
 class ScriptSegmentModel(BaseModel):

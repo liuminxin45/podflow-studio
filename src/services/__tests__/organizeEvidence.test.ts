@@ -105,6 +105,8 @@ describe('organizeEvidence', () => {
     const current: any = {
       unitId: 0,
       provider: 'tavily',
+      researchProfile: 'standard',
+      inputFingerprint: '1234abcd',
       completionMode: 'hybrid',
       queries: ['事实查询', '背景查询'],
       results: [{ id: 'r1', title: '来源', url: 'https://example.com', excerpt: '摘要', provider: 'tavily', taskId: 'facts' }],

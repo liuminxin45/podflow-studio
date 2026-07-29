@@ -46,6 +46,9 @@ def build_editorial_plan_prompt(
             "claim": fact.get("claim"),
             "confidence": fact.get("confidence"),
             "is_deep_dive": bool(fact.get("is_deep_dive")),
+            "deep_dive_brief": fact.get("deep_dive_brief")
+            if fact.get("is_deep_dive")
+            else None,
         }
         for fact in facts
     ]
@@ -60,8 +63,7 @@ def build_editorial_plan_prompt(
 {json.dumps(fact_ids, ensure_ascii=False)}
 2. role 只能是 headline、standard、practical、explainer、comparison、light、deep_dive。
 3. 指定深度事实 ID 为 {json.dumps(marked_deep_id, ensure_ascii=False)}。
-   非空时它必须且只能使用 deep_dive；为空且本期 deep_dive 数量为 {deep_dive_count} 时，
-   从材料最完整、最能回答连续现实问题的事实卡中选择相应数量。
+   非空时它必须且只能使用 deep_dive；为空时不得生成 deep_dive。写稿阶段无权临时选择深度稿。
 4. 新闻不少于 3 条时，deep_dive 不能是第一条或最后一条。
 5. 同一 role 不得连续出现 3 次。
 6. opening.target_chars 为 100 至 180，closing.target_chars 为 50 至 100。
@@ -195,10 +197,8 @@ def validate_editorial_plan(
     if marked_deep_id:
         if len(deep_items) != 1 or deep_items[0]["fact_id"] != marked_deep_id:
             raise ValueError("成稿编排格式错误：深度稿必须绑定整理页指定事实")
-    elif len(deep_items) != expected_deep_dive_count:
-        raise ValueError(
-            f"成稿编排格式错误：本期必须包含 {expected_deep_dive_count} 条深度稿"
-        )
+    elif deep_items:
+        raise ValueError("成稿编排格式错误：整理页未指定深度稿，写稿阶段不得临时选择")
     if deep_items and deep_items[0]["fact_id"] not in opening_fact_ids:
         if len(opening_fact_ids) < 2:
             opening_fact_ids.append(deep_items[0]["fact_id"])

@@ -173,6 +173,15 @@
     "factCard": {
       "type": "object",
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": ["is_deep_dive"],
+            "properties": { "is_deep_dive": { "const": true } }
+          },
+          "then": { "required": ["deep_dive_brief"] }
+        }
+      ],
       "required": [
         "id",
         "title",
@@ -196,7 +205,78 @@
         "source_titles": { "type": "array", "items": { "type": "string" } },
         "source_urls": { "type": "array", "items": { "type": "string" } },
         "is_deep_dive": { "type": "boolean" },
+        "deep_dive_brief": { "$ref": "#/$defs/deepDiveBrief" },
         "used_in_segments": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "deepDiveClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "sourceUrls", "confidence"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "sourceUrls": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "format": "uri" }
+        },
+        "confidence": { "enum": ["high", "medium", "low"] }
+      }
+    },
+    "deepDiveSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "question", "listenerValue", "claims"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "question": { "type": "string", "minLength": 1 },
+        "listenerValue": { "type": "string", "minLength": 1 },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/deepDiveClaim" }
+        }
+      }
+    },
+    "deepDiveBrief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "inputFingerprint",
+        "coreQuestion",
+        "whyNow",
+        "thesisBoundary",
+        "sections",
+        "counterpoints",
+        "limitations",
+        "sourceUrls",
+        "generatedAt"
+      ],
+      "properties": {
+        "version": { "const": 1 },
+        "inputFingerprint": { "type": "string", "pattern": "^[a-f0-9]{8}$" },
+        "coreQuestion": { "type": "string", "minLength": 1 },
+        "whyNow": { "type": "string", "minLength": 1 },
+        "thesisBoundary": { "type": "string", "minLength": 1 },
+        "sections": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/deepDiveSection" }
+        },
+        "counterpoints": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/deepDiveClaim" }
+        },
+        "limitations": { "type": "array", "items": { "type": "string" } },
+        "sourceUrls": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "format": "uri" }
+        },
+        "generatedAt": { "type": "string", "format": "date-time" }
       }
     },
     "script": {

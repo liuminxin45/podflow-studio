@@ -210,27 +210,26 @@ def test_editorial_plan_requires_exact_fact_coverage_and_places_deep_dive_inside
     assert single["items"][0]["transition"] == "direct"
 
 
-def test_editorial_plan_selects_a_profile_deep_dive_when_none_is_preselected():
+def test_editorial_plan_rejects_a_late_deep_dive_when_none_is_preselected():
     facts = [
         {"id": "fact_001", "title": "头条"},
         {"id": "fact_002", "title": "适合深挖"},
         {"id": "fact_003", "title": "轻资讯"},
     ]
-    plan = validate_editorial_plan(
-        {
-            "opening": {"fact_ids": ["fact_001", "fact_002"], "listener_question": "限制是什么？", "promise_fact_id": "fact_002", "target_chars": 140},
-            "items": [
-                {"fact_id": "fact_001", "role": "headline", "target_chars": 160, "listener_question": "发生了什么？", "listener_value": "了解变化", "transition": "direct"},
-                {"fact_id": "fact_002", "role": "deep_dive", "target_chars": 1800, "listener_question": "限制是什么？", "listener_value": "理解限制", "transition": "resolve", "transition_reason": "兑现开场问题"},
-                {"fact_id": "fact_003", "role": "light", "target_chars": 180, "listener_question": "还有什么变化？", "listener_value": "补充变化", "transition": "reset"},
-            ],
-            "closing": {"target_chars": 80},
-        },
-        facts,
-        expected_deep_dive_count=1,
-    )
-
-    assert plan["items"][1]["role"] == "deep_dive"
+    with pytest.raises(ValueError, match="写稿阶段不得临时选择"):
+        validate_editorial_plan(
+            {
+                "opening": {"fact_ids": ["fact_001", "fact_002"], "listener_question": "限制是什么？", "promise_fact_id": "fact_002", "target_chars": 140},
+                "items": [
+                    {"fact_id": "fact_001", "role": "headline", "target_chars": 160, "listener_question": "发生了什么？", "listener_value": "了解变化", "transition": "direct"},
+                    {"fact_id": "fact_002", "role": "deep_dive", "target_chars": 1800, "listener_question": "限制是什么？", "listener_value": "理解限制", "transition": "resolve", "transition_reason": "兑现开场问题"},
+                    {"fact_id": "fact_003", "role": "light", "target_chars": 180, "listener_question": "还有什么变化？", "listener_value": "补充变化", "transition": "reset"},
+                ],
+                "closing": {"target_chars": 80},
+            },
+            facts,
+            expected_deep_dive_count=1,
+        )
 
 
 def test_episode_prompt_follows_validated_plan_order_and_short_opening():

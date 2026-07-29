@@ -124,6 +124,32 @@ const facts: FactCard[] = [
   },
 ]
 
+const deepDiveBrief: NonNullable<FactCard['deep_dive_brief']> = {
+  version: 1,
+  inputFingerprint: '1234abcd',
+  coreQuestion: '这次模型更新真正改变了什么？',
+  whyNow: '产品能力与行业竞争同时发生变化。',
+  thesisBoundary: '只讨论已被公开材料支持的能力变化。',
+  sections: [
+    {
+      title: '更新内容',
+      question: '官方实际发布了哪些能力？',
+      listenerValue: '分清公告事实与市场解读。',
+      claims: [{ text: '官方发布了新的模型能力。', sourceUrls: ['https://example.com/b'], confidence: 'high' }],
+    },
+    {
+      title: '行业影响',
+      question: '这次更新会如何影响竞争？',
+      listenerValue: '理解变化对行业参与者的意义。',
+      claims: [{ text: '更新提高了产品竞争压力。', sourceUrls: ['https://example.com/b'], confidence: 'medium' }],
+    },
+  ],
+  counterpoints: [{ text: '公开信息尚不足以证明长期优势。', sourceUrls: ['https://example.com/b'], confidence: 'medium' }],
+  limitations: ['缺少长期使用数据。'],
+  sourceUrls: ['https://example.com/b'],
+  generatedAt: '2026-07-01T08:00:00.000Z',
+}
+
 describe('morning-news writing surfaces', () => {
   it('does not fall back to unfinished organize materials or their stale facts', () => {
     render(
@@ -228,7 +254,13 @@ describe('morning-news writing surfaces', () => {
         onClose={vi.fn()}
         rawContents={[
           { title: facts[0].title, summary: facts[0].summary, url: facts[0].source_url },
-          { title: facts[1].title, summary: facts[1].summary, url: facts[1].source_url, _isDeepDive: true },
+          {
+            title: facts[1].title,
+            summary: facts[1].summary,
+            url: facts[1].source_url,
+            _isDeepDive: true,
+            _deepDiveBrief: deepDiveBrief,
+          },
           { title: facts[2].title, summary: facts[2].summary, url: facts[2].source_url },
         ]}
         initialFacts={facts}
@@ -247,10 +279,38 @@ describe('morning-news writing surfaces', () => {
       fact_id: 'fact_002',
       is_deep_dive: true,
     })
+    expect(latestStructure.facts.at(-1)).toMatchObject({
+      id: 'fact_002',
+      is_deep_dive: true,
+      deep_dive_brief: deepDiveBrief,
+    })
     expect(latestStructure.blocks.at(-2)).toMatchObject({
       type: 'deep_dive',
       title: '科技公司更新模型能力',
     })
+  })
+
+  it('does not invent a deep dive when organized materials have no verified brief', async () => {
+    const onStateChange = vi.fn()
+    render(
+      <EpisodeDraftStudio
+        visible
+        onClose={vi.fn()}
+        rawContents={facts.map(fact => ({
+          title: fact.title,
+          summary: fact.summary,
+          url: fact.source_url,
+        }))}
+        initialFacts={facts}
+        onStateChange={onStateChange}
+      />,
+    )
+
+    expect(screen.queryByText('深度稿')).toBeNull()
+    await waitFor(() => expect(onStateChange).toHaveBeenCalled())
+    const latestStructure = onStateChange.mock.calls.at(-1)?.[0]
+    expect(latestStructure.selected_topics.every((topic: { is_deep_dive?: boolean }) => !topic.is_deep_dive)).toBe(true)
+    expect(latestStructure.blocks.slice(1, -1).every((block: { type: string }) => block.type === 'quick_news')).toBe(true)
   })
 
   it('persists script edits when moving to production without overwriting generated script', async () => {

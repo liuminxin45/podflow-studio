@@ -20,6 +20,7 @@ import {
   buildOrganizeUiPatch,
   contentOriginKeys,
   getErrorMessage,
+  isCurrentDepthSelectionState,
   organizeWorkspaceMatchesSelection,
   readyCandidatesForDraft,
   toCandidateItems,
@@ -1245,6 +1246,9 @@ function App() {
           initialResearchSessions={Array.isArray(workflow?.state?.organize_ui?.researchSessions)
             ? workflow.state.organize_ui.researchSessions.filter(isCurrentResearchSession)
             : []}
+          initialDepthSelection={isCurrentDepthSelectionState(workflow?.state?.organize_ui?.depthSelection)
+            ? workflow.state.organize_ui.depthSelection
+            : undefined}
           onProcessLog={(entry) => {
             const workflowId = workflow?.id
             if (!workflowId || !window.electronAPI?.appendWorkflowLogs) return
@@ -1283,7 +1287,7 @@ function App() {
           }}
           onStateChange={(state) => {
             const patch = {
-              organize_ui: buildOrganizeUiPatch(state.candidates, state.researchSessions),
+              organize_ui: buildOrganizeUiPatch(state.candidates, state.researchSessions, state.depthSelection),
               selected_materials: readyCandidatesForDraft(state.candidates),
             }
             organizeSaveQueueRef.current = organizeSaveQueueRef.current
@@ -1291,7 +1295,7 @@ function App() {
               .then(async () => { await updateWorkflowPatch(patch) })
             return organizeSaveQueueRef.current
           }}
-          onProceedToIdeate={(candidates, researchSessions, allCandidates) => {
+          onProceedToIdeate={(candidates, researchSessions, allCandidates, depthSelection) => {
             if (candidates.length === 0) {
               showNotice('warning', '请至少将一条新闻标记为整理完成后再进入成稿')
               return
@@ -1301,7 +1305,7 @@ function App() {
               .catch(() => undefined)
               .then(async () => {
                 await updateWorkflowPatch({
-                  organize_ui: buildOrganizeUiPatch(allCandidates, researchSessions),
+                  organize_ui: buildOrganizeUiPatch(allCandidates, researchSessions, depthSelection),
                   selected_materials: candidates,
                   // Facts and topics belong to the prior organized selection.
                   // Rebuild them from this ready-only handoff in the draft flow.

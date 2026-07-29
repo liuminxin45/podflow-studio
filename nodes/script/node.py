@@ -34,7 +34,7 @@ def _resolve_script_structure(
     facts: list[dict[str, Any]],
     preset: dict[str, Any],
 ) -> dict[str, Any]:
-    """Let an explicit organize-page choice override the automatic density rule."""
+    """Resolve depth only from the evidence-backed organize-page decision."""
 
     structure = dict(resolve_morning_news_structure(len(facts), preset))
     actual_total = int(structure["actual_news_item_count"])
@@ -43,7 +43,16 @@ def _resolve_script_structure(
         isinstance(fact, dict) and bool(fact.get("is_deep_dive"))
         for fact in selected_facts
     )
-    if not has_explicit_deep_dive or actual_total <= 0:
+    if actual_total <= 0:
+        return structure
+    if not has_explicit_deep_dive:
+        structure.update(
+            {
+                "actual_quick_news_count": actual_total,
+                "actual_deep_dive_count": 0,
+                "template_variant": f"quick_{actual_total}",
+            }
+        )
         return structure
 
     structure.update(
@@ -63,7 +72,31 @@ def _resolve_script_structure(
 
 def _explicit_deep_dive_text(fact: dict[str, Any], preset: dict[str, Any]) -> str:
     title = str(fact.get("title") or "这条新闻").strip()
-    body = " ".join(str(fact.get("summary") or fact.get("claim") or "").split())
+    brief = fact.get("deep_dive_brief")
+    brief = brief if isinstance(brief, dict) else {}
+    brief_parts = [
+        str(brief.get("whyNow") or ""),
+        *[
+            " ".join(
+                str(claim.get("text") or "")
+                for claim in section.get("claims", [])
+                if isinstance(claim, dict)
+            )
+            for section in brief.get("sections", [])
+            if isinstance(section, dict)
+        ],
+        *[
+            str(claim.get("text") or "")
+            for claim in brief.get("counterpoints", [])
+            if isinstance(claim, dict)
+        ],
+        str(brief.get("thesisBoundary") or ""),
+    ]
+    body = " ".join(
+        " ".join(part.split())
+        for part in brief_parts
+        if part and str(part).strip()
+    ) or " ".join(str(fact.get("summary") or fact.get("claim") or "").split())
     char_range = preset.get("deep_dive_chars") or [2000, 2600]
     try:
         max_chars = max(200, int(char_range[1]))
@@ -83,7 +116,6 @@ def generate_deterministic_script(
     """Keep deterministic fallback aligned with an explicitly selected deep dive."""
 
     resolved_preset = preset or get_default_preset()
-    base_structure = resolve_morning_news_structure(len(facts), resolved_preset)
     marked_fact = next(
         (
             fact
@@ -92,6 +124,17 @@ def generate_deterministic_script(
         ),
         None,
     )
+    generation_preset = resolved_preset
+    if not isinstance(marked_fact, dict):
+        generation_preset = {
+            **resolved_preset,
+            "quick_news_recommended_count": int(
+                resolved_preset.get("recommended_news_item_count", len(facts))
+            ),
+            "deep_dive_recommended_count": 0,
+            "template_variant": f"quick_{min(len(facts), int(resolved_preset.get('recommended_news_item_count', len(facts))))}",
+        }
+    base_structure = resolve_morning_news_structure(len(facts), generation_preset)
     generation_facts = facts
     if isinstance(marked_fact, dict) and int(base_structure["actual_news_item_count"]) > 0:
         generation_facts = [
@@ -104,7 +147,7 @@ def generate_deterministic_script(
         ]
     script = _generate_base_deterministic_script(
         generation_facts,
-        resolved_preset,
+        generation_preset,
         episode_id=episode_id,
         title=title,
     )
@@ -714,8 +757,6 @@ def _select_script_facts(
             if not isinstance(topic, dict):
                 continue
             fact_id = str(topic.get("fact_id") or "")
-            if bool(topic.get("is_deep_dive")):
-                deep_fact_id = fact_id
             fact = by_id.get(fact_id)
             if fact and fact_id not in seen:
                 selected.append(fact)

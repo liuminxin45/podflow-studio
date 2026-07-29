@@ -27,7 +27,16 @@ vi.mock('../../services/organizeResearch', () => ({
   searchForOrganize: vi.fn(),
 }))
 
+vi.mock('../../services/deepDiveSelection', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../services/deepDiveSelection')>()
+  return {
+    ...actual,
+    analyzeAndResearchDeepDive: vi.fn(),
+  }
+})
+
 import OrganizePanel, { type OrganizePanelHandle } from '../OrganizePanel'
+import { analyzeAndResearchDeepDive } from '../../services/deepDiveSelection'
 import { llmService } from '../../services/llmService'
 import { searchForOrganize } from '../../services/organizeResearch'
 import { DEFAULT_SETTINGS } from '../../types/settings'
@@ -88,6 +97,62 @@ describe('OrganizePanel research tolerance', () => {
         ...DEFAULT_SETTINGS.creatorPreferences,
         organizeCompletionMode: 'web_only',
       },
+    })
+    vi.mocked(analyzeAndResearchDeepDive).mockImplementation(async options => {
+      const selected = options.units.find(unit => unit._id === options.preferredUnitId) || options.units[0]
+      const claim = { text: '已核验事实', sourceUrls: ['https://a.test'], confidence: 'high' as const }
+      return {
+        selectedUnit: {
+          ...selected,
+          _isDeepDive: true,
+          _status: 'editing',
+          _deepDiveBrief: {
+            version: 1,
+            inputFingerprint: '1234abcd',
+            coreQuestion: '为什么值得深挖？',
+            whyNow: '现在需要解释。',
+            thesisBoundary: '只说明已有证据。',
+            sections: [
+              { title: '事实', question: '发生了什么？', listenerValue: '理解事实', claims: [claim] },
+              { title: '机制', question: '为什么发生？', listenerValue: '理解机制', claims: [claim] },
+            ],
+            counterpoints: [claim],
+            limitations: [],
+            sourceUrls: ['https://a.test'],
+            generatedAt: '2026-07-29T00:00:00.000Z',
+          },
+        },
+        researchSession: {
+          unitId: selected._id,
+          provider: 'tavily',
+          researchProfile: 'deep',
+          inputFingerprint: '1234abcd',
+          completionMode: 'web_only',
+          queries: ['事实', '影响', '机制', '反方'],
+          results: [],
+          status: 'completed',
+          updatedAt: '2026-07-29T00:00:00.000Z',
+          reportType: 'event',
+          coreSubject: '深度问题',
+          tasks: [
+            { id: 'facts', question: '事实', purpose: '事实', role: 'direct_fact', freshness: 'latest', queries: ['事实'] },
+            { id: 'impact', question: '影响', purpose: '影响', role: 'consumer_experience', freshness: 'year', queries: ['影响'] },
+            { id: 'mechanism', question: '机制', purpose: '机制', role: 'mechanism', freshness: 'any', queries: ['机制'] },
+            { id: 'counter', question: '反方', purpose: '反方', role: 'counter_evidence', freshness: 'any', queries: ['反方'] },
+          ],
+          metrics: { retrieved: 0, accepted: 0, rejected: 0, uniqueDomains: 0, coveredTasks: 0, totalTasks: 4 },
+        },
+        state: {
+          version: 1,
+          status: 'selected',
+          inputFingerprint: '1234abcd',
+          source: 'manual',
+          selectedUnitId: selected._id,
+          candidates: [],
+          attemptedUnitIds: [selected._id],
+          updatedAt: '2026-07-29T00:00:00.000Z',
+        },
+      }
     })
   })
 
@@ -231,6 +296,8 @@ describe('OrganizePanel research tolerance', () => {
     const researchSessions = [{
       unitId: 0,
       provider: 'tavily' as const,
+      researchProfile: 'standard' as const,
+      inputFingerprint: '1234abcd',
       queries: ['国家医保局 生育保险', '生育保险 历史背景'],
       results: [{
         id: 'official-source',
@@ -332,6 +399,7 @@ describe('OrganizePanel research tolerance', () => {
       [expect.objectContaining({ title: '补全后的新闻', _status: 'ready' })],
       expect.any(Array),
       [expect.objectContaining({ title: '补全后的新闻', _status: 'ready' })],
+      expect.objectContaining({ status: 'idle' }),
     )
 
     expect(researchToggle.getAttribute('aria-expanded')).toBe('true')
@@ -540,7 +608,8 @@ describe('OrganizePanel research tolerance', () => {
     }))
 
     render(<OrganizePanel visible onClose={vi.fn()} contents={[{ title: '原始新闻', content: '原始内容', source: '来源甲' }]} />)
-    fireEvent.click(screen.getByRole('button', { name: '设为深度稿' }))
+    fireEvent.click(screen.getByRole('button', { name: '优先核验此条' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '已通过深度核验' })).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: '自动补全深度资料' }))
 
     await waitFor(() => expect(searchForOrganize).toHaveBeenCalledTimes(4))
@@ -607,7 +676,8 @@ describe('OrganizePanel research tolerance', () => {
     }))
 
     render(<OrganizePanel visible onClose={vi.fn()} contents={[{ title: '原始新闻', content: '原始内容', source: '来源甲' }]} />)
-    fireEvent.click(screen.getByRole('button', { name: '设为深度稿' }))
+    fireEvent.click(screen.getByRole('button', { name: '优先核验此条' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '已通过深度核验' })).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: '自动补全深度资料' }))
 
     await waitFor(() => expect(screen.getByText(/网页 12 · AI 0/)).toBeTruthy())
@@ -737,7 +807,8 @@ describe('OrganizePanel research tolerance', () => {
     } as any))
 
     render(<OrganizePanel visible onClose={vi.fn()} contents={[{ title: '为什么米村拌饭各个门店都那么火？', content: '观察到多个门店排队', source: '主来源' }]} />)
-    fireEvent.click(screen.getByRole('button', { name: '设为深度稿' }))
+    fireEvent.click(screen.getByRole('button', { name: '优先核验此条' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '已通过深度核验' })).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: '自动补全深度资料' }))
 
     await waitFor(() => expect(screen.getByText('原因解释')).toBeTruthy())
@@ -779,7 +850,10 @@ describe('OrganizePanel research tolerance', () => {
         ],
       } as any,
     ]} />)
-    if (deep) fireEvent.click(screen.getByRole('button', { name: '设为深度稿' }))
+    if (deep) {
+      fireEvent.click(screen.getByRole('button', { name: '优先核验此条' }))
+      await waitFor(() => expect(screen.getByRole('button', { name: '已通过深度核验' })).toBeTruthy())
+    }
     fireEvent.click(screen.getByRole('button', { name: button }))
 
     await waitFor(() => expect(screen.getByDisplayValue('不完整整理结果')).toBeTruthy())

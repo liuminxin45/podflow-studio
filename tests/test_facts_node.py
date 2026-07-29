@@ -3,6 +3,39 @@ from nodes.facts.node import run as facts_run
 from tests.mock_data import create_base_state, create_mock_cleaned_contents, create_mock_materials
 
 
+def _deep_brief(url: str) -> dict:
+    claim = {
+        "text": "已核验的深度资料支持这一事实判断。",
+        "sourceUrls": [url],
+        "confidence": "high",
+    }
+    return {
+        "version": 1,
+        "inputFingerprint": "1234abcd",
+        "coreQuestion": "这件事为什么值得继续追问？",
+        "whyNow": "当前变化会直接影响听众判断。",
+        "thesisBoundary": "只能说明已公开且有来源支持的范围。",
+        "sections": [
+            {
+                "title": "发生了什么",
+                "question": "直接事实是什么？",
+                "listenerValue": "先确认事件边界。",
+                "claims": [claim],
+            },
+            {
+                "title": "为什么重要",
+                "question": "它怎样影响普通人？",
+                "listenerValue": "理解实际影响。",
+                "claims": [claim],
+            },
+        ],
+        "counterpoints": [claim],
+        "limitations": ["仍需等待后续公开信息。"],
+        "sourceUrls": [url],
+        "generatedAt": "2026-07-29T00:00:00.000Z",
+    }
+
+
 def test_facts_node_uses_selected_materials_first():
     state = create_base_state()
     state["selected_materials"] = create_mock_materials()
@@ -31,7 +64,14 @@ def test_facts_node_preserves_the_unique_deep_dive_and_its_richer_packet():
             "url": f"https://example.com/{index}",
             "published": "2026-07-15",
             "_status": "ready",
-            **({"_isDeepDive": True} if index == 4 else {}),
+            **(
+                {
+                    "_isDeepDive": True,
+                    "_deepDiveBrief": _deep_brief(f"https://example.com/{index}"),
+                }
+                if index == 4
+                else {}
+            ),
         }
         for index in range(1, 5)
     ]
@@ -57,6 +97,7 @@ def test_facts_node_preserves_an_explicit_deep_dive_on_a_sparse_day():
             "url": "https://example.com/only",
             "published": "2026-07-15",
             "_isDeepDive": True,
+            "_deepDiveBrief": _deep_brief("https://example.com/only"),
             "_status": "ready",
         }
     ]
@@ -91,6 +132,7 @@ def test_facts_node_keeps_a_late_deep_dive_inside_the_fact_limit_and_matches_by_
             "source": "深度来源",
             "url": "https://example.com/deep",
             "_isDeepDive": True,
+            "_deepDiveBrief": _deep_brief("https://example.com/deep"),
             "_status": "ready",
         },
     ]
@@ -118,6 +160,7 @@ def test_facts_node_uses_url_to_disambiguate_same_title_deep_materials():
             "content": "深度来源证据。" * 100,
             "url": "https://example.com/deep",
             "_isDeepDive": True,
+            "_deepDiveBrief": _deep_brief("https://example.com/deep"),
             "_status": "ready",
         },
     ]

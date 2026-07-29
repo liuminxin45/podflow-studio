@@ -21,6 +21,7 @@ import type { ContentItem } from '../types/workflow'
 import type { LLMResponse } from '../types/llm'
 import type {
   CandidateItem,
+  DepthSelectionState,
   EvidenceRole,
   NewsEditorial,
   NewsReference,
@@ -54,6 +55,11 @@ import {
   parseKnowledgeCandidates,
   promoteKnowledgeCandidates,
 } from '../services/organizeKnowledge'
+import {
+  analyzeAndResearchDeepDive,
+  buildDepthInputFingerprint,
+  type DeepDiveSelectionProgress,
+} from '../services/deepDiveSelection'
 
 interface Props {
   visible: boolean
@@ -63,12 +69,18 @@ interface Props {
   userTopic?: string
   initialCandidates?: CandidateItem[]
   initialResearchSessions?: OrganizeResearchSession[]
+  initialDepthSelection?: DepthSelectionState
   onProceedToIdeate?: (
     candidates: CandidateItem[],
     researchSessions: OrganizeResearchSession[],
     allCandidates: CandidateItem[],
+    depthSelection: DepthSelectionState,
   ) => void
-  onStateChange?: (state: { candidates: CandidateItem[]; researchSessions: OrganizeResearchSession[] }) => void | Promise<void>
+  onStateChange?: (state: {
+    candidates: CandidateItem[]
+    researchSessions: OrganizeResearchSession[]
+    depthSelection: DepthSelectionState
+  }) => void | Promise<void>
   onProcessLog?: (entry: string) => void
   onRemoveFromMaterialPool?: (originKeys: string[]) => void
 }
@@ -326,6 +338,7 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
   userTopic = '',
   initialCandidates = [],
   initialResearchSessions = [],
+  initialDepthSelection,
   onProceedToIdeate,
   onStateChange,
   onProcessLog,
@@ -352,6 +365,16 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
   const [synthesisErrorByUnit, setSynthesisErrorByUnit] = useState<Record<number, string>>({})
   const [synthesisProgressByUnit, setSynthesisProgressByUnit] = useState<Record<number, SynthesisProgress>>({})
   const [researchSessions, setResearchSessions] = useState<OrganizeResearchSession[]>(initialResearchSessions)
+  const initialDepthFingerprint = buildDepthInputFingerprint(initialUnits, userTopic)
+  const [depthSelection, setDepthSelection] = useState<DepthSelectionState>(initialDepthSelection || {
+    version: 1,
+    status: 'idle',
+    inputFingerprint: initialDepthFingerprint,
+    candidates: [],
+    attemptedUnitIds: [],
+    updatedAt: new Date().toISOString(),
+  })
+  const [depthProgress, setDepthProgress] = useState<DeepDiveSelectionProgress | null>(null)
   const [referenceDraft, setReferenceDraft] = useState(EMPTY_REFERENCE_DRAFT)
   const writeProcessLog = useCallback((detail: string) => {
     onProcessLog?.(`[OrganizeResearch] ${new Date().toISOString()} | ${detail}`)
@@ -420,7 +443,13 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
         const retainedReferences = (unit._references || []).filter(reference => (
           !reference._originKey || selectedByKey.has(reference._originKey)
         ))
-        return [{ ...unit, _originKeys: retainedOriginKeys, _references: retainedReferences }]
+        return [{
+          ...unit,
+          _originKeys: retainedOriginKeys,
+          _references: retainedReferences,
+          _isDeepDive: false,
+          _deepDiveBrief: undefined,
+        }]
       })
       const represented = new Set(reconciled.flatMap(unit => unit._originKeys || []))
       const nextId = reconciled.reduce((highest, unit) => Math.max(highest, unit._id), -1) + 1
@@ -437,7 +466,16 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
     setSynthesisRunning(false)
     setResearchSessions(previous => previous.filter(session => selectedByKey.size > 0 && unitsRef.current.some(unit => (
       unit._id === session.unitId && (unit._originKeys || [contentIdentity(unit)]).some(key => selectedByKey.has(key))
-    ))))
+    )) && session.researchProfile !== 'deep'))
+    setDepthSelection({
+      version: 1,
+      status: 'idle',
+      inputFingerprint: buildDepthInputFingerprint(normalizeUnits(contents), userTopic),
+      candidates: [],
+      attemptedUnitIds: [],
+      reason: '素材范围已变化，需要重新判断本期深度稿',
+      updatedAt: new Date().toISOString(),
+    })
     setResearchTraceByUnit({})
     setResearchProgressByUnit({})
     setSynthesisErrorByUnit({})
@@ -445,7 +483,7 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
     setResearchExpandedIds(new Set())
     setReferenceDraft(EMPTY_REFERENCE_DRAFT)
     undoMergeRef.current = null
-  }, [contentInputSignature, contents])
+  }, [contentInputSignature, contents, userTopic])
 
   const orderedUnits = useMemo(
     () => [...units].sort((a, b) => a._order - b._order),
@@ -463,14 +501,14 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
   const activeUnit = orderedUnits.find(unit => unit._id === activeId) || orderedUnits[0] || null
   const readyUnits = orderedUnits.filter(unit => unit._status === 'ready')
   const syncState = useCallback(async () => {
-    const signature = JSON.stringify([orderedUnits, researchSessions])
+    const signature = JSON.stringify([orderedUnits, researchSessions, depthSelection])
     if (signature === lastSyncRef.current) return lastSyncPromiseRef.current
     lastSyncRef.current = signature
     lastSyncPromiseRef.current = Promise.resolve(
-      onStateChangeRef.current?.({ candidates: orderedUnits, researchSessions }),
+      onStateChangeRef.current?.({ candidates: orderedUnits, researchSessions, depthSelection }),
     )
     return lastSyncPromiseRef.current
-  }, [orderedUnits, researchSessions])
+  }, [depthSelection, orderedUnits, researchSessions])
 
   useImperativeHandle(ref, () => ({ flushState: syncState }), [syncState])
 
@@ -493,6 +531,21 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
     ])
   }, [])
 
+  const invalidateDepthSelection = useCallback((reason: string) => {
+    if (depthSelection.status !== 'selected') return
+    setDepthSelection({
+      version: 1,
+      status: 'idle',
+      inputFingerprint: buildDepthInputFingerprint(unitsRef.current, userTopic),
+      candidates: [],
+      attemptedUnitIds: [],
+      reason,
+      updatedAt: new Date().toISOString(),
+    })
+    setUnits(previous => previous.map(unit => ({ ...unit, _isDeepDive: false, _deepDiveBrief: undefined })))
+    setResearchSessions(previous => previous.filter(session => session.researchProfile !== 'deep'))
+  }, [depthSelection.status, userTopic])
+
   const updateResearchTrace = useCallback((unitId: number, updater: (items: ResearchTraceItem[]) => ResearchTraceItem[]) => {
     setResearchTraceByUnit(previous => ({
       ...previous,
@@ -502,25 +555,109 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
 
   const updateEditorial = useCallback((field: keyof NewsEditorial, value: string) => {
     if (!activeUnit) return
+    invalidateDepthSelection('新闻内容已修改，需要重新核验本期深度稿')
     updateUnit(activeUnit._id, unit => ({
       ...unit,
       _status: 'editing',
       _editorial: { ...EMPTY_EDITORIAL, ...unit._editorial, [field]: value },
     }))
-  }, [activeUnit, updateUnit])
+  }, [activeUnit, invalidateDepthSelection, updateUnit])
+
+  const updateTitle = useCallback((value: string) => {
+    if (!activeUnit) return
+    invalidateDepthSelection('新闻标题已修改，需要重新核验本期深度稿')
+    updateUnit(activeUnit._id, unit => ({ ...unit, title: value, _status: 'editing' }))
+  }, [activeUnit, invalidateDepthSelection, updateUnit])
+
+  const runDepthSelection = useCallback(async (preferredUnitId?: number) => {
+    if (researchRunning || synthesisRunning || orderedUnits.length === 0) return
+    const abortController = new AbortController()
+    researchAbortRef.current = abortController
+    setResearchRunning(true)
+    setDepthProgress({ status: 'triaging', detail: '正在比较本期全部新闻', completed: 0, total: 4 })
+    try {
+      const result = await analyzeAndResearchDeepDive({
+        units: orderedUnits,
+        userTopic,
+        preferredUnitId,
+        source: preferredUnitId === undefined ? 'automatic' : 'manual',
+        signal: abortController.signal,
+        onProgress: setDepthProgress,
+      })
+      setDepthSelection(result.state)
+      if (result.selectedUnit && result.researchSession) {
+        const evidenceReferences = result.researchSession.results.map(item => ({
+          ...buildReference({
+            title: item.title,
+            url: item.url,
+            content: item.excerpt,
+            summary: item.excerpt,
+            published: item.publishedAt,
+            source: sourceDomain(item.url) || '网页来源',
+          }),
+          _evidenceRole: item.evidenceRole,
+          _researchTaskId: item.taskId,
+          _relation: item.relation,
+          _limitations: item.limitations,
+        }))
+        setUnits(previous => previous.map(unit => unit._id === result.selectedUnit?._id
+          ? {
+              ...result.selectedUnit,
+              _references: [
+                ...(unit._references || []),
+                ...evidenceReferences.filter(reference => !(unit._references || []).some(existing => referenceKey(existing) === referenceKey(reference))),
+              ],
+            }
+          : { ...unit, _isDeepDive: false, _deepDiveBrief: undefined }))
+        replaceResearchSession(result.researchSession)
+        setActiveId(result.selectedUnit._id)
+        setMobilePane('editor')
+        message.success('已自动确定本期唯一深度稿，并完成来源核验与深度研究')
+      } else if (result.state.status === 'provisional') {
+        message.warning(result.state.reason || '仅形成 AI 候选；联网能力可用后才能自动确定深度稿')
+      } else {
+        setUnits(previous => previous.map(unit => ({ ...unit, _isDeepDive: false, _deepDiveBrief: undefined })))
+        message.info(result.state.reason || '本期没有新闻通过深度稿证据门槛')
+      }
+    } catch (error) {
+      if (abortController.signal.aborted) return
+      const detail = error instanceof Error ? error.message : '本期重点分析失败'
+      setDepthSelection({
+        version: 1,
+        status: 'failed',
+        inputFingerprint: buildDepthInputFingerprint(orderedUnits, userTopic),
+        candidates: [],
+        attemptedUnitIds: [],
+        error: detail,
+        updatedAt: new Date().toISOString(),
+      })
+      message.error(detail)
+    } finally {
+      if (researchAbortRef.current === abortController) researchAbortRef.current = null
+      setResearchRunning(false)
+      setDepthProgress(null)
+    }
+  }, [orderedUnits, replaceResearchSession, researchRunning, synthesisRunning, userTopic])
 
   const toggleDeepDive = useCallback(() => {
     if (!activeUnit || researchRunning || synthesisRunning) return
-    const shouldEnable = !activeUnit._isDeepDive
-    setUnits(previous => previous.map(unit => ({
-      ...unit,
-      _isDeepDive: shouldEnable ? unit._id === activeUnit._id : false,
-      _status: unit._id === activeUnit._id ? 'editing' : unit._status,
-    })))
-    message.success(shouldEnable
-      ? '已设为本期唯一深度稿；整理要求和资料研究已增强'
-      : '已恢复为普通快讯')
-  }, [activeUnit, researchRunning, synthesisRunning])
+    if (activeUnit._isDeepDive) {
+      setUnits(previous => previous.map(unit => ({ ...unit, _isDeepDive: false, _deepDiveBrief: undefined })))
+      setResearchSessions(previous => previous.filter(session => session.researchProfile !== 'deep'))
+      setDepthSelection({
+        version: 1,
+        status: 'idle',
+        inputFingerprint: buildDepthInputFingerprint(orderedUnits, userTopic),
+        candidates: [],
+        attemptedUnitIds: [],
+        reason: '已取消本期深度稿',
+        updatedAt: new Date().toISOString(),
+      })
+      message.success('已取消本期深度稿')
+      return
+    }
+    void runDepthSelection(activeUnit._id)
+  }, [activeUnit, orderedUnits, researchRunning, runDepthSelection, synthesisRunning, userTopic])
 
   const toggleMerge = useCallback((id: number) => {
     if (researchRunning || synthesisRunning || id === activeUnit?._id) return
@@ -549,6 +686,7 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
       message.info('请先选择要并入当前新闻的条目')
       return
     }
+    invalidateDepthSelection('新闻已合并，需要重新核验本期深度稿')
     undoMergeRef.current = { units, activeId }
     const additions = sourceUnits.flatMap(unit => [
       buildReference(unit),
@@ -571,7 +709,7 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
     setMergeIds(new Set())
     setMergeMode(false)
     message.success(`已将 ${sourceUnits.length} 条新闻并为参考来源`)
-  }, [activeId, activeUnit, mergeIds, orderedUnits, researchRunning, synthesisRunning, units, updateUnit])
+  }, [activeId, activeUnit, invalidateDepthSelection, mergeIds, orderedUnits, researchRunning, synthesisRunning, units, updateUnit])
 
   const undoMerge = useCallback(() => {
     if (researchRunning || synthesisRunning) return
@@ -596,10 +734,11 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
       message.warning('这份资料已经存在')
       return
     }
+    invalidateDepthSelection('参考资料已变化，需要重新核验本期深度稿')
     updateUnit(activeUnit._id, unit => ({ ...unit, _references: [...(unit._references || []), reference], _status: 'editing' }))
     setReferenceDraft(EMPTY_REFERENCE_DRAFT)
     setAddingReference(false)
-  }, [activeUnit, referenceDraft, researchRunning, synthesisRunning, updateUnit])
+  }, [activeUnit, invalidateDepthSelection, referenceDraft, researchRunning, synthesisRunning, updateUnit])
 
   const cancelReferenceDraft = useCallback(() => {
     setReferenceDraft(EMPTY_REFERENCE_DRAFT)
@@ -608,15 +747,17 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
 
   const removeReference = useCallback((referenceId: string) => {
     if (!activeUnit || researchRunning || synthesisRunning) return
+    invalidateDepthSelection('参考资料已变化，需要重新核验本期深度稿')
     updateUnit(activeUnit._id, unit => ({
       ...unit,
       _references: (unit._references || []).filter(reference => reference._referenceId !== referenceId),
       _status: 'editing',
     }))
-  }, [activeUnit, researchRunning, synthesisRunning, updateUnit])
+  }, [activeUnit, invalidateDepthSelection, researchRunning, synthesisRunning, updateUnit])
 
   const removeUnit = useCallback((id: number) => {
     if (researchRunning || synthesisRunning) return
+    invalidateDepthSelection('新闻范围已变化，需要重新核验本期深度稿')
     const removedUnit = units.find(unit => unit._id === id)
     setMergeIds(previous => {
       const next = new Set(previous)
@@ -633,7 +774,7 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
       onRemoveFromMaterialPool?.(removedUnit._originKeys || [contentIdentity(removedUnit)])
       message.success('已从整理工作区和发现页选择中移除')
     }
-  }, [activeId, onRemoveFromMaterialPool, researchRunning, synthesisRunning, units])
+  }, [activeId, invalidateDepthSelection, onRemoveFromMaterialPool, researchRunning, synthesisRunning, units])
 
   const toggleReady = useCallback(() => {
     if (!activeUnit || researchRunning || synthesisRunning) return
@@ -656,6 +797,9 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
     }
     const unitSnapshot = activeUnit
     const isDeepDive = Boolean(unitSnapshot._isDeepDive)
+    const unitResearchFingerprint = isDeepDive && unitSnapshot._deepDiveBrief
+      ? unitSnapshot._deepDiveBrief.inputFingerprint
+      : buildDepthInputFingerprint([unitSnapshot], userTopic)
     const phases = researchPhasesFor(mode)
     const researchQueryLimit = isDeepDive ? 12 : 8
     const phaseTimeouts = isDeepDive
@@ -842,6 +986,8 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
       replaceResearchSession({
         unitId: unitSnapshot._id,
         provider: searchStatus.provider,
+        researchProfile: isDeepDive ? 'deep' : 'standard',
+        inputFingerprint: unitResearchFingerprint,
         completionMode: mode,
         queries,
         results: [],
@@ -859,6 +1005,8 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
         replaceResearchSession({
           unitId: unitSnapshot._id,
           provider: searchStatus.provider,
+          researchProfile: isDeepDive ? 'deep' : 'standard',
+          inputFingerprint: unitResearchFingerprint,
           completionMode: mode,
           queries,
           results: [],
@@ -884,6 +1032,8 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
         replaceResearchSession({
           unitId: unitSnapshot._id,
           provider: searchStatus.provider,
+          researchProfile: isDeepDive ? 'deep' : 'standard',
+          inputFingerprint: unitResearchFingerprint,
           completionMode: mode,
           queries,
           results: [],
@@ -1000,6 +1150,8 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
           replaceResearchSession({
             unitId: unitSnapshot._id,
             provider: searchStatus.provider,
+            researchProfile: isDeepDive ? 'deep' : 'standard',
+            inputFingerprint: unitResearchFingerprint,
             completionMode: mode,
             queries,
             results: [],
@@ -1139,6 +1291,8 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
       replaceResearchSession({
         unitId: unitSnapshot._id,
         provider: searchStatus.provider,
+        researchProfile: isDeepDive ? 'deep' : 'standard',
+        inputFingerprint: unitResearchFingerprint,
         completionMode: mode,
         queries,
         results: evidence,
@@ -1203,6 +1357,8 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
         replaceResearchSession({
           unitId: unitSnapshot._id,
           provider: searchStatus.provider,
+          researchProfile: isDeepDive ? 'deep' : 'standard',
+          inputFingerprint: unitResearchFingerprint,
           completionMode: mode,
           queries: plannedQueries,
           results: collectedEvidence,
@@ -1267,6 +1423,16 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
     const unitSnapshot = activeUnit
     const isDeepDive = Boolean(unitSnapshot._isDeepDive)
     const researchSession = researchSessions.find(item => item.unitId === unitSnapshot._id)
+    if (isDeepDive && (
+      researchSession?.researchProfile !== 'deep'
+      || researchSession.inputFingerprint !== unitSnapshot._deepDiveBrief?.inputFingerprint
+    )) {
+      const errorMessage = '深度研究已失效，请重新执行本期重点判断与深挖'
+      setSynthesisErrorByUnit(previous => ({ ...previous, [unitSnapshot._id]: errorMessage }))
+      writeProcessLog(`SYNTHESIS_BLOCKED unit=${unitSnapshot._id} reason=stale_deep_research`)
+      message.warning(errorMessage)
+      return
+    }
     const knowledgeCandidates = researchSession?.knowledgeCandidates || []
     const reportType = researchSession?.reportType || 'event'
     const isMultiDimensionalReport = reportType !== 'event'
@@ -1670,8 +1836,8 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
   const proceed = useCallback(() => {
     if (researchRunning || synthesisRunning) return
     const output = readyUnits.map(prepareCandidateForDraft)
-    onProceedToIdeate?.(output, researchSessions, orderedUnits)
-  }, [onProceedToIdeate, orderedUnits, readyUnits, researchRunning, researchSessions, synthesisRunning])
+    onProceedToIdeate?.(output, researchSessions, orderedUnits, depthSelection)
+  }, [depthSelection, onProceedToIdeate, orderedUnits, readyUnits, researchRunning, researchSessions, synthesisRunning])
 
   if (!visible) return null
 
@@ -1703,6 +1869,36 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
           onClick: proceed,
         }}
       />
+
+      <section className="organize-depth-selection" aria-label="本期深度稿判断">
+        <div className="organize-depth-selection-copy">
+          <span className="organize-depth-selection-kicker">本期重点</span>
+          <strong>
+            {depthSelection.status === 'selected'
+              ? orderedUnits.find(unit => unit._id === depthSelection.selectedUnitId)?.title || '已确定深度稿'
+              : depthSelection.status === 'provisional'
+                ? '已有候选，等待联网核验'
+                : depthSelection.status === 'none'
+                  ? '本期暂不设置深度稿'
+                  : '先比较价值，再用网络证据决定'}
+          </strong>
+          <span>{depthProgress?.detail || depthSelection.reason || depthSelection.error || '系统会比较全部新闻，最多核验三个候选；只有证据充足时才会确定唯一深度稿。'}</span>
+        </div>
+        <div className="organize-depth-selection-action">
+          {researchRunning && depthProgress ? (
+            <Button icon={<StopOutlined />} onClick={cancelSourceCompletion}>停止</Button>
+          ) : (
+            <Button
+              type={depthSelection.status === 'selected' ? 'default' : 'primary'}
+              icon={<SearchOutlined />}
+              disabled={researchRunning || synthesisRunning || orderedUnits.length === 0}
+              onClick={() => void runDepthSelection()}
+            >
+              {depthSelection.status === 'selected' ? '重新判断' : '智能判断并深挖'}
+            </Button>
+          )}
+        </div>
+      </section>
 
       <div className="organize-workspace-tabs" role="tablist" aria-label="整理工作区">
         {([
@@ -1829,7 +2025,7 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
                   className="organize-story-title-input"
                   value={activeUnit.title}
                   placeholder="新闻标题"
-                  onChange={event => updateUnit(activeUnit._id, unit => ({ ...unit, title: event.target.value, _status: 'editing' }))}
+                  onChange={event => updateTitle(event.target.value)}
                 />
                 <button
                   type="button"
@@ -1837,11 +2033,11 @@ const OrganizePanel = forwardRef<OrganizePanelHandle, Props>(function OrganizePa
                   aria-pressed={Boolean(activeUnit._isDeepDive)}
                   disabled={researchRunning || synthesisRunning}
                   title={activeUnit._isDeepDive
-                    ? '取消后恢复普通快讯整理要求'
-                    : '设为本期唯一深度稿；其他新闻会自动取消深度标记'}
+                    ? '取消本期深度稿及其深度研究结果'
+                    : '优先核验这条新闻；只有通过来源门槛后才会设为深度稿'}
                   onClick={toggleDeepDive}
                 >
-                  {activeUnit._isDeepDive ? '已设为深度稿' : '设为深度稿'}
+                  {activeUnit._isDeepDive ? '已通过深度核验' : '优先核验此条'}
                 </button>
                 <Button
                   className="organize-completion-button"

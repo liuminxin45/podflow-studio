@@ -193,6 +193,31 @@ export interface FactCard {
   claim: string
   confidence: 'high' | 'medium' | 'low'
   is_deep_dive?: boolean
+  deep_dive_brief?: {
+    version: 1
+    inputFingerprint: string
+    coreQuestion: string
+    whyNow: string
+    thesisBoundary: string
+    sections: Array<{
+      title: string
+      question: string
+      listenerValue: string
+      claims: Array<{
+        text: string
+        sourceUrls: string[]
+        confidence: 'high' | 'medium' | 'low'
+      }>
+    }>
+    counterpoints: Array<{
+      text: string
+      sourceUrls: string[]
+      confidence: 'high' | 'medium' | 'low'
+    }>
+    limitations: string[]
+    sourceUrls: string[]
+    generatedAt: string
+  }
   used_in_segments?: string[]
 }
 

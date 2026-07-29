@@ -75,6 +75,26 @@ def _enrich_organized_facts(
         )
         fact["source_urls"] = source_urls
         fact["source_titles"] = source_titles
+        if material.get("_isDeepDive"):
+            brief = material.get("_deepDiveBrief")
+            if not isinstance(brief, dict):
+                raise ValueError(
+                    "The selected deep-dive material is missing _deepDiveBrief; "
+                    "run evidence-backed deep research before generating facts"
+                )
+            brief_urls = brief.get("sourceUrls")
+            if not isinstance(brief_urls, list) or not brief_urls:
+                raise ValueError("The selected deep-dive brief has no sourceUrls")
+            unknown_urls = [
+                str(url)
+                for url in brief_urls
+                if str(url) not in source_urls
+            ]
+            if unknown_urls:
+                raise ValueError(
+                    "The selected deep-dive brief references sources outside the organized evidence packet"
+                )
+            fact["deep_dive_brief"] = brief
         # A synthesized unit combines several sources. Without claim-level
         # provenance it must not be presented as a single-link high-confidence
         # statement, even when the primary item has a URL and timestamp.

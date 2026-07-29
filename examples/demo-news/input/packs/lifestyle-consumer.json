@@ -30,7 +30,50 @@
     "url": "https://www.nhsa.gov.cn/art/2026/7/9/art_14_21357.html",
     "published": "2026-07-09T18:00:00+08:00",
     "source": "国家医疗保障局",
-    "_isDeepDive": true
+    "_isDeepDive": true,
+    "_deepDiveBrief": {
+      "version": 1,
+      "inputFingerprint": "8a7b6c5d",
+      "coreQuestion": "异地就医直接结算的进展，真正为参保人减少了什么，又有哪些使用边界？",
+      "whyNow": "阶段性数据和医保找药服务同时发布，适合把规模进展与个人使用条件放在一起解释。",
+      "thesisBoundary": "公开信息可以说明全国阶段性进展和服务入口，不能推导为所有地区、机构、药品和费用都已无条件直接结算。",
+      "sections": [
+        {
+          "title": "规模与节省",
+          "question": "跨省直接结算覆盖到什么规模？",
+          "listenerValue": "理解政策进展是否已经进入日常使用阶段。",
+          "claims": [
+            {
+              "text": "2026 年 1 至 5 月跨省异地就医直接结算 1.47 亿人次，减少群众垫付 886 亿元。",
+              "sourceUrls": ["https://www.nhsa.gov.cn/art/2026/7/9/art_14_21357.html"],
+              "confidence": "high"
+            }
+          ]
+        },
+        {
+          "title": "入口与边界",
+          "question": "参保人能怎样使用，又要先核对什么？",
+          "listenerValue": "避免把阶段性覆盖误解成无条件通用。",
+          "claims": [
+            {
+              "text": "国家医保服务平台已上线医保找药服务，但具体结算仍取决于参保地规则和定点机构状态。",
+              "sourceUrls": ["https://www.nhsa.gov.cn/art/2026/7/9/art_14_21357.html"],
+              "confidence": "high"
+            }
+          ]
+        }
+      ],
+      "counterpoints": [
+        {
+          "text": "全国进展数据不意味着每一家医院、药店、每一种药品或每一笔费用都能直接结算。",
+          "sourceUrls": ["https://www.nhsa.gov.cn/art/2026/7/9/art_14_21357.html"],
+          "confidence": "high"
+        }
+      ],
+      "limitations": ["该离线示例只绑定一个国家医保局公开来源，不用于证明多来源交叉核验已经完成。"],
+      "sourceUrls": ["https://www.nhsa.gov.cn/art/2026/7/9/art_14_21357.html"],
+      "generatedAt": "2026-07-29T00:00:00.000Z"
+    }
   },
   {
     "title": "信息通信行业公布十件民生实事",

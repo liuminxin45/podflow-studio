@@ -55,6 +55,8 @@ vi.mock('../components/OrganizePanel', async () => {
           researchSessions: [{
             unitId: 0,
             provider: 'tavily',
+            researchProfile: 'standard',
+            inputFingerprint: '1234abcd',
             queries: ['官方资料', '新闻背景'],
             results: [],
             status: 'completed',
@@ -112,7 +114,7 @@ vi.mock('../components/EpisodeDraftStudio', () => ({
 }))
 
 const allCandidates = [
-  { title: '实习新闻', url: 'https://example.com/intern', _status: 'ready', _isDeepDive: true, _id: 0, _order: 0, _priority: 'important' },
+  { title: '实习新闻', url: 'https://example.com/intern', _status: 'ready', _id: 0, _order: 0, _priority: 'important' },
   { title: '股市新闻', url: 'https://example.com/market', _status: 'ready', _id: 1, _order: 1, _priority: 'important' },
   { title: '痴迷', url: 'https://example.com/movie', _status: 'needs_context', _id: 2, _order: 2, _priority: 'backup' },
 ]
