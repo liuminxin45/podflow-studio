@@ -71,10 +71,10 @@ interface Props {
 // ============================================================
 
 const CAPABILITY_LABELS: Record<NodeCapabilityType, { label: string; icon: React.ReactNode; color: string }> = {
-  search: { label: '信息获取', icon: <SearchOutlined />, color: '#10b981' },
-  text: { label: '文本理解', icon: <FileTextOutlined />, color: '#2563eb' },
-  reasoning: { label: '深度推理', icon: <BulbOutlined />, color: '#8b5cf6' },
-  audio: { label: '语音生成', icon: <SoundOutlined />, color: '#ef4444' },
+  search: { label: '信息获取', icon: <SearchOutlined />, color: '#4f5156' },
+  text: { label: '文本理解', icon: <FileTextOutlined />, color: '#4f5156' },
+  reasoning: { label: '深度推理', icon: <BulbOutlined />, color: '#4f5156' },
+  audio: { label: '语音生成', icon: <SoundOutlined />, color: '#4f5156' },
 }
 
 const STAGE_META: Record<StageId, { label: string; icon: ReactNode; desc: string; defaultCap: NodeCapabilityType }> = {
@@ -107,49 +107,49 @@ const PROVIDER_KIND_COPY: Record<AIModelProviderConfig['kind'], {
     badge: '本地模型',
     desc: '默认监听 localhost:11434/v1',
     mark: 'Ol',
-    accent: '#111827',
+    accent: '#242529',
   },
   lm_studio: {
     label: 'LM Studio',
     badge: '本地模型',
     desc: '默认监听 127.0.0.1:1234/v1',
     mark: 'LM',
-    accent: '#2563eb',
+    accent: '#4f5156',
   },
   openai: {
     label: 'OpenAI',
     badge: 'API 模型',
     desc: 'OpenAI 官方接口',
     mark: 'AI',
-    accent: '#111827',
+    accent: '#242529',
   },
   anthropic: {
     label: 'Anthropic',
     badge: 'API 模型',
     desc: 'Claude 官方接口',
     mark: 'A',
-    accent: '#d97706',
+    accent: '#4f5156',
   },
   gemini: {
     label: 'Gemini',
     badge: 'API 模型',
     desc: 'Google Gemini 兼容接口',
     mark: 'G',
-    accent: '#2563eb',
+    accent: '#4f5156',
   },
   openrouter: {
     label: 'OpenRouter',
     badge: 'API 模型',
     desc: '多模型聚合接口',
     mark: 'OR',
-    accent: '#7c3aed',
+    accent: '#4f5156',
   },
   openai_compatible: {
     label: 'OpenAI 兼容',
     badge: 'API 模型',
     desc: '适配自建或第三方兼容接口',
     mark: 'OC',
-    accent: '#0f766e',
+    accent: '#4f5156',
   },
 }
 
@@ -710,7 +710,7 @@ function NodeOverrideCard({ stageId, settings, updateSettings }: {
                   padding: '10px 12px',
                   borderRadius: 8,
                   background: 'var(--success-bg)',
-                  border: '1px solid rgba(16,185,129,0.25)',
+                  border: '1px solid rgba(79,81,86,0.22)',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <CheckOutlined style={{ color: 'var(--success-color)' }} />

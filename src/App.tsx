@@ -888,6 +888,10 @@ function App() {
           colorPrimaryActive: '#0d0e10',
           colorText: '#202124',
           colorTextSecondary: '#62646a',
+          colorSuccess: '#4f5156',
+          colorWarning: '#62646a',
+          colorError: '#303136',
+          colorInfo: '#62646a',
           colorBgBase: '#ffffff',
           colorBgContainer: '#ffffff',
           colorBgElevated: '#ffffff',
@@ -923,6 +927,10 @@ function App() {
             controlItemBgHover: '#f4f4f5',
             controlItemBgActive: '#f0f0f1',
             controlItemBgActiveHover: '#e9e9eb',
+          },
+          Tag: {
+            defaultBg: '#f4f4f5',
+            defaultColor: '#4f5156',
           },
         },
       }}

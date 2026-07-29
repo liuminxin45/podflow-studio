@@ -19,14 +19,14 @@
   --border-light: #efede8;
   --border-active: #c8c0b3;
 
-  --success-color: #346538;
+  --success-color: #4f5156;
   --success-bg: #edf3ec;
-  --warning-color: #956400;
-  --warning-bg: #fbf3db;
-  --error-color: #9f2f2d;
-  --error-bg: #fdebec;
-  --info-color: #1f6c9f;
-  --info-bg: #e1f3fe;
+  --warning-color: #4f5156;
+  --warning-bg: #f4f4f5;
+  --error-color: #4f5156;
+  --error-bg: #f4f4f5;
+  --info-color: #4f5156;
+  --info-bg: #f4f4f5;
 
   --shadow-soft: 0 2px 8px rgba(15, 15, 15, 0.035);
   --shadow-subtle: 0 1px 3px rgba(15, 15, 15, 0.03);
@@ -723,13 +723,13 @@ pre {
 }
 
 .discover-hint.warning {
-  border-color: #ead9a4;
+  border-color: #d6d7da;
   background: var(--warning-bg);
   color: var(--warning-color);
 }
 
 .discover-hint.info {
-  border-color: #c6dfef;
+  border-color: #d6d7da;
   background: var(--info-bg);
   color: var(--info-color);
 }
@@ -848,7 +848,7 @@ pre {
 }
 
 .discover-stream.failed {
-  border-color: #f3c4c4;
+  border-color: #d6d7da;
   background: #fff8f7;
 }
 
@@ -971,13 +971,13 @@ pre {
 }
 
 .discover-stream-source.completed {
-  border-color: #cadfca;
+  border-color: #d6d7da;
   background: var(--success-bg);
   color: var(--success-color);
 }
 
 .discover-stream-source.failed {
-  border-color: #f3c4c4;
+  border-color: #d6d7da;
   background: var(--error-bg);
   color: var(--error-color);
 }
@@ -1058,7 +1058,7 @@ pre {
 }
 
 .discover-item.blocked {
-  border-color: #f3c4c4;
+  border-color: #d6d7da;
   background: #fff8f7;
 }
 
@@ -1991,7 +1991,7 @@ pre {
 }
 
 .organize-completion-mark.is-ready {
-  color: var(--success-color, #267342);
+  color: var(--success-color, #4f5156);
 }
 
 .organize-completion-mark.is-target {
@@ -2093,7 +2093,7 @@ pre {
 .organize-row-remove:hover,
 .organize-source-meta button:hover {
   background: var(--bg-secondary);
-  color: var(--error-color, #b42318);
+  color: var(--error-color, #4f5156);
 }
 
 .organize-source-meta button:disabled {
@@ -2226,9 +2226,9 @@ pre {
   font-size: 10px !important;
 }
 
-.organize-status-tag.is-success { background: #e8f5ec; color: #267342; }
-.organize-status-tag.is-warning { background: #fff3dc; color: #995b08; }
-.organize-status-tag.is-info { background: #e9f1fb; color: #315f91; }
+.organize-status-tag.is-success { background: #f4f4f5; color: #4f5156; }
+.organize-status-tag.is-warning { background: #f4f4f5; color: #4f5156; }
+.organize-status-tag.is-info { background: #f4f4f5; color: #4f5156; }
 .organize-status-tag.is-muted { background: var(--bg-tertiary); color: var(--text-secondary); }
 
 .organize-story-title-input.ant-input {
@@ -2366,7 +2366,7 @@ pre {
   animation: none;
 }
 
-.organize-synthesis-progress.is-completed .organize-synthesis-activity i { background: var(--success-color, #267342); }
+.organize-synthesis-progress.is-completed .organize-synthesis-activity i { background: var(--success-color, #4f5156); }
 .organize-synthesis-progress.is-failed .organize-synthesis-activity i { background: var(--error-color); }
 
 @keyframes organizeSynthesisActivity {
@@ -2382,11 +2382,11 @@ pre {
 .organize-synthesis-step > svg { flex: 0 0 auto; font-size: 10px; }
 .organize-synthesis-step > i { width: 7px; height: 7px; flex: 0 0 auto; border: 1px solid var(--border-color); border-radius: 50%; }
 .organize-synthesis-step.is-running { color: var(--accent-primary); }
-.organize-synthesis-step.is-success { color: var(--success-color, #267342); }
+.organize-synthesis-step.is-success { color: var(--success-color, #4f5156); }
 .organize-synthesis-step.is-error { color: var(--error-color); }
 
 .organize-draft-warning {
-  color: var(--warning-color, #995b08);
+  color: var(--warning-color, #4f5156);
   font-size: 10px;
   line-height: 1.45;
 }
@@ -2462,7 +2462,7 @@ pre {
 }
 
 .organize-check-list span.is-done {
-  color: #267342;
+  color: #4f5156;
 }
 
 .organize-research-queue {
@@ -2711,8 +2711,8 @@ pre {
 
 .organize-knowledge-card.is-unverified .organize-knowledge-meta > span:nth-child(2),
 .organize-knowledge-card.is-conflicted .organize-knowledge-meta > span:nth-child(2) {
-  border-color: color-mix(in srgb, var(--warning-color, #995b08) 35%, var(--border-light));
-  color: var(--warning-color, #995b08);
+  border-color: color-mix(in srgb, var(--warning-color, #4f5156) 35%, var(--border-light));
+  color: var(--warning-color, #4f5156);
 }
 
 .organize-knowledge-actions {
@@ -2767,7 +2767,7 @@ pre {
 
 .organize-trace-row.is-pending { color: var(--text-tertiary); }
 .organize-trace-row.is-running { color: var(--accent-primary); }
-.organize-trace-row.is-success > svg { color: var(--success-color, #267342); }
+.organize-trace-row.is-success > svg { color: var(--success-color, #4f5156); }
 .organize-trace-row.is-error,
 .organize-research-error { color: var(--error-color); }
 
@@ -3114,25 +3114,25 @@ pre {
 }
 
 .ui-status-success {
-  border-color: rgba(52, 101, 56, 0.22);
+  border-color: rgba(79, 81, 86, 0.22);
   background: var(--success-bg);
   color: var(--success-color);
 }
 
 .ui-status-warning {
-  border-color: rgba(149, 100, 0, 0.24);
+  border-color: rgba(98, 100, 106, 0.24);
   background: var(--warning-bg);
   color: var(--warning-color);
 }
 
 .ui-status-error {
-  border-color: rgba(159, 47, 45, 0.22);
+  border-color: rgba(48, 49, 54, 0.22);
   background: var(--error-bg);
   color: var(--error-color);
 }
 
 .ui-status-info {
-  border-color: rgba(31, 108, 159, 0.2);
+  border-color: rgba(98, 100, 106, 0.2);
   background: var(--info-bg);
   color: var(--info-color);
 }
@@ -3307,8 +3307,8 @@ pre {
 }
 
 @keyframes soundStudioPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(159, 47, 45, 0.16); }
-  50% { box-shadow: 0 0 0 8px rgba(159, 47, 45, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(48, 49, 54, 0.16); }
+  50% { box-shadow: 0 0 0 8px rgba(48, 49, 54, 0); }
 }
 
 @keyframes timelineSelectionIn {
@@ -3502,7 +3502,7 @@ pre {
 
 .creation-warning {
   margin-bottom: 10px;
-  border: 1px solid rgba(149, 100, 0, 0.18);
+  border: 1px solid rgba(98, 100, 106, 0.18);
   border-radius: var(--radius-sm);
   background: var(--warning-bg);
   color: var(--warning-color);
@@ -3728,6 +3728,14 @@ pre {
   --border-color: #e5e5e7;
   --border-light: #f0f0f1;
   --border-active: #c7c8cc;
+  --success-color: #4f5156;
+  --success-bg: #f4f4f5;
+  --warning-color: #62646a;
+  --warning-bg: #f4f4f5;
+  --error-color: #303136;
+  --error-bg: #eeeeef;
+  --info-color: #62646a;
+  --info-bg: #f4f4f5;
   --shadow-soft: 0 1px 2px rgba(20, 21, 24, 0.035);
   --shadow-subtle: none;
   --radius-sm: 6px;
@@ -5821,4 +5829,47 @@ body {
 .log-panel-scroll {
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+}
+
+/* Enterprise monochrome system: state is communicated by copy, iconography,
+   weight and contrast instead of decorative or semantic rainbow colors. */
+.ant-tag[class*="ant-tag-"],
+.ant-alert-success,
+.ant-alert-info,
+.ant-alert-warning,
+.ant-alert-error {
+  border-color: var(--border-color) !important;
+  background: var(--bg-tertiary) !important;
+  color: var(--text-secondary) !important;
+}
+
+.ant-badge-status-success,
+.ant-badge-status-processing,
+.ant-badge-status-warning,
+.ant-badge-status-error,
+.ant-badge-status-default,
+.ant-progress-bg,
+.ant-progress-success-bg,
+.ant-progress-circle-path {
+  background: var(--text-secondary) !important;
+  stroke: var(--text-secondary) !important;
+}
+
+.ant-switch.ant-switch-checked,
+.ant-checkbox-checked .ant-checkbox-inner,
+.ant-radio-wrapper .ant-radio-checked .ant-radio-inner {
+  border-color: var(--accent-primary) !important;
+  background: var(--accent-primary) !important;
+}
+
+.ant-btn-dangerous,
+.ant-btn-dangerous:hover,
+.ant-btn-dangerous:focus,
+.ant-dropdown-menu-item-danger,
+.ant-dropdown-menu-item-danger:hover,
+.ant-menu-item-danger,
+.ant-menu-item-danger:hover {
+  border-color: var(--border-active) !important;
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
 }

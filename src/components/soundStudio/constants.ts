@@ -80,7 +80,7 @@ export const OUTPUT_FORMATS: Array<{ value: OutputFormat; label: string }> = [
   { value: 'opus', label: 'Opus · 小体积' },
 ]
 
-export const SEGMENT_COLORS = ['#e05a3f', '#3478c9', '#7655b5', '#168b83', '#a06a24']
+export const SEGMENT_COLORS = ['#303136', '#4f5156', '#62646a', '#77797f', '#92949a']
 
 export const PRODUCE_NODE_LABELS: Record<string, string> = {
   tts: '生成分段语音',

@@ -196,7 +196,7 @@
 }
 
 .produce-segment-state.is-ready {
-  color: var(--success-color, #168b62);
+  color: var(--success-color, #4f5156);
   font-size: 13px;
 }
 
@@ -591,8 +591,8 @@
 }
 
 .produce-checklist li.is-complete {
-  border-color: color-mix(in srgb, #168b62 28%, var(--border-color));
-  color: #168b62;
+  border-color: color-mix(in srgb, #4f5156 28%, var(--border-color));
+  color: #4f5156;
 }
 
 .produce-checklist li > svg {

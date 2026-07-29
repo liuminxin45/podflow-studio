@@ -31,6 +31,23 @@ function lastCssBlock(source, selector) {
   return end === -1 ? '' : source.slice(start, end + 1)
 }
 
+function channelSpread(red, green, blue) {
+  return Math.max(red, green, blue) - Math.min(red, green, blue)
+}
+
+function findChromaticColor(source) {
+  for (const match of source.matchAll(/#([0-9a-f]{6})\b/gi)) {
+    const value = match[1]
+    const channels = [0, 2, 4].map(offset => Number.parseInt(value.slice(offset, offset + 2), 16))
+    if (channelSpread(...channels) > 24) return match[0]
+  }
+  for (const match of source.matchAll(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/gi)) {
+    const channels = match.slice(1, 4).map(Number)
+    if (channelSpread(...channels) > 24) return match[0]
+  }
+  return ''
+}
+
 const css = read(cssPath)
 const app = read(appPath)
 const guide = read(guidePath)
@@ -56,6 +73,10 @@ for (const token of [
   '--border-color: #e5e5e7;',
   '--accent-primary: #242529;',
   '--accent-light: #f0f0f1;',
+  '--success-color: #4f5156;',
+  '--warning-color: #62646a;',
+  '--error-color: #303136;',
+  '--info-color: #62646a;',
   '--radius-sm: 6px;',
   '--radius-md: 8px;',
   '--radius-lg: 12px;',
@@ -96,11 +117,19 @@ for (const filePath of uiFiles) {
   if (/#(?:f4efe5|f7f6f3|f1eadf|f7f4ee|faf9f6|fbfaf7|eeede8|e7e5de|dddbd3)\b/i.test(source)) {
     failures.push(`${relativePath} contains a retired warm-neutral color`)
   }
+  const chromaticColor = findChromaticColor(source)
+  if (chromaticColor) {
+    failures.push(`${relativePath} contains a prohibited chromatic UI color: ${chromaticColor}`)
+  }
 }
 
 for (const token of [
   "colorPrimary: '#242529'",
   "colorText: '#202124'",
+  "colorSuccess: '#4f5156'",
+  "colorWarning: '#62646a'",
+  "colorError: '#303136'",
+  "colorInfo: '#62646a'",
   "colorBgLayout: '#ffffff'",
   "colorBorder: '#e5e5e7'",
   "controlItemBgHover: '#f4f4f5'",

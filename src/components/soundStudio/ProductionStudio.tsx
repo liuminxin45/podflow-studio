@@ -1330,7 +1330,7 @@ export default function ProductionStudio({
                     {' · '}{formatBytes(audioOutputs.file_size)}
                   </p>
                 </div>
-                <Tag color={audioOutputs.degraded ? 'orange' : 'green'}>
+                <Tag>
                   {audioOutputs.degraded ? '降级输出' : '制作完成'}
                 </Tag>
               </div>
@@ -1612,7 +1612,7 @@ export default function ProductionStudio({
                 <section className="produce-settings-section">
                   <div className="produce-settings-title">
                     <div><span className="produce-eyebrow">语音生成</span><h3>声音</h3></div>
-                    <Tag color={providerConfigured ? 'green' : 'orange'}>
+                    <Tag>
                       {unsupportedEngine ? '引擎不受支持' : providerConfigured ? '配置可用' : '待配置'}
                     </Tag>
                   </div>

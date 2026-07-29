@@ -60,9 +60,9 @@ export interface CategoryGroup {
 }
 
 const PRIORITY_DISPLAY: Record<PriorityLevel, { label: string; color: string; bg: string }> = {
-  high:   { label: '重要',   color: '#dc2626', bg: '#fef2f2' },
-  normal: { label: '一般',   color: '#2563eb', bg: '#eff6ff' },
-  low:    { label: '低优先', color: '#9ca3af', bg: '#f9fafb' },
+  high:   { label: '重要',   color: '#4f5156', bg: '#f4f4f5' },
+  normal: { label: '一般',   color: '#4f5156', bg: '#f4f4f5' },
+  low:    { label: '低优先', color: '#92949a', bg: '#f9fafb' },
 }
 
 export function getPriorityDisplay(priority: PriorityLevel) {
@@ -497,7 +497,7 @@ export function groupByCategory(items: ContentItem[]): CategoryGroup[] {
 
     const catId = classification.categoryId
     const catRule = catId === 'unclassified'
-      ? { id: 'unclassified', label: '未分类', color: '#9ca3af', bg: '#f3f4f6', keywords: [] }
+      ? { id: 'unclassified', label: '未分类', color: '#92949a', bg: '#f3f4f6', keywords: [] }
       : getCategoryById(catId)
 
     if (!groupMap.has(catId)) {

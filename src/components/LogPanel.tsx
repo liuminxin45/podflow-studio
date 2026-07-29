@@ -63,10 +63,10 @@ export default function LogPanel({ workflow, collapsed = false, onToggle, showTo
   
   const getNodeStatusIcon = (status: string) => {
     switch (status) {
-      case 'running': return <SyncOutlined spin style={{ color: '#1890ff' }} />
-      case 'completed': return <CheckCircleOutlined style={{ color: '#52c41a' }} />
-      case 'failed': return <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
-      case 'waiting_approval': return <ClockCircleOutlined style={{ color: '#faad14' }} />
+      case 'running': return <SyncOutlined spin style={{ color: '#62646a' }} />
+      case 'completed': return <CheckCircleOutlined style={{ color: '#4f5156' }} />
+      case 'failed': return <CloseCircleOutlined style={{ color: '#303136' }} />
+      case 'waiting_approval': return <ClockCircleOutlined style={{ color: '#77797f' }} />
       default: return null
     }
   }

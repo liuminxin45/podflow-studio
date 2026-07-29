@@ -32,9 +32,9 @@ export interface RelevanceTag {
 
 export function getRelevanceTag(level: RelevanceLevel): RelevanceTag {
   switch (level) {
-    case 'high': return { label: '高度相关', color: '#16a34a', bg: '#f0fdf4' }
-    case 'medium': return { label: '可能感兴趣', color: '#d97706', bg: '#fffbeb' }
-    case 'low': return { label: '扩展发现', color: '#9ca3af', bg: '#f9fafb' }
+    case 'high': return { label: '高度相关', color: '#4f5156', bg: '#f4f4f5' }
+    case 'medium': return { label: '可能感兴趣', color: '#4f5156', bg: '#f4f4f5' }
+    case 'low': return { label: '扩展发现', color: '#92949a', bg: '#f9fafb' }
   }
 }
 
@@ -49,9 +49,9 @@ export function getSignalStrength(index: number, total: number): SignalStrength 
 
 export function getSignalColor(strength: SignalStrength): string {
   switch (strength) {
-    case 'hot': return '#ef4444'
-    case 'warm': return '#3b82f6'
-    case 'cool': return '#d1d5db'
+    case 'hot': return '#4f5156'
+    case 'warm': return '#4f5156'
+    case 'cool': return '#92949a'
   }
 }
 

@@ -218,7 +218,7 @@ export default function CreationStudio({
               <div style={{ fontSize: 14, fontWeight: 500 }}>事实卡片</div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>推荐 9 条快讯 + 1 条深度解读，允许任意数量</div>
             </div>
-            <Tag bordered={false} color={selectedFacts.length > 0 ? 'green' : 'orange'}>
+            <Tag bordered={false}>
               已选 {selectedFacts.length} / 推荐 {RECOMMENDED_NEWS_COUNT}
             </Tag>
           </div>
@@ -252,7 +252,7 @@ export default function CreationStudio({
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                     <strong style={{ fontSize: 13 }}>{fact.title}</strong>
-                    <Tag bordered={false} color={fact.confidence === 'high' ? 'green' : fact.confidence === 'medium' ? 'blue' : 'orange'} style={{ margin: 0 }}>
+                    <Tag bordered={false} style={{ margin: 0 }}>
                       {fact.confidence}
                     </Tag>
                   </div>

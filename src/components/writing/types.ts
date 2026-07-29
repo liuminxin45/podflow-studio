@@ -55,10 +55,10 @@ export const SEGMENT_TONES: Array<{ key: SegmentTone; label: string }> = [
 ]
 
 export const SEGMENT_TYPE_CONFIG: Record<SegmentType, { label: string; color: string; defaultSeconds: number }> = {
-  opening: { label: '开场', color: '#956400', defaultSeconds: 30 },
-  quick_news: { label: '快讯', color: '#1f6c9f', defaultSeconds: 45 },
-  deep_dive: { label: '深度解读', color: '#346538', defaultSeconds: 240 },
-  closing: { label: '结尾', color: '#9f2f2d', defaultSeconds: 60 },
+  opening: { label: '开场', color: '#62646a', defaultSeconds: 30 },
+  quick_news: { label: '快讯', color: '#4f5156', defaultSeconds: 45 },
+  deep_dive: { label: '深度解读', color: '#303136', defaultSeconds: 240 },
+  closing: { label: '结尾', color: '#77797f', defaultSeconds: 60 },
   custom: { label: '自定义', color: '#62615d', defaultSeconds: 120 },
 }
 

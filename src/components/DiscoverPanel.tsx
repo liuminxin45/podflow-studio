@@ -183,10 +183,10 @@ function formatTime(value?: string | null): string {
 }
 
 function noticeStyle(type: NonNullable<Notice>['type']) {
-  if (type === 'error') return { background: 'var(--error-bg)', color: 'var(--error-color)', borderColor: '#f3c4c4' }
-  if (type === 'warning') return { background: 'var(--warning-bg)', color: 'var(--warning-color)', borderColor: '#ead9a4' }
-  if (type === 'success') return { background: 'var(--success-bg)', color: 'var(--success-color)', borderColor: '#cadfca' }
-  return { background: 'var(--info-bg)', color: 'var(--info-color)', borderColor: '#c6dfef' }
+  if (type === 'error') return { background: 'var(--error-bg)', color: 'var(--error-color)', borderColor: '#d6d7da' }
+  if (type === 'warning') return { background: 'var(--warning-bg)', color: 'var(--warning-color)', borderColor: '#d6d7da' }
+  if (type === 'success') return { background: 'var(--success-bg)', color: 'var(--success-color)', borderColor: '#d6d7da' }
+  return { background: 'var(--info-bg)', color: 'var(--info-color)', borderColor: '#d6d7da' }
 }
 
 function mergeConfig(...configs: Array<Partial<DiscoverConfig> | undefined>): DiscoverConfig {

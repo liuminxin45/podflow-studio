@@ -11,11 +11,11 @@ export interface StageDefinition {
 }
 
 export const STAGES: StageDefinition[] = [
-  { id: 'discover', label: '发现', subtitle: '世界在发生什么', subNodes: ['fetch'], color: '#3b82f6' },
-  { id: 'organize', label: '整理', subtitle: '去噪、筛选、归类', subNodes: ['preprocess'], color: '#06b6d4' },
-  { id: 'draft', label: '成稿', subtitle: '事实卡片、结构确认、口播稿', subNodes: ['research', 'topic_selection', 'facts', 'script'], color: '#8b5cf6' },
-  { id: 'produce', label: '制作', subtitle: '让文字变成声音', subNodes: ['tts', 'audio_postprocess', 'assets'], color: '#10b981' },
-  { id: 'publish', label: '发布', subtitle: '归档并同步到发布目标', subNodes: ['publish'], color: '#ef4444' },
+  { id: 'discover', label: '发现', subtitle: '世界在发生什么', subNodes: ['fetch'], color: '#242529' },
+  { id: 'organize', label: '整理', subtitle: '去噪、筛选、归类', subNodes: ['preprocess'], color: '#3f4146' },
+  { id: 'draft', label: '成稿', subtitle: '事实卡片、结构确认、口播稿', subNodes: ['research', 'topic_selection', 'facts', 'script'], color: '#55575d' },
+  { id: 'produce', label: '制作', subtitle: '让文字变成声音', subNodes: ['tts', 'audio_postprocess', 'assets'], color: '#6b6d73' },
+  { id: 'publish', label: '发布', subtitle: '归档并同步到发布目标', subNodes: ['publish'], color: '#85878d' },
 ]
 
 function hasItems(value: unknown): boolean {
