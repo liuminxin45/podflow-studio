@@ -22,7 +22,7 @@ After `npm install`, npm also exposes the package bin locally as `podflow`. `npm
 
 | Command | Purpose |
 | --- | --- |
-| `doctor` | Checks Node, Electron, Vite, renderer source, and optional built assets. |
+| `doctor` | Checks Node, Electron, Vite, Python 3.13, npm-managed FFmpeg, renderer source, and optional built assets. |
 | `start` | Starts an isolated session in the background and returns only after renderer readiness. |
 | `run` | Runs the same supervised session in the foreground. |
 | `status` | Returns manifest state, PIDs, paths, and loopback endpoints. |

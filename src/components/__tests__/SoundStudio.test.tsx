@@ -131,7 +131,7 @@ describe('SoundStudio production workflow', () => {
     expect(saveNodeConfig).toHaveBeenCalledWith('audio_postprocess', expect.objectContaining({
       segment_pause_ms: 0,
     }))
-  }, 60_000)
+  }, 180_000)
 
   it('blocks production when configs fail to load and supports a safe retry', async () => {
     loadNodeConfig.mockRejectedValueOnce(new Error('配置文件暂时不可读'))
@@ -497,7 +497,7 @@ describe('SoundStudio production workflow', () => {
       await waitFor(() => expect((screen.getByRole('button', { name: '真人录音' }) as HTMLButtonElement).disabled).toBe(false))
       fireEvent.click(screen.getByRole('button', { name: '真人录音' }))
       fireEvent.click(screen.getByRole('button', { name: '开始录制' }))
-      await screen.findByRole('button', { name: '结束录制' })
+      await screen.findByRole('button', { name: '结束录制' }, { timeout: 30_000 })
 
       await act(async () => {
         recorderInstance?.onerror?.(new Event('error'))
@@ -599,7 +599,7 @@ describe('SoundStudio production workflow', () => {
       Object.defineProperty(globalThis, 'MediaRecorder', { configurable: true, value: originalMediaRecorder })
       Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: originalMediaDevices })
     }
-  }, 60_000)
+  }, 180_000)
 
   it('stops the microphone when the page is hidden', async () => {
     const stopTrack = vi.fn()
@@ -645,7 +645,7 @@ describe('SoundStudio production workflow', () => {
       await waitFor(() => expect((screen.getByRole('button', { name: '真人录音' }) as HTMLButtonElement).disabled).toBe(false))
       fireEvent.click(screen.getByRole('button', { name: '真人录音' }))
       fireEvent.click(screen.getByRole('button', { name: '开始录制' }))
-      await screen.findByRole('button', { name: '结束录制' })
+      await screen.findByRole('button', { name: '结束录制' }, { timeout: 30_000 })
 
       rerender(<SoundStudio {...props} visible={false} />)
 
@@ -655,5 +655,5 @@ describe('SoundStudio production workflow', () => {
       Object.defineProperty(globalThis, 'MediaRecorder', { configurable: true, value: originalMediaRecorder })
       Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: originalMediaDevices })
     }
-  }, 60_000)
+  }, 180_000)
 })

@@ -38,7 +38,8 @@ PodFlow Studio 面向独立创作者和小型编辑团队，把每天重复的�
 - 当前 Node.js LTS
 - Python 3.13
 - Windows 10 / 11（当前主要桌面开发与验证环境）
-- 可选：FFmpeg，用于导出 MP3 和进行音频后处理
+
+`npm install` 会按当前平台安装 PodFlow 使用的 FFmpeg，无需另外配置系统 FFmpeg。Python 依赖仍由 `npm run setup:python` 安装到项目 `.venv`。
 
 ### 本地运行
 
@@ -62,7 +63,7 @@ npm run setup:python
 npm run demo:news
 ```
 
-这条路径不依赖外网、LLM Key 或 TTS Key。没有真实 TTS 时会生成 mock WAV；检测到 FFmpeg 时输出 `final.mp3`，否则保留 `final.wav` 并在报告中记录降级原因。
+这条路径不依赖外网、LLM Key 或 TTS Key。没有真实 TTS 时会生成 mock WAV，再由 npm 安装的 FFmpeg 完成音频处理并输出 `final.mp3`。若 npm 安装不完整，流程会明确失败并报告缺失的运行时依赖。
 
 运行完成后，主要结果位于 `examples/demo-news/output/`：
 
@@ -100,7 +101,7 @@ dist/episodes/<episode_id> # 完整发布包
 
 ### 可解释的降级
 
-外部模型、TTS 或 FFmpeg 不可用时，流程会尽可能产生可检查的替代结果，并把降级写入 `run_report.json`。失败不会被伪装成成功。
+外部模型或 TTS 不可用时，流程会尽可能产生可检查的替代结果，并把降级写入 `run_report.json`。FFmpeg 是由 npm 管理的必需运行时；缺失时会明确失败，不会把不完整发布包伪装成成功。
 
 ### 本地预览与公网发布分离
 

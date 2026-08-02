@@ -11,6 +11,7 @@ const { stopLocalAgentProcesses } = require('./localAgentService')
 const { detectLocalAgents } = require('./aiTargetManager')
 const { listDoubaoVoices } = require('./services/doubaoVoiceService')
 const { resolvePythonCommand } = require('../scripts/python313')
+const { buildFfmpegEnv } = require('../scripts/ffmpegRuntime')
 const { create: createFileService } = require('./services/fileService')
 const {
   capWorkflowLogs,
@@ -67,7 +68,7 @@ if (ENABLE_FAKE_MEDIA) {
 }
 
 function getPythonSpawnEnv(extra = {}) {
-  return {
+  return buildFfmpegEnv({
     ...process.env,
     LANG: process.env.LANG || 'C.UTF-8',
     LC_ALL: process.env.LC_ALL || 'C.UTF-8',
@@ -75,7 +76,7 @@ function getPythonSpawnEnv(extra = {}) {
     PYTHONUTF8: '1',
     PYTHONUNBUFFERED: '1',
     ...extra,
-  }
+  })
 }
 
 let pythonCommand = null

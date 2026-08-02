@@ -3,6 +3,8 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
+const { inspectBundledFfmpeg } = require('./ffmpegRuntime')
+const { resolvePythonCommand } = require('./python313')
 const {
   atomicWriteJson,
   createManifest,
@@ -305,10 +307,26 @@ async function acceptCommand(options) {
 }
 
 function doctorCommand(options) {
+  let ffmpeg
+  try {
+    const runtime = inspectBundledFfmpeg()
+    ffmpeg = { name: 'ffmpeg', ok: true, detail: `${runtime.version} (${runtime.executable})` }
+  } catch (error) {
+    ffmpeg = { name: 'ffmpeg', ok: false, detail: error.message }
+  }
+  let python
+  try {
+    const command = resolvePythonCommand()
+    python = { name: 'python', ok: true, detail: command.join(' ') }
+  } catch (error) {
+    python = { name: 'python', ok: false, detail: error.message }
+  }
   const checks = [
     { name: 'node', ok: Number(process.versions.node.split('.')[0]) >= 20, detail: process.version },
     { name: 'electron', ok: fs.existsSync(require('electron')), detail: require('electron') },
     { name: 'vite', ok: fs.existsSync(path.join(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js')), detail: 'node_modules/vite/bin/vite.js' },
+    python,
+    ffmpeg,
     { name: 'renderer-source', ok: fs.existsSync(path.join(projectRoot, 'src', 'main.tsx')), detail: 'src/main.tsx' },
     { name: 'built-renderer', ok: fs.existsSync(path.join(projectRoot, 'dist', 'index.html')), detail: 'dist/index.html (required only for --mode built)' },
   ]

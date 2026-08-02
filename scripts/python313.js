@@ -1,6 +1,7 @@
 const { spawnSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
+const { buildFfmpegEnv } = require('./ffmpegRuntime')
 
 const MIN_VERSION = [3, 13]
 const VERSION_CHECK = [
@@ -39,7 +40,7 @@ function uvPythonCandidate() {
 function canRunPython(command) {
   const [executable, ...args] = command
   const result = spawnSync(executable, [...args, '-c', VERSION_CHECK], {
-    env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+    env: buildFfmpegEnv({ ...process.env, PYTHONIOENCODING: 'utf-8' }),
     stdio: 'ignore'
   })
   return result.status === 0
@@ -57,7 +58,7 @@ function resolvePythonCommand(options = {}) {
 function spawnChecked(command, args) {
   const [executable, ...prefixArgs] = command
   const result = spawnSync(executable, [...prefixArgs, ...args], {
-    env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+    env: buildFfmpegEnv({ ...process.env, PYTHONIOENCODING: 'utf-8' }),
     stdio: 'inherit'
   })
 

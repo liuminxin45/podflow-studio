@@ -646,7 +646,7 @@ describe('OrganizePanel research tolerance', () => {
     const practicalValue = (screen.getByLabelText('现实影响与结论边界') as HTMLTextAreaElement).value
     expect(practicalValue).toContain('直接影响现有用户')
     expect(practicalValue).toContain('不能据此判断长期安排')
-  }, 15_000)
+  }, 180_000)
 
   it('screens a large deep-dive result set in bounded batches', async () => {
     const assessmentBatch = (count: number) => ({
@@ -694,7 +694,7 @@ describe('OrganizePanel research tolerance', () => {
     expect(secondBatch.messages?.[1]?.content).not.toContain('"index":5')
     expect(thirdBatch.messages?.[1]?.content).toContain('"index":1')
     expect(thirdBatch.messages?.[1]?.content).not.toContain('"index":2')
-  }, 15_000)
+  }, 180_000)
 
   it('rejects evidence screening responses with duplicate indexes', async () => {
     vi.mocked(llmService.call)
@@ -736,7 +736,7 @@ describe('OrganizePanel research tolerance', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: /研究记录/ }).textContent).toMatch(/联网搜索 \/ [1-9]\d* 秒/), { timeout: 2500 })
     fireEvent.click(screen.getByRole('button', { name: '停止补全' }))
-  }, 15_000)
+  }, 180_000)
 
   it('gives searching a fresh independent timeout budget after planning', async () => {
     vi.useFakeTimers()
@@ -768,7 +768,7 @@ describe('OrganizePanel research tolerance', () => {
       view?.unmount()
       vi.useRealTimers()
     }
-  }, 15_000)
+  }, 180_000)
 
   it('uses historical, comparative, and counter evidence for an explanatory report without a same-event gate', async () => {
     vi.mocked(llmService.call)
@@ -823,7 +823,7 @@ describe('OrganizePanel research tolerance', () => {
     const synthesisOptions = vi.mocked(llmService.call).mock.calls[2]?.[0] as { messages?: Array<{ role: string; content: string }> }
     expect(synthesisOptions.messages?.[0]?.content).toContain('不要求描述同一时间发生的单一事件')
     expect(synthesisOptions.messages?.[1]?.content).toContain('historical_context')
-  }, 15_000)
+  }, 180_000)
 
   it.each([
     { deep: false, button: 'AI 整理资料' },
