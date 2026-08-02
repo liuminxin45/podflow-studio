@@ -9,6 +9,7 @@
  *   - Resume-from capability (pass resumeFrom node name)
  *   - Structured logging with orchestrator prefix
  */
+const path = require('path')
 const { validateNodeOutput } = require('./nodeValidator')
 
 const NODE_STAGE_LABELS = {
@@ -91,6 +92,20 @@ function applySeriesDefaults(nodeName, loadedConfig, state) {
     config.podcast_description = series.description || series.title
     config.podcast_author = defaults.author
     config.enabled_platforms = defaults.enabledPlatforms
+  }
+  return config
+}
+
+function applyRuntimeStorageDefaults(nodeName, loadedConfig) {
+  const dataDir = process.env.PODFLOW_DATA_DIR
+  if (!dataDir) return loadedConfig
+  const config = { ...(loadedConfig || {}) }
+  if (nodeName === 'tts') config.output_dir = path.join(dataDir, 'voice-segments')
+  if (nodeName === 'audio_postprocess') config.output_dir = path.join(dataDir, 'episodes')
+  if (nodeName === 'assets') config.output_dir = path.join(dataDir, 'assets')
+  if (nodeName === 'publish') {
+    config.local_base_dir = path.join(dataDir, 'publish', 'episodes')
+    config.rss_output_dir = path.join(dataDir, 'publish', 'rss')
   }
   return config
 }
@@ -209,7 +224,8 @@ function create(ctx) {
 
       try {
         const loadedNodeConfig = configManager ? configManager.loadNodeConfig(nodeName) : null
-        const nodeConfig = applySeriesDefaults(nodeName, loadedNodeConfig, currentWorkflow.state)
+        const storageConfig = applyRuntimeStorageDefaults(nodeName, loadedNodeConfig)
+        const nodeConfig = applySeriesDefaults(nodeName, storageConfig, currentWorkflow.state)
 
         if (nodeConfig) {
           currentWorkflow.state.runtime_config = currentWorkflow.state.runtime_config || {}
@@ -408,4 +424,4 @@ function create(ctx) {
   return { run, PIPELINE_NODES, NODE_STAGE_LABELS }
 }
 
-module.exports = { applySeriesDefaults, create, getNodeResultError, redactRuntimeConfigSecrets, resolveDownstreamStale }
+module.exports = { applyRuntimeStorageDefaults, applySeriesDefaults, create, getNodeResultError, redactRuntimeConfigSecrets, resolveDownstreamStale }

@@ -69,6 +69,33 @@ declare global {
 
   interface ElectronAPI {
     appLog: (level: 'log' | 'warning' | 'error', message: string) => Promise<{ success: boolean }>
+    runtimePing: () => Promise<{
+      sessionId: string | null
+      pid: number
+      version: string
+      userDataDir: string
+      dataDir: string | null
+      artifactDir: string | null
+      windowMode: string
+      cdpUrl: string | null
+    }>
+    notifyRendererReady: (payload: {
+      title: string
+      href: string
+      readyState: string
+    }) => Promise<{
+      sessionId: string | null
+      pid: number
+      version: string
+      userDataDir: string
+      dataDir: string | null
+      artifactDir: string | null
+      windowMode: string
+      cdpUrl: string | null
+      title: string
+      href: string
+      readyState: string
+    }>
     createWorkflow: (config: Record<string, any>) => Promise<WorkflowCreateResult>
     getWorkflow: (id: string) => Promise<Workflow | null>
     listWorkflows: () => Promise<WorkflowSummary[]>

@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const { notifyAcceptanceResult } = require('./cliLifecycle')
 
 function nowStamp() {
   return new Date().toISOString().replace(/[:.]/g, '-')
@@ -14,14 +15,20 @@ function toPosixPath(value) {
   return String(value || '').replace(/\\/g, '/')
 }
 
-async function runCdpAcceptance({ app, mainWindow, projectRoot }) {
+async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, suite = 'e2e-offline' }) {
+  if (!['startup', 'ui', 'e2e-offline'].includes(suite)) {
+    throw new Error(`Unknown CDP acceptance suite: ${suite}`)
+  }
   const webContents = mainWindow.webContents
   const debuggerApi = webContents.debugger
   const startedAt = new Date()
   const stamp = nowStamp()
-  const acceptanceDir = path.join(projectRoot, 'docs', 'acceptance')
+  const acceptanceDir = artifactDir ? path.resolve(artifactDir) : path.join(projectRoot, 'docs', 'acceptance')
   const screenshotDir = path.join(acceptanceDir, 'screenshots', stamp)
-  const reportPath = path.join(acceptanceDir, 'CDP_ACCEPTANCE_REPORT.md')
+  const reportPath = artifactDir
+    ? path.join(acceptanceDir, 'report.md')
+    : path.join(acceptanceDir, 'CDP_ACCEPTANCE_REPORT.md')
+  const resultPath = path.join(acceptanceDir, 'result.json')
   const steps = []
   const assertions = []
   const failures = []
@@ -89,8 +96,8 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot }) {
 
   async function screenshot(name) {
     const filePath = path.join(screenshotDir, `${name}.png`)
-    const result = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
-    fs.writeFileSync(filePath, Buffer.from(result.data, 'base64'))
+    const image = await webContents.capturePage()
+    fs.writeFileSync(filePath, image.toPNG())
     screenshots.push(filePath)
     return filePath
   }
@@ -123,6 +130,7 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot }) {
     assert('媒体 API 可用', Boolean(domState?.hasMediaDevices && domState?.hasMediaRecorder), 'getUserMedia 与 MediaRecorder 必须存在')
     recordStep('读取首页 DOM', 'PASS', `title=${domState?.title || ''}`)
 
+    if (suite === 'e2e-offline') {
     const workflowResult = await evaluate(`(async () => {
       const result = await window.electronAPI.createWorkflow({ autoRun: false, acceptance: true })
       window.__acceptanceWorkflowId = result.workflowId
@@ -303,25 +311,59 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot }) {
         durationSeconds: 11,
         data: buffer
       })
+      const sampleRate = 16000
+      const durationSeconds = 11
+      const sampleCount = sampleRate * durationSeconds
+      const wavBuffer = new ArrayBuffer(44 + sampleCount * 2)
+      const view = new DataView(wavBuffer)
+      const writeAscii = (offset, text) => {
+        for (let index = 0; index < text.length; index += 1) view.setUint8(offset + index, text.charCodeAt(index))
+      }
+      writeAscii(0, 'RIFF')
+      view.setUint32(4, 36 + sampleCount * 2, true)
+      writeAscii(8, 'WAVE')
+      writeAscii(12, 'fmt ')
+      view.setUint32(16, 16, true)
+      view.setUint16(20, 1, true)
+      view.setUint16(22, 1, true)
+      view.setUint32(24, sampleRate, true)
+      view.setUint32(28, sampleRate * 2, true)
+      view.setUint16(32, 2, true)
+      view.setUint16(34, 16, true)
+      writeAscii(36, 'data')
+      view.setUint32(40, sampleCount * 2, true)
+      for (let index = 0; index < sampleCount; index += 1) {
+        const sample = Math.sin((2 * Math.PI * 220 * index) / sampleRate) * 0.08
+        view.setInt16(44 + index * 2, Math.round(sample * 32767), true)
+      }
+      const assemblySaved = await window.electronAPI.saveRecording({
+        episodeId,
+        segmentId: segment.id + '_assembly',
+        mimeType: 'audio/wav',
+        durationSeconds,
+        data: wavBuffer
+      })
       await window.electronAPI.updateWorkflowState(id, {
         voice_segments: [{
           segment_id: segment.id,
-          path: saved.path,
+          path: assemblySaved.path,
           text: segment.text || '这是第一段 CDP 自验收脚本。',
           speaker: segment.speaker || 'Host A',
           source_fact_ids: segment.source_fact_ids || [],
           engine: 'recording',
           voice: 'recording',
-          mime_type: saved.mimeType,
-          duration_seconds: saved.durationSeconds,
-          size: saved.size
+          mime_type: assemblySaved.mimeType,
+          duration_seconds: assemblySaved.durationSeconds,
+          size: assemblySaved.size
         }]
       })
-      return { saved, workflow: await window.electronAPI.getWorkflow(id), blobSize: blob.size, blobType: blob.type }
+      return { saved, assemblySaved, workflow: await window.electronAPI.getWorkflow(id), blobSize: blob.size, blobType: blob.type }
     })()`)
     const recordingPath = recordingResult?.saved?.path
     const recordingFile = await fileInfo(recordingPath)
     assert('真人录制 WebM 已保存', recordingFile.exists && recordingFile.size > 0, `${recordingPath} size=${recordingFile.size}`)
+    const assemblyFile = await fileInfo(recordingResult?.assemblySaved?.path)
+    assert('离线音频装配输入已保存', assemblyFile.exists && assemblyFile.size > 0, `${recordingResult?.assemblySaved?.path} size=${assemblyFile.size}`)
     assert('录音段写入 workflow state', Boolean(recordingResult?.workflow?.state?.voice_segments?.[0]?.path), JSON.stringify(recordingResult?.workflow?.state?.voice_segments || []))
     recordStep('真人录制与保存', 'PASS', `path=${recordingPath}, blobSize=${recordingResult?.blobSize}`)
     await screenshot('03-recording-state')
@@ -340,8 +382,8 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot }) {
       const id = window.__acceptanceWorkflowId
       await window.electronAPI.saveNodeConfig('publish', {
         storage_type: 'local',
-        local_base_dir: 'dist/episodes',
-        rss_output_dir: 'out/rss',
+        local_base_dir: ${JSON.stringify(path.join(process.env.PODFLOW_DATA_DIR || projectRoot, 'publish', 'episodes'))},
+        rss_output_dir: ${JSON.stringify(path.join(process.env.PODFLOW_DATA_DIR || projectRoot, 'publish', 'rss'))},
         public_base_url: 'https://podcast.example.com/podflow-cdp',
         podcast_title: '通勤早咖啡',
         podcast_description: 'CDP 验收 RSS feed',
@@ -409,6 +451,25 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot }) {
     })()`)
     assert('设置页已删除系统发布、数据表现与成长入口', !/系统与发布|数据与表现|创作者成长/.test(settingsUi || ''), String(settingsUi || ''))
     await screenshot('05-settings-state')
+    } else if (suite === 'ui') {
+      const uiProbe = await evaluate(`(async () => {
+        const settingsButton = [...document.querySelectorAll('button')]
+          .find(button => button.textContent?.trim() === '设置')
+        settingsButton?.click()
+        await new Promise(resolve => setTimeout(resolve, 400))
+        return {
+          body: document.body.innerText,
+          settingsFound: Boolean(settingsButton),
+          duplicateCreateActions: [...document.querySelectorAll('button')]
+            .filter(button => /新建节目|创建节目/.test(button.textContent || '')).length,
+        }
+      })()`)
+      assert('设置入口可交互', uiProbe?.settingsFound === true, JSON.stringify(uiProbe || {}))
+      assert('设置页可读取', /设置/.test(uiProbe?.body || ''), String(uiProbe?.body || ''))
+      assert('节目库不出现重复主创建动作', Number(uiProbe?.duplicateCreateActions || 0) <= 1, JSON.stringify(uiProbe || {}))
+      recordStep('基础 UI 导航', 'PASS', `createActions=${uiProbe?.duplicateCreateActions || 0}`)
+      await screenshot('02-settings')
+    }
 
     assert('无前端 console error', consoleErrors.length === 0, markdownList(consoleErrors))
     assert('无 Runtime exception', exceptions.length === 0, markdownList(exceptions))
@@ -425,12 +486,13 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot }) {
     const status = failures.length ? 'FAIL' : 'PASS'
     const endedAt = new Date()
     const report = [
-      '# CDP Acceptance Report',
+      `# CDP Acceptance Report: ${suite}`,
       '',
       `- Status: ${status}`,
       `- Started: ${startedAt.toISOString()}`,
       `- Ended: ${endedAt.toISOString()}`,
       `- Duration: ${Math.round((endedAt.getTime() - startedAt.getTime()) / 1000)}s`,
+      `- Suite: ${suite}`,
       `- CDP transport: Electron webContents.debugger`,
       '',
       '## Steps',
@@ -464,13 +526,27 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot }) {
     ].join('\n')
 
     fs.writeFileSync(reportPath, report, 'utf-8')
+    const result = {
+      status,
+      suite,
+      startedAt: startedAt.toISOString(),
+      endedAt: endedAt.toISOString(),
+      durationMs: endedAt.getTime() - startedAt.getTime(),
+      reportPath,
+      resultPath,
+      screenshots,
+      failures,
+      assertionCount: assertions.length,
+      stepCount: steps.length,
+    }
+    fs.writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`, 'utf-8')
+    notifyAcceptanceResult(result)
     console.log(`[CDP Acceptance] ${status}: ${reportPath}`)
 
     if (process.env.CDP_ACCEPTANCE_QUIT !== '0') {
       const exitCode = status === 'PASS' ? 0 : 1
       console.log(`[CDP Acceptance] exiting with code ${exitCode}`)
       app.exit(exitCode)
-      process.kill(process.pid, exitCode === 0 ? 'SIGTERM' : 'SIGINT')
     }
   }
 }

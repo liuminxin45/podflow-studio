@@ -183,6 +183,24 @@ function App() {
   } | null>(null)
   const hasElectronBackend = Boolean(window.electronAPI?.listWorkflows)
 
+  useEffect(() => {
+    if (!window.electronAPI?.runtimePing || !window.electronAPI?.notifyRendererReady) return
+    let cancelled = false
+    void window.electronAPI.runtimePing()
+      .then(() => {
+        if (cancelled) return
+        return window.electronAPI.notifyRendererReady({
+          title: document.title,
+          href: window.location.href,
+          readyState: document.readyState,
+        })
+      })
+      .catch((error) => {
+        console.error('[Runtime] Renderer readiness handshake failed:', error)
+      })
+    return () => { cancelled = true }
+  }, [])
+
   const navigationWorkflow = useMemo<Workflow | null>(() => {
     if (!workflow || !discoverRunning) return workflow
     return {

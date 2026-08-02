@@ -24,12 +24,19 @@ const { create: createSeriesFeedService } = require('./services/seriesFeedServic
 const { create: createPlaybackService } = require('./services/playbackService')
 const { applyRecoveryPlan, buildRecoveryPlan } = require('./services/workflowRecovery')
 const { validateNodeOutput } = require('./nodeValidator')
+const {
+  configureCliRuntime,
+  installParentLifecycle,
+  notifyRendererReady,
+  runtimeInfo,
+} = require('./cliLifecycle')
 
 const SPAWN_SHELL = false
 const CDP_DEBUG_ENABLED = process.env.CDP_DEBUG === '1' || process.env.CDP_ACCEPTANCE === '1'
 const CDP_PORT = process.env.CDP_PORT || process.env.CDP_ACCEPTANCE_PORT || (CDP_DEBUG_ENABLED ? '9222' : '')
 const CDP_HOST = process.env.CDP_HOST || '127.0.0.1'
 const ENABLE_FAKE_MEDIA = process.env.CDP_ACCEPTANCE === '1' || process.env.CDP_FAKE_MEDIA === '1'
+const WINDOW_HIDDEN = process.env.PODFLOW_WINDOW_MODE === 'hidden'
 const ICON_PACK_PATH = path.join(__dirname, 'assets', 'PodFlow_Studio_Icon_Pack')
 const DEFAULT_APP_ICON_PATH = path.join(ICON_PACK_PATH, 'app', 'light-theme', 'png', 'podflow-app-1024x1024.png')
 const WINDOWS_APP_ICON_PATHS = {
@@ -45,6 +52,8 @@ const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.opus
 protocol.registerSchemesAsPrivileged([
   { scheme: 'podflow-media', privileges: { secure: true, supportFetchAPI: true, stream: true } },
 ])
+
+configureCliRuntime(app)
 
 if (CDP_PORT) {
   app.commandLine.appendSwitch('remote-debugging-port', String(CDP_PORT))
@@ -92,13 +101,20 @@ let currentWorkflow = null
 let currentWorkflowDirty = false
 let isQuitting = false
 let closeConfirmationInProgress = false
-const WORKFLOW_DIR = path.join(__dirname, '..', 'out', 'workflows')
 const PROJECT_ROOT = path.join(__dirname, '..')
+const STORAGE_ROOT = process.env.PODFLOW_DATA_DIR ? path.resolve(process.env.PODFLOW_DATA_DIR) : PROJECT_ROOT
+const WORKFLOW_DIR = process.env.PODFLOW_DATA_DIR
+  ? path.join(path.resolve(process.env.PODFLOW_DATA_DIR), 'workflows')
+  : path.join(PROJECT_ROOT, 'out', 'workflows')
 const EPISODE_SCHEMA_VERSION = 1
 const FETCH_SOURCES_DIR = path.join(PROJECT_ROOT, 'nodes', 'fetch', 'sources')
 let fetchSourcesCache = null
 let fetchSourcesCacheSignature = ''
 let fetchSourcesInflight = null
+let acceptanceStarted = false
+const disposeParentLifecycle = installParentLifecycle(app, () => {
+  isQuitting = true
+})
 
 function broadcastWorkflowUpdate() {
   capWorkflowLogs(currentWorkflow)
@@ -403,6 +419,7 @@ function syncWindowIconWithSystemTheme() {
 }
 
 function createSplashWindow() {
+  if (WINDOW_HIDDEN) return
   const splashLogoPath = path.join(ICON_PACK_PATH, 'app', 'dark-theme', 'png', 'podflow-app-128x128.png')
   const splashLogoDataUrl = `data:image/png;base64,${fs.readFileSync(splashLogoPath).toString('base64')}`
   splashWindow = new BrowserWindow({
@@ -495,7 +512,7 @@ function updateSplash(progress, status) {
 function revealMainWindow() {
   updateSplash(100, '启动完成')
   setTimeout(() => {
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show()
+    if (!WINDOW_HIDDEN && mainWindow && !mainWindow.isDestroyed()) mainWindow.show()
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close()
   }, 220)
 }
@@ -513,6 +530,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      backgroundThrottling: false,
       preload: path.join(__dirname, 'preload.js')
     }
   })
@@ -543,7 +561,6 @@ function createWindow() {
   mainWindow.webContents.once('did-finish-load', () => {
     updateSplash(92, '恢复本地工作流中…')
     broadcastWorkflowUpdate()
-    revealMainWindow()
   })
 
   mainWindow.on('close', (event) => {
@@ -570,21 +587,6 @@ function createWindow() {
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close()
   })
 
-  if (process.env.CDP_ACCEPTANCE === '1') {
-    mainWindow.webContents.once('did-finish-load', () => {
-      setTimeout(() => {
-        const { runCdpAcceptance } = require('./acceptanceRunner')
-        runCdpAcceptance({
-          app,
-          mainWindow,
-          projectRoot: path.join(__dirname, '..')
-        }).catch((error) => {
-          console.error('[CDP Acceptance] Unhandled failure:', error)
-          app.quit()
-        })
-      }, 500)
-    })
-  }
 }
 
 function runPythonNode(nodeName, state, timeoutMs = 600000) {
@@ -762,11 +764,11 @@ const sharedCtx = {
   runPythonNode
 }
 const workflowRunner = createWorkflowRunner(sharedCtx)
-const seriesService = createSeriesService({ projectRoot: PROJECT_ROOT })
-const seriesFeedService = createSeriesFeedService({ projectRoot: PROJECT_ROOT })
-const playbackService = createPlaybackService({ projectRoot: PROJECT_ROOT })
+const seriesService = createSeriesService({ projectRoot: STORAGE_ROOT })
+const seriesFeedService = createSeriesFeedService({ projectRoot: STORAGE_ROOT })
+const playbackService = createPlaybackService({ projectRoot: STORAGE_ROOT })
 const fileService = createFileService({
-  projectRoot: PROJECT_ROOT,
+  projectRoot: STORAGE_ROOT,
   getCurrentWorkflow: () => currentWorkflow
 })
 
@@ -798,6 +800,30 @@ function writeAppLog(level, message) {
 ipcMain.handle('app:log', async (_event, payload = {}) => {
   writeAppLog(payload.level, String(payload.message || ''))
   return { success: true }
+})
+
+ipcMain.handle('runtime:ping', async () => runtimeInfo(app))
+
+ipcMain.handle('runtime:rendererReady', async (_event, payload = {}) => {
+  const renderer = notifyRendererReady(app, payload)
+  revealMainWindow()
+  if (process.env.CDP_ACCEPTANCE === '1' && !acceptanceStarted) {
+    acceptanceStarted = true
+    setTimeout(() => {
+      const { runCdpAcceptance } = require('./acceptanceRunner')
+      runCdpAcceptance({
+        app,
+        mainWindow,
+        projectRoot: PROJECT_ROOT,
+        artifactDir: process.env.PODFLOW_ARTIFACT_DIR,
+        suite: process.env.CDP_ACCEPTANCE_SUITE || 'e2e-offline',
+      }).catch((error) => {
+        console.error('[CDP Acceptance] Unhandled failure:', error)
+        app.exit(1)
+      })
+    }, 350)
+  }
+  return renderer
 })
 
 ipcMain.handle('app:setDirtyState', async (_event, dirty) => {
@@ -1218,6 +1244,7 @@ function isPathInside(rootPath, targetPath) {
 function authorizeAudioPath(audioPath) {
   const resolved = path.resolve(String(audioPath || ''))
   const ownedRoots = [
+    STORAGE_ROOT,
     path.join(PROJECT_ROOT, 'out'),
     path.join(PROJECT_ROOT, 'dist'),
     path.join(PROJECT_ROOT, 'examples', 'demo-news'),
@@ -1595,6 +1622,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   nativeTheme.removeListener('updated', syncWindowIconWithSystemTheme)
+  disposeParentLifecycle()
   cleanupBeforeQuit()
 })
 

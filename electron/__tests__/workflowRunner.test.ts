@@ -1,8 +1,27 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import path from 'node:path'
 
-const { applySeriesDefaults, getNodeResultError, redactRuntimeConfigSecrets, resolveDownstreamStale } = require('../workflowRunner')
+const { applyRuntimeStorageDefaults, applySeriesDefaults, getNodeResultError, redactRuntimeConfigSecrets, resolveDownstreamStale } = require('../workflowRunner')
+const originalDataDir = process.env.PODFLOW_DATA_DIR
+
+afterEach(() => {
+  if (originalDataDir === undefined) delete process.env.PODFLOW_DATA_DIR
+  else process.env.PODFLOW_DATA_DIR = originalDataDir
+})
 
 describe('workflow runner result guards', () => {
+  it('forces generated outputs into the CLI session data directory', () => {
+    process.env.PODFLOW_DATA_DIR = path.resolve('runtime', 'agent-001', 'data')
+
+    expect(applyRuntimeStorageDefaults('audio_postprocess', { output_dir: 'out/episodes' })).toEqual({
+      output_dir: path.join(process.env.PODFLOW_DATA_DIR, 'episodes'),
+    })
+    expect(applyRuntimeStorageDefaults('publish', null)).toEqual({
+      local_base_dir: path.join(process.env.PODFLOW_DATA_DIR, 'publish', 'episodes'),
+      rss_output_dir: path.join(process.env.PODFLOW_DATA_DIR, 'publish', 'rss'),
+    })
+  })
+
   it('applies series defaults to script, speech and publish nodes', () => {
     const state = {
       selected_topic: { title: '今日科技' },

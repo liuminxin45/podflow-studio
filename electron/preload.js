@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
   appLog: (level, message) => ipcRenderer.invoke('app:log', { level, message }),
+  runtimePing: () => ipcRenderer.invoke('runtime:ping'),
+  notifyRendererReady: (payload) => ipcRenderer.invoke('runtime:rendererReady', payload),
   createWorkflow: (config) => ipcRenderer.invoke('workflow:create', config),
   getWorkflow: (workflowId) => ipcRenderer.invoke('workflow:get', workflowId),
   listWorkflows: () => ipcRenderer.invoke('workflow:list'),

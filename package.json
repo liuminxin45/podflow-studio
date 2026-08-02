@@ -5,16 +5,20 @@
   "author": "PodFlow Studio Contributors",
   "license": "LGPL-3.0-only",
   "main": "electron/main.js",
+  "bin": {
+    "podflow": "scripts/podflow-cli.js"
+  },
   "scripts": {
     "setup": "npm run setup:python",
     "setup:python": "node scripts/python313.js --setup",
     "demo:news": "node scripts/python313.js scripts/run_demo_news.py",
-    "dev": "node scripts/dev.js",
+    "cli": "node scripts/podflow-cli.js",
+    "dev": "node scripts/podflow-cli.js run --mode dev --session default --window show",
     "dev:react": "vite --host 127.0.0.1 --port 5174 --strictPort",
     "dev:electron": "wait-on http://127.0.0.1:5174 && cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://127.0.0.1:5174 electron .",
     "dev:electron:cdp": "wait-on http://127.0.0.1:5174 && cross-env NODE_ENV=development VITE_DEV_SERVER_URL=http://127.0.0.1:5174 CDP_DEBUG=1 CDP_PORT=9222 CDP_FAKE_MEDIA=1 electron .",
-    "dev:cdp": "node scripts/dev.js --cdp",
-    "acceptance:cdp": "node scripts/run_cdp_acceptance.js",
+    "dev:cdp": "node scripts/podflow-cli.js run --mode dev --session default --window show --cdp auto",
+    "acceptance:cdp": "node scripts/podflow-cli.js accept --suite e2e-offline --window hidden --json",
     "build": "tsc && vite build",
     "build:electron": "npm run build && electron-builder",
     "start": "npm run dev",

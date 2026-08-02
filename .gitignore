@@ -35,6 +35,7 @@ Thumbs.db
 
 # Test and debug files
 .codex-run/
+.podflow/
 tests/debug/
 tmp/
 docs/acceptance/acceptance-run.*.log
