@@ -22,7 +22,7 @@ dev = [
   "jsonschema>=4.23.0",
   "pytest>=8.2.0",
   "pyupgrade>=3.21.2",
-  "ruff>=0.15.20",
+  "ruff==0.15.22",
 ]
 
 
