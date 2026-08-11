@@ -8,13 +8,13 @@
 
 从素材发现、整理与事实卡片，到口播稿、配音、音频成片和 RSS 发布包，一条工作流完成一期节目。
 
-[下载 Windows 0.2.0](https://github.com/liuminxin45/podflow-studio/releases/tag/0.2.0) · [CLI 与 Agent 接入](docs/cli.md) · [版本说明](docs/releases/0.2.0.md)
+[产品介绍](https://liuminxin45.github.io/works/podflow-studio) · [试听节目](https://liuminxin45.github.io/works/podflow-studio#episodes) · [下载 Windows 0.2.0](https://github.com/liuminxin45/podflow-studio/releases/tag/0.2.0) · [查看源码](https://github.com/liuminxin45/podflow-studio)
 
 </div>
 
 ## PodFlow Studio 是什么
 
-PodFlow Studio 面向独立创作者和小型编辑团队，把每天重复的新闻播客生产流程放进一个统一的桌面工作台。它默认服务约 22 分钟的单人新闻早报，但素材数量、节目结构和声音方案都可以按实际内容调整。
+PodFlow Studio 面向独立创作者和小型编辑团队，把每天重复的新闻播客生产流程放进一个统一的桌面工作台。默认节目品牌为 `PodFlow 晨报`，采用 6 条快讯加 1 条重点解读的 12 至 15 分钟结构；素材或来源不足时会阻断公开发布，不以无来源内容凑满时长。
 
 它不是一个只会“生成文案”的聊天框。素材会沿着明确的编辑链路前进：先收集和整理来源，再形成事实卡片与可编辑稿件，最后进入配音、音频装配和发布。关键节点保留人工确认，来源与 AI 补充知识也会分开呈现。
 
@@ -96,7 +96,7 @@ dist/episodes/<episode_id> # 完整发布包
 4. **制作**：为稿件分段生成语音，或替换为真人录音，然后自动装配最终音频。
 5. **发布**：检查节目元数据、音频和警告，导出 RSS 与发布包。
 
-默认 preset 为 `morning_news_brief`，推荐“9 条快讯 + 1 条深度解读”，目标时长约 22 分钟。推荐结构不是硬限制：素材质量不足时可以减少条目，也可以按选题需要调整数量。
+默认 preset 为 `morning_news_brief`，公开节目固定“6 条快讯 + 1 条重点解读”，目标 14 分钟、允许范围 12 至 15 分钟。素材或独立来源不足时必须先补齐，不通过调整默认数量绕过公开门禁。
 
 ## CLI 与 AI Agent
 
@@ -130,6 +130,22 @@ npm run acceptance:cdp
 
 当 `publish.public_base_url` 为空时，生成的 RSS 仅供本地预览，并非公网可订阅 Feed。运行报告会明确给出这一警告。
 
+### 导出公开节目包
+
+发布节点会在本地包中生成 `show-notes.md`、`transcript.vtt`、`chapters.json` 和 `sources.json`。一期节目完成事实、成稿、发音与听感终审后，可以显式导出站点清单：
+
+```bash
+npm run showcase:export -- --episode-dir <publish-package> --output-dir <site-content> --audio-url <release-mp3-url> --site-base-url <site-episode-base-url> --approved
+```
+
+GitHub Release 上传脚本默认只打印计划。必须同时提供原始 `episode.json` 作为非 mock 音频证明，并显式添加 `--publish` 才会写入远端：
+
+```bash
+npm run showcase:publish -- --episode-id 2026-08-11 --audio <final.mp3> --notes <show-notes.md> --episode-json <episode.json>
+```
+
+已存在的日期型 Release 与站点节目目录都不会被覆盖。
+
 ## 配置
 
 桌面端「设置」可以管理常用配置；仓库中的 `config.example.yaml` 展示了完整配置结构。密钥请放在本地环境或桌面端配置中，不要写入仓库。
@@ -155,7 +171,7 @@ npm run demo:news       # 运行端到端离线示例
 npm run acceptance:cdp # 运行隔离的 Electron/CDP 主路径验收
 ```
 
-README 主图来自 CDP 验收捕获的真实应用界面，并由 [`scripts/render_readme_hero.js`](scripts/render_readme_hero.js) 渲染为桌面场景；产品界面本身没有经过重绘。
+README 主图来自 Electron/CDP 离线验收捕获的真实素材发现界面，产品界面没有经过重绘。
 
 项目主要由 Electron、React、TypeScript 和 Python 组成。Electron 负责桌面编排与 IPC，React 提供编辑工作台，Python 节点负责采集、研究、写作、语音、音频和发布流水线。
 

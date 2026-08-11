@@ -53,6 +53,14 @@ def _public_publish_state(tmp_path: Path, *, engine: str = "doubao_tts") -> tupl
     state["episode_id"] = "2026-08-11-test"
     state["cover_path"] = str(cover)
     state["facts"] = [{"id": "fact_001", "title": "公开来源", "source_url": "https://example.com/news"}]
+    state["edited_script"] = {
+        "title": "PodFlow 晨报",
+        "description": "6 条快讯加 1 条重点解读",
+        "segments": [
+            {"id": f"quick_{index}", "type": "quick_news", "text": "快讯", "source_fact_ids": ["fact_001"]}
+            for index in range(6)
+        ] + [{"id": "deep_1", "type": "deep_dive", "text": "重点解读", "source_fact_ids": ["fact_001"]}],
+    }
     state["audio_outputs"] = {
         "status": "ok",
         "format": "mp3",

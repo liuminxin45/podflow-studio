@@ -239,6 +239,12 @@ def _validate_public_readiness(state: dict[str, Any], audio_outputs: dict[str, A
     audio_artifact = audio_outputs.get("audio_artifact") or {}
     if int(audio_artifact.get("size_bytes") or 0) < duration_seconds * 16_000:
         raise RuntimeError("Public publishing requires at least a 128 kbps MP3 payload size.")
+    script = state.get("edited_script") if isinstance(state.get("edited_script"), dict) else {}
+    segments = [segment for segment in script.get("segments", []) if isinstance(segment, dict)]
+    quick_count = sum(segment.get("type") == "quick_news" for segment in segments)
+    deep_count = sum(segment.get("type") == "deep_dive" for segment in segments)
+    if (quick_count, deep_count) != (6, 1):
+        raise RuntimeError("Public PodFlow 晨报 episodes require exactly 6 quick news segments and 1 deep dive.")
     cover_path = Path(str(state.get("cover_path") or ""))
     if not cover_path.is_file():
         raise RuntimeError("Public publishing requires a generated PodFlow 晨报 cover.")
