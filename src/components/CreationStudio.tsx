@@ -65,7 +65,7 @@ export default function CreationStudio({
   const [query, setQuery] = useState('')
   const [facts, setFacts] = useState<FactCard[]>([])
   const [selectedFactIds, setSelectedFactIds] = useState<string[]>([])
-  const [topicTitle, setTopicTitle] = useState(selectedTopic?.title || '通勤早咖啡：今日新闻简报')
+  const [topicTitle, setTopicTitle] = useState(selectedTopic?.title || 'PodFlow 晨报')
   const [topicDesc, setTopicDesc] = useState(selectedTopic?.description || '面向通勤场景的单人新闻早报')
   const lastSyncedStateRef = useRef('')
 
@@ -79,7 +79,7 @@ export default function CreationStudio({
     setFacts(nextFacts)
     const initialIds = initialSelectedTopics.map(topic => topic.fact_id).filter(Boolean) as string[]
     setSelectedFactIds(initialIds.length > 0 ? initialIds : nextFacts.slice(0, RECOMMENDED_NEWS_COUNT).map(fact => fact.id))
-    setTopicTitle(selectedTopic?.title || '通勤早咖啡：今日新闻简报')
+    setTopicTitle(selectedTopic?.title || 'PodFlow 晨报')
     setTopicDesc(selectedTopic?.description || '面向通勤场景的单人新闻早报')
   }, [initialFacts, initialSelectedTopics, materials, selectedTopic?.description, selectedTopic?.title, visible])
 
@@ -216,7 +216,7 @@ export default function CreationStudio({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div>
               <div style={{ fontSize: 14, fontWeight: 500 }}>事实卡片</div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>推荐 9 条快讯 + 1 条深度解读，允许任意数量</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>黄金规格为 6 条快讯 + 1 条重点解读</div>
             </div>
             <Tag bordered={false}>
               已选 {selectedFacts.length} / 推荐 {RECOMMENDED_NEWS_COUNT}

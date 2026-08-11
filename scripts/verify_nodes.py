@@ -100,7 +100,7 @@ def _test_state() -> dict:
     }
     script = {
         "id": "test_ep_script",
-        "title": "通勤早咖啡测试早报",
+        "title": "PodFlow 晨报测试期",
         "description": "用于 verify:nodes 的最小早报节目",
         "content_type": "news_brief",
         "preset_id": "morning_news_brief",
@@ -111,7 +111,7 @@ def _test_state() -> dict:
                 "id": "seg_opening",
                 "type": "opening",
                 "title": "开场导语",
-                "text": "早上好，欢迎收听今天的通勤早咖啡。",
+                "text": "早上好，欢迎收听今天的 PodFlow 晨报。",
                 "source_fact_ids": [],
                 "estimated_seconds": 12,
                 "speaker": "Host A",
@@ -168,7 +168,7 @@ def _test_state() -> dict:
         "researched_contents": [{**article, "research_notes": "", "key_points": [], "verified": False}],
         "facts": [fact],
         "selected_topic": {
-            "title": "通勤早咖啡测试早报",
+            "title": "PodFlow 晨报测试期",
             "description": "用于 verify:nodes 的测试主题",
             "keywords": ["早报"],
         },

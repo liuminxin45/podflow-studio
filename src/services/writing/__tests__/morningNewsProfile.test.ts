@@ -6,12 +6,12 @@ describe("morning news editorial profile", () => {
   it("uses the exemplar-derived standard density", () => {
     const profile = resolveMorningNewsProfile(DEFAULT_SETTINGS);
 
-    expect(profile.targetDurationMinutes).toBe(22);
-    expect(profile.quickNewsRecommendedCount).toBe(9);
+    expect(profile.targetDurationMinutes).toBe(14);
+    expect(profile.quickNewsRecommendedCount).toBe(6);
     expect(profile.deepDiveRecommendedCount).toBe(1);
-    expect(profile.quickNewsChars).toEqual({ min: 240, max: 360 });
-    expect(profile.deepDiveChars).toEqual({ min: 2000, max: 2600 });
-    expect(profile.episodeChars).toEqual({ min: 5200, max: 6200 });
+    expect(profile.quickNewsChars).toEqual({ min: 220, max: 300 });
+    expect(profile.deepDiveChars).toEqual({ min: 1200, max: 1600 });
+    expect(profile.episodeChars).toEqual({ min: 3000, max: 3800 });
   });
 
   it("keeps professional and human voice systems explicit", () => {

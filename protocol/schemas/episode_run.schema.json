@@ -92,6 +92,10 @@
         "episode_dir": { "type": "string" },
         "audio_path": { "type": "string" },
         "episode_json": { "type": "string" },
+        "show_notes": { "type": "string" },
+        "transcript_vtt": { "type": "string" },
+        "chapters_json": { "type": "string" },
+        "sources_json": { "type": "string" },
         "feed_xml": { "type": "string" },
         "run_report_json": { "type": "string" },
         "enclosure_url": { "type": "string" },
@@ -150,7 +154,7 @@
             "hostName": { "type": "string" },
             "defaultVoice": { "type": "string" },
             "enabledPlatforms": { "type": "array", "items": { "type": "string" } },
-            "templateVariant": { "const": "quick_9_plus_deep_1" }
+            "templateVariant": { "const": "quick_6_plus_deep_1" }
           }
         }
       }
@@ -355,6 +359,10 @@
         "file_size": { "type": "integer" },
         "audio_report_path": { "type": "string" },
         "audio_artifact": { "type": "object" },
+        "sample_rate_hz": { "type": "integer" },
+        "bitrate_kbps": { "type": "integer" },
+        "target_lufs": { "type": ["number", "null"] },
+        "true_peak_db": { "type": ["number", "null"] },
         "message": { "type": "string" }
       }
     },

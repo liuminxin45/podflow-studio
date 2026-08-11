@@ -50,8 +50,8 @@ def build_episode_script_prompt(
         "max": int(getattr(config, "quick_news_chars_max", 360)),
     }
     deep_dive_chars = {
-        "min": int(getattr(config, "deep_dive_chars_min", 2000)),
-        "max": int(getattr(config, "deep_dive_chars_max", 2600)),
+        "min": int(getattr(config, "deep_dive_chars_min", 1200)),
+        "max": int(getattr(config, "deep_dive_chars_max", 1600)),
     }
     episode_chars = {
         "min": int(getattr(config, "episode_chars_min", target_chars)),
@@ -236,7 +236,7 @@ def build_episode_script_prompt(
 - {deep_preview_rule}
 - 只有制作参数 JSON 明确提供 show_name、host_name 或 episode_date 时，才播报对应信息。字段为空时使用“早上好，以下是本期早报”这样的中性开场，不得补造节目名、主持人姓名或日期。
 - “历史上的今天”只在事实卡明确提供时使用。
-- 有编排计划时建议 100 至 180 字；没有编排计划时建议 320 至 450 字。开场不做长评论，不使用“今天内容很丰富”等空话。
+- 无论是否有编排计划，开场都控制在 180 至 260 字。开场不做长评论，不使用“今天内容很丰富”等空话。
 
 ### quick_news
 每条快讯是一个完整的小报道，建议 {quick_news_chars['min']} 至 {quick_news_chars['max']} 字。写作顺序如下：

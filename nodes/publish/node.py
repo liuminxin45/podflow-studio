@@ -1,5 +1,6 @@
 import mimetypes
 import os
+import re
 import shutil
 from datetime import UTC, datetime
 from email.utils import format_datetime
@@ -61,8 +62,14 @@ def run(state: dict[str, Any], config: PublishConfig = None) -> dict[str, Any]:
                 raise RuntimeError(
                     "Public publishing requires known, non-mock source engines."
                 )
+            if "doubao_tts" not in source_engines or not source_engines.issubset({"doubao_tts", "recording"}):
+                raise RuntimeError(
+                    "Public PodFlow 晨报 episodes require the fixed Doubao BigTTS baseline; recording replacements are optional."
+                )
         if not audio_artifact:
             raise RuntimeError("No readable final audio artifact found for publishing.")
+        if not local_preview_only:
+            _validate_public_readiness(state, audio_outputs)
 
         stored_audio = ""
         if audio_path.exists() and audio_path.is_file():
@@ -79,11 +86,26 @@ def run(state: dict[str, Any], config: PublishConfig = None) -> dict[str, Any]:
             shutil.copy2(cover_path, stored_cover_path)
             stored_cover = str(stored_cover_path)
 
-        episode_json = _episode_payload(state, config, stored_audio, stored_cover)
+        enclosure_url = _build_enclosure_url(stored_audio, episode_dir, config, local_preview_only)
+        public_artifacts = _write_public_artifacts(
+            episode_dir,
+            state,
+            config,
+            enclosure_url,
+            stored_audio,
+            stored_cover,
+        )
+        episode_json = _episode_payload(
+            state,
+            config,
+            stored_audio,
+            stored_cover,
+            enclosure_url,
+            public_artifacts,
+        )
         episode_json_path = episode_dir / "episode.json"
         write_json(episode_json_path, episode_json)
 
-        enclosure_url = _build_enclosure_url(stored_audio, episode_dir, config, local_preview_only)
         state["publish_outputs"] = {
             "episode_dir": str(episode_dir),
             "audio_path": stored_audio,
@@ -91,6 +113,7 @@ def run(state: dict[str, Any], config: PublishConfig = None) -> dict[str, Any]:
             "enclosure_url": enclosure_url,
             "local_preview_only": local_preview_only,
             "contains_mock_audio": contains_mock_audio,
+            **public_artifacts,
         }
 
         report = build_run_report(state)
@@ -151,8 +174,14 @@ def _episode_payload(
     config: PublishConfig,
     stored_audio: str,
     stored_cover: str,
+    enclosure_url: str,
+    public_artifacts: dict[str, str],
 ) -> dict[str, Any]:
     script = state.get("edited_script", {})
+    audio_outputs = state.get("audio_outputs", {})
+    sources = _collect_sources(state.get("facts", []))
+    episode_dir = Path(public_artifacts["chapters_json"]).parent
+    cover_url = _public_asset_url(config.public_base_url, episode_dir.name, Path(stored_cover).name) if stored_cover else ""
     return {
         "episode_id": state.get("episode_id", ""),
         "preset": state.get("preset", {}),
@@ -168,7 +197,237 @@ def _episode_payload(
             "outputs": state.get("audio_outputs", {}),
         },
         "created_at": state.get("created_at", ""),
+        "showcase": {
+            "id": state.get("episode_id", ""),
+            "title": script.get("title", config.podcast_title),
+            "summary": script.get("description", config.podcast_description),
+            "publishedAt": state.get("created_at", ""),
+            "durationSeconds": audio_outputs.get("duration_seconds", 0),
+            "audioUrl": enclosure_url,
+            "audioBytes": Path(stored_audio).stat().st_size,
+            "coverUrl": cover_url,
+            "transcriptUrl": _public_asset_url(config.public_base_url, episode_dir.name, "transcript.vtt"),
+            "chaptersUrl": _public_asset_url(config.public_base_url, episode_dir.name, "chapters.json"),
+            "sources": sources,
+            "credits": [{"role": "制作", "name": "PodFlow Studio"}],
+            "ttsProvider": _tts_provider_label(audio_outputs.get("source_engines", [])),
+            "aiAssisted": True,
+            "explicit": False,
+        },
     }
+
+
+def _validate_public_readiness(state: dict[str, Any], audio_outputs: dict[str, Any]) -> None:
+    episode_id = str(state.get("episode_id") or "")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?", episode_id):
+        raise RuntimeError("Public publishing requires an immutable date-based episode ID.")
+    if int(audio_outputs.get("sample_rate_hz") or 0) != 48_000:
+        raise RuntimeError("Public publishing requires 48 kHz final audio.")
+    if str(audio_outputs.get("format") or "").lower() != "mp3":
+        raise RuntimeError("Public publishing requires a final MP3 artifact.")
+    if int(audio_outputs.get("bitrate_kbps") or 0) < 128:
+        raise RuntimeError("Public publishing requires MP3 bitrate of at least 128 kbps.")
+    target_lufs = audio_outputs.get("target_lufs")
+    if target_lufs is None or not -17.0 <= float(target_lufs) <= -15.0:
+        raise RuntimeError("Public publishing requires integrated loudness of -16 LUFS ±1.")
+    true_peak_db = audio_outputs.get("true_peak_db")
+    if true_peak_db is None or float(true_peak_db) > -1.0:
+        raise RuntimeError("Public publishing requires true peak no higher than -1 dBTP.")
+    duration_seconds = int(float(audio_outputs.get("duration_seconds") or 0))
+    if not 720 <= duration_seconds <= 900:
+        raise RuntimeError("Public publishing requires a 12-15 minute final episode.")
+    audio_artifact = audio_outputs.get("audio_artifact") or {}
+    if int(audio_artifact.get("size_bytes") or 0) < duration_seconds * 16_000:
+        raise RuntimeError("Public publishing requires at least a 128 kbps MP3 payload size.")
+    cover_path = Path(str(state.get("cover_path") or ""))
+    if not cover_path.is_file():
+        raise RuntimeError("Public publishing requires a generated PodFlow 晨报 cover.")
+    if not _collect_sources(state.get("facts", [])):
+        raise RuntimeError("Public publishing requires at least one traceable source.")
+    pending_terms = sorted({
+        str(term)
+        for segment in state.get("voice_segments", [])
+        if isinstance(segment, dict)
+        for term in (segment.get("pronunciation_review") or {}).get("unresolved_terms", [])
+    })
+    if pending_terms:
+        raise RuntimeError(
+            "Public publishing requires pronunciation review for: " + ", ".join(pending_terms)
+        )
+
+
+def _write_public_artifacts(
+    episode_dir: Path,
+    state: dict[str, Any],
+    config: PublishConfig,
+    enclosure_url: str,
+    stored_audio: str,
+    stored_cover: str,
+) -> dict[str, str]:
+    script = state.get("edited_script") if isinstance(state.get("edited_script"), dict) else {}
+    segments = [segment for segment in script.get("segments", []) if isinstance(segment, dict)]
+    duration_seconds = max(1, int(float(state.get("audio_outputs", {}).get("duration_seconds") or 0)))
+    chapters = _build_chapters(segments, duration_seconds)
+    sources = _collect_sources(state.get("facts", []))
+
+    chapters_path = episode_dir / "chapters.json"
+    transcript_path = episode_dir / "transcript.vtt"
+    sources_path = episode_dir / "sources.json"
+    show_notes_path = episode_dir / "show-notes.md"
+    write_json(chapters_path, {"version": "1.2.0", "chapters": chapters})
+    write_json(sources_path, sources)
+    transcript_path.write_text(_build_transcript_vtt(segments, chapters, duration_seconds), encoding="utf-8")
+    show_notes_path.write_text(
+        _build_show_notes(
+            title=str(script.get("title") or config.podcast_title),
+            summary=str(script.get("description") or config.podcast_description),
+            chapters=chapters,
+            sources=sources,
+            enclosure_url=enclosure_url,
+            stored_audio=stored_audio,
+            stored_cover=stored_cover,
+            tts_provider=_tts_provider_label(state.get("audio_outputs", {}).get("source_engines", [])),
+        ),
+        encoding="utf-8",
+    )
+    return {
+        "show_notes": str(show_notes_path),
+        "transcript_vtt": str(transcript_path),
+        "chapters_json": str(chapters_path),
+        "sources_json": str(sources_path),
+    }
+
+
+def _build_chapters(segments: list[dict[str, Any]], duration_seconds: int) -> list[dict[str, Any]]:
+    if not segments:
+        return [{"startTime": 0, "title": "PodFlow 晨报"}]
+    weights = [
+        max(1, int(segment.get("estimated_seconds") or max(1, len(str(segment.get("text") or "")) / 4)))
+        for segment in segments
+    ]
+    total_weight = max(1, sum(weights))
+    elapsed = 0
+    chapters: list[dict[str, Any]] = []
+    for index, (segment, weight) in enumerate(zip(segments, weights)):
+        start_time = min(duration_seconds - 1, int(elapsed * duration_seconds / total_weight))
+        if chapters:
+            start_time = max(chapters[-1]["startTime"] + 1, start_time)
+            start_time = min(duration_seconds - 1, start_time)
+        chapters.append({
+            "startTime": max(0, start_time),
+            "title": str(segment.get("title") or _segment_label(str(segment.get("type") or ""), index)),
+        })
+        elapsed += weight
+    return chapters
+
+
+def _build_transcript_vtt(
+    segments: list[dict[str, Any]],
+    chapters: list[dict[str, Any]],
+    duration_seconds: int,
+) -> str:
+    cues = ["WEBVTT", ""]
+    for index, segment in enumerate(segments):
+        start = int(chapters[index]["startTime"]) if index < len(chapters) else 0
+        end = (
+            int(chapters[index + 1]["startTime"])
+            if index + 1 < len(chapters)
+            else duration_seconds
+        )
+        end = max(start + 1, end)
+        cues.extend([
+            str(index + 1),
+            f"{_vtt_timestamp(start)} --> {_vtt_timestamp(end)}",
+            str(segment.get("text") or "").strip(),
+            "",
+        ])
+    return "\n".join(cues)
+
+
+def _collect_sources(raw_facts: Any) -> list[dict[str, str]]:
+    facts = raw_facts if isinstance(raw_facts, list) else []
+    collected: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for fact in facts:
+        if not isinstance(fact, dict):
+            continue
+        urls = [str(fact.get("source_url") or ""), *[str(value or "") for value in fact.get("source_urls", [])]]
+        titles = [str(fact.get("source_title") or fact.get("title") or "来源"), *[str(value or "") for value in fact.get("source_titles", [])]]
+        for index, url in enumerate(urls):
+            if not re.match(r"^https?://", url) or url in seen:
+                continue
+            seen.add(url)
+            collected.append({"title": titles[index] if index < len(titles) and titles[index] else "来源", "url": url})
+    return collected
+
+
+def _tts_provider_label(source_engines: Any) -> str:
+    engines = {str(engine).strip().casefold() for engine in source_engines or [] if str(engine).strip()}
+    if "doubao_tts" in engines and "recording" in engines:
+        return "豆包 BigTTS + 真人录音"
+    if "doubao_tts" in engines:
+        return "豆包 BigTTS"
+    if engines == {"recording"}:
+        return "真人录音"
+    return ", ".join(sorted(engines))
+
+
+def _build_show_notes(
+    *,
+    title: str,
+    summary: str,
+    chapters: list[dict[str, Any]],
+    sources: list[dict[str, str]],
+    enclosure_url: str,
+    stored_audio: str,
+    stored_cover: str,
+    tts_provider: str,
+) -> str:
+    chapter_lines = "\n".join(
+        f"- {_human_timestamp(int(chapter['startTime']))} {chapter['title']}" for chapter in chapters
+    )
+    source_lines = "\n".join(f"- [{source['title']}]({source['url']})" for source in sources) or "- 本期暂无可公开来源"
+    return f"""# {title}
+
+{summary}
+
+## 章节
+
+{chapter_lines}
+
+## 来源
+
+{source_lines}
+
+## 制作说明
+
+- 制作：PodFlow Studio
+- 配音服务：{tts_provider or '真人录音'}
+- AI 辅助：素材整理、事实卡片与初稿生成；事实、成稿、发音和听感需人工终审
+- 音频：{enclosure_url or Path(stored_audio).name}
+- 封面：{Path(stored_cover).name if stored_cover else '未提供'}
+"""
+
+
+def _segment_label(segment_type: str, index: int) -> str:
+    labels = {"opening": "开场", "deep_dive": "重点解读", "closing": "收尾"}
+    return labels.get(segment_type, f"快讯 {index}")
+
+
+def _vtt_timestamp(value: int) -> str:
+    hours, remainder = divmod(max(0, value), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}.000"
+
+
+def _human_timestamp(value: int) -> str:
+    minutes, seconds = divmod(max(0, value), 60)
+    return f"{minutes:02d}:{seconds:02d}"
+
+
+def _public_asset_url(base_url: str, episode_id: str, filename: str) -> str:
+    relative = f"episodes/{episode_id}/{filename}"
+    return f"{base_url.rstrip('/')}/{relative}" if base_url else relative
 
 
 def _build_enclosure_url(

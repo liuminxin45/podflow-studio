@@ -125,7 +125,7 @@ def resolve_morning_news_structure(
         1,
         int(preset.get("recommended_news_item_count", 10)),
     )
-    recommended_quick = max(0, int(preset.get("quick_news_recommended_count", 9)))
+    recommended_quick = max(0, int(preset.get("quick_news_recommended_count", 6)))
     recommended_deep = max(0, int(preset.get("deep_dive_recommended_count", 1)))
     available_total = max(0, int(available_fact_count))
     actual_total = (
@@ -146,7 +146,7 @@ def resolve_morning_news_structure(
         "actual_news_item_count": actual_total,
         "actual_quick_news_count": actual_quick,
         "actual_deep_dive_count": actual_deep,
-        "template_variant": str(preset.get("template_variant", "quick_9_plus_deep_1")),
+        "template_variant": str(preset.get("template_variant", "quick_6_plus_deep_1")),
     }
 
 
@@ -155,7 +155,7 @@ def generate_deterministic_script(
     preset: dict[str, Any] | None = None,
     *,
     episode_id: str = "",
-    title: str = "通勤早咖啡：今日新闻简报",
+    title: str = "PodFlow 晨报",
 ) -> dict[str, Any]:
     """Generate a source-grounded solo news script without an external model."""
 
@@ -174,7 +174,7 @@ def generate_deterministic_script(
             "seg_001",
             "opening",
             "开场",
-            "早上好，欢迎来到通勤早咖啡。"
+            "早上好，欢迎收听 PodFlow 晨报。"
             f"今天按实际素材整理 {len(selected)} 条新闻，"
             f"其中 {structure['actual_quick_news_count']} 条快讯"
             f"和 {structure['actual_deep_dive_count']} 段重点展开。{tone_line}",
@@ -206,7 +206,7 @@ def generate_deterministic_script(
             f"seg_{len(segments) + 1:03d}",
             "closing",
             "收束",
-            "以上就是今天的单人新闻早报。你可以在发布前继续编辑稿件、替换单段录音，确认无误后再导出 RSS 或发布包。",
+            "以上是今天的 PodFlow 晨报。重要事件仍在继续发展，我们会追踪新的公开信息和关键变化。感谢收听，明天早上再见。",
             source_ids,
         )
     )
@@ -301,13 +301,13 @@ def build_run_report(state: dict[str, Any]) -> dict[str, Any]:
         "script": {
             "source_for_tts": script_name,
             "segments": len(segments),
-            "template_variant": preset.get("template_variant", "quick_9_plus_deep_1"),
+            "template_variant": preset.get("template_variant", "quick_6_plus_deep_1"),
             "recommended_news_item_count": recommended_count,
             "actual_news_item_count": len(news_segments),
             "quick_news_count": segment_counts_by_type.get("quick_news", 0),
             "deep_dive_count": segment_counts_by_type.get("deep_dive", 0),
             "custom_count_allowed": bool(preset.get("allow_custom_news_item_count", True)),
-            "target_duration_minutes": preset.get("target_duration_minutes", 22),
+            "target_duration_minutes": preset.get("target_duration_minutes", 14),
             "segment_counts_by_type": segment_counts_by_type,
             "segment_plan": preset.get("segment_plan", []),
             "segment_ids_without_sources": [

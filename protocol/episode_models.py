@@ -142,6 +142,10 @@ class AudioOutputsModel(BaseModel):
     file_size: int = 0
     audio_report_path: str = ""
     audio_artifact: dict[str, Any] = Field(default_factory=dict)
+    sample_rate_hz: int = 0
+    bitrate_kbps: int = 0
+    target_lufs: float | None = None
+    true_peak_db: float | None = None
     message: str = ""
 
 
@@ -253,6 +257,10 @@ class PublishOutputsModel(BaseModel):
     episode_dir: str = ""
     audio_path: str = ""
     episode_json: str = ""
+    show_notes: str = ""
+    transcript_vtt: str = ""
+    chapters_json: str = ""
+    sources_json: str = ""
     feed_xml: str = ""
     run_report_json: str = ""
     enclosure_url: str = ""
@@ -287,12 +295,12 @@ class SeriesDefaultsModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     language: str = "zh-CN"
-    targetDurationMinutes: int = Field(default=22, ge=1, le=240)
+    targetDurationMinutes: int = Field(default=14, ge=1, le=240)
     author: str = "PodFlow Studio"
     hostName: str = ""
     defaultVoice: str = ""
     enabledPlatforms: list[str] = Field(default_factory=lambda: ["local", "rss"])
-    templateVariant: Literal["quick_9_plus_deep_1"] = "quick_9_plus_deep_1"
+    templateVariant: Literal["quick_6_plus_deep_1"] = "quick_6_plus_deep_1"
 
 
 class SeriesSnapshotModel(BaseModel):

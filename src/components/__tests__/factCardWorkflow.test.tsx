@@ -325,7 +325,7 @@ describe('morning-news writing surfaces', () => {
             id: 'seg_opening',
             type: 'opening',
             title: '开场导语',
-            text: '大家早上好，欢迎收听今天的通勤早咖啡。',
+            text: '大家早上好，欢迎收听今天的 PodFlow 晨报。',
             source_fact_ids: [],
             estimated_seconds: 20,
           },

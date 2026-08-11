@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -18,6 +19,8 @@ if str(ROOT) not in sys.path:
 
 from nodes.audio_postprocess.config import AudioPostprocessConfig
 from nodes.audio_postprocess.node import run as audio_run
+from nodes.assets.config import AssetsConfig
+from nodes.assets.node import run as assets_run
 from nodes.facts.config import FactsConfig
 from nodes.facts.node import run as facts_run
 from nodes.publish.config import PublishConfig
@@ -157,17 +160,31 @@ def run_demo_news(
             final_basename="final",
         ),
     )
+    state = assets_run(
+        state,
+        AssetsConfig(output_dir=str(output_dir / "assets"), generate_cover=True),
+    )
     state = publish_run(
         state,
         PublishConfig(
             local_base_dir=str(output_dir / "dist" / "episodes"),
             rss_output_dir=str(output_dir),
             public_base_url=os.environ.get("PODFLOW_PUBLIC_BASE_URL", ""),
-            podcast_title="通勤早咖啡",
+            podcast_title="PodFlow 晨报",
             podcast_description="PodFlow Studio 单人新闻早报 demo",
             podcast_category="News",
         ),
     )
+
+    for key, filename in (
+        ("show_notes", "show-notes.md"),
+        ("transcript_vtt", "transcript.vtt"),
+        ("chapters_json", "chapters.json"),
+        ("sources_json", "sources.json"),
+    ):
+        artifact = Path(str(state.get("publish_outputs", {}).get(key) or ""))
+        if artifact.is_file():
+            shutil.copy2(artifact, output_dir / filename)
 
     schema_ok, schema_errors = validate_episode_run_payload(state)
     state.setdefault("run_report", {})["schema_validation"] = {
@@ -199,7 +216,10 @@ def _episode_summary(state: dict[str, Any]) -> dict[str, Any]:
         "selected_topics": state.get("selected_topics", []),
         "script": state.get("script", {}),
         "edited_script": state.get("edited_script", {}),
+        "voice_segments": state.get("voice_segments", []),
+        "production_plan": state.get("production_plan", {}),
         "audio_outputs": state.get("audio_outputs", {}),
+        "cover_path": state.get("cover_path", ""),
         "publish_outputs": state.get("publish_outputs", {}),
     }
 

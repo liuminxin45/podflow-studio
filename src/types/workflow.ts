@@ -109,7 +109,7 @@ export interface SeriesDefaults {
   hostName: string
   defaultVoice: string
   enabledPlatforms: string[]
-  templateVariant: 'quick_9_plus_deep_1'
+  templateVariant: 'quick_6_plus_deep_1'
 }
 
 export interface SeriesSnapshot {

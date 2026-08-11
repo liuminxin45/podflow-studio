@@ -27,7 +27,7 @@ def _rss(enclosure_url: str, *, length: str = "1234") -> str:
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
-    <title>通勤早咖啡</title>
+    <title>PodFlow 晨报</title>
     <description>demo</description>
     <language>zh-CN</language>
     <item>

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 
 NUMBER_TOKEN = re.compile(
@@ -18,6 +19,13 @@ LISTENER_COMMAND_PATTERN = re.compile(
 )
 ATTRIBUTED_OFFICIAL_ACTION = re.compile(
     r"(?:官方|有关部门|主管部门|公告|通知|指南).{0,24}(?:要求|提醒|建议|规定)"
+)
+INTERNAL_INSTRUCTION_PATTERN = re.compile(
+    r"(?:发布前|播出前|编辑时|后期时|核验提示|发布提示|编辑提示|"
+    r"请(?:核对|确认|补充|替换|删除|修改)|"
+    r"(?:导出|生成)(?:\s*RSS|发布包)|工作流(?:节点|状态)|"
+    r"(?:事实|数字|来源).{0,8}(?:待核验|需核验|需要核验))",
+    re.IGNORECASE,
 )
 
 
@@ -59,11 +67,16 @@ def assess_script_quality(
                 opening,
             )
         )
-    if len(opening_text) > 180:
-        soft.append(_issue("OPENING_TOO_LONG", f"开场 {len(opening_text)} 字，目标不超过 180 字", opening))
-    if len(str(closing.get("text") or "")) > 120:
-        soft.append(_issue("CLOSING_TOO_LONG", "收尾偏长，可能重复本期内容", closing))
-    _assess_text_integrity(closing, str(closing.get("text") or ""), "", hard, soft)
+    if len(opening_text) > 260:
+        soft.append(_issue("OPENING_TOO_LONG", f"开场 {len(opening_text)} 字，目标不超过 260 字", opening))
+    elif len(opening_text) < 180:
+        soft.append(_issue("OPENING_TOO_SHORT", f"开场 {len(opening_text)} 字，目标不少于 180 字", opening))
+    closing_text = str(closing.get("text") or "")
+    if len(closing_text) > 100:
+        soft.append(_issue("CLOSING_TOO_LONG", "收尾超过 100 字，可能重复本期内容", closing))
+    elif len(closing_text) < 60:
+        soft.append(_issue("CLOSING_TOO_SHORT", "收尾少于 60 字，缺少稳定的节目落点", closing))
+    _assess_text_integrity(closing, closing_text, "", hard, soft)
 
     planned_items = editorial_plan.get("items", [])
     if len(news) != len(planned_items):
@@ -72,15 +85,31 @@ def assess_script_quality(
 
     lengths: list[int] = []
     opening_prefixes: list[str] = []
+    seen_sentences: dict[str, str] = {}
     for segment, planned in zip(news, planned_items):
         source_ids = [str(value) for value in segment.get("source_fact_ids", [])]
         if source_ids != [planned["fact_id"]]:
             hard.append(_issue("FACT_BINDING", "新闻段事实绑定与编排不一致", segment))
             continue
+        fact = facts_by_id.get(str(planned["fact_id"]))
+        if fact is None:
+            hard.append(_issue("MISSING_FACT", "新闻段绑定的事实卡不存在", segment))
+            continue
+        source_hosts = _source_hosts(fact)
+        if segment.get("type") == "deep_dive" and len(source_hosts) < 3:
+            hard.append(
+                _issue(
+                    "DEEP_DIVE_SOURCES",
+                    f"重点解读至少需要三个独立来源，当前只有 {len(source_hosts)} 个",
+                    segment,
+                )
+            )
+        elif segment.get("type") == "quick_news" and not source_hosts:
+            hard.append(_issue("QUICK_NEWS_SOURCE", "每条快讯至少需要一个可追溯来源", segment))
         text = str(segment.get("text") or "")
         lengths.append(len(text))
         fact_text = " ".join(
-            str(facts_by_id[planned["fact_id"]].get(field) or "")
+            str(fact.get(field) or "")
             for field in ("title", "summary", "claim", "published_at")
         )
         _assess_text_integrity(
@@ -108,6 +137,21 @@ def assess_script_quality(
             )
         if opening_text and _overlap_ratio(opening_text, text) >= 0.55:
             soft.append(_issue("OPENING_BODY_REPETITION", "开场与正文存在明显重复", segment))
+        for sentence in _spoken_sentences(text):
+            previous_segment_id = seen_sentences.get(sentence)
+            if previous_segment_id and previous_segment_id != str(segment.get("id") or ""):
+                hard.append(_issue("REPEATED_TEMPLATE_SENTENCE", "不同新闻段重复使用相同模板句", segment))
+                break
+            seen_sentences[sentence] = str(segment.get("id") or "")
+
+    opening_question = str(editorial_plan.get("opening", {}).get("listener_question") or "")
+    if opening_question:
+        promised_terms = _question_terms(opening_question)
+        if promised_terms and not any(
+            promised_terms & _question_terms(str(segment.get("text") or ""))
+            for segment in news
+        ):
+            hard.append(_issue("OPENING_PROMISE_UNFULFILLED", f"正文没有兑现开场问题：{opening_question}", opening))
 
     for index in range(len(opening_prefixes) - 1):
         if opening_prefixes[index] and opening_prefixes[index] == opening_prefixes[index + 1]:
@@ -250,6 +294,14 @@ def _assess_text_integrity(
 ) -> None:
     if "\ufffd" in text:
         hard.append(_issue("INVALID_TEXT_ENCODING", "口播包含无法解码的替换字符“�”", segment))
+    if INTERNAL_INSTRUCTION_PATTERN.search(text):
+        hard.append(
+            _issue(
+                "INTERNAL_INSTRUCTION_LEAK",
+                "口播包含编辑、核验或发布阶段的内部指令",
+                segment,
+            )
+        )
     command_sentences = [
         sentence
         for sentence in re.split(r"(?<=[。！？!?])", text)
@@ -269,6 +321,28 @@ def _assess_text_integrity(
                 segment,
             )
         )
+
+
+def _source_hosts(fact: dict[str, Any]) -> set[str]:
+    urls = [str(fact.get("source_url") or "")]
+    urls.extend(str(value or "") for value in fact.get("source_urls", []))
+    brief = fact.get("deep_dive_brief")
+    if isinstance(brief, dict):
+        urls.extend(str(value or "") for value in brief.get("sourceUrls", []))
+    hosts: set[str] = set()
+    for value in urls:
+        parsed = urlparse(value.strip())
+        if parsed.scheme in {"http", "https"} and parsed.hostname:
+            hosts.add(parsed.hostname.lower().removeprefix("www."))
+    return hosts
+
+
+def _spoken_sentences(value: str) -> set[str]:
+    return {
+        re.sub(r"\s+", "", sentence)
+        for sentence in re.split(r"[。！？!?]", value)
+        if len(re.sub(r"\s+", "", sentence)) >= 12
+    }
 
 
 def _question_terms(value: str) -> set[str]:

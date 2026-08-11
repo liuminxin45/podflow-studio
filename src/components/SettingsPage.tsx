@@ -257,8 +257,8 @@ export function buildNodeConfigs(settings: AppSettings): Record<string, Record<s
       local_base_dir: 'dist/episodes',
       rss_output_dir: 'out/rss',
       public_base_url: '',
-      podcast_title: '通勤早咖啡',
-      podcast_description: '单人新闻早报播客',
+      podcast_title: 'PodFlow 晨报',
+      podcast_description: '每天 6 条快讯和 1 条重点解读，保留来源与判断边界。',
       podcast_author: 'PodFlow Studio',
       podcast_language: 'zh-CN',
     },
@@ -497,7 +497,7 @@ export default function SettingsPage({ visible, workflow, onClose, onClearLogs }
       <SectionHeader
         icon={<UserOutlined />}
         title="创作设置"
-        desc="设置早咖啡单人新闻播客的成稿表达、内容结构与声音输出"
+        desc="设置 PodFlow 晨报的成稿表达、内容结构与声音输出"
       />
 
       <SubsectionBlock title="播报表达" desc="选择主持人在口播稿中的表达方式">
@@ -606,7 +606,7 @@ export default function SettingsPage({ visible, workflow, onClose, onClearLogs }
             {
               key: 'medium' as DurationPreference,
               title: '标准早报',
-              desc: `约 ${MORNING_NEWS_DURATION_PROFILES.medium.targetDurationMinutes} 分钟，9 条快讯和 1 条深度稿，全期 5200-6200 字`,
+              desc: `约 ${MORNING_NEWS_DURATION_PROFILES.medium.targetDurationMinutes} 分钟，6 条快讯和 1 条重点解读，全期 3000-3800 字`,
               badge: '推荐',
             },
           ]).map(option => (

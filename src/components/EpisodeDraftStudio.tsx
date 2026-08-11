@@ -77,7 +77,7 @@ export default function EpisodeDraftStudio({
   onProceedToProduction,
 }: Props) {
   const [facts, setFacts] = useState<FactCard[]>([])
-  const [topicTitle, setTopicTitle] = useState(selectedTopic?.title || '通勤早咖啡：今日新闻简报')
+  const [topicTitle, setTopicTitle] = useState(selectedTopic?.title || 'PodFlow 晨报')
   const [topicDesc, setTopicDesc] = useState(selectedTopic?.description || '面向通勤场景的单人新闻早报')
   const [draftHasContent, setDraftHasContent] = useState(false)
   const [generationRunning, setGenerationRunning] = useState(false)
@@ -114,7 +114,7 @@ export default function EpisodeDraftStudio({
     setSavedSettings(settingsRepository.load())
     const nextFacts = factsForCurrentMaterials(initialFacts, materials)
     setFacts(nextFacts)
-    setTopicTitle(selectedTopic?.title || '通勤早咖啡：今日新闻简报')
+    setTopicTitle(selectedTopic?.title || 'PodFlow 晨报')
     setTopicDesc(selectedTopic?.description || '面向通勤场景的单人新闻早报')
   }, [initialFacts, materials, selectedTopic?.description, selectedTopic?.title, visible])
 

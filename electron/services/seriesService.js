@@ -21,7 +21,7 @@ function create({ projectRoot }) {
     const title = String(input?.title ?? existing.title ?? '').trim()
     if (!title) throw new Error('Series title is required')
     const now = new Date().toISOString()
-    const targetDurationMinutes = Number(input?.defaults?.targetDurationMinutes ?? existing.defaults?.targetDurationMinutes ?? 22)
+    const targetDurationMinutes = Number(input?.defaults?.targetDurationMinutes ?? existing.defaults?.targetDurationMinutes ?? 14)
     if (!Number.isInteger(targetDurationMinutes) || targetDurationMinutes < 1 || targetDurationMinutes > 240) {
       throw new Error('Series target duration must be an integer between 1 and 240 minutes')
     }
@@ -42,7 +42,7 @@ function create({ projectRoot }) {
           : Array.isArray(existing.defaults?.enabledPlatforms)
           ? existing.defaults.enabledPlatforms.map(String).filter(Boolean)
           : ['local', 'rss'],
-        templateVariant: 'quick_9_plus_deep_1',
+        templateVariant: 'quick_6_plus_deep_1',
       },
       episodeIds: Array.isArray(existing.episodeIds) ? existing.episodeIds.map(String) : [],
       createdAt: existing.createdAt || now,

@@ -149,7 +149,7 @@ function createInitialState(episodeId, runtimeConfig) {
   const series = runtimeConfig?.series?.id ? toSeriesSnapshot(runtimeConfig.series) : {}
   const cleanRuntimeConfig = { ...(runtimeConfig || {}) }
   delete cleanRuntimeConfig.series
-  const targetDuration = Number(series?.defaults?.targetDurationMinutes || 22)
+  const targetDuration = Number(series?.defaults?.targetDurationMinutes || 14)
   const language = String(series?.defaults?.language || 'zh-CN')
   return {
     episode_id: episodeId,
@@ -160,19 +160,19 @@ function createInitialState(episodeId, runtimeConfig) {
       content_type: 'news_brief',
       num_hosts: 1,
       target_duration_minutes: targetDuration,
-      target_duration_minutes_range: `${Math.max(1, targetDuration - 2)}-${targetDuration + 2}`,
-      template_variant: 'quick_9_plus_deep_1',
-      recommended_news_item_count: 10,
-      quick_news_recommended_count: 9,
+      target_duration_minutes_range: '12-15',
+      template_variant: 'quick_6_plus_deep_1',
+      recommended_news_item_count: 7,
+      quick_news_recommended_count: 6,
       deep_dive_recommended_count: 1,
-      allow_custom_news_item_count: true,
+      allow_custom_news_item_count: false,
       tone: 'clear, concise, commute-friendly',
       language,
       segment_plan: [
-        { type: 'opening', count: 1, target_seconds: [75, 110] },
-        { type: 'quick_news', recommended_count: 9, target_seconds: [55, 90] },
-        { type: 'deep_dive', recommended_count: 1, target_seconds: [480, 625] },
-        { type: 'closing', count: 1, target_seconds: [20, 40] }
+        { type: 'opening', count: 1, target_seconds: [45, 60] },
+        { type: 'quick_news', recommended_count: 6, target_seconds: [45, 65] },
+        { type: 'deep_dive', recommended_count: 1, target_seconds: [300, 420] },
+        { type: 'closing', count: 1, target_seconds: [15, 25] }
       ]
     },
     source_inputs: [],

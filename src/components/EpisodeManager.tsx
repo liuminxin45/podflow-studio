@@ -117,7 +117,7 @@ export default function EpisodeManager({
   const [seriesTitle, setSeriesTitle] = useState('')
   const [seriesDescription, setSeriesDescription] = useState('')
   const [seriesCadence, setSeriesCadence] = useState<'daily' | 'weekly'>('daily')
-  const [seriesDuration, setSeriesDuration] = useState(22)
+  const [seriesDuration, setSeriesDuration] = useState(14)
   const [seriesAuthor, setSeriesAuthor] = useState('PodFlow Studio')
   const [seriesCoverPath, setSeriesCoverPath] = useState('')
   const [seriesHostName, setSeriesHostName] = useState('')
@@ -186,7 +186,7 @@ export default function EpisodeManager({
     setSeriesTitle(value?.title || '')
     setSeriesDescription(value?.description || '')
     setSeriesCadence(value?.cadence || 'daily')
-    setSeriesDuration(value?.defaults.targetDurationMinutes || 22)
+    setSeriesDuration(value?.defaults.targetDurationMinutes || 14)
     setSeriesAuthor(value?.defaults.author || 'PodFlow Studio')
     setSeriesCoverPath(value?.coverPath || '')
     setSeriesHostName(value?.defaults.hostName || '')
@@ -216,7 +216,7 @@ export default function EpisodeManager({
           hostName: seriesHostName.trim(),
           defaultVoice: seriesDefaultVoice.trim(),
           enabledPlatforms: seriesPlatforms.split(/[,，]/).map(value => value.trim()).filter(Boolean),
-          templateVariant: 'quick_9_plus_deep_1',
+          templateVariant: 'quick_6_plus_deep_1',
         },
       })
       populateSeries(saved)
@@ -459,7 +459,7 @@ export default function EpisodeManager({
               <label className="ui-field"><span>默认封面路径</span><Input value={seriesCoverPath} onChange={event => setSeriesCoverPath(event.target.value)} /></label>
               <div className="series-manager-defaults">
                 <label className="ui-field"><span>更新节奏</span><Select value={seriesCadence} onChange={setSeriesCadence} options={[{ value: 'daily', label: '每日' }, { value: 'weekly', label: '每周' }]} /></label>
-                <label className="ui-field"><span>默认时长（分钟）</span><Input type="number" min={1} max={240} value={seriesDuration} onChange={event => setSeriesDuration(Number(event.target.value || 22))} /></label>
+                <label className="ui-field"><span>默认时长（分钟）</span><Input type="number" min={1} max={240} value={seriesDuration} onChange={event => setSeriesDuration(Number(event.target.value || 14))} /></label>
                 <label className="ui-field"><span>RSS 作者</span><Input value={seriesAuthor} onChange={event => setSeriesAuthor(event.target.value)} /></label>
               </div>
               <div className="series-manager-defaults">

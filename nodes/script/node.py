@@ -97,11 +97,11 @@ def _explicit_deep_dive_text(fact: dict[str, Any], preset: dict[str, Any]) -> st
         for part in brief_parts
         if part and str(part).strip()
     ) or " ".join(str(fact.get("summary") or fact.get("claim") or "").split())
-    char_range = preset.get("deep_dive_chars") or [2000, 2600]
+    char_range = preset.get("deep_dive_chars") or [1200, 1600]
     try:
         max_chars = max(200, int(char_range[1]))
     except (IndexError, TypeError, ValueError):
-        max_chars = 2600
+        max_chars = 1600
     prefix = f"接下来展开今天的深度稿：{title}。"
     return f"{prefix}{body}"[:max_chars]
 
@@ -111,7 +111,7 @@ def generate_deterministic_script(
     preset: dict[str, Any] | None = None,
     *,
     episode_id: str = "",
-    title: str = "通勤早咖啡：今日新闻简报",
+    title: str = "PodFlow 晨报",
 ) -> dict[str, Any]:
     """Keep deterministic fallback aligned with an explicitly selected deep dive."""
 
@@ -219,7 +219,7 @@ def _normalize_script(
                     facts,
                     _preset_from_config(config),
                     episode_id="",
-                    title=topic.get("title", "通勤早咖啡：今日新闻简报"),
+                    title=topic.get("title", "PodFlow 晨报"),
                 )
             normalized_segments.append(
                 {
@@ -238,7 +238,7 @@ def _normalize_script(
             facts,
             _preset_from_config(config),
             episode_id="",
-            title=topic.get("title", "通勤早咖啡：今日新闻简报"),
+            title=topic.get("title", "PodFlow 晨报"),
         )
 
     structure = _resolve_script_structure(facts, _preset_from_config(config))
@@ -363,11 +363,11 @@ def _normalize_script(
             facts,
             _preset_from_config(config),
             episode_id="",
-            title=topic.get("title", "通勤早咖啡：今日新闻简报"),
+            title=topic.get("title", "PodFlow 晨报"),
         )
 
     script = {
-        "title": raw_script.get("title") or topic.get("title") or "通勤早咖啡：今日新闻简报",
+        "title": raw_script.get("title") or topic.get("title") or "PodFlow 晨报",
         "description": raw_script.get("description") or "单人新闻早报，面向通勤路上的快速收听。",
         "content_type": "news_brief",
         "preset_id": config.preset_id,
@@ -382,7 +382,7 @@ def _normalize_script(
 def run(state: dict[str, Any], config: ScriptConfig = None) -> dict[str, Any]:
     config = config or ScriptConfig()
     ctx = NodeContext("ScriptNode", state)
-    topic = state.get("selected_topic", {}) or {"title": "通勤早咖啡：今日新闻早报"}
+    topic = state.get("selected_topic", {}) or {"title": "PodFlow 晨报"}
     facts = state.get("facts", [])
 
     ctx.log_start(
@@ -493,7 +493,7 @@ def _generate_script(
             facts,
             preset,
             episode_id="",
-            title=topic.get("title", "通勤早咖啡：今日新闻简报"),
+            title=topic.get("title", "PodFlow 晨报"),
         )
 
     with create_llm_runtime(config, debug_mode=ctx.debug_mode) as client:
@@ -631,7 +631,7 @@ def _generate_script(
                 raise RuntimeError(f"成稿 AI 未通过事实质检：{details}")
             ctx.log(f"成稿事实质检失败，使用 deterministic 降级输出: {details}")
             return generate_deterministic_script(
-                facts, preset, episode_id="", title=topic.get("title", "通勤早咖啡：今日新闻简报")
+                facts, preset, episode_id="", title=topic.get("title", "PodFlow 晨报")
             )
         if quality["soft"]:
             ctx.log(
@@ -650,7 +650,7 @@ def _generate_script(
         facts,
         preset,
         episode_id="",
-        title=topic.get("title", "通勤早咖啡：今日新闻简报"),
+        title=topic.get("title", "PodFlow 晨报"),
     )
 
 
@@ -702,7 +702,7 @@ def _preset_from_config(config: ScriptConfig) -> dict[str, Any]:
                 {
                     "type": "opening",
                     "count": 1,
-                    "target_seconds": [seconds_for_chars(320), seconds_for_chars(450)],
+                    "target_seconds": [seconds_for_chars(180), seconds_for_chars(260)],
                 },
                 {
                     "type": "quick_news",

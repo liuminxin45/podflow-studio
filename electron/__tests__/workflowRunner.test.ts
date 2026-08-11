@@ -36,7 +36,7 @@ describe('workflow runner result guards', () => {
           hostName: '小流',
           defaultVoice: 'voice-a',
           enabledPlatforms: ['local', 'rss'],
-          templateVariant: 'quick_9_plus_deep_1',
+          templateVariant: 'quick_6_plus_deep_1',
         },
       },
     }

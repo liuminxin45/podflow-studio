@@ -5,11 +5,11 @@ from protocol.config_base import NodeConfigBase, LLMConfigMixin
 from protocol.presets import DEFAULT_PRESET_ID
 
 
-DEFAULT_TARGET_DURATION_MINUTES = 22
-DEFAULT_WORDS_PER_MINUTE = 250
-DEFAULT_EPISODE_CHARS_MIN = 5200
-DEFAULT_EPISODE_CHARS_MAX = 6200
-DEFAULT_QUICK_NEWS_COUNT = 9
+DEFAULT_TARGET_DURATION_MINUTES = 14
+DEFAULT_WORDS_PER_MINUTE = 240
+DEFAULT_EPISODE_CHARS_MIN = 3000
+DEFAULT_EPISODE_CHARS_MAX = 3800
+DEFAULT_QUICK_NEWS_COUNT = 6
 DEFAULT_DEEP_DIVE_COUNT = 1
 RETIRED_SCRIPT_SETTINGS = {
     "tone_style",
@@ -41,7 +41,7 @@ class ScriptConfig(NodeConfigBase, LLMConfigMixin):
         description="目标播客时长（分钟）",
     )
     num_hosts: Literal[1] = Field(default=1, description="主持人数量")
-    recommended_news_item_count: int = Field(default=10, ge=1, le=20, description="新闻早报模式下的推荐新闻条目数量")
+    recommended_news_item_count: int = Field(default=7, ge=1, le=20, description="新闻早报模式下的推荐新闻条目数量")
     quick_news_recommended_count: int = Field(
         default=DEFAULT_QUICK_NEWS_COUNT,
         ge=0,
@@ -55,12 +55,12 @@ class ScriptConfig(NodeConfigBase, LLMConfigMixin):
         description="推荐深度解读数量；素材不足时会自动省略",
     )
     allow_custom_news_item_count: bool = Field(
-        default=True, description="是否允许实际新闻数量超过推荐结构"
+        default=False, description="是否允许实际新闻数量超过推荐结构"
     )
-    quick_news_chars_min: int = Field(default=240, ge=80, le=1000, description="单条快讯建议最少字数")
-    quick_news_chars_max: int = Field(default=360, ge=120, le=1500, description="单条快讯建议最多字数")
-    deep_dive_chars_min: int = Field(default=2000, ge=0, le=10000, description="深度稿建议最少字数")
-    deep_dive_chars_max: int = Field(default=2600, ge=0, le=12000, description="深度稿建议最多字数")
+    quick_news_chars_min: int = Field(default=220, ge=80, le=1000, description="单条快讯建议最少字数")
+    quick_news_chars_max: int = Field(default=300, ge=120, le=1500, description="单条快讯建议最多字数")
+    deep_dive_chars_min: int = Field(default=1200, ge=0, le=10000, description="深度稿建议最少字数")
+    deep_dive_chars_max: int = Field(default=1600, ge=0, le=12000, description="深度稿建议最多字数")
     episode_chars_min: int = Field(
         default=DEFAULT_EPISODE_CHARS_MIN,
         ge=1,

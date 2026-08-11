@@ -64,7 +64,16 @@ def test_build_production_plan_uses_section_aware_default_joins():
     )
 
     assert any(join["duration_ms"] == 450 for join in plan["joins"])
-    assert plan["joins"][-1]["duration_ms"] == 1200
+    assert plan["joins"][-1] == {
+        "after_clip_id": plan["clips"][-2]["id"],
+        "type": "transition",
+        "duration_ms": 1000,
+    }
+    assert plan["music"]["intro"]["path"] == "assets/audio/podflow-intro.wav"
+    assert plan["music"]["intro"]["duration_ms"] == 5000
+    assert plan["music"]["transition"]["duration_ms"] == 1000
+    assert plan["music"]["bed"]["enabled"] is False
+    assert plan["music"]["outro"]["duration_ms"] == 4000
 
 
 def test_build_production_plan_adds_context_and_speech_direction():

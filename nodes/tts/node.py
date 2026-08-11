@@ -3,6 +3,7 @@ import base64
 import json
 import math
 import os
+import re
 import struct
 import urllib.request
 import uuid
@@ -115,7 +116,11 @@ async def _synthesize_plan(
             generation_key = ""
             reused_count += 1
         else:
-            voice = config.voice_mapping.get(str(clip.get("speaker") or ""), config.default_voice)
+            voice = (
+                config.doubao_voice_type
+                if engine in {"doubao_tts", "voice_clone"}
+                else config.voice_mapping.get(str(clip.get("speaker") or ""), config.default_voice)
+            )
             generation_key = voice_generation_key(
                 text=text,
                 engine=engine,
@@ -171,6 +176,7 @@ async def _synthesize_plan(
             clip_index,
             duration_seconds=duration_seconds,
             generation_key=generation_key,
+            pronunciation_overrides=config.pronunciation_overrides,
         )
         segments.append(segment)
         update_plan_clip(
@@ -195,6 +201,7 @@ def _voice_segment(
     *,
     duration_seconds: float = 0.0,
     generation_key: str = "",
+    pronunciation_overrides: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     prosody_quality = _analyze_prosody(
         filepath,
@@ -214,6 +221,29 @@ def _voice_segment(
         "duration_seconds": duration_seconds,
         "generation_key": generation_key,
         "prosody_quality": prosody_quality,
+        "pronunciation_review": _pronunciation_review(
+            str(segment.get("text") or ""),
+            pronunciation_overrides if isinstance(pronunciation_overrides, dict) else {},
+        ),
+    }
+
+
+def _pronunciation_review(text: str, overrides: dict[str, str]) -> dict[str, Any]:
+    candidates = {
+        token
+        for token in re.findall(
+            r"(?<![A-Za-z0-9])(?:[A-Z]{2,}(?:[-./][A-Z0-9]+)*|[A-Za-z]+\d+[A-Za-z0-9-]*|\d+(?:\.\d+)?(?:%|万|亿|元|美元)?)",
+            text,
+        )
+        if token
+    }
+    resolved = sorted(token for token in candidates if str(overrides.get(token) or "").strip())
+    unresolved = sorted(candidates - set(resolved))
+    return {
+        "status": "review" if unresolved else "ok",
+        "terms": sorted(candidates),
+        "resolved_terms": resolved,
+        "unresolved_terms": unresolved,
     }
 
 

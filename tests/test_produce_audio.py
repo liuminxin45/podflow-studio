@@ -42,6 +42,33 @@ def _write_wav(path: Path, *, frequency: float, seconds: float = 0.25) -> None:
         output.writeframes(b"".join(frames))
 
 
+def _public_publish_state(tmp_path: Path, *, engine: str = "doubao_tts") -> tuple[dict, Path]:
+    final_audio = tmp_path / "2026-08-11-test.mp3"
+    _write_wav(final_audio, frequency=440)
+    with final_audio.open("r+b") as output:
+        output.truncate(840 * 16_000)
+    cover = tmp_path / "cover.png"
+    cover.write_bytes(b"podflow-cover")
+    state = create_base_state()
+    state["episode_id"] = "2026-08-11-test"
+    state["cover_path"] = str(cover)
+    state["facts"] = [{"id": "fact_001", "title": "公开来源", "source_url": "https://example.com/news"}]
+    state["audio_outputs"] = {
+        "status": "ok",
+        "format": "mp3",
+        "contains_mock_audio": False,
+        "final_audio_path": str(final_audio),
+        "source_engines": [engine],
+        "audio_artifact": file_fingerprint(final_audio),
+        "sample_rate_hz": 48_000,
+        "bitrate_kbps": 128,
+        "target_lufs": -16.0,
+        "true_peak_db": -1.0,
+        "duration_seconds": 840,
+    }
+    return state, final_audio
+
+
 def test_audio_postprocess_mixes_bgm_and_isolates_episode_output(tmp_path: Path):
     voice_path = tmp_path / "voice.wav"
     bgm_path = tmp_path / "bed.wav"
@@ -609,16 +636,7 @@ def test_local_publish_fails_when_final_audio_is_missing(tmp_path: Path):
 
 
 def test_public_publish_does_not_depend_on_review_results(tmp_path: Path):
-    final_audio = tmp_path / "review-failed.wav"
-    _write_wav(final_audio, frequency=440)
-    state = create_base_state()
-    state["audio_outputs"] = {
-        "status": "ok",
-        "contains_mock_audio": False,
-        "final_audio_path": str(final_audio),
-        "source_engines": ["openai"],
-        "audio_artifact": file_fingerprint(final_audio),
-    }
+    state, final_audio = _public_publish_state(tmp_path)
     state["review_summary"] = {
         "checks": [{"level": "error", "message": "Audio too short"}],
         "audio_artifact": file_fingerprint(final_audio),
@@ -666,17 +684,8 @@ def test_public_publish_fails_closed_without_audio_provenance_or_review(tmp_path
 
 def test_public_publish_ignores_stale_review_artifacts(tmp_path: Path):
     reviewed_audio = tmp_path / "reviewed.wav"
-    final_audio = tmp_path / "replaced.wav"
     _write_wav(reviewed_audio, frequency=220)
-    _write_wav(final_audio, frequency=440)
-    state = create_base_state()
-    state["audio_outputs"] = {
-        "status": "ok",
-        "contains_mock_audio": False,
-        "final_audio_path": str(final_audio),
-        "source_engines": ["openai"],
-        "audio_artifact": file_fingerprint(final_audio),
-    }
+    state, _final_audio = _public_publish_state(tmp_path)
     state["review_summary"] = {
         "checks": [{"level": "pass", "message": "Audio file ready"}],
         "audio_artifact": file_fingerprint(reviewed_audio),
@@ -696,16 +705,7 @@ def test_public_publish_ignores_stale_review_artifacts(tmp_path: Path):
 
 
 def test_publish_reports_only_local_archive_and_rss(tmp_path: Path):
-    final_audio = tmp_path / "selected-platforms.wav"
-    _write_wav(final_audio, frequency=440)
-    state = create_base_state()
-    state["audio_outputs"] = {
-        "status": "ok",
-        "contains_mock_audio": False,
-        "final_audio_path": str(final_audio),
-        "source_engines": ["recording"],
-        "audio_artifact": file_fingerprint(final_audio),
-    }
+    state, _final_audio = _public_publish_state(tmp_path)
 
     result = publish_run(
         state,

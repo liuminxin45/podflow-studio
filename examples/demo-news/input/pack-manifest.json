@@ -4,7 +4,7 @@
     "label": "综合早报（虚构素材）",
     "description": "原有的无网络综合演示素材，用于稳定回归测试。",
     "file": "sample-items.json",
-    "episode_title": "通勤早咖啡：今日新闻简报",
+    "episode_title": "PodFlow 晨报：今日新闻简报",
     "topic_description": "面向通勤场景的单人新闻早报 demo",
     "keywords": ["通勤", "早报", "新闻"],
     "as_of": "2026-07-01",

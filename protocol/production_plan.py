@@ -45,10 +45,22 @@ def _music_slot(
 
 def default_music() -> dict[str, Any]:
     return {
-        "intro": _music_slot(),
-        "transition": _music_slot(duration_ms=1500, fade_in_ms=150, fade_out_ms=300),
+        "intro": {
+            **_music_slot(),
+            "enabled": True,
+            "path": "assets/audio/podflow-intro.wav",
+        },
+        "transition": {
+            **_music_slot(duration_ms=1000, fade_in_ms=100, fade_out_ms=250),
+            "enabled": True,
+            "path": "assets/audio/podflow-transition.wav",
+        },
         "bed": _music_slot(),
-        "outro": _music_slot(),
+        "outro": {
+            **_music_slot(duration_ms=4000, fade_in_ms=400, fade_out_ms=1000),
+            "enabled": True,
+            "path": "assets/audio/podflow-outro.wav",
+        },
     }
 
 
@@ -201,10 +213,12 @@ def _default_join(
     same_segment = clip["parent_segment_id"] == next_clip["parent_segment_id"]
     direction = clip.get("direction") if isinstance(clip.get("direction"), dict) else {}
     directed_pause = int(direction.get("pause_after_ms") or 0)
+    if not same_segment and next_clip["segment_type"] == "deep_dive":
+        return {"after_clip_id": clip["id"], "type": "transition", "duration_ms": 1000}
     duration_ms = (
         min(450, directed_pause)
         if same_segment
-        else max(directed_pause, 1200 if next_clip["segment_type"] == "deep_dive" else 600)
+        else max(directed_pause, 600)
     )
     return {"after_clip_id": clip["id"], "type": "pause", "duration_ms": duration_ms}
 

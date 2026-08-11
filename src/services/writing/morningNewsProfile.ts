@@ -47,13 +47,13 @@ export const MORNING_NEWS_DURATION_PROFILES: Record<
     episodeChars: { min: 2000, max: 2800 },
   },
   medium: {
-    targetDurationMinutes: 22,
-    recommendedNewsItemCount: 10,
-    quickNewsRecommendedCount: 9,
+    targetDurationMinutes: 14,
+    recommendedNewsItemCount: 7,
+    quickNewsRecommendedCount: 6,
     deepDiveRecommendedCount: 1,
-    quickNewsChars: { min: 240, max: 360 },
-    deepDiveChars: { min: 2000, max: 2600 },
-    episodeChars: { min: 5200, max: 6200 },
+    quickNewsChars: { min: 220, max: 300 },
+    deepDiveChars: { min: 1200, max: 1600 },
+    episodeChars: { min: 3000, max: 3800 },
   },
 };
 
@@ -95,8 +95,8 @@ export function resolveMorningNewsProfile(
     tone: TONE_PROFILE[editorialVoice],
     ...EDITORIAL_VOICE_PROFILE[editorialVoice],
     editorialVoice,
-    openingChars: { min: 320, max: 450 },
-    closingChars: { min: 80, max: 160 },
+    openingChars: { min: 180, max: 260 },
+    closingChars: { min: 60, max: 100 },
     contentGuidance:
       CONTENT_GUIDANCE[settings.creatorPreferences.contentTendency],
     wordsPerMinute: 240,

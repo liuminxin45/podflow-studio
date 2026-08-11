@@ -111,6 +111,10 @@ def run(state: dict[str, Any], config: AudioPostprocessConfig = None) -> dict[st
             "operations": operations,
             "file_size": final_path.stat().st_size if final_path.exists() else 0,
             "audio_artifact": file_fingerprint(final_path),
+            "sample_rate_hz": config.sample_rate_hz if not degraded else _wav_sample_rate(final_path),
+            "bitrate_kbps": int(config.mp3_bitrate.removesuffix("k")) if final_path.suffix.lower() == ".mp3" and not degraded else 0,
+            "target_lufs": config.target_lufs if config.normalize_loudness and not degraded else None,
+            "true_peak_db": config.true_peak_db if config.normalize_loudness and not degraded else None,
         }
         audio_report_path = output_dir / "audio_report.json"
         audio_outputs["audio_report_path"] = str(audio_report_path)
@@ -179,10 +183,7 @@ def _assemble_with_pydub(
 
     production_plan = production_plan if isinstance(production_plan, dict) else {}
     has_plan = bool(production_plan.get("clips"))
-    plan_render = production_plan.get("render") if isinstance(production_plan.get("render"), dict) else {}
-    normalize_loudness = (
-        plan_render.get("normalize_loudness", True) if has_plan else config.normalize_loudness
-    )
+    normalize_loudness = config.normalize_loudness
     joins = {
         str(join.get("after_clip_id")): join
         for join in production_plan.get("joins", [])
@@ -228,8 +229,8 @@ def _assemble_with_pydub(
                         operations.append(f"pause_{segment.get('segment_id')}_{pause_ms}ms")
 
     if normalize_loudness:
-        target_lufs = float(plan_render.get("target_lufs", -16.0) if has_plan else -16.0)
-        true_peak_db = float(plan_render.get("true_peak_db", -1.0) if has_plan else -1.0)
+        target_lufs = config.target_lufs
+        true_peak_db = config.true_peak_db
         export_parameters = [
             "-af",
             f"loudnorm=I={target_lufs}:TP={true_peak_db}:LRA=11",
@@ -276,8 +277,21 @@ def _assemble_with_pydub(
             ]
         )
 
-    combined.export(str(output_path), format=output_format, parameters=export_parameters)
+    combined = combined.set_frame_rate(config.sample_rate_hz)
+    operations.append(f"resample_{config.sample_rate_hz}hz")
+    export_kwargs: dict[str, Any] = {"format": output_format, "parameters": export_parameters}
+    if output_format == "mp3":
+        export_kwargs["bitrate"] = config.mp3_bitrate
+        operations.append(f"export_{config.mp3_bitrate}bps")
+    combined.export(str(output_path), **export_kwargs)
     return output_path, len(combined) / 1000.0
+
+
+def _wav_sample_rate(path: Path) -> int:
+    if path.suffix.lower() != ".wav" or not path.is_file():
+        return 0
+    with wave.open(str(path), "rb") as source:
+        return source.getframerate()
 
 
 def _resolve_music_path(slot: Any) -> Path:

@@ -25,19 +25,19 @@ def test_default_preset_is_morning_news_brief():
     preset = get_default_preset()
     script_config = ScriptConfig()
     assert preset["id"] == "morning_news_brief"
-    assert preset["template_variant"] == "quick_9_plus_deep_1"
-    assert preset["recommended_news_item_count"] == 10
-    assert preset["allow_custom_news_item_count"] is True
-    assert preset["target_duration_minutes"] == 22
+    assert preset["template_variant"] == "quick_6_plus_deep_1"
+    assert preset["recommended_news_item_count"] == 7
+    assert preset["allow_custom_news_item_count"] is False
+    assert preset["target_duration_minutes"] == 14
     assert script_config.preset_id == "morning_news_brief"
     assert script_config.num_hosts == 1
     assert script_config.content_type == "news_brief"
-    assert script_config.target_duration_minutes == 22
-    assert script_config.recommended_news_item_count == 10
-    assert script_config.quick_news_recommended_count == 9
+    assert script_config.target_duration_minutes == 14
+    assert script_config.recommended_news_item_count == 7
+    assert script_config.quick_news_recommended_count == 6
     assert script_config.deep_dive_recommended_count == 1
-    assert [script_config.episode_chars_min, script_config.episode_chars_max] == [5200, 6200]
-    assert script_config.words_per_minute == 250
+    assert [script_config.episode_chars_min, script_config.episode_chars_max] == [3000, 3800]
+    assert script_config.words_per_minute == 240
 
 
 def test_script_config_rejects_obsolete_and_inconsistent_fields():
@@ -53,7 +53,7 @@ def test_script_config_rejects_obsolete_and_inconsistent_fields():
         ScriptConfig(quick_news_chars_min=500, quick_news_chars_max=200)
     with pytest.raises(ValueError, match="target_duration_minutes"):
         ScriptConfig(
-            words_per_minute=390,
+            words_per_minute=200,
             episode_chars_min=5200,
             episode_chars_max=6200,
         )
@@ -154,9 +154,6 @@ def test_deterministic_script_uses_recommended_quick_plus_deep_structure():
         "quick_news",
         "quick_news",
         "quick_news",
-        "quick_news",
-        "quick_news",
-        "quick_news",
         "deep_dive",
         "closing",
     ]
@@ -187,7 +184,7 @@ def test_deterministic_script_allows_non_recommended_counts():
 
 
 def test_morning_news_structure_honors_custom_count_and_preserves_sparse_days():
-    medium = get_default_preset()
+    medium = {**get_default_preset(), "allow_custom_news_item_count": True}
     dense = resolve_morning_news_structure(12, medium)
     sparse = resolve_morning_news_structure(2, medium)
 
@@ -203,8 +200,8 @@ def test_morning_news_structure_caps_dense_days_when_custom_count_is_disabled():
     preset = {**get_default_preset(), "allow_custom_news_item_count": False}
     dense = resolve_morning_news_structure(12, preset)
 
-    assert dense["actual_news_item_count"] == 10
-    assert dense["actual_quick_news_count"] == 9
+    assert dense["actual_news_item_count"] == 7
+    assert dense["actual_quick_news_count"] == 6
     assert dense["actual_deep_dive_count"] == 1
 
 
@@ -420,7 +417,7 @@ def test_script_node_requires_fact_and_topic_outputs():
     os.environ.pop("OPENAI_API_KEY", None)
     os.environ.pop("OPENAI_API_BASE", None)
     state = create_base_state()
-    state["selected_topic"] = {"title": "通勤早咖啡"}
+    state["selected_topic"] = {"title": "PodFlow 晨报"}
     result = script_run(state, ScriptConfig())
     assert result["script"] == {}
     assert any("Missing facts" in error["message"] for error in result["errors"])
@@ -428,7 +425,7 @@ def test_script_node_requires_fact_and_topic_outputs():
 
 def test_facts_node_runs_before_script_in_primary_path():
     state = create_base_state()
-    state["selected_topic"] = {"title": "通勤早咖啡"}
+    state["selected_topic"] = {"title": "PodFlow 晨报"}
     state["selected_materials"] = [{**item, "_status": "ready"} for item in create_mock_fetch_contents()]
     state = facts_run(state, FactsConfig(max_facts=20, selected_topic_count=7))
     assert state["facts"]
@@ -437,7 +434,7 @@ def test_facts_node_runs_before_script_in_primary_path():
     assert result["_manifest"]["nodes"]["script"]["status"] == "ok"
 
 
-def test_default_facts_and_script_nodes_share_the_ten_item_profile():
+def test_default_facts_and_script_nodes_share_the_seven_item_profile():
     state = create_base_state()
     state["selected_materials"] = [
         {
@@ -453,13 +450,13 @@ def test_default_facts_and_script_nodes_share_the_ten_item_profile():
     state = facts_run(state, FactsConfig())
     result = script_run(state, ScriptConfig(allow_custom_news_item_count=False))
 
-    assert len(state["selected_topics"]) == 10
+    assert len(state["selected_topics"]) == 7
     news_segments = [
         segment
         for segment in result["script"]["segments"]
         if segment["type"] in {"quick_news", "deep_dive"}
     ]
-    assert len(news_segments) == 10
+    assert len(news_segments) == 7
 
 
 def test_tts_prefers_edited_script(tmp_path: Path):
@@ -512,7 +509,7 @@ def test_publish_package_outputs_feed_and_marks_local_preview(tmp_path: Path):
     _write_test_wav(audio_path)
     state = create_base_state()
     state["audio_outputs"] = {"final_audio_path": str(audio_path), "duration_seconds": 0.1}
-    state["edited_script"] = {"title": "通勤早咖啡", "description": "demo", "segments": []}
+    state["edited_script"] = {"title": "PodFlow 晨报", "description": "demo", "segments": []}
     result = publish_run(
         state,
         PublishConfig(
@@ -541,6 +538,9 @@ def test_demo_news_e2e_runs_without_external_api_keys(tmp_path: Path):
         "run_report.json",
         "episode.json",
         "feed.xml",
+        "show-notes.md",
+        "transcript.vtt",
+        "chapters.json",
     ]
     for filename in required:
         assert (output_dir / filename).exists(), filename
@@ -549,8 +549,8 @@ def test_demo_news_e2e_runs_without_external_api_keys(tmp_path: Path):
     assert report["preset_id"] == "morning_news_brief"
     assert report["facts"]["total"] == 10
     assert report["script"]["source_for_tts"] == "edited_script"
-    assert report["script"]["target_duration_minutes"] == 22
-    assert report["script"]["quick_news_count"] == 9
+    assert report["script"]["target_duration_minutes"] == 14
+    assert report["script"]["quick_news_count"] == 6
     assert report["script"]["deep_dive_count"] == 1
     assert report["schema_validation"]["ok"] is True
     assert report["rss_validation"]["ok"] is True
@@ -587,7 +587,7 @@ def test_source_verified_demo_packs_are_complete_and_runnable(tmp_path: Path):
         assert state["run_report"]["schema_validation"]["ok"] is True
 
 
-def test_demo_news_accepts_a_sparse_custom_eight_item_run(tmp_path: Path):
+def test_demo_news_caps_an_eight_item_run_to_the_default_seven(tmp_path: Path):
     sample_path = (
         Path(__file__).resolve().parents[1]
         / "examples"
@@ -606,8 +606,8 @@ def test_demo_news_accepts_a_sparse_custom_eight_item_run(tmp_path: Path):
 
     assert state["errors"] == []
     assert report["facts"]["total"] == 8
-    assert report["script"]["actual_news_item_count"] == 8
-    assert any(warning["code"] == "below_recommended_news_items" for warning in report["warnings"])
+    assert report["script"]["actual_news_item_count"] == 7
+    assert not any(warning["code"] == "below_recommended_news_items" for warning in report["warnings"])
 
 
 def test_user_requested_ai_generation_fails_without_overwriting_the_existing_draft():

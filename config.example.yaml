@@ -1,33 +1,33 @@
 # PodFlow Studio 配置示例
-# 默认路径固定为：单人新闻早报 / 通勤早咖啡式内容生产。
+# 默认路径固定为：PodFlow 晨报的单人新闻早报内容生产。
 # 复制为 config.yaml 后可按需替换真实 LLM / TTS provider。
 
 preset:
   id: "morning_news_brief"
   content_type: "news_brief"
   num_hosts: 1
-  target_duration_minutes: 22
-  target_duration_minutes_range: "20-24"
-  template_variant: "quick_9_plus_deep_1"
-  recommended_news_item_count: 10
-  quick_news_recommended_count: 9
+  target_duration_minutes: 14
+  target_duration_minutes_range: "12-15"
+  template_variant: "quick_6_plus_deep_1"
+  recommended_news_item_count: 7
+  quick_news_recommended_count: 6
   deep_dive_recommended_count: 1
-  allow_custom_news_item_count: true
+  allow_custom_news_item_count: false
   tone: "clear, concise, commute-friendly"
   language: "zh-CN"
   segment_plan:
     - type: opening
       count: 1
-      target_seconds: [75, 110]
+      target_seconds: [45, 60]
     - type: quick_news
-      recommended_count: 9
-      target_seconds: [55, 90]
+      recommended_count: 6
+      target_seconds: [45, 65]
     - type: deep_dive
       recommended_count: 1
-      target_seconds: [480, 625]
+      target_seconds: [300, 420]
     - type: closing
       count: 1
-      target_seconds: [20, 40]
+      target_seconds: [15, 25]
 
 fetch:
   sources:
@@ -63,27 +63,27 @@ topic_selection:
 
 facts:
   max_facts: 20
-  selected_topic_count: 10
+  selected_topic_count: 7
 
 # 成稿阶段内部节点：口播稿生成
 script:
   preset_id: "morning_news_brief"
   content_type: "news_brief"
-  target_duration_minutes: 22
+  target_duration_minutes: 14
   num_hosts: 1
-  recommended_news_item_count: 10
-  quick_news_recommended_count: 9
+  recommended_news_item_count: 7
+  quick_news_recommended_count: 6
   deep_dive_recommended_count: 1
-  quick_news_chars_min: 240
-  quick_news_chars_max: 360
-  deep_dive_chars_min: 2000
-  deep_dive_chars_max: 2600
-  episode_chars_min: 5200
-  episode_chars_max: 6200
+  quick_news_chars_min: 220
+  quick_news_chars_max: 300
+  deep_dive_chars_min: 1200
+  deep_dive_chars_max: 1600
+  episode_chars_min: 3000
+  episode_chars_max: 3800
   tone: "clear, concise, commute-friendly"
   language: "zh-CN"
   require_approval: true
-  words_per_minute: 250
+  words_per_minute: 240
   llm_model: "gpt-4o"
   api_key: ""
   api_base: ""
@@ -91,7 +91,7 @@ script:
 
 tts:
   # mock 会生成本地 WAV 片段，保证无外部 key 时 demo 可跑通。
-  # 可改为 edge-tts 或 openai-compatible 走真实语音。
+  # 正式节目推荐 doubao_bigtts；密钥只通过本地设置或环境变量提供。
   engine: "mock"
   voice_mapping:
     Host A: "zh-CN-XiaoxiaoNeural"
@@ -102,6 +102,10 @@ tts:
   volume: "+0%"
   # 表演导演的基础角色描述；句级意图、情绪、重点和上下文由 production_plan v2 提供。
   performance_prompt: "自然、可信的中文新闻播客主播"
+  # 正式发布前为专名、数字和英文缩写提供确定读法；未覆盖项会进入发音复核清单。
+  pronunciation_overrides:
+    AI: "A I"
+    GDP: "G D P"
   # Azure Speech（engine: azure_speech）
   azure_speech_key: ""
   azure_speech_region: ""
@@ -114,6 +118,10 @@ audio_postprocess:
   final_basename: "final"
   segment_pause_ms: 600
   normalize_loudness: true
+  target_lufs: -16.0
+  true_peak_db: -1.0
+  sample_rate_hz: 48000
+  mp3_bitrate: "128k"
   trim_silence: false
   add_bgm: false
 
@@ -126,8 +134,8 @@ publish:
   local_base_dir: "dist/episodes"
   rss_output_dir: "out/rss"
   public_base_url: ""
-  podcast_title: "通勤早咖啡"
-  podcast_description: "单人新闻早报播客"
+  podcast_title: "PodFlow 晨报"
+  podcast_description: "每天 6 条快讯和 1 条重点解读，保留来源与判断边界。"
   podcast_author: "PodFlow Studio"
   podcast_language: "zh-CN"
   podcast_category: "News"

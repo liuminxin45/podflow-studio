@@ -180,7 +180,7 @@ def _generate_cover(episode_id: str, state: dict, config: AssetsConfig) -> str:
     )
     draw.text(
         (padding + marker_size + round(w * 0.022), padding - 2),
-        "PODFLOW · 晨间简报",
+        "PODFLOW · 晨报",
         fill=ink,
         font=label_font,
     )
@@ -204,7 +204,7 @@ def _generate_cover(episode_id: str, state: dict, config: AssetsConfig) -> str:
     draw.line((padding, footer_y, w - padding, footer_y), fill=(190, 187, 178), width=2)
     draw.text(
         (padding, footer_y + round(h * 0.035)),
-        "单人新闻早报 · 为通勤而作",
+        "6 条快讯 · 1 条重点解读",
         fill=muted,
         font=meta_font,
     )

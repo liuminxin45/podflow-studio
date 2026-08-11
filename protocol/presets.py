@@ -6,10 +6,10 @@ from typing import Any
 
 DEFAULT_PRESET_ID = "morning_news_brief"
 DEFAULT_SEGMENT_PLAN = [
-    {"type": "opening", "count": 1, "target_seconds": [75, 110]},
-    {"type": "quick_news", "recommended_count": 9, "target_seconds": [55, 90]},
-    {"type": "deep_dive", "recommended_count": 1, "target_seconds": [480, 625]},
-    {"type": "closing", "count": 1, "target_seconds": [20, 40]},
+    {"type": "opening", "count": 1, "target_seconds": [45, 60]},
+    {"type": "quick_news", "recommended_count": 6, "target_seconds": [45, 65]},
+    {"type": "deep_dive", "recommended_count": 1, "target_seconds": [300, 420]},
+    {"type": "closing", "count": 1, "target_seconds": [15, 25]},
 ]
 
 
@@ -20,13 +20,13 @@ class MorningNewsBriefPreset:
     id: str = DEFAULT_PRESET_ID
     content_type: str = "news_brief"
     num_hosts: int = 1
-    target_duration_minutes: int = 22
-    target_duration_minutes_range: str = "20-24"
-    template_variant: str = "quick_9_plus_deep_1"
-    recommended_news_item_count: int = 10
-    quick_news_recommended_count: int = 9
+    target_duration_minutes: int = 14
+    target_duration_minutes_range: str = "12-15"
+    template_variant: str = "quick_6_plus_deep_1"
+    recommended_news_item_count: int = 7
+    quick_news_recommended_count: int = 6
     deep_dive_recommended_count: int = 1
-    allow_custom_news_item_count: bool = True
+    allow_custom_news_item_count: bool = False
     tone: str = "clear, concise, commute-friendly"
     language: str = "zh-CN"
     segment_plan: list[dict[str, Any]] = field(default_factory=lambda: DEFAULT_SEGMENT_PLAN)

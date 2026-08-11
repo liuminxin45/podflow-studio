@@ -265,22 +265,22 @@ def test_episode_prompt_follows_validated_plan_order_and_short_opening():
         plan,
     )
 
-    assert "有编排计划时建议 100 至 180 字" in prompt
+    assert "开场都控制在 180 至 260 字" in prompt
     assert "严格按照已校验编排计划 items 的顺序" in prompt
     assert prompt.index('"source_fact_ids": [\n        "fact_002"') < prompt.index('"source_fact_ids": [\n        "fact_003"')
 
 
 def test_quality_gate_rejects_unbound_numbers_and_warns_on_long_opening():
-    facts = [{"id": "fact_001", "title": "价格调整", "summary": "价格调整为 20 元。"}]
+    facts = [{"id": "fact_001", "title": "价格调整", "summary": "价格调整为 20 元。", "source_url": "https://example.com/price"}]
     plan = {
-        "opening": {"fact_ids": ["fact_001"], "listener_question": "", "target_chars": 120},
-        "items": [{"fact_id": "fact_001", "role": "headline", "target_chars": 150, "listener_question": "价格调整到多少？", "listener_value": "确认价格"}],
-        "closing": {"target_chars": 70},
+        "opening": {"fact_ids": ["fact_001"], "listener_question": "", "target_chars": 260},
+        "items": [{"fact_id": "fact_001", "role": "headline", "target_chars": 300, "listener_question": "价格调整到多少？", "listener_value": "确认价格"}],
+        "closing": {"target_chars": 100},
     }
     report = assess_script_quality(
         {
             "segments": [
-                {"id": "opening", "type": "opening", "text": "开场" * 100, "source_fact_ids": ["fact_001"]},
+                {"id": "opening", "type": "opening", "text": "开场" * 140, "source_fact_ids": ["fact_001"]},
                 {"id": "news", "type": "quick_news", "text": "价格调整为 37 元。", "source_fact_ids": ["fact_001"]},
                 {"id": "closing", "type": "closing", "text": "收尾", "source_fact_ids": []},
             ]
@@ -296,7 +296,7 @@ def test_quality_gate_rejects_unbound_numbers_and_warns_on_long_opening():
 
 
 def test_quality_gate_rejects_garbled_text_and_editorial_checklists():
-    facts = [{"id": "fact_001", "title": "招生新闻", "summary": "学生已经完成注册。"}]
+    facts = [{"id": "fact_001", "title": "招生新闻", "summary": "学生已经完成注册。", "source_url": "https://example.com/enrollment"}]
     plan = {
         "opening": {"fact_ids": [], "listener_question": "", "target_chars": 100},
         "items": [{"fact_id": "fact_001", "role": "practical", "target_chars": 280, "listener_question": "是否完成注册？", "listener_value": "确认注册状态"}],
@@ -330,6 +330,7 @@ def test_quality_gate_checks_closing_encoding_and_allows_sourced_official_action
         "id": "fact_001",
         "title": "报名通知",
         "summary": "官方通知要求考生在截止时间前登录系统确认报名。",
+        "source_url": "https://example.com/notice",
     }]
     plan = {
         "opening": {"fact_ids": [], "listener_question": "", "target_chars": 100},
@@ -361,6 +362,7 @@ def test_quality_gate_does_not_treat_loose_keyword_overlap_as_official_instructi
         "id": "fact_001",
         "title": "产品新闻",
         "summary": "官方发布新产品，应用下载量增长，但市场仍存在风险。",
+        "source_url": "https://example.com/product",
     }]
     plan = {
         "opening": {"fact_ids": [], "listener_question": "", "target_chars": 100},
@@ -387,6 +389,7 @@ def test_quality_gate_allows_listener_value_and_normalizes_equivalent_money_unit
         "id": "fact_001",
         "title": "补贴通知",
         "summary": "补贴总额为1亿元，消费者需要了解办理流程。",
+        "source_url": "https://example.com/subsidy",
     }]
     plan = {
         "opening": {"fact_ids": [], "listener_question": "", "target_chars": 100},
@@ -409,11 +412,78 @@ def test_quality_gate_allows_listener_value_and_normalizes_equivalent_money_unit
     assert "EDITORIAL_INSTRUCTION" not in [issue["code"] for issue in report["hard"]]
 
 
+def test_quality_gate_rejects_internal_instructions_and_missing_independent_sources():
+    facts = [
+        {"id": "fact_001", "title": "快讯", "summary": "事件已经发生。"},
+        {
+            "id": "fact_002",
+            "title": "重点解读",
+            "summary": "事件仍在发展。",
+            "source_urls": ["https://one.example/story", "https://two.example/story"],
+        },
+    ]
+    plan = {
+        "opening": {"fact_ids": [], "listener_question": "", "target_chars": 180},
+        "items": [
+            {"fact_id": "fact_001", "role": "headline", "target_chars": 220, "listener_question": "", "listener_value": ""},
+            {"fact_id": "fact_002", "role": "deep_dive", "target_chars": 1200, "listener_question": "", "listener_value": ""},
+        ],
+        "closing": {"target_chars": 60},
+    }
+    report = assess_script_quality(
+        {
+            "segments": [
+                {"id": "opening", "type": "opening", "text": "今天先看两条值得关注的变化。" * 8, "source_fact_ids": []},
+                {"id": "quick", "type": "quick_news", "text": "事件已经发生，发布前请核对来源。", "source_fact_ids": ["fact_001"]},
+                {"id": "deep", "type": "deep_dive", "text": "事件仍在发展，影响还需要继续观察。", "source_fact_ids": ["fact_002"]},
+                {"id": "closing", "type": "closing", "text": "以上是今天的 PodFlow 晨报，我们会继续跟进变化，明天早上再见。", "source_fact_ids": []},
+            ]
+        },
+        facts,
+        plan,
+    )
+
+    codes = {issue["code"] for issue in report["hard"]}
+    assert {"QUICK_NEWS_SOURCE", "DEEP_DIVE_SOURCES", "INTERNAL_INSTRUCTION_LEAK"} <= codes
+
+
+def test_quality_gate_rejects_repeated_templates_and_unfulfilled_opening_question():
+    facts = [
+        {"id": "fact_001", "title": "甲", "summary": "甲事件公布结果。", "source_url": "https://one.example/a"},
+        {"id": "fact_002", "title": "乙", "summary": "乙事件公布结果。", "source_url": "https://two.example/b"},
+    ]
+    plan = {
+        "opening": {"fact_ids": [], "listener_question": "限制是什么？", "target_chars": 180},
+        "items": [
+            {"fact_id": "fact_001", "role": "headline", "target_chars": 220, "listener_question": "", "listener_value": ""},
+            {"fact_id": "fact_002", "role": "standard", "target_chars": 220, "listener_question": "", "listener_value": ""},
+        ],
+        "closing": {"target_chars": 60},
+    }
+    repeated = "接下来关注这项变化带来的后续影响。"
+    report = assess_script_quality(
+        {
+            "segments": [
+                {"id": "opening", "type": "opening", "text": "今天的问题是，这项变化究竟有哪些限制？" * 6, "source_fact_ids": []},
+                {"id": "first", "type": "quick_news", "text": f"甲事件公布结果。{repeated}", "source_fact_ids": ["fact_001"]},
+                {"id": "second", "type": "quick_news", "text": f"乙事件公布结果。{repeated}", "source_fact_ids": ["fact_002"]},
+                {"id": "closing", "type": "closing", "text": "以上是今天的 PodFlow 晨报，我们会继续跟进变化，明天早上再见。", "source_fact_ids": []},
+            ]
+        },
+        facts,
+        plan,
+    )
+
+    codes = {issue["code"] for issue in report["hard"]}
+    assert "REPEATED_TEMPLATE_SENTENCE" in codes
+    assert "OPENING_PROMISE_UNFULFILLED" in codes
+
+
 def test_editorial_plan_clamps_length_and_allows_repeated_roles():
     facts = [{"id": f"fact_{index:03d}"} for index in range(1, 4)]
     plan = validate_editorial_plan(
         {
-            "opening": {"fact_ids": [], "listener_question": "", "promise_fact_id": "", "target_chars": 181},
+            "opening": {"fact_ids": [], "listener_question": "", "promise_fact_id": "", "target_chars": 999},
             "items": [
                 {
                     "fact_id": fact["id"],
@@ -431,8 +501,8 @@ def test_editorial_plan_clamps_length_and_allows_repeated_roles():
         facts,
     )
 
-    assert plan["opening"]["target_chars"] == 180
-    assert plan["closing"]["target_chars"] == 50
+    assert plan["opening"]["target_chars"] == 260
+    assert plan["closing"]["target_chars"] == 60
     assert [item["target_chars"] for item in plan["items"]] == [340, 340, 340]
 
 
@@ -630,7 +700,7 @@ def test_script_config_rejects_obsolete_and_incomplete_shapes():
     with pytest.raises(ValueError, match="Extra inputs are not permitted"):
         ScriptConfig.from_dict({"news_item_count": 7})
     with pytest.raises(ValueError, match="recommended_news_item_count"):
-        ScriptConfig.from_dict({"quick_news_recommended_count": 6})
+        ScriptConfig.from_dict({"quick_news_recommended_count": 5})
 
 
 def test_script_config_ignores_retired_settings_from_old_local_json():

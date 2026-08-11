@@ -20,6 +20,7 @@ class TTSConfig:
     rate: str = "+0%"
     volume: str = "+0%"
     performance_prompt: str = "自然、可信的中文新闻播客主播"
+    pronunciation_overrides: dict[str, str] = field(default_factory=dict)
     doubao_app_id: str = ""
     doubao_access_token: str = ""
     doubao_cluster: str = "volcano_tts"
@@ -47,6 +48,7 @@ class TTSConfig:
             "rate": "+0%",
             "volume": "+0%",
             "performance_prompt": "自然、可信的中文新闻播客主播",
+            "pronunciation_overrides": {},
             "voice_mapping": {
                 "Host A": "zh-CN-XiaoxiaoNeural",
             },

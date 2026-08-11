@@ -23,15 +23,15 @@ describe('writing node config bridge', () => {
       aiTarget: 'model:test',
     })
 
-    expect(configs.facts.selected_topic_count).toBe(10)
+    expect(configs.facts.selected_topic_count).toBe(7)
     expect(configs.script).toMatchObject({
       api_base: 'https://example.com/v1',
       api_key: 'test-key',
       llm_model: 'test-model',
       ai_target: 'model:test',
-      target_duration_minutes: 22,
-      quick_news_chars_min: 240,
-      deep_dive_chars_max: 2600,
+      target_duration_minutes: 14,
+      quick_news_chars_min: 220,
+      deep_dive_chars_max: 1600,
     })
     expect(configs.script).not.toHaveProperty('compliance_strictness')
     expect(configs.script).not.toHaveProperty('assist_level')

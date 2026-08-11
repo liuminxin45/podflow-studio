@@ -131,7 +131,7 @@ def test_episode_run_accepts_series_and_playback_contracts():
             "hostName": "小流",
             "defaultVoice": "voice-a",
             "enabledPlatforms": ["local", "rss"],
-            "templateVariant": "quick_9_plus_deep_1",
+            "templateVariant": "quick_6_plus_deep_1",
         },
     }
     state["playback"] = {

@@ -4,12 +4,12 @@
 
 ## Product Position
 
-PodFlow Studio 是一个本地优先的单人新闻播客生产流水线，面向“通勤早咖啡”这类单人新闻简报场景，支持自动采集数据、自动生成可编辑播客稿、AI 语音合成或人声替换、自动音频成片，并输出可发布 RSS / 发布包。
+PodFlow Studio 是一个本地优先的单人新闻播客生产流水线，以 `PodFlow 晨报` 为默认节目，支持自动采集数据、自动生成可编辑播客稿、AI 语音合成或人声替换、自动音频成片，并输出可发布 RSS / 发布包。
 
 默认定位必须收敛为：
 
 ```text
-单人新闻早报 / 单人新闻播客 / 通勤早咖啡式内容生产
+PodFlow 晨报 / 单人新闻播客 / 6 条快讯加 1 条重点解读
 ```
 
 默认 preset 必须是 `morning_news_brief`：
@@ -18,13 +18,13 @@ PodFlow Studio 是一个本地优先的单人新闻播客生产流水线，面�
 id: morning_news_brief
 content_type: news_brief
 num_hosts: 1
-target_duration_minutes: 22
-target_duration_minutes_range: 20-24
-template_variant: quick_9_plus_deep_1
-recommended_news_item_count: 10
-quick_news_recommended_count: 9
+target_duration_minutes: 14
+target_duration_minutes_range: 12-15
+template_variant: quick_6_plus_deep_1
+recommended_news_item_count: 7
+quick_news_recommended_count: 6
 deep_dive_recommended_count: 1
-allow_custom_news_item_count: true
+allow_custom_news_item_count: false
 tone: clear, concise, commute-friendly
 language: zh-CN
 ```
@@ -103,7 +103,7 @@ run_report
 - 默认入口必须指向 `morning_news_brief`。
 - 默认主持人数量必须是 1。
 - 默认内容类型必须是 `news_brief`。
-- 默认早咖啡模板推荐 9 条快讯 + 1 条深度解读，但不得把推荐条数作为阻断条件。
+- 默认节目采用 6 条快讯 + 1 条重点解读；素材或来源不足时必须停止并说明原因，不得用无来源内容补足。
 - script 生成必须基于 `facts`，不能直接把原始素材拼成稿件。
 - `script` 必须结构化为 `ScriptSegment[]`，不能只保存大段文本。
 - `edited_script` 优先级高于 generated `script`。

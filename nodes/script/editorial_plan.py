@@ -66,7 +66,7 @@ def build_editorial_plan_prompt(
    非空时它必须且只能使用 deep_dive；为空时不得生成 deep_dive。写稿阶段无权临时选择深度稿。
 4. 新闻不少于 3 条时，deep_dive 不能是第一条或最后一条。
 5. 同一 role 不得连续出现 3 次。
-6. opening.target_chars 为 100 至 180，closing.target_chars 为 50 至 100。
+6. opening.target_chars 为 180 至 260，closing.target_chars 为 60 至 100。
 7. headline 为 120 至 200 字，light 为 140 至 220 字，standard 为 220 至 340 字，
    practical 为 280 至 420 字，explainer/comparison 为 340 至 520 字，
    deep_dive 为 1600 至 2300 字。素材不足时取下限，不用套话填充。
@@ -138,8 +138,8 @@ def validate_editorial_plan(
     opening_fact_ids = [str(value) for value in opening_fact_ids]
     if len(opening_fact_ids) > 2 or any(value not in fact_ids for value in opening_fact_ids):
         raise ValueError("成稿编排格式错误：开场最多引用两个有效事实 ID")
-    opening_chars = _bounded_int(opening.get("target_chars"), 100, 180, "opening.target_chars")
-    closing_chars = _bounded_int(closing.get("target_chars"), 50, 100, "closing.target_chars")
+    opening_chars = _bounded_int(opening.get("target_chars"), 180, 260, "opening.target_chars")
+    closing_chars = _bounded_int(closing.get("target_chars"), 60, 100, "closing.target_chars")
     opening_question = str(opening.get("listener_question") or "").strip()
     promise_fact_id = str(opening.get("promise_fact_id") or "").strip()
     if bool(opening_question) != bool(promise_fact_id):

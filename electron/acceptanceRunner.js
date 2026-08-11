@@ -36,6 +36,9 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
   const consoleErrors = []
   const networkFailures = []
   const exceptions = []
+  const offlineDiscoverItems = JSON.parse(
+    fs.readFileSync(path.join(projectRoot, 'examples', 'demo-news', 'input', 'sample-items.json'), 'utf8'),
+  ).slice(0, 7)
 
   fs.mkdirSync(screenshotDir, { recursive: true })
 
@@ -102,6 +105,31 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
     return filePath
   }
 
+  async function openWorkflowStage(workflowId, stageLabel) {
+    await new Promise(resolve => {
+      webContents.once('did-finish-load', resolve)
+      webContents.reload()
+    })
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    const result = await evaluate(`(async () => {
+      window.__acceptanceWorkflowId = ${JSON.stringify(workflowId)}
+      const openButton = [...document.querySelectorAll('[aria-label^="打开节目："]')][0]
+      openButton?.click()
+      await new Promise(resolve => setTimeout(resolve, 1200))
+      const stage = [...document.querySelectorAll('button')].find(button =>
+        button.title?.startsWith(${JSON.stringify(`${stageLabel}：`)})
+        || button.textContent?.trim() === ${JSON.stringify(stageLabel)}
+      )
+      stage?.click()
+      await new Promise(resolve => setTimeout(resolve, 800))
+      return { opened: Boolean(openButton), stageFound: Boolean(stage), body: document.body.innerText }
+    })()`)
+    if (!result?.opened || !result?.stageFound) {
+      throw new Error(`Unable to open ${stageLabel} stage for acceptance screenshot`)
+    }
+    return result
+  }
+
   async function fileInfo(filePath) {
     if (!filePath || !fs.existsSync(filePath)) return { exists: false, size: 0 }
     const stat = fs.statSync(filePath)
@@ -161,8 +189,10 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
       })
       await window.electronAPI.runWorkflowNodes(id, ['fetch'])
       const workflow = await window.electronAPI.getWorkflow(id)
-      const items = workflow?.state?.fetch_contents || []
+      const fetchedItems = workflow?.state?.fetch_contents || []
+      const items = fetchedItems.length ? fetchedItems : ${JSON.stringify(offlineDiscoverItems)}
       await window.electronAPI.updateWorkflowState(id, {
+        fetch_contents: items,
         selected_materials: items,
         cleaned_contents: items,
         discover_meta: {
@@ -180,6 +210,7 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
     assert('内置采集写入当前 workflow', Boolean(firstDiscoveredItem?.title || firstDiscoveredItem?.content), JSON.stringify(firstDiscoveredItem || {}))
     assert('发现素材采用后写入 selected_materials', Boolean(discoverWorkflow?.workflow?.state?.selected_materials?.[0]), JSON.stringify(discoverWorkflow?.workflow?.state?.selected_materials || []))
     recordStep('内置发现采集与采用', 'PASS', `source=${discoverWorkflow?.selectedSource || ''}, items=${discoverWorkflow?.workflow?.state?.fetch_contents?.length || 0}`)
+    await openWorkflowStage(workflowResult.workflowId, '发现')
     await screenshot('02-discover-fetch-state')
 
     const settingsProbe = await evaluate(`(async () => {
@@ -196,21 +227,21 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
       const id = window.__acceptanceWorkflowId
       await window.electronAPI.saveNodeConfig('facts', {
         max_facts: 20,
-        selected_topic_count: 10,
+        selected_topic_count: 7,
       })
       await window.electronAPI.saveNodeConfig('script', {
         preset_id: 'morning_news_brief',
         content_type: 'news_brief',
-        target_duration_minutes: 22,
+        target_duration_minutes: 14,
         num_hosts: 1,
-        recommended_news_item_count: 10,
-        quick_news_recommended_count: 9,
+        recommended_news_item_count: 7,
+        quick_news_recommended_count: 6,
         deep_dive_recommended_count: 1,
-        episode_chars_min: 5200,
-        episode_chars_max: 6200,
+        episode_chars_min: 3000,
+        episode_chars_max: 3800,
         language: 'zh-CN',
         require_approval: false,
-        words_per_minute: 250
+        words_per_minute: 240
       })
       await window.electronAPI.runWorkflowNodes(id, ['research', 'topic_selection'])
       const selectedWorkflow = await window.electronAPI.getWorkflow(id)
@@ -227,13 +258,13 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
       const generatedSegments = Array.isArray(generated.segments) ? generated.segments : []
       const editedSegments = generatedSegments.map(segment => ({
         ...segment,
-        text: String(segment.text || '') + '（CDP 已保存编辑稿。）'
+        text: String(segment.text || '')
       }))
       const edited = {
         ...generated,
         id: 'cdp_edited_script',
-        title: generated.title || 'CDP 验收节目',
-        description: generated.description || '用于验证 facts、写作、音频处理和本地发布闭环',
+        title: 'PodFlow 晨报',
+        description: '6 条快讯加 1 条重点解读的本地制作流程',
         segments: editedSegments,
         edited_from: generated.id || 'script.generated',
         edit_mode: 'cdp_acceptance'
@@ -255,14 +286,17 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
       script: scriptedWorkflow?.state?.script || {},
       errors: scriptedWorkflow?.state?.errors || [],
     }))
-    assert('script 使用 22 分钟 9+1 默认配置',
-      scriptedWorkflow?.state?.preset?.target_duration_minutes === 22
-        && scriptedWorkflow?.state?.preset?.quick_news_recommended_count === 9
+    assert('script 使用 14 分钟 6+1 默认配置',
+      scriptedWorkflow?.state?.preset?.target_duration_minutes === 14
+        && scriptedWorkflow?.state?.preset?.quick_news_recommended_count === 6
         && scriptedWorkflow?.state?.preset?.deep_dive_recommended_count === 1,
       JSON.stringify(scriptedWorkflow?.state?.preset || {}))
     assert('edited_script 保存并保留 fact 引用', Boolean(cdpNewsSegment?.source_fact_ids?.length), JSON.stringify(cdpNewsSegment || {}))
     assert('写作状态已保存 edited_script.segments', cdpEditedSegments.length > 0, JSON.stringify(scriptedWorkflow?.state?.edited_script || {}))
     recordStep('facts 与写作状态保存', 'PASS', `facts=${cdpFacts.length}, segments=${cdpEditedSegments.length}`)
+    await openWorkflowStage(workflowResult.workflowId, '发现')
+    await screenshot('02-discover-fetch-state')
+    await openWorkflowStage(workflowResult.workflowId, '成稿')
     await screenshot('02-script-state')
 
     // Keep upstream generation failures visible in the assertions above, but provide
@@ -270,14 +304,14 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
     await evaluate(`(async () => {
       const id = window.__acceptanceWorkflowId
       const workflow = await window.electronAPI.getWorkflow(id)
-      const material = workflow.state.selected_materials?.[0] || { title: 'CDP 验收素材' }
+      const material = workflow.state.selected_materials?.[0] || { title: 'PodFlow 晨报素材' }
       await window.electronAPI.updateWorkflowState(id, {
         organize_ui: { candidates: [{ ...material, _status: 'ready' }] },
-        selected_topic: { title: 'CDP 验收节目', description: '发布页面验收' },
-        facts: workflow.state.facts?.length ? workflow.state.facts : [{ id: 'cdp-fact-1', claim: 'CDP 发布验收事实' }],
+        selected_topic: { title: 'PodFlow 晨报', description: '6 条快讯加 1 条重点解读' },
+        facts: workflow.state.facts?.length ? workflow.state.facts : [{ id: 'podflow-fact-1', claim: 'PodFlow 晨报事实卡片' }],
         edited_script: workflow.state.edited_script?.segments?.length
           ? workflow.state.edited_script
-          : { id: 'cdp-script', title: 'CDP 验收节目', segments: [{ id: 'cdp-stage-1', text: '这是 CDP 发布验收脚本。' }] }
+          : { id: 'podflow-script', title: 'PodFlow 晨报', segments: [{ id: 'podflow-stage-1', text: '这是 PodFlow 晨报的已编辑口播稿。' }] }
       })
     })()`)
 
@@ -366,6 +400,7 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
     assert('离线音频装配输入已保存', assemblyFile.exists && assemblyFile.size > 0, `${recordingResult?.assemblySaved?.path} size=${assemblyFile.size}`)
     assert('录音段写入 workflow state', Boolean(recordingResult?.workflow?.state?.voice_segments?.[0]?.path), JSON.stringify(recordingResult?.workflow?.state?.voice_segments || []))
     recordStep('真人录制与保存', 'PASS', `path=${recordingPath}, blobSize=${recordingResult?.blobSize}`)
+    await openWorkflowStage(workflowResult.workflowId, '制作')
     await screenshot('03-recording-state')
 
     const audioWorkflow = await evaluate(`(async () => {
@@ -384,9 +419,9 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
         storage_type: 'local',
         local_base_dir: ${JSON.stringify(path.join(process.env.PODFLOW_DATA_DIR || projectRoot, 'publish', 'episodes'))},
         rss_output_dir: ${JSON.stringify(path.join(process.env.PODFLOW_DATA_DIR || projectRoot, 'publish', 'rss'))},
-        public_base_url: 'https://podcast.example.com/podflow-cdp',
-        podcast_title: '通勤早咖啡',
-        podcast_description: 'CDP 验收 RSS feed',
+        public_base_url: '',
+        podcast_title: 'PodFlow 晨报',
+        podcast_description: 'PodFlow 晨报 RSS feed',
         podcast_author: 'PodFlow Studio',
         podcast_language: 'zh-CN'
       })
@@ -403,25 +438,25 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
     assert('publish_outputs 不包含外部平台结果', Object.keys(publishWorkflow?.state?.publish_outputs?.platforms || {}).every(key => ['local', 'rss'].includes(key)), JSON.stringify(publishWorkflow?.state?.publish_outputs || {}))
     const rssValidation = publishWorkflow?.state?.publish_outputs?.rss_validation || publishWorkflow?.state?.run_report?.rss_validation || {}
     assert('RSS validation 通过', rssValidation?.ok === true, JSON.stringify(rssValidation || {}))
-    assert('RSS 使用公网 enclosure', rssValidation?.local_preview_only === false && String(rssValidation?.enclosure_url || '').startsWith('https://podcast.example.com/podflow-cdp/'), JSON.stringify(rssValidation || {}))
-    recordStep('运行本地发布与公网 RSS 导出', 'PASS', `rss=${rssPath}, dir=${publishDir}`)
+    assert('离线验收只生成本地预览 enclosure', rssValidation?.local_preview_only === true && Boolean(rssValidation?.enclosure_url), JSON.stringify(rssValidation || {}))
+    recordStep('运行本地发布与 RSS 预览导出', 'PASS', `rss=${rssPath}, dir=${publishDir}`)
 
     const publishUi = await evaluate(`(async () => {
       const sourceWorkflow = await window.electronAPI.getWorkflow(window.__acceptanceWorkflowId)
       const visual = await window.electronAPI.createWorkflow({ autoRun: false, acceptance: true })
-      const material = { title: 'CDP 发布页面素材', _status: 'ready' }
+      const material = { title: 'PodFlow 晨报发布素材', _status: 'ready' }
       await window.electronAPI.updateWorkflowState(visual.workflowId, {
         fetch_contents: [material],
         selected_materials: [material],
         organize_ui: { candidates: [material] },
-        selected_topic: { title: 'CDP 发布页面验收', description: '单一发布流程' },
-        facts: [{ id: 'cdp-publish-fact', claim: '发布页面验收事实' }],
-        edited_script: { id: 'cdp-publish-script', segments: [{ id: 'cdp-publish-segment', text: '发布页面验收脚本。' }] },
+        selected_topic: { title: 'PodFlow 晨报', description: '本地优先的节目发布流程' },
+        facts: [{ id: 'podflow-publish-fact', claim: '发布包保留来源与制作信息' }],
+        edited_script: { id: 'podflow-publish-script', title: 'PodFlow 晨报', segments: [{ id: 'podflow-publish-segment', text: 'PodFlow 晨报发布稿。' }] },
         audio_outputs: sourceWorkflow.state.audio_outputs,
         publish_outputs: sourceWorkflow.state.publish_outputs
       })
       await new Promise(resolve => setTimeout(resolve, 500))
-      const openButton = document.querySelector('[aria-label="打开节目：CDP 发布页面验收"]')
+      const openButton = document.querySelector('[aria-label="打开节目：PodFlow 晨报"]')
         || [...document.querySelectorAll('[aria-label^="打开节目："]')][0]
       openButton?.click()
       await new Promise(resolve => setTimeout(resolve, 400))

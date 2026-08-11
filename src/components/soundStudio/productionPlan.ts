@@ -81,12 +81,15 @@ function clipId(parentId: string, index: number, total: number): string {
 
 function defaultJoin(clip: ProductionClip, nextClip: ProductionClip): ProductionJoin {
   const sameSegment = clip.parent_segment_id === nextClip.parent_segment_id
+  if (!sameSegment && nextClip.segment_type === 'deep_dive') {
+    return { after_clip_id: clip.id, type: 'transition', duration_ms: 1000 }
+  }
   return {
     after_clip_id: clip.id,
     type: 'pause',
     duration_ms: sameSegment
       ? Math.min(450, clip.direction.pause_after_ms)
-      : Math.max(clip.direction.pause_after_ms, nextClip.segment_type === 'deep_dive' ? 1200 : 600),
+      : Math.max(clip.direction.pause_after_ms, 600),
   }
 }
 
@@ -185,10 +188,10 @@ export function reconcileProductionPlan(
     clips,
     joins,
     music: {
-      intro: musicSlot(existing?.music?.intro),
-      transition: musicSlot({ duration_ms: 1500, fade_in_ms: 150, fade_out_ms: 300, ...existing?.music?.transition }),
+      intro: musicSlot({ enabled: true, path: 'assets/audio/podflow-intro.wav', ...existing?.music?.intro }),
+      transition: musicSlot({ enabled: true, path: 'assets/audio/podflow-transition.wav', duration_ms: 1000, fade_in_ms: 100, fade_out_ms: 250, ...existing?.music?.transition }),
       bed: musicSlot(existing?.music?.bed),
-      outro: musicSlot(existing?.music?.outro),
+      outro: musicSlot({ enabled: true, path: 'assets/audio/podflow-outro.wav', duration_ms: 4000, fade_in_ms: 400, fade_out_ms: 1000, ...existing?.music?.outro }),
     },
     render: {
       output_format: existing?.render?.output_format || 'mp3',
