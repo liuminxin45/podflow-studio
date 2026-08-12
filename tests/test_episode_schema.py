@@ -47,7 +47,8 @@ def test_episode_run_payload_validates_with_model():
 def test_episode_run_accepts_versioned_production_plan():
     state = create_base_state()
     state["production_plan"] = {
-        "version": 2,
+        "version": 3,
+        "quality_profile": "podflow_morning_v3",
         "script_hash": "script-hash",
         "clips": [{
             "id": "seg_001__001",
@@ -59,10 +60,10 @@ def test_episode_run_accepts_versioned_production_plan():
             "context_after": "",
             "direction": {
                 "intent": "opening_warm",
-                "emotion": "warm",
+                "provider_emotion": "happy",
+                "emotion_scale": 2,
                 "energy": 0.72,
                 "pace": 0.96,
-                "pitch": 0.03,
                 "pause_before_ms": 0,
                 "pause_after_ms": 650,
                 "emphasis": [],
@@ -79,17 +80,22 @@ def test_episode_run_accepts_versioned_production_plan():
         "joins": [],
         "music": {
             name: {
-                "enabled": False,
+                "asset_id": f"quick-spark-{name}",
                 "path": "",
-                "volume": 0.15,
-                "duration_ms": 1500 if name == "transition" else 5000,
-                "fade_in_ms": 150 if name == "transition" else 500,
-                "fade_out_ms": 300 if name == "transition" else 1000,
+                "gain_db": -4,
+                "duration_ms": 1500,
+                "fade_in_ms": 150,
+                "fade_out_ms": 300,
+                "voice_overlap_ms": 0,
+                "duck_db": 0,
+                "rights_ref": "assets/audio/RIGHTS.md#quick-spark",
             }
-            for name in ("intro", "transition", "bed", "outro")
+            for name in ("intro", "sting", "bridge", "outro")
         },
         "render": {
             "output_format": "mp3",
+            "sample_rate_hz": 48000,
+            "mp3_bitrate": "160k",
             "normalize_loudness": True,
             "target_lufs": -16,
             "true_peak_db": -1,
@@ -112,7 +118,7 @@ def test_episode_run_rejects_unversioned_non_empty_production_plan():
     schema_errors = list(Draft202012Validator(_episode_run_schema()).iter_errors(state))
 
     assert not ok
-    assert "version is required" in "\n".join(errors)
+    assert "version=3" in "\n".join(errors)
     assert schema_errors
 
 

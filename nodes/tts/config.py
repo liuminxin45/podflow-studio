@@ -2,6 +2,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+DEFAULT_DOUBAO_VOICE_TYPE = "zh_female_shuangkuaisisi_emo_v2_mars_bigtts"
+
+
 @dataclass
 class TTSConfig:
     engine: str = "mock"
@@ -24,7 +27,7 @@ class TTSConfig:
     doubao_app_id: str = ""
     doubao_access_token: str = ""
     doubao_cluster: str = "volcano_tts"
-    doubao_voice_type: str = "zh_female_shuangkuaisisi_moon_bigtts"
+    doubao_voice_type: str = DEFAULT_DOUBAO_VOICE_TYPE
     doubao_endpoint: str = "https://openspeech.bytedance.com/api/v1/tts"
     doubao_resource_id: str = "volc.service_type.10029"
     azure_speech_key: str = ""
@@ -55,7 +58,7 @@ class TTSConfig:
             "doubao_app_id": "",
             "doubao_access_token": "",
             "doubao_cluster": "volcano_tts",
-            "doubao_voice_type": "zh_female_shuangkuaisisi_moon_bigtts",
+            "doubao_voice_type": DEFAULT_DOUBAO_VOICE_TYPE,
             "doubao_endpoint": "https://openspeech.bytedance.com/api/v1/tts",
             "doubao_resource_id": "volc.service_type.10029",
             "azure_speech_key": "",

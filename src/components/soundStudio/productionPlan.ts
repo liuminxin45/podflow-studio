@@ -7,17 +7,20 @@ import type {
   VoiceSegment,
 } from '../../types/workflow'
 
-const MAX_TTS_CHARS = 320
-const MAX_TTS_SENTENCES = 5
+const MAX_TTS_CHARS = 140
+const MAX_TTS_SENTENCES = 2
 
 function musicSlot(overrides: Partial<ProductionMusicSlot> = {}): ProductionMusicSlot {
   return {
-    enabled: false,
+    asset_id: '',
     path: '',
-    volume: 0.15,
+    gain_db: -4,
     duration_ms: 5000,
     fade_in_ms: 500,
     fade_out_ms: 1000,
+    voice_overlap_ms: 0,
+    duck_db: 0,
+    rights_ref: 'assets/audio/RIGHTS.md#quick-spark',
     ...overrides,
   }
 }
@@ -82,23 +85,26 @@ function clipId(parentId: string, index: number, total: number): string {
 function defaultJoin(clip: ProductionClip, nextClip: ProductionClip): ProductionJoin {
   const sameSegment = clip.parent_segment_id === nextClip.parent_segment_id
   if (!sameSegment && nextClip.segment_type === 'deep_dive') {
-    return { after_clip_id: clip.id, type: 'transition', duration_ms: 1000 }
+    return { after_clip_id: clip.id, type: 'bridge', duration_ms: 2400 }
+  }
+  if (!sameSegment && clip.segment_type === 'quick_news' && nextClip.segment_type === 'quick_news') {
+    return { after_clip_id: clip.id, type: 'sting', duration_ms: 1350 }
   }
   return {
     after_clip_id: clip.id,
     type: 'pause',
     duration_ms: sameSegment
-      ? Math.min(450, clip.direction.pause_after_ms)
+      ? Math.min(380, Math.max(220, clip.direction.pause_after_ms))
       : Math.max(clip.direction.pause_after_ms, 600),
   }
 }
 
 const DIRECTION_PROFILES = {
-  opening: { intent: 'opening_warm', emotion: 'warm', energy: 0.72, pace: 0.96, pitch: 0.03 },
-  quick_news: { intent: 'quick_news', emotion: 'focused', energy: 0.68, pace: 1.03, pitch: 0 },
-  deep_dive: { intent: 'deep_dive', emotion: 'thoughtful', energy: 0.55, pace: 0.92, pitch: -0.02 },
-  closing: { intent: 'closing_relaxed', emotion: 'warm', energy: 0.48, pace: 0.9, pitch: -0.03 },
-  custom: { intent: 'natural_narration', emotion: 'neutral', energy: 0.58, pace: 0.97, pitch: 0 },
+  opening: { intent: 'opening_warm', provider_emotion: 'happy', emotion_scale: 2, energy: 0.72, pace: 0.96 },
+  quick_news: { intent: 'quick_news', provider_emotion: 'neutral', emotion_scale: 1, energy: 0.68, pace: 1.02 },
+  deep_dive: { intent: 'deep_dive', provider_emotion: 'neutral', emotion_scale: 1, energy: 0.55, pace: 0.94 },
+  closing: { intent: 'closing_relaxed', provider_emotion: 'happy', emotion_scale: 1, energy: 0.48, pace: 0.92 },
+  custom: { intent: 'natural_narration', provider_emotion: 'neutral', emotion_scale: 1, energy: 0.58, pace: 0.97 },
 } as const
 
 function speechDirection(type: WorkflowScriptSegment['type'], value: string): ProductionClip['direction'] {
@@ -110,8 +116,6 @@ function speechDirection(type: WorkflowScriptSegment['type'], value: string): Pr
   return {
     ...profile,
     intent: /[？?]/.test(value) ? 'rhetorical_question' : profile.intent,
-    emotion: /(但是|不过|然而|值得注意)/.test(value) ? 'concerned' : profile.emotion,
-    pace: /(但是|不过|然而|值得注意)/.test(value) ? Math.max(0.75, profile.pace - 0.05) : profile.pace,
     pause_before_ms: 0,
     pause_after_ms: type === 'quick_news' ? 450 : 650,
     emphasis,
@@ -123,8 +127,8 @@ export function reconcileProductionPlan(
   existing?: Partial<ProductionPlan> | null,
   voices: VoiceSegment[] = [],
 ): ProductionPlan {
-  if (existing?.version != null && existing.version !== 2) {
-    throw new Error(`不支持制作计划版本 ${existing.version}，当前版本为 2，请重新生成制作计划。`)
+  if (existing?.version != null && existing.version !== 3) {
+    throw new Error(`不支持制作计划版本 ${existing.version}，当前版本为 3，请重新生成制作计划。`)
   }
   const previousClips = new Map((existing?.clips || []).map(clip => [clip.id, clip]))
   const voiceById = new Map(voices.map(voice => [voice.segment_id, voice]))
@@ -177,24 +181,27 @@ export function reconcileProductionPlan(
     const saved = previousJoins.get(clip.id)
     return {
       after_clip_id: clip.id,
-      type: saved?.type === 'transition' ? 'transition' as const : 'pause' as const,
+      type: saved?.type === 'sting' || saved?.type === 'bridge' ? saved.type : 'pause' as const,
       duration_ms: Math.min(15000, Math.max(0, Number(saved?.duration_ms ?? fallback.duration_ms))),
     }
   })
 
   return {
-    version: 2,
+    version: 3,
+    quality_profile: 'podflow_morning_v3',
     script_hash: scriptHash(segments),
     clips,
     joins,
     music: {
-      intro: musicSlot({ enabled: true, path: 'assets/audio/podflow-intro.wav', ...existing?.music?.intro }),
-      transition: musicSlot({ enabled: true, path: 'assets/audio/podflow-transition.wav', duration_ms: 1000, fade_in_ms: 100, fade_out_ms: 250, ...existing?.music?.transition }),
-      bed: musicSlot(existing?.music?.bed),
-      outro: musicSlot({ enabled: true, path: 'assets/audio/podflow-outro.wav', duration_ms: 4000, fade_in_ms: 400, fade_out_ms: 1000, ...existing?.music?.outro }),
+      intro: musicSlot({ asset_id: 'quick-spark-intro', path: 'assets/audio/podflow-intro.wav', gain_db: -2, duration_ms: 8000, fade_in_ms: 120, fade_out_ms: 700, voice_overlap_ms: 2500, duck_db: 11, ...existing?.music?.intro }),
+      sting: musicSlot({ asset_id: 'quick-spark-sting', path: 'assets/audio/podflow-transition.wav', duration_ms: 1350, fade_in_ms: 50, fade_out_ms: 220, ...existing?.music?.sting }),
+      bridge: musicSlot({ asset_id: 'quick-spark-bridge', path: 'assets/audio/podflow-bridge.wav', duration_ms: 2400, fade_in_ms: 80, fade_out_ms: 350, ...existing?.music?.bridge }),
+      outro: musicSlot({ asset_id: 'quick-spark-outro', path: 'assets/audio/podflow-outro.wav', gain_db: -2, duration_ms: 7000, fade_in_ms: 700, fade_out_ms: 900, voice_overlap_ms: 2500, duck_db: 11, ...existing?.music?.outro }),
     },
     render: {
       output_format: existing?.render?.output_format || 'mp3',
+      sample_rate_hz: 48000,
+      mp3_bitrate: '160k',
       normalize_loudness: existing?.render?.normalize_loudness !== false,
       target_lufs: Number(existing?.render?.target_lufs ?? -16),
       true_peak_db: Number(existing?.render?.true_peak_db ?? -1),

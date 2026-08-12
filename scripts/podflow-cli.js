@@ -28,13 +28,15 @@ const EXIT = Object.freeze({
   ACCEPTANCE: 7,
   STOP: 8,
   INTERNAL: 9,
+  PRODUCTION: 10,
 })
 
-const COMMANDS = new Set(['doctor', 'start', 'run', 'status', 'stop', 'logs', 'accept', 'version', 'help'])
+const COMMANDS = new Set(['doctor', 'start', 'run', 'status', 'stop', 'logs', 'accept', 'produce', 'version', 'help'])
 const VALUE_OPTIONS = new Set([
   'mode', 'session', 'cdp', 'window', 'timeout', 'artifacts-dir', 'suite', 'tail',
+  'workflow', 'stage', 'audio-sha256', 'reviewer', 'notes', 'output',
 ])
-const BOOLEAN_OPTIONS = new Set(['json', 'follow', 'help'])
+const BOOLEAN_OPTIONS = new Set(['json', 'follow', 'help', 'allow-paid-tts'])
 
 class CliError extends Error {
   constructor(message, exitCode) {
@@ -306,6 +308,29 @@ async function acceptCommand(options) {
   return passed ? EXIT.OK : EXIT.ACCEPTANCE
 }
 
+async function produceCommand(options) {
+  if (!options.workflow) throw new CliError('produce requires --workflow', EXIT.ARGUMENT)
+  const stage = validateEnum(options.stage, ['render', 'approve', 'package'], 'stage', '')
+  const python = resolvePythonCommand()
+  const args = [
+    ...python.slice(1), path.join(projectRoot, 'scripts', 'produce_workflow.py'),
+    '--workflow', options.workflow, '--stage', stage,
+  ]
+  if (options['allow-paid-tts']) args.push('--allow-paid-tts')
+  for (const name of ['audio-sha256', 'reviewer', 'notes', 'output']) {
+    if (options[name]) args.push(`--${name}`, options[name])
+  }
+  const child = spawn(python[0], args, { cwd: projectRoot, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+  child.stdout.on('data', chunk => { process.stdout.write(chunk) })
+  child.stderr.on('data', chunk => { process.stderr.write(chunk) })
+  const code = await new Promise((resolve, reject) => {
+    child.once('error', reject)
+    child.once('exit', value => resolve(value ?? EXIT.PRODUCTION))
+  })
+  if (code !== 0) throw new CliError(`Production stage ${stage} failed`, EXIT.PRODUCTION)
+  return EXIT.OK
+}
+
 function doctorCommand(options) {
   let ffmpeg
   try {
@@ -346,9 +371,11 @@ function helpCommand() {
   process.stdout.write('  stop                   Gracefully stop a session owned by its nonce\n')
   process.stdout.write('  logs                   Print or follow the session log\n')
   process.stdout.write('  accept                 Run startup, ui, or e2e-offline acceptance\n')
+  process.stdout.write('  produce                Render, approve, or package one explicit workflow\n')
   process.stdout.write('  version                Print the application and CLI version\n\n')
   process.stdout.write('Common options: --session <id> --mode <dev|built> --window <show|hidden> --cdp <off|auto|port> --json\n')
   process.stdout.write('Acceptance:    --suite <startup|ui|e2e-offline> --artifacts-dir <path> --timeout <seconds>\n')
+  process.stdout.write('Production:    --workflow <id|path> --stage <render|approve|package> [--allow-paid-tts]\n')
   process.stdout.write('Logs:          --tail <lines> --follow\n')
   return EXIT.OK
 }
@@ -370,6 +397,7 @@ async function main(argv = process.argv.slice(2)) {
     if (parsed.command === 'stop') return await stopCommand(parsed.options)
     if (parsed.command === 'logs') return await logsCommand(parsed.options)
     if (parsed.command === 'accept') return await acceptCommand(parsed.options)
+    if (parsed.command === 'produce') return await produceCommand(parsed.options)
     throw new CliError(`Unsupported command: ${parsed.command}`, EXIT.ARGUMENT)
   } catch (error) {
     const exitCode = error instanceof CliError ? error.exitCode : EXIT.INTERNAL

@@ -163,11 +163,11 @@ describe('SoundStudio production workflow', () => {
     loadNodeConfig
       .mockResolvedValueOnce({
         engine: 'doubao_tts',
-        default_voice: 'zh_female_shuangkuaisisi_moon_bigtts',
+        default_voice: 'zh_female_shuangkuaisisi_emo_v2_mars_bigtts',
         doubao_app_id: 'doubao-app',
         doubao_access_token: 'doubao-token',
         doubao_cluster: 'volcano_tts',
-        doubao_voice_type: 'zh_female_shuangkuaisisi_moon_bigtts',
+        doubao_voice_type: 'zh_female_shuangkuaisisi_emo_v2_mars_bigtts',
         doubao_endpoint: 'https://openspeech.bytedance.com/api/v1/tts',
         doubao_resource_id: 'volc.service_type.10029',
       })
@@ -191,7 +191,7 @@ describe('SoundStudio production workflow', () => {
     await waitFor(() => expect(onRunNodes).toHaveBeenCalled())
     expect(saveNodeConfig).toHaveBeenCalledWith('tts', expect.objectContaining({
       engine: 'doubao_tts',
-      doubao_voice_type: 'zh_female_shuangkuaisisi_moon_bigtts',
+      doubao_voice_type: 'zh_female_shuangkuaisisi_emo_v2_mars_bigtts',
       doubao_resource_id: 'volc.service_type.10029',
     }))
   }, 60_000)
@@ -200,8 +200,8 @@ describe('SoundStudio production workflow', () => {
     loadNodeConfig
       .mockResolvedValueOnce({
         engine: 'doubao_tts',
-        default_voice: 'zh_female_shuangkuaisisi_moon_bigtts',
-        doubao_voice_type: 'zh_female_shuangkuaisisi_moon_bigtts',
+        default_voice: 'zh_female_shuangkuaisisi_emo_v2_mars_bigtts',
+        doubao_voice_type: 'zh_female_shuangkuaisisi_emo_v2_mars_bigtts',
         doubao_app_id: 'doubao-app',
         doubao_access_token: 'doubao-token',
         doubao_cluster: 'volcano_tts',
@@ -219,10 +219,10 @@ describe('SoundStudio production workflow', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: /晓晓/ }).getAttribute('aria-pressed')).toBe('true'))
     expect(screen.queryByText('已配置音色')).toBeNull()
-    expect(screen.queryByText('zh_female_shuangkuaisisi_moon_bigtts')).toBeNull()
+    expect(screen.queryByText('zh_female_shuangkuaisisi_emo_v2_mars_bigtts')).toBeNull()
   }, 60_000)
 
-  it('persists node configs, runs only Produce nodes, and waits for a verified artifact', async () => {
+  it('persists the v3 fixed production profile, runs only Produce nodes, and waits for a verified artifact', async () => {
     const onUpdateWorkflow = vi.fn(async () => undefined)
     const onRunNodes = vi.fn(async () => undefined)
     const onOpenPath = vi.fn(async () => ({ success: true }))
@@ -237,9 +237,8 @@ describe('SoundStudio production workflow', () => {
     const { rerender } = render(<SoundStudio {...props} />)
 
     await waitFor(() => expect((screen.getByRole('button', { name: /制作成品/ }) as HTMLButtonElement).disabled).toBe(false))
-    fireEvent.click(screen.getByRole('switch', { name: '叠加背景音乐' }))
-    fireEvent.click(screen.getByRole('button', { name: '选择背景音乐' }))
-    await waitFor(() => expect(selectAudioFile).toHaveBeenCalled())
+    expect(screen.getByText('正式节目固定使用 Quick Spark 派生 cue，正文不持续铺底乐。')).toBeTruthy()
+    expect(screen.queryByRole('switch', { name: '叠加背景音乐' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /制作成品/ }))
 
     await waitFor(() => expect(onRunNodes).toHaveBeenCalledWith(['tts', 'audio_postprocess', 'assets']))
@@ -257,8 +256,13 @@ describe('SoundStudio production workflow', () => {
     }))
     expect(onUpdateWorkflow).toHaveBeenCalledWith(expect.objectContaining({
       production_plan: expect.objectContaining({
+        version: 3,
+        quality_profile: 'podflow_morning_v3',
         music: expect.objectContaining({
-          bed: expect.objectContaining({ enabled: true, path: 'D:\\Music\\podcast-bed.wav' }),
+          intro: expect.objectContaining({ asset_id: 'quick-spark-intro' }),
+          sting: expect.objectContaining({ asset_id: 'quick-spark-sting' }),
+          bridge: expect.objectContaining({ asset_id: 'quick-spark-bridge' }),
+          outro: expect.objectContaining({ asset_id: 'quick-spark-outro' }),
         }),
       }),
       audio_outputs: {},

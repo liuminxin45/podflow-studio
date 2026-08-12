@@ -1,0 +1,38 @@
+{
+  "title": "Quick Spark",
+  "artist": "Ondrosik",
+  "license": "CC0 1.0 Universal",
+  "sourceUrl": "https://ondrosik.sk/music/",
+  "trackUrl": "https://freemusicarchive.org/music/Ondrosik/no-words/quick-spark/",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "downloadedAt": "2026-08-12",
+  "originalFilename": "Quick Spark.mp3",
+  "originalSha256": "b83c636ee9365d83a57253c39a0a9e9ba5ec0c3ecf5b37878313bfebab727f52",
+  "edits": "Cropped, faded and loudness-adjusted during final mixing.",
+  "cues": [
+    {
+      "filename": "podflow-intro.wav",
+      "startMs": 0,
+      "durationMs": 8000,
+      "sha256": "5e7fdd9dcf14b187fe2e3513b7750be05625e359971767275a1952ff32d35557"
+    },
+    {
+      "filename": "podflow-transition.wav",
+      "startMs": 11500,
+      "durationMs": 1350,
+      "sha256": "ab55cd12f3903a02b87dfb2980cb84eeea8dbd89ddc7de468ca67c64d14e1531"
+    },
+    {
+      "filename": "podflow-bridge.wav",
+      "startMs": 20000,
+      "durationMs": 2400,
+      "sha256": "6bfe3c0ba3cb041ef09220b71f85e1da94011e614186edaeb6c4eb949751a5ab"
+    },
+    {
+      "filename": "podflow-outro.wav",
+      "startMs": 34500,
+      "durationMs": 7000,
+      "sha256": "65cbad4db47c7a6ef56c92c0b59d53a540edd1f4b379229507928a282313d778"
+    }
+  ]
+}

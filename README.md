@@ -29,8 +29,8 @@ PodFlow Studio 面向独立创作者和小型编辑团队，把每天重复的�
 - **整理与研究**：围绕候选选题补充背景、管理参考来源，把网络证据与 AI 知识分开处理。
 - **事实驱动写作**：先生成结构化 `FactCard`，再写出口播稿，减少原始素材直接进入生成提示带来的失真。
 - **可编辑成稿**：保留生成稿和人工编辑稿；后续 TTS 始终优先使用已编辑版本。
-- **灵活配音**：支持 mock TTS、Edge TTS、OpenAI-compatible TTS，以及分段真人录音替换。
-- **自动成片**：合并语音片段、插入段间停顿，并在工具可用时完成响度处理和 MP3 导出。
+- **可导演配音**：正式节目固定豆包“爽快思思多情感”，按 80 至 140 字、最多 2 句切分，并把情感、强度和分段语速真正传入 Provider；真人录音可替换任意片段。
+- **自动成片**：片头与开场重叠、5 个快讯 sting、1 个深度 bridge、片尾与收束重叠；正文不持续铺底乐。成片固定 48 kHz、160 kbps、-16 LUFS ±1、真峰值不高于 -1 dBTP。
 - **发布交付**：生成节目音频、`feed.xml`、节目元数据和运行报告，组装为可检查的发布包。
 - **本地优先**：工作流和中间产物保存在本机；没有外部 API Key 也能运行完整离线 demo。
 - **Agent 可验收**：内置会话隔离的 CLI、机器可读状态、CDP 端点、日志、截图与离线端到端验收。
@@ -110,6 +110,20 @@ npm run cli -- stop --session agent-demo --json
 npm run acceptance:cdp
 ```
 
+正式制作统一使用 v3 三阶段命令，`--workflow` 必须明确指定一期工作流，不会自动选择“最新一期”：
+
+```powershell
+npm run cli -- produce --workflow <id或绝对路径> --stage render --allow-paid-tts --json
+npm run cli -- produce --workflow <id或绝对路径> --stage approve --audio-sha256 <sha256> --reviewer <name> --json
+npm run cli -- produce --workflow <id或绝对路径> --stage package --output <showcase目录> --json
+```
+
+`render` 会先报告总字符、未缓存字符和调用片段数；存在未缓存的豆包片段时，缺少 `--allow-paid-tts` 会在首次外部调用前失败。`approve` 与 `package` 均绑定最终 MP3 SHA256，重新渲染会自动使旧审批失效。
+
+### 音乐与授权
+
+正式品牌 cue 派生自 Ondrosik 的 [Quick Spark](https://freemusicarchive.org/music/Ondrosik/no-words/quick-spark/)。[作者曲库](https://ondrosik.sk/music/)将曲目声明为 CC0；项目保存原始 SHA256、取得日期、裁剪区间与派生文件指纹。素材经裁剪、淡入淡出和响度处理，第三方音乐仍为 CC0，不改写为 LGPL。完整记录见 [音频权利文件](assets/audio/RIGHTS.md)。
+
 命令、退出码、会话目录和 Agent 安全调用模式见 [CLI 文档](docs/cli.md)。
 
 ## 关键设计
@@ -132,13 +146,17 @@ npm run acceptance:cdp
 
 ### 导出公开节目包
 
-发布节点会在本地包中生成 `show-notes.md`、`transcript.vtt`、`chapters.json` 和 `sources.json`。一期节目完成事实、成稿、发音与听感终审后，可以显式导出站点清单：
+正式节目统一通过 `produce` 三阶段命令渲染、指纹审批并导出站点包：
 
 ```bash
-npm run showcase:export -- --episode-dir <publish-package> --output-dir <site-content> --audio-url <public-mp3-url> --site-base-url <site-episode-base-url> --approved
+npm run cli -- produce --workflow <workflow> --stage render --allow-paid-tts --json
+npm run cli -- produce --workflow <workflow> --stage approve --audio-sha256 <sha256> --reviewer <name> --json
+npm run cli -- produce --workflow <workflow> --stage package --output <showcase-directory> --json
 ```
 
-`audio-url` 可以指向与节目页面同域的静态音频，也可以指向独立音频托管地址。官方样片目前把已终审 MP3、章节、文字稿和 RSS 一起部署到 `www.liuminxin.cn`，页面内直接使用浏览器原生播放器播放，不需要跳转到 GitHub 或第三方播客网站。
+`package` 会生成 `episode.json`、`show-notes.md`、`transcript.vtt`、`chapters.json`、封面和质量报告。它只接受 `production_plan v3`、自动终审通过、最终 MP3 指纹一致的人工审批、非 mock 豆包音频、12 至 15 分钟黄金时长及完整来源。
+
+官方样片只接受 `www.liuminxin.cn` 同域的静态音频。页面内使用浏览器原生播放器，不跳转 GitHub 或第三方播放器。
 
 如果选择 GitHub Releases 托管音频，仓库仍提供显式发布脚本。脚本默认只打印计划；必须同时提供原始 `episode.json` 作为非 mock 音频证明，并添加 `--publish` 才会写入远端：
 

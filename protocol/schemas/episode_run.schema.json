@@ -85,6 +85,17 @@
     "cover_path": { "type": "string" },
     "intro_outro_paths": { "type": "object", "additionalProperties": { "type": "string" } },
     "review_summary": { "type": "object" },
+    "audio_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": { "enum": ["approved", "rejected"] },
+        "audio_sha256": { "type": "string", "pattern": "^(?:|[a-f0-9]{64})$" },
+        "reviewed_at": { "type": "string" },
+        "reviewer": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
     "publish_outputs": {
       "type": "object",
       "additionalProperties": false,
@@ -369,14 +380,17 @@
     "productionMusicSlot": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "path", "volume", "duration_ms", "fade_in_ms", "fade_out_ms"],
+      "required": ["asset_id", "path", "gain_db", "duration_ms", "fade_in_ms", "fade_out_ms", "voice_overlap_ms", "duck_db", "rights_ref"],
       "properties": {
-        "enabled": { "type": "boolean" },
+        "asset_id": { "type": "string", "minLength": 1 },
         "path": { "type": "string" },
-        "volume": { "type": "number", "minimum": 0, "maximum": 1 },
+        "gain_db": { "type": "number", "minimum": -60, "maximum": 12 },
         "duration_ms": { "type": "integer", "minimum": 0, "maximum": 120000 },
         "fade_in_ms": { "type": "integer", "minimum": 0, "maximum": 15000 },
-        "fade_out_ms": { "type": "integer", "minimum": 0, "maximum": 15000 }
+        "fade_out_ms": { "type": "integer", "minimum": 0, "maximum": 15000 },
+        "voice_overlap_ms": { "type": "integer", "minimum": 0, "maximum": 15000 },
+        "duck_db": { "type": "number", "minimum": 0, "maximum": 30 },
+        "rights_ref": { "type": "string", "minLength": 1 }
       }
     },
     "productionPlan": {
@@ -386,12 +400,13 @@
         { "maxProperties": 0 },
         {
           "required": [
-            "version", "script_hash", "clips", "joins", "music", "render", "updated_at"
+            "version", "quality_profile", "script_hash", "clips", "joins", "music", "render", "updated_at"
           ]
         }
       ],
       "properties": {
-        "version": { "const": 2 },
+        "version": { "const": 3 },
+        "quality_profile": { "const": "podflow_morning_v3" },
         "script_hash": { "type": "string" },
         "clips": {
           "type": "array",
@@ -416,15 +431,15 @@
                 "type": "object",
                 "additionalProperties": false,
                 "required": [
-                  "intent", "emotion", "energy", "pace", "pitch",
+                  "intent", "provider_emotion", "emotion_scale", "energy", "pace",
                   "pause_before_ms", "pause_after_ms", "emphasis"
                 ],
                 "properties": {
                   "intent": { "type": "string", "minLength": 1 },
-                  "emotion": { "type": "string", "minLength": 1 },
+                  "provider_emotion": { "enum": ["happy", "neutral", "surprised", "excited", "coldness"] },
+                  "emotion_scale": { "type": "integer", "minimum": 1, "maximum": 5 },
                   "energy": { "type": "number", "minimum": 0, "maximum": 1 },
                   "pace": { "type": "number", "minimum": 0.5, "maximum": 1.5 },
-                  "pitch": { "type": "number", "minimum": -0.5, "maximum": 0.5 },
                   "pause_before_ms": { "type": "integer", "minimum": 0, "maximum": 5000 },
                   "pause_after_ms": { "type": "integer", "minimum": 0, "maximum": 5000 },
                   "emphasis": {
@@ -453,7 +468,7 @@
             "required": ["after_clip_id", "type", "duration_ms"],
             "properties": {
               "after_clip_id": { "type": "string" },
-              "type": { "enum": ["pause", "transition"] },
+              "type": { "enum": ["pause", "sting", "bridge"] },
               "duration_ms": { "type": "integer", "minimum": 0, "maximum": 15000 }
             }
           }
@@ -461,20 +476,22 @@
         "music": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["intro", "transition", "bed", "outro"],
+          "required": ["intro", "sting", "bridge", "outro"],
           "properties": {
             "intro": { "$ref": "#/$defs/productionMusicSlot" },
-            "transition": { "$ref": "#/$defs/productionMusicSlot" },
-            "bed": { "$ref": "#/$defs/productionMusicSlot" },
+            "sting": { "$ref": "#/$defs/productionMusicSlot" },
+            "bridge": { "$ref": "#/$defs/productionMusicSlot" },
             "outro": { "$ref": "#/$defs/productionMusicSlot" }
           }
         },
         "render": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["output_format", "normalize_loudness", "target_lufs", "true_peak_db"],
+          "required": ["output_format", "sample_rate_hz", "mp3_bitrate", "normalize_loudness", "target_lufs", "true_peak_db"],
           "properties": {
             "output_format": { "enum": ["mp3", "wav", "opus"] },
+            "sample_rate_hz": { "const": 48000 },
+            "mp3_bitrate": { "const": "160k" },
             "normalize_loudness": { "type": "boolean" },
             "target_lufs": { "type": "number" },
             "true_peak_db": { "type": "number" }

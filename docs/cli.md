@@ -29,6 +29,7 @@ After `npm install`, npm also exposes the package bin locally as `podflow`. `npm
 | `stop` | Requests graceful Electron shutdown with the session nonce, then waits for cleanup. |
 | `logs` | Prints the session log; `--follow` waits until the session ends. |
 | `accept` | Runs a layered CDP acceptance suite and writes evidence into the session artifact directory. |
+| `produce` | Runs one explicit workflow through v3 render, SHA256 approval, or immutable packaging. |
 | `version` | Prints the PodFlow Studio package version. |
 
 Common options:
@@ -91,6 +92,25 @@ The state machine is `starting -> ready -> stopping -> exited`, or `starting -> 
 | 7 | Acceptance failed or timed out |
 | 8 | Graceful stop failed |
 | 9 | Internal CLI error |
+| 10 | Production preflight, render, approval, or package failure |
+
+## Production v3
+
+```powershell
+npm run cli -- produce --workflow <id-or-absolute-path> --stage render --allow-paid-tts --json
+npm run cli -- produce --workflow <id-or-absolute-path> --stage approve --audio-sha256 <sha256> --reviewer <name> --json
+npm run cli -- produce --workflow <id-or-absolute-path> --stage package --output <directory> --json
+```
+
+The CLI and desktop app consume the same `production_plan v3` defaults. There is no implicit latest-workflow selection and no v2 fallback.
+
+- `render` runs TTS, v3 cue assembly, cover generation and automatic review. It prints total characters, uncached characters and uncached clip count before calling a paid provider.
+- `--allow-paid-tts` is required whenever uncached Doubao clips exist. Missing credentials, unresolved pronunciation items, missing cue files, missing CC0 provenance or a legacy plan fail before the first external call.
+- TTS cache keys include the v3 direction, multi-emotion voice, emotion strength, pace, adjacent context and performance prompt. Re-rendering clears `audio_approval`.
+- `approve` requires a passing automatic review and the exact SHA256 of the current final MP3. The reviewer identity and UTC review time are persisted; secrets are removed before the workflow is written.
+- `package` requires a passing `audio-quality-report.json`, matching human approval, non-mock audio and an immutable output directory. It never overwrites a prior revision.
+
+If a stage fails, correct the reported preflight or quality issue and rerun the same stage. Do not hand-edit the fingerprint or quality report. A new render intentionally invalidates the earlier approval.
 
 ## Agent-safe pattern
 

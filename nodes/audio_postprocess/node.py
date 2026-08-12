@@ -25,7 +25,7 @@ def run(state: dict[str, Any], config: AudioPostprocessConfig = None) -> dict[st
 
     ctx.log_start(
         f"AudioAssembly starting | segments={len(segments)}, output={requested_format}, "
-        f"plan={'v2' if has_production_plan else 'legacy'}"
+        f"plan={'v3' if has_production_plan else 'legacy'}"
     )
 
     state["audio_outputs"] = {}
@@ -64,7 +64,9 @@ def run(state: dict[str, Any], config: AudioPostprocessConfig = None) -> dict[st
         degraded = False
         operations = ["merge_voice_segments"]
         if has_production_plan:
-            operations.append("production_plan_v2")
+            if production_plan.get("version") != 3 or production_plan.get("quality_profile") != "podflow_morning_v3":
+                raise RuntimeError("Audio rendering requires production_plan v3 / podflow_morning_v3. Regenerate the plan.")
+            operations.append("production_plan_v3")
         else:
             operations.append(f"segment_pause_{config.segment_pause_ms}ms")
 
@@ -115,8 +117,8 @@ def run(state: dict[str, Any], config: AudioPostprocessConfig = None) -> dict[st
             "operations": operations,
             "file_size": final_path.stat().st_size if final_path.exists() else 0,
             "audio_artifact": file_fingerprint(final_path),
-            "sample_rate_hz": config.sample_rate_hz if not degraded else _wav_sample_rate(final_path),
-            "bitrate_kbps": int(config.mp3_bitrate.removesuffix("k")) if final_path.suffix.lower() == ".mp3" and not degraded else 0,
+            "sample_rate_hz": int(plan_render.get("sample_rate_hz") or config.sample_rate_hz) if not degraded else _wav_sample_rate(final_path),
+            "bitrate_kbps": int(str(plan_render.get("mp3_bitrate") or config.mp3_bitrate).removesuffix("k")) if final_path.suffix.lower() == ".mp3" and not degraded else 0,
             "target_lufs": config.target_lufs if config.normalize_loudness and not degraded else None,
             "true_peak_db": config.true_peak_db if config.normalize_loudness and not degraded else None,
         }
@@ -219,10 +221,11 @@ def _assemble_with_pydub(
         combined += chunk
         if idx < len(segments) - 1:
             join = joins.get(str(segment.get("segment_id"))) if has_plan else None
-            if join and join.get("type") == "transition":
-                transition = _music_clip(AudioSegment, music.get("transition"), join.get("duration_ms"))
-                combined += transition
-                operations.append(f"transition_after_{segment.get('segment_id')}")
+            if join and join.get("type") in {"sting", "bridge"}:
+                join_type = str(join["type"])
+                cue = _music_clip(AudioSegment, music.get(join_type), join.get("duration_ms"))
+                combined += cue
+                operations.append(f"{join_type}_after_{segment.get('segment_id')}")
             else:
                 pause_ms = int(join.get("duration_ms", 600)) if join else config.segment_pause_ms
                 if pause_ms:
@@ -238,25 +241,21 @@ def _assemble_with_pydub(
         operations.append(f"true_peak_limit_{true_peak_db:g}db")
 
     if has_plan:
-        bed_slot = music.get("bed") if isinstance(music.get("bed"), dict) else {}
-        if bed_slot.get("enabled"):
-            background = _looping_music(AudioSegment, bed_slot, len(combined))
-            combined = combined.overlay(background)
-            operations.extend(["mix_bgm", "mix_bed_music"])
-
         intro_slot = music.get("intro") if isinstance(music.get("intro"), dict) else {}
-        if intro_slot.get("enabled"):
-            intro = _music_clip(AudioSegment, intro_slot)
-            crossfade = min(int(intro_slot.get("fade_out_ms") or 0), len(intro), len(combined))
-            combined = intro.append(combined, crossfade=crossfade)
-            operations.append("mix_intro_music")
+        intro = _music_clip(AudioSegment, intro_slot)
+        intro_overlap = min(int(intro_slot.get("voice_overlap_ms") or 0), len(intro), len(combined))
+        intro_solo = intro[: len(intro) - intro_overlap]
+        intro_ducked = intro[len(intro) - intro_overlap :].apply_gain(-float(intro_slot.get("duck_db") or 0))
+        combined = intro_solo + intro_ducked.overlay(combined[:intro_overlap]) + combined[intro_overlap:]
+        operations.append("mix_intro_music_5500ms_solo_2500ms_voice_overlap")
 
         outro_slot = music.get("outro") if isinstance(music.get("outro"), dict) else {}
-        if outro_slot.get("enabled"):
-            outro = _music_clip(AudioSegment, outro_slot)
-            crossfade = min(int(outro_slot.get("fade_in_ms") or 0), len(outro), len(combined))
-            combined = combined.append(outro, crossfade=crossfade)
-            operations.append("mix_outro_music")
+        outro = _music_clip(AudioSegment, outro_slot)
+        outro_overlap = min(int(outro_slot.get("voice_overlap_ms") or 0), len(outro), len(combined))
+        overlap_at = len(combined) - outro_overlap
+        outro_ducked = outro[:outro_overlap].apply_gain(-float(outro_slot.get("duck_db") or 0))
+        combined = combined[:overlap_at] + combined[overlap_at:].overlay(outro_ducked) + outro[outro_overlap:]
+        operations.append("mix_outro_music_2500ms_voice_overlap_4500ms_tail")
     elif config.add_bgm:
         if bgm_path is None:
             raise RuntimeError("Configured BGM path was not resolved.")
@@ -276,12 +275,14 @@ def _assemble_with_pydub(
             ]
         )
 
-    combined = combined.set_frame_rate(config.sample_rate_hz)
-    operations.append(f"resample_{config.sample_rate_hz}hz")
+    sample_rate_hz = int(production_plan.get("render", {}).get("sample_rate_hz") or config.sample_rate_hz)
+    combined = combined.set_frame_rate(sample_rate_hz)
+    operations.append(f"resample_{sample_rate_hz}hz")
     export_kwargs: dict[str, Any] = {"format": output_format}
     if output_format == "mp3":
-        export_kwargs["bitrate"] = config.mp3_bitrate
-        operations.append(f"export_{config.mp3_bitrate}bps")
+        bitrate = str(production_plan.get("render", {}).get("mp3_bitrate") or config.mp3_bitrate)
+        export_kwargs["bitrate"] = bitrate
+        operations.append(f"export_{bitrate}bps")
     if normalize_loudness:
         _export_two_pass_loudnorm(
             combined,
@@ -429,8 +430,10 @@ def _music_clip(AudioSegment, slot: Any, requested_duration_ms: Any = None):
     duration_ms = max(1, int(requested_duration_ms or slot.get("duration_ms") or len(audio)))
     repeats = max(1, math.ceil(duration_ms / len(audio)))
     audio = (audio * repeats)[:duration_ms]
-    volume = max(0.0001, min(1.0, float(slot.get("volume", 0.15))))
-    audio = audio.apply_gain(20 * math.log10(volume))
+    target_dbfs = -20.0 if str(slot.get("asset_id") or "").endswith(("intro", "outro")) else -22.0
+    if audio.dBFS != float("-inf"):
+        audio = audio.apply_gain(target_dbfs - audio.dBFS)
+    audio = audio.apply_gain(float(slot.get("gain_db") or 0.0))
     fade_in_ms = min(len(audio), max(0, int(slot.get("fade_in_ms") or 0)))
     fade_out_ms = min(len(audio), max(0, int(slot.get("fade_out_ms") or 0)))
     if fade_in_ms:

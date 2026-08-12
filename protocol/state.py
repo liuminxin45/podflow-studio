@@ -49,6 +49,7 @@ class PodcastState:
     intro_outro_paths: dict[str, str] = field(default_factory=dict)
 
     review_summary: dict[str, Any] = field(default_factory=dict)
+    audio_approval: dict[str, Any] = field(default_factory=dict)
 
     publish_outputs: dict[str, Any] = field(default_factory=dict)
     subtitle_path: str = ""

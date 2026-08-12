@@ -50,6 +50,7 @@ const EMPTY_VALUES = {
   cover_path: '',
   intro_outro_paths: {},
   review_summary: {},
+  audio_approval: {},
   run_report: {},
   publish_outputs: {},
 }

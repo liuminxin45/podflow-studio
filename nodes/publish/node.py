@@ -225,8 +225,8 @@ def _validate_public_readiness(state: dict[str, Any], audio_outputs: dict[str, A
         raise RuntimeError("Public publishing requires 48 kHz final audio.")
     if str(audio_outputs.get("format") or "").lower() != "mp3":
         raise RuntimeError("Public publishing requires a final MP3 artifact.")
-    if int(audio_outputs.get("bitrate_kbps") or 0) < 128:
-        raise RuntimeError("Public publishing requires MP3 bitrate of at least 128 kbps.")
+    if int(audio_outputs.get("bitrate_kbps") or 0) != 160:
+        raise RuntimeError("Public publishing requires a 160 kbps MP3.")
     target_lufs = audio_outputs.get("target_lufs")
     if target_lufs is None or not -17.0 <= float(target_lufs) <= -15.0:
         raise RuntimeError("Public publishing requires integrated loudness of -16 LUFS ±1.")
@@ -239,6 +239,15 @@ def _validate_public_readiness(state: dict[str, Any], audio_outputs: dict[str, A
     audio_artifact = audio_outputs.get("audio_artifact") or {}
     if int(audio_artifact.get("size_bytes") or 0) < duration_seconds * 16_000:
         raise RuntimeError("Public publishing requires at least a 128 kbps MP3 payload size.")
+    plan = state.get("production_plan") if isinstance(state.get("production_plan"), dict) else {}
+    if plan.get("version") != 3 or plan.get("quality_profile") != "podflow_morning_v3":
+        raise RuntimeError("Public publishing requires production_plan v3 / podflow_morning_v3.")
+    review = state.get("review_summary") if isinstance(state.get("review_summary"), dict) else {}
+    if review.get("status") != "passed" or review.get("audio_artifact") != audio_artifact:
+        raise RuntimeError("Public publishing requires a passing review bound to the final audio fingerprint.")
+    approval = state.get("audio_approval") if isinstance(state.get("audio_approval"), dict) else {}
+    if approval.get("status") != "approved" or approval.get("audio_sha256") != audio_artifact.get("sha256"):
+        raise RuntimeError("Public publishing requires human approval bound to the final MP3 SHA256.")
     script = state.get("edited_script") if isinstance(state.get("edited_script"), dict) else {}
     segments = [segment for segment in script.get("segments", []) if isinstance(segment, dict)]
     quick_count = sum(segment.get("type") == "quick_news" for segment in segments)

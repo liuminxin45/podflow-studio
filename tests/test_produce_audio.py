@@ -90,11 +90,15 @@ def _public_publish_state(tmp_path: Path, *, engine: str = "doubao_tts") -> tupl
         "source_engines": [engine],
         "audio_artifact": file_fingerprint(final_audio),
         "sample_rate_hz": 48_000,
-        "bitrate_kbps": 128,
+        "bitrate_kbps": 160,
         "target_lufs": -16.0,
         "true_peak_db": -1.0,
         "duration_seconds": 840,
     }
+    state["production_plan"] = {"version": 3, "quality_profile": "podflow_morning_v3"}
+    artifact = state["audio_outputs"]["audio_artifact"]
+    state["review_summary"] = {"status": "passed", "audio_artifact": artifact}
+    state["audio_approval"] = {"status": "approved", "audio_sha256": artifact["sha256"], "reviewer": "tester"}
     return state, final_audio
 
 
@@ -215,7 +219,8 @@ def test_audio_postprocess_renders_clip_trims_and_individual_joins(tmp_path: Pat
         {"segment_id": "clip_2", "path": str(second), "engine": "mock"},
     ]
     state["production_plan"] = {
-        "version": 2,
+        "version": 3,
+        "quality_profile": "podflow_morning_v3",
         "clips": [
             {
                 "id": "clip_1",
@@ -226,8 +231,13 @@ def test_audio_postprocess_renders_clip_trims_and_individual_joins(tmp_path: Pat
             {"id": "clip_2", "path": str(second), "trim_start_ms": 0, "trim_end_ms": 0},
         ],
         "joins": [{"after_clip_id": "clip_1", "type": "pause", "duration_ms": 100}],
-        "music": {},
-        "render": {"output_format": "wav", "normalize_loudness": False},
+        "music": {
+            name: {"asset_id": f"quick-spark-{name}", "path": str(first), "gain_db": -4,
+                   "duration_ms": 100, "fade_in_ms": 10, "fade_out_ms": 10,
+                   "voice_overlap_ms": 0, "duck_db": 0, "rights_ref": "RIGHTS.md"}
+            for name in ("intro", "sting", "bridge", "outro")
+        },
+        "render": {"output_format": "wav", "sample_rate_hz": 48000, "mp3_bitrate": "160k", "normalize_loudness": False},
     }
 
     result = audio_postprocess_run(
@@ -237,13 +247,13 @@ def test_audio_postprocess_renders_clip_trims_and_individual_joins(tmp_path: Pat
 
     assert result["audio_outputs"]["status"] == "ok"
     assert result["audio_outputs"]["source_engines"] == ["mock", "recording"]
-    assert "production_plan_v2" in result["audio_outputs"]["operations"]
+    assert "production_plan_v3" in result["audio_outputs"]["operations"]
     assert "trim_clip_clip_1" in result["audio_outputs"]["operations"]
     assert "pause_clip_1_100ms" in result["audio_outputs"]["operations"]
-    assert result["audio_outputs"]["duration_seconds"] == 0.5
+    assert result["audio_outputs"]["duration_seconds"] == 0.7
 
 
-def test_audio_postprocess_renders_intro_transition_bed_and_outro(tmp_path: Path):
+def test_audio_postprocess_renders_intro_sting_bridge_and_outro(tmp_path: Path):
     voice = tmp_path / "voice.wav"
     music = tmp_path / "music.wav"
     _write_wav(voice, frequency=440, seconds=0.25)
@@ -251,19 +261,23 @@ def test_audio_postprocess_renders_intro_transition_bed_and_outro(tmp_path: Path
     state = create_base_state()
     state["voice_segments"] = [{"segment_id": "clip_1", "path": str(voice), "engine": "recording"}]
     slot = {
-        "enabled": True,
+        "asset_id": "quick-spark-sting",
         "path": str(music),
-        "volume": 0.15,
+        "gain_db": -4,
         "duration_ms": 100,
         "fade_in_ms": 10,
         "fade_out_ms": 10,
+        "voice_overlap_ms": 0,
+        "duck_db": 0,
+        "rights_ref": "RIGHTS.md",
     }
     state["production_plan"] = {
-        "version": 2,
+        "version": 3,
+        "quality_profile": "podflow_morning_v3",
         "clips": [{"id": "clip_1", "path": str(voice), "trim_start_ms": 0, "trim_end_ms": 0}],
         "joins": [],
-        "music": {"intro": slot, "transition": slot, "bed": slot, "outro": slot},
-        "render": {"output_format": "wav", "normalize_loudness": False},
+        "music": {"intro": {**slot, "asset_id": "quick-spark-intro"}, "sting": slot, "bridge": {**slot, "asset_id": "quick-spark-bridge"}, "outro": {**slot, "asset_id": "quick-spark-outro"}},
+        "render": {"output_format": "wav", "sample_rate_hz": 48000, "mp3_bitrate": "160k", "normalize_loudness": False},
     }
 
     result = audio_postprocess_run(
@@ -273,9 +287,8 @@ def test_audio_postprocess_renders_intro_transition_bed_and_outro(tmp_path: Path
 
     operations = result["audio_outputs"]["operations"]
     assert result["audio_outputs"]["status"] == "ok"
-    assert "mix_bed_music" in operations
-    assert "mix_intro_music" in operations
-    assert "mix_outro_music" in operations
+    assert "mix_intro_music_5500ms_solo_2500ms_voice_overlap" in operations
+    assert "mix_outro_music_2500ms_voice_overlap_4500ms_tail" in operations
 
 
 def test_tts_splits_long_script_and_reuses_unchanged_clips(tmp_path: Path, monkeypatch):
@@ -416,10 +429,10 @@ def test_openai_expressive_tts_compiles_direction_and_context(tmp_path: Path, mo
         "context_after": "下一句。",
         "direction": {
             "intent": "deep_dive",
-            "emotion": "thoughtful",
+            "provider_emotion": "neutral",
+            "emotion_scale": 1,
             "energy": 0.55,
             "pace": 0.9,
-            "pitch": -0.02,
             "pause_before_ms": 0,
             "pause_after_ms": 650,
             "emphasis": ["关键结论"],
@@ -484,7 +497,7 @@ def test_cosyvoice_tts_sends_instruct_payload(tmp_path: Path, monkeypatch):
 
     monkeypatch.setattr("nodes.tts.node.urllib.request.urlopen", fake_urlopen)
     config = TTSConfig(cosyvoice_endpoint="http://127.0.0.1:50000/")
-    clip = {"direction": {"intent": "opening_warm", "emotion": "warm", "pace": 0.96, "emphasis": []}}
+    clip = {"direction": {"intent": "opening_warm", "provider_emotion": "happy", "emotion_scale": 2, "pace": 0.96, "emphasis": []}}
 
     _synthesize_cosyvoice("欢迎收听。", "中文女", str(tmp_path / "speech.mp3"), config, clip)
 
@@ -664,9 +677,10 @@ def test_local_publish_fails_when_final_audio_is_missing(tmp_path: Path):
     )
 
 
-def test_public_publish_does_not_depend_on_review_results(tmp_path: Path):
+def test_public_publish_requires_passing_review_results(tmp_path: Path):
     state, final_audio = _public_publish_state(tmp_path)
     state["review_summary"] = {
+        "status": "failed",
         "checks": [{"level": "error", "message": "Audio too short"}],
         "audio_artifact": file_fingerprint(final_audio),
     }
@@ -680,9 +694,8 @@ def test_public_publish_does_not_depend_on_review_results(tmp_path: Path):
         ),
     )
 
-    assert result["publish_outputs"]["status"] == "success"
-    assert result["publish_outputs"]["platforms"] == {"local": "success", "rss": "success"}
-    assert not any(error["node"] == "publish" for error in result["errors"])
+    assert result["publish_outputs"] == {}
+    assert any(error["node"] == "publish" and "passing review" in error["message"] for error in result["errors"])
 
 
 def test_public_publish_fails_closed_without_audio_provenance_or_review(tmp_path: Path):
@@ -711,11 +724,12 @@ def test_public_publish_fails_closed_without_audio_provenance_or_review(tmp_path
     )
 
 
-def test_public_publish_ignores_stale_review_artifacts(tmp_path: Path):
+def test_public_publish_rejects_stale_review_artifacts(tmp_path: Path):
     reviewed_audio = tmp_path / "reviewed.wav"
     _write_wav(reviewed_audio, frequency=220)
     state, _final_audio = _public_publish_state(tmp_path)
     state["review_summary"] = {
+        "status": "passed",
         "checks": [{"level": "pass", "message": "Audio file ready"}],
         "audio_artifact": file_fingerprint(reviewed_audio),
     }
@@ -729,8 +743,8 @@ def test_public_publish_ignores_stale_review_artifacts(tmp_path: Path):
         ),
     )
 
-    assert result["publish_outputs"]["status"] == "success"
-    assert not any(error["node"] == "publish" for error in result["errors"])
+    assert result["publish_outputs"] == {}
+    assert any(error["node"] == "publish" and "passing review" in error["message"] for error in result["errors"])
 
 
 def test_publish_reports_only_local_archive_and_rss(tmp_path: Path):

@@ -16,7 +16,6 @@ import {
 } from '../../icons/antdCompat'
 import type {
   ProductionClip,
-  ProductionMusicSlot,
   ProductionPlan,
   VoiceSegment,
   Workflow,
@@ -278,8 +277,6 @@ export default function ProductionStudio({
     [workflow?.state?.voice_segments],
   )
   const savedProductionPlan = workflow?.state?.production_plan
-  const legacyIntroPath = workflow?.state?.intro_outro_paths?.intro
-  const legacyOutroPath = workflow?.state?.intro_outro_paths?.outro
   const recordingSignature = JSON.stringify(voiceSegments)
   const restoredRecordings = useMemo(
     () => savedRecordings(JSON.parse(recordingSignature) as VoiceSegment[]),
@@ -454,43 +451,6 @@ export default function ProductionStudio({
           bgmPath: text(nextPostprocess.bgm_path),
           bgmVolume: clamp(finiteNumber(nextPostprocess.bgm_volume, DEFAULT_POSTPROCESS.bgmVolume), 0.01, 1),
         })
-        if (!savedProductionPlan?.version) {
-          const legacyIntro = text(legacyIntroPath)
-          const legacyOutro = text(legacyOutroPath)
-          setProductionPlan(current => {
-            const migrated: ProductionPlan = {
-              ...current,
-              joins: current.joins.map(join => ({
-                ...join,
-                duration_ms: clamp(
-                  finiteNumber(nextPostprocess.segment_pause_ms, join.duration_ms),
-                  0,
-                  5000,
-                ),
-              })),
-              render: {
-                ...current.render,
-                output_format: OUTPUT_FORMATS.some(item => item.value === nextPostprocess.output_format)
-                  ? nextPostprocess.output_format as OutputFormat
-                  : current.render.output_format,
-                normalize_loudness: nextPostprocess.normalize_loudness !== false,
-              },
-              music: {
-                ...current.music,
-                intro: legacyIntro ? { ...current.music.intro, enabled: true, path: legacyIntro } : current.music.intro,
-                outro: legacyOutro ? { ...current.music.outro, enabled: true, path: legacyOutro } : current.music.outro,
-                bed: {
-                  ...current.music.bed,
-                  enabled: Boolean(nextPostprocess.add_bgm),
-                  path: text(nextPostprocess.bgm_path),
-                  volume: clamp(finiteNumber(nextPostprocess.bgm_volume, DEFAULT_POSTPROCESS.bgmVolume), 0.01, 1),
-                },
-              },
-            }
-            productionPlanRef.current = migrated
-            return migrated
-          })
-        }
         setGenerateCover(nextAssets.generate_cover !== false)
         setConfigReady(true)
       })
@@ -509,8 +469,6 @@ export default function ProductionStudio({
     }
   }, [
     configLoadAttempt,
-    legacyIntroPath,
-    legacyOutroPath,
     savedProductionPlan?.version,
     visible,
     workflow?.state?.episode_id,
@@ -924,39 +882,10 @@ export default function ProductionStudio({
       joins: productionPlanRef.current.joins.map(join => (
         join.after_clip_id === clipId ? { ...join, ...patch } : join
       )),
-      music: patch.type === 'transition'
-        ? {
-            ...productionPlanRef.current.music,
-            transition: { ...productionPlanRef.current.music.transition, enabled: true },
-          }
-        : productionPlanRef.current.music,
+      music: productionPlanRef.current.music,
     }
     await persistProductionPlan(next)
   }, [persistProductionPlan])
-
-  const updateMusic = useCallback(async (
-    name: keyof ProductionPlan['music'],
-    patch: Partial<ProductionMusicSlot>,
-  ) => {
-    const next: ProductionPlan = {
-      ...productionPlanRef.current,
-      music: {
-        ...productionPlanRef.current.music,
-        [name]: { ...productionPlanRef.current.music[name], ...patch },
-      },
-    }
-    await persistProductionPlan(next)
-  }, [persistProductionPlan])
-
-  const chooseMusicFile = useCallback(async (name: keyof ProductionPlan['music']) => {
-    if (!window.electronAPI?.selectAudioFile) {
-      message.warning({ content: '当前环境没有音频文件选择接口。', duration: 2, style: { marginTop: 60 } })
-      return
-    }
-    const result = await window.electronAPI.selectAudioFile()
-    if (!result.success || !result.path) return
-    await updateMusic(name, { path: result.path, enabled: true })
-  }, [updateMusic])
 
   const regenerateClip = useCallback(async (clip: ProductionClip) => {
     if (!onRunNodes || !onUpdateWorkflow || clipGeneratingId) return
@@ -1011,8 +940,7 @@ export default function ProductionStudio({
       message.warning({ content: detail, duration: 3, style: { marginTop: 60 } })
       return
     }
-    const missingMusic = Object.entries(currentPlan.music)
-      .find(([, slot]) => slot.enabled && !text(slot.path))
+    const missingMusic = Object.entries(currentPlan.music).find(([, slot]) => !text(slot.path))
     if (missingMusic) {
       message.warning({ content: '已启用节目音乐，请先选择可读取的音频文件。', duration: 3, style: { marginTop: 60 } })
       return
@@ -1404,7 +1332,7 @@ export default function ProductionStudio({
                           <p>{clip.text}</p>
                           {isSelected && clip.source === 'tts' && (
                             <div className="produce-trim-row">
-                              <span>表演：{clip.direction.intent} · {clip.direction.emotion}</span>
+                              <span>表演：{clip.direction.intent} · {clip.direction.provider_emotion} × {clip.direction.emotion_scale}</span>
                               <Slider
                                 min={0.5}
                                 max={1.5}
@@ -1520,17 +1448,18 @@ export default function ProductionStudio({
                           <Select
                             aria-label={`语音块 ${clipIndex + 1} 后的衔接`}
                             size="small"
-                            value={join.type === 'transition' ? 'transition' : String(join.duration_ms)}
+                            value={join.type === 'sting' || join.type === 'bridge' ? join.type : String(join.duration_ms)}
                             disabled={isBusy || recordingLocked}
                             options={[
                               { value: '0', label: '无停顿' },
                               { value: '300', label: '短停顿 · 0.3s' },
                               { value: '600', label: '标准停顿 · 0.6s' },
                               { value: '1200', label: '长停顿 · 1.2s' },
-                              { value: 'transition', label: '转场音乐' },
+                              { value: 'sting', label: '快讯转场 · 1.35s' },
+                              { value: 'bridge', label: '深度桥接 · 2.4s' },
                             ]}
-                            onChange={value => void updateJoin(clip.id, value === 'transition'
-                              ? { type: 'transition', duration_ms: productionPlan.music.transition.duration_ms }
+                            onChange={value => void updateJoin(clip.id, value === 'sting' || value === 'bridge'
+                              ? { type: value, duration_ms: productionPlan.music[value].duration_ms }
                               : { type: 'pause', duration_ms: Number(value) })}
                           />
                           <span className="produce-join-line" />
@@ -1741,82 +1670,19 @@ export default function ProductionStudio({
               </section>
 
               <section className="produce-settings-section">
-                <div className="produce-settings-title"><div><span className="produce-eyebrow">节目音乐</span><h3>片头与转场</h3></div></div>
-                {(['intro', 'transition', 'outro'] as const).map(name => {
+                <div className="produce-settings-title"><div><span className="produce-eyebrow">节目音乐</span><h3>固定品牌 Cue</h3></div></div>
+                {(['intro', 'sting', 'bridge', 'outro'] as const).map(name => {
                   const slot = productionPlan.music[name]
-                  const label = name === 'intro' ? '片头音乐' : name === 'transition' ? '转场音乐' : '片尾音乐'
+                  const label = name === 'intro' ? '片头音乐' : name === 'sting' ? '快讯转场' : name === 'bridge' ? '深度桥接' : '片尾音乐'
                   return (
                     <div className="produce-music-slot" key={name}>
                       <div className="produce-switch-row">
-                        <span><strong>{label}</strong><small>{slot.path ? fileName(slot.path) : '尚未选择文件'}</small></span>
-                        <Switch
-                          aria-label={label}
-                          checked={slot.enabled}
-                          disabled={isBusy}
-                          onChange={value => void updateMusic(name, { enabled: value })}
-                        />
+                        <span><strong>{label}</strong><small>{slot.duration_ms / 1000}s · {fileName(slot.path)}</small></span>
                       </div>
-                      {slot.enabled && (
-                        <div className="produce-file-row">
-                          <Input value={slot.path} readOnly placeholder="选择本地音频文件" />
-                          <Button aria-label={`选择${label}`} onClick={() => void chooseMusicFile(name)}>选择</Button>
-                        </div>
-                      )}
                     </div>
                   )
                 })}
-              </section>
-
-              <section className="produce-settings-section">
-                <div className="produce-settings-title"><div><span className="produce-eyebrow">混音</span><h3>背景铺底</h3></div></div>
-                <div className="produce-switch-row">
-                  <span><strong>叠加 BGM</strong><small>循环并铺满成品时长</small></span>
-                  <Switch
-                    aria-label="叠加背景音乐"
-                    checked={productionPlan.music.bed.enabled}
-                    disabled={isBusy}
-                    onChange={value => void updateMusic('bed', { enabled: value })}
-                  />
-                </div>
-                {productionPlan.music.bed.enabled && (
-                  <>
-                    <label>
-                      <span>音频文件路径</span>
-                      <div className="produce-file-row">
-                        <Input
-                          aria-label="背景音乐文件路径"
-                          value={productionPlan.music.bed.path}
-                          readOnly
-                          placeholder="选择本地背景音乐"
-                        />
-                        <Button aria-label="选择背景音乐" disabled={isBusy} onClick={() => void chooseMusicFile('bed')}>选择</Button>
-                      </div>
-                    </label>
-                    <p className="produce-field-help"><WarningOutlined /> 路径必须可被桌面应用读取；不存在时制作会明确失败。</p>
-                    <label>
-                      <span>背景音量 <strong>{Math.round(productionPlan.music.bed.volume * 100)}%</strong></span>
-                      <Slider
-                        min={0.01}
-                        max={0.5}
-                        step={0.01}
-                        value={productionPlan.music.bed.volume}
-                        disabled={isBusy}
-                        onChange={value => {
-                          const next = {
-                            ...productionPlanRef.current,
-                            music: {
-                              ...productionPlanRef.current.music,
-                              bed: { ...productionPlanRef.current.music.bed, volume: value },
-                            },
-                          }
-                          productionPlanRef.current = next
-                          setProductionPlan(next)
-                        }}
-                        onChangeComplete={value => void updateMusic('bed', { volume: value })}
-                      />
-                    </label>
-                  </>
-                )}
+                <p className="produce-field-help">正式节目固定使用 Quick Spark 派生 cue，正文不持续铺底乐。</p>
               </section>
 
               <section className="produce-settings-section">

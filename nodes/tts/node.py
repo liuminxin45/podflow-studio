@@ -228,7 +228,7 @@ def _voice_segment(
     }
 
 
-def _pronunciation_review(text: str, overrides: dict[str, str]) -> dict[str, Any]:
+def pronunciation_review(text: str, overrides: dict[str, str]) -> dict[str, Any]:
     candidates = {
         token
         for token in re.findall(
@@ -247,6 +247,11 @@ def _pronunciation_review(text: str, overrides: dict[str, str]) -> dict[str, Any
     }
 
 
+# Kept private inside this module's implementation; production preflight uses the
+# public helper above so pronunciation failures are found before a paid request.
+_pronunciation_review = pronunciation_review
+
+
 def _analyze_prosody(
     filepath: str,
     text: str,
@@ -259,13 +264,16 @@ def _analyze_prosody(
         from pydub import AudioSegment
 
         audio = AudioSegment.from_file(filepath)
-        samples = [
-            audio[start : start + 200].dBFS
+        samples = sorted(
+            frame.dBFS
             for start in range(0, len(audio), 200)
-            if audio[start : start + 200].dBFS != float("-inf")
-        ]
-        if samples:
-            energy_range_db = round(max(samples) - min(samples), 2)
+            if (frame := audio[start : start + 200]).dBFS != float("-inf")
+            and frame.rms > 100
+        )
+        if len(samples) >= 5:
+            low = samples[max(0, int(len(samples) * 0.1) - 1)]
+            high = samples[min(len(samples) - 1, int(len(samples) * 0.9))]
+            energy_range_db = round(high - low, 2)
     except Exception:
         pass
     target_pace = float(direction.get("pace", 1.0))
@@ -323,7 +331,7 @@ def _performance_instructions(config: TTSConfig, clip: dict[str, Any] | None) ->
     context_after = str(clip.get("context_after") or "")
     parts = [
         config.performance_prompt,
-        f"表达意图：{direction.get('intent', 'natural_narration')}；情绪：{direction.get('emotion', 'neutral')}；"
+        f"表达意图：{direction.get('intent', 'natural_narration')}；情绪：{direction.get('provider_emotion', 'neutral')}；"
         f"能量：{direction.get('energy', 0.58)}；语速：{direction.get('pace', 0.97)}。",
         "保持自然呼吸、信息层级和句间节奏，不要逐字匀速朗读。",
     ]
@@ -415,6 +423,9 @@ def _synthesize_doubao(
             "voice_type": voice_type,
             "encoding": encoding,
             "speed_ratio": _clip_speed(config, clip or {}),
+            "enable_emotion": True,
+            "emotion": str(_direction(clip).get("provider_emotion") or "neutral"),
+            "emotion_scale": int(_direction(clip).get("emotion_scale") or 1),
         },
         "request": {
             "reqid": str(uuid.uuid4()),

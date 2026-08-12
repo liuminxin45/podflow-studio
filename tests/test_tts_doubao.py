@@ -58,7 +58,8 @@ def test_doubao_tts_sends_official_v1_payload_and_writes_audio(tmp_path: Path, m
         doubao_resource_id="volc.service_type.10029",
     )
 
-    _synthesize_doubao("真实口播", config.doubao_voice_type, str(output_path), config)
+    clip = {"direction": {"provider_emotion": "happy", "emotion_scale": 2, "pace": 0.96}}
+    _synthesize_doubao("真实口播", config.doubao_voice_type, str(output_path), config, clip)
 
     request = captured["request"]
     payload = json.loads(request.data.decode("utf-8"))
@@ -74,7 +75,10 @@ def test_doubao_tts_sends_official_v1_payload_and_writes_audio(tmp_path: Path, m
     assert payload["audio"] == {
         "voice_type": "zh_female_test_bigtts",
         "encoding": "mp3",
-        "speed_ratio": 1.1,
+        "speed_ratio": 1.06,
+        "enable_emotion": True,
+        "emotion": "happy",
+        "emotion_scale": 2,
     }
     assert payload["request"]["text"] == "真实口播"
     assert payload["request"]["operation"] == "query"

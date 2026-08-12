@@ -35,6 +35,7 @@ describe('PodFlow CLI contract', () => {
       ACCEPTANCE: 7,
       STOP: 8,
       INTERNAL: 9,
+      PRODUCTION: 10,
     })
   })
 })

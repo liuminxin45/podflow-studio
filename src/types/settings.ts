@@ -388,7 +388,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
       audioDoubaoAppId: '',
       audioDoubaoAccessToken: '',
       audioDoubaoCluster: 'volcano_tts',
-      audioDoubaoVoiceType: 'zh_female_shuangkuaisisi_moon_bigtts',
+      audioDoubaoVoiceType: 'zh_female_shuangkuaisisi_emo_v2_mars_bigtts',
       audioDoubaoEndpoint: 'https://openspeech.bytedance.com/api/v1/tts',
       audioDoubaoResourceId: 'volc.service_type.10029',
       audioDoubaoCloneAppId: '',

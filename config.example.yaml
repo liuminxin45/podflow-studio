@@ -100,12 +100,13 @@ tts:
   output_format: "wav"
   rate: "+0%"
   volume: "+0%"
-  # 表演导演的基础角色描述；句级意图、情绪、重点和上下文由 production_plan v2 提供。
+  # 表演导演的基础角色描述；句级意图、多情感参数、重点和上下文由 production_plan v3 提供。
   performance_prompt: "自然、可信的中文新闻播客主播"
   # 正式发布前为专名、数字和英文缩写提供确定读法；未覆盖项会进入发音复核清单。
   pronunciation_overrides:
     AI: "A I"
     GDP: "G D P"
+  doubao_voice_type: "zh_female_shuangkuaisisi_emo_v2_mars_bigtts"
   # Azure Speech（engine: azure_speech）
   azure_speech_key: ""
   azure_speech_region: ""
@@ -121,7 +122,7 @@ audio_postprocess:
   target_lufs: -16.0
   true_peak_db: -1.0
   sample_rate_hz: 48000
-  mp3_bitrate: "128k"
+  mp3_bitrate: "160k"
   trim_silence: false
   add_bgm: false
 

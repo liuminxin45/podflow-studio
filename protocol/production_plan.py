@@ -10,16 +10,17 @@ import re
 from typing import Any
 
 
-PRODUCTION_PLAN_VERSION = 2
-MAX_TTS_CHARS = 320
-MAX_TTS_SENTENCES = 5
+PRODUCTION_PLAN_VERSION = 3
+QUALITY_PROFILE = "podflow_morning_v3"
+MAX_TTS_CHARS = 140
+MAX_TTS_SENTENCES = 2
 
 _DIRECTION_PROFILES: dict[str, dict[str, Any]] = {
-    "opening": {"intent": "opening_warm", "emotion": "warm", "energy": 0.72, "pace": 0.96, "pitch": 0.03},
-    "quick_news": {"intent": "quick_news", "emotion": "focused", "energy": 0.68, "pace": 1.03, "pitch": 0.0},
-    "deep_dive": {"intent": "deep_dive", "emotion": "thoughtful", "energy": 0.55, "pace": 0.92, "pitch": -0.02},
-    "closing": {"intent": "closing_relaxed", "emotion": "warm", "energy": 0.48, "pace": 0.9, "pitch": -0.03},
-    "custom": {"intent": "natural_narration", "emotion": "neutral", "energy": 0.58, "pace": 0.97, "pitch": 0.0},
+    "opening": {"intent": "opening_warm", "provider_emotion": "happy", "emotion_scale": 2, "energy": 0.72, "pace": 0.96},
+    "quick_news": {"intent": "quick_news", "provider_emotion": "neutral", "emotion_scale": 1, "energy": 0.68, "pace": 1.02},
+    "deep_dive": {"intent": "deep_dive", "provider_emotion": "neutral", "emotion_scale": 1, "energy": 0.55, "pace": 0.94},
+    "closing": {"intent": "closing_relaxed", "provider_emotion": "happy", "emotion_scale": 1, "energy": 0.48, "pace": 0.92},
+    "custom": {"intent": "natural_narration", "provider_emotion": "neutral", "emotion_scale": 1, "energy": 0.58, "pace": 0.97},
 }
 
 
@@ -27,46 +28,40 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _music_slot(
-    *,
-    duration_ms: int = 5000,
-    fade_in_ms: int = 500,
-    fade_out_ms: int = 1000,
-) -> dict[str, Any]:
+def _music_slot(*, asset_id: str, path: str, gain_db: float, duration_ms: int,
+                fade_in_ms: int, fade_out_ms: int, voice_overlap_ms: int = 0,
+                duck_db: float = 0.0) -> dict[str, Any]:
     return {
-        "enabled": False,
-        "path": "",
-        "volume": 0.15,
+        "asset_id": asset_id,
+        "path": path,
+        "gain_db": gain_db,
         "duration_ms": duration_ms,
         "fade_in_ms": fade_in_ms,
         "fade_out_ms": fade_out_ms,
+        "voice_overlap_ms": voice_overlap_ms,
+        "duck_db": duck_db,
+        "rights_ref": "assets/audio/RIGHTS.md#quick-spark",
     }
 
 
 def default_music() -> dict[str, Any]:
     return {
-        "intro": {
-            **_music_slot(),
-            "enabled": True,
-            "path": "assets/audio/podflow-intro.wav",
-        },
-        "transition": {
-            **_music_slot(duration_ms=1000, fade_in_ms=100, fade_out_ms=250),
-            "enabled": True,
-            "path": "assets/audio/podflow-transition.wav",
-        },
-        "bed": _music_slot(),
-        "outro": {
-            **_music_slot(duration_ms=4000, fade_in_ms=400, fade_out_ms=1000),
-            "enabled": True,
-            "path": "assets/audio/podflow-outro.wav",
-        },
+        "intro": _music_slot(asset_id="quick-spark-intro", path="assets/audio/podflow-intro.wav", gain_db=-2.0,
+                             duration_ms=8000, fade_in_ms=120, fade_out_ms=700, voice_overlap_ms=2500, duck_db=11.0),
+        "sting": _music_slot(asset_id="quick-spark-sting", path="assets/audio/podflow-transition.wav", gain_db=-4.0,
+                             duration_ms=1350, fade_in_ms=50, fade_out_ms=220),
+        "bridge": _music_slot(asset_id="quick-spark-bridge", path="assets/audio/podflow-bridge.wav", gain_db=-4.0,
+                              duration_ms=2400, fade_in_ms=80, fade_out_ms=350),
+        "outro": _music_slot(asset_id="quick-spark-outro", path="assets/audio/podflow-outro.wav", gain_db=-2.0,
+                             duration_ms=7000, fade_in_ms=700, fade_out_ms=900, voice_overlap_ms=2500, duck_db=11.0),
     }
 
 
 def default_render() -> dict[str, Any]:
     return {
         "output_format": "mp3",
+        "sample_rate_hz": 48000,
+        "mp3_bitrate": "160k",
         "normalize_loudness": True,
         "target_lufs": -16.0,
         "true_peak_db": -1.0,
@@ -198,9 +193,6 @@ def direction_for_segment(segment_type: str, text: str) -> dict[str, Any]:
             "emphasis": _emphasis_terms(text),
         }
     )
-    if any(marker in text for marker in ("但是", "不过", "然而", "值得注意")):
-        profile["emotion"] = "concerned"
-        profile["pace"] = round(max(0.75, float(profile["pace"]) - 0.05), 2)
     if "？" in text or "?" in text:
         profile["intent"] = "rhetorical_question"
     return profile
@@ -213,10 +205,12 @@ def _default_join(
     same_segment = clip["parent_segment_id"] == next_clip["parent_segment_id"]
     direction = clip.get("direction") if isinstance(clip.get("direction"), dict) else {}
     directed_pause = int(direction.get("pause_after_ms") or 0)
-    if not same_segment and next_clip["segment_type"] == "deep_dive":
-        return {"after_clip_id": clip["id"], "type": "transition", "duration_ms": 1000}
+    if not same_segment and clip["segment_type"] == "quick_news" and next_clip["segment_type"] == "quick_news":
+        return {"after_clip_id": clip["id"], "type": "sting", "duration_ms": 1350}
+    if not same_segment and clip["segment_type"] == "quick_news" and next_clip["segment_type"] == "deep_dive":
+        return {"after_clip_id": clip["id"], "type": "bridge", "duration_ms": 2400}
     duration_ms = (
-        min(450, directed_pause)
+        min(380, max(220, directed_pause))
         if same_segment
         else max(directed_pause, 600)
     )
@@ -293,7 +287,7 @@ def build_production_plan(
     for index, clip in enumerate(clips[:-1]):
         fallback = _default_join(clip, clips[index + 1])
         saved = saved_joins.get(clip["id"], {})
-        join_type = saved.get("type") if saved.get("type") in {"pause", "transition"} else fallback["type"]
+        join_type = saved.get("type") if saved.get("type") in {"pause", "sting", "bridge"} else fallback["type"]
         duration_ms = max(0, min(15000, int(saved.get("duration_ms", fallback["duration_ms"]))))
         joins.append({"after_clip_id": clip["id"], "type": join_type, "duration_ms": duration_ms})
 
@@ -314,6 +308,7 @@ def build_production_plan(
 
     return {
         "version": PRODUCTION_PLAN_VERSION,
+        "quality_profile": QUALITY_PROFILE,
         "script_hash": script_hash(script_segments),
         "clips": clips,
         "joins": joins,

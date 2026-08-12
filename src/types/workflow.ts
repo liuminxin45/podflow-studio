@@ -89,6 +89,13 @@ export interface PodcastState {
   cover_path: string
   intro_outro_paths: Record<string, string>
   review_summary: Record<string, any>
+  audio_approval?: {
+    status?: 'approved' | 'rejected'
+    audio_sha256?: string
+    reviewed_at?: string
+    reviewer?: string
+    notes?: string
+  }
   publish_outputs: Record<string, any>
   subtitle_path: string
   run_report: Record<string, any>
@@ -290,10 +297,10 @@ export interface ProductionClip {
   context_after: string
   direction: {
     intent: string
-    emotion: string
+    provider_emotion: 'happy' | 'neutral' | 'surprised' | 'excited' | 'coldness'
+    emotion_scale: number
     energy: number
     pace: number
-    pitch: number
     pause_before_ms: number
     pause_after_ms: number
     emphasis: string[]
@@ -310,32 +317,38 @@ export interface ProductionClip {
 
 export interface ProductionJoin {
   after_clip_id: string
-  type: 'pause' | 'transition'
+  type: 'pause' | 'sting' | 'bridge'
   duration_ms: number
 }
 
 export interface ProductionMusicSlot {
-  enabled: boolean
+  asset_id: string
   path: string
-  volume: number
+  gain_db: number
   duration_ms: number
   fade_in_ms: number
   fade_out_ms: number
+  voice_overlap_ms: number
+  duck_db: number
+  rights_ref: string
 }
 
 export interface ProductionPlan {
-  version: 2
+  version: 3
+  quality_profile: 'podflow_morning_v3'
   script_hash: string
   clips: ProductionClip[]
   joins: ProductionJoin[]
   music: {
     intro: ProductionMusicSlot
-    transition: ProductionMusicSlot
-    bed: ProductionMusicSlot
+    sting: ProductionMusicSlot
+    bridge: ProductionMusicSlot
     outro: ProductionMusicSlot
   }
   render: {
     output_format: 'mp3' | 'wav' | 'opus'
+    sample_rate_hz: 48000
+    mp3_bitrate: '160k'
     normalize_loudness: boolean
     target_lufs: number
     true_peak_db: number

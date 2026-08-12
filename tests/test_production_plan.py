@@ -63,17 +63,17 @@ def test_build_production_plan_uses_section_aware_default_joins():
         ]
     )
 
-    assert any(join["duration_ms"] == 450 for join in plan["joins"])
+    assert any(220 <= join["duration_ms"] <= 380 for join in plan["joins"] if join["type"] == "pause")
     assert plan["joins"][-1] == {
         "after_clip_id": plan["clips"][-2]["id"],
-        "type": "transition",
-        "duration_ms": 1000,
+        "type": "bridge",
+        "duration_ms": 2400,
     }
     assert plan["music"]["intro"]["path"] == "assets/audio/podflow-intro.wav"
-    assert plan["music"]["intro"]["duration_ms"] == 5000
-    assert plan["music"]["transition"]["duration_ms"] == 1000
-    assert plan["music"]["bed"]["enabled"] is False
-    assert plan["music"]["outro"]["duration_ms"] == 4000
+    assert plan["music"]["intro"]["duration_ms"] == 8000
+    assert plan["music"]["sting"]["duration_ms"] == 1350
+    assert plan["music"]["bridge"]["duration_ms"] == 2400
+    assert plan["music"]["outro"]["duration_ms"] == 7000
 
 
 def test_build_production_plan_adds_context_and_speech_direction():
@@ -81,7 +81,8 @@ def test_build_production_plan_adds_context_and_speech_direction():
         _segment(text="第一句说明背景。第二句包含数字 42%。第三句给出结论。" * 6),
     ])
 
-    assert plan["version"] == 2
+    assert plan["version"] == 3
+    assert plan["quality_profile"] == "podflow_morning_v3"
     assert len(plan["clips"]) > 1
     assert plan["clips"][0]["context_after"]
     assert plan["clips"][1]["context_before"]
@@ -90,8 +91,13 @@ def test_build_production_plan_adds_context_and_speech_direction():
 
 
 def test_build_production_plan_rejects_unversioned_existing_shape():
-    with pytest.raises(ValueError, match="expected 2"):
+    with pytest.raises(ValueError, match="expected 3"):
         build_production_plan([_segment()], {"clips": []})
+
+
+def test_build_production_plan_rejects_v2():
+    with pytest.raises(ValueError, match="expected 3"):
+        build_production_plan([_segment()], {"version": 2})
 
 
 def test_build_production_plan_carries_context_across_script_segments():

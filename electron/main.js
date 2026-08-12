@@ -200,6 +200,7 @@ function createInitialState(episodeId, runtimeConfig) {
     cover_path: series.coverPath || '',
     intro_outro_paths: {},
     review_summary: {},
+    audio_approval: {},
     publish_outputs: {},
     subtitle_path: '',
     run_report: {},
@@ -226,7 +227,7 @@ const CURRENT_STATE_KEYS = new Set([
   'selected_topic', 'selected_topics', 'selected_materials', 'auto_selected_items',
   'auto_rejected_items', 'script', 'edited_script', 'generation_request', 'generation_meta',
   'script_snapshots', 'downstream_stale', 'voice_segments', 'production_plan', 'audio_outputs', 'cover_path',
-  'intro_outro_paths', 'review_summary', 'publish_outputs', 'subtitle_path', 'run_report',
+  'intro_outro_paths', 'review_summary', 'audio_approval', 'publish_outputs', 'subtitle_path', 'run_report',
   'discover_meta', 'discover_ui', 'organize_ui', 'episode_brief', 'writing_meta', 'series', 'playback', '_manifest',
 ])
 

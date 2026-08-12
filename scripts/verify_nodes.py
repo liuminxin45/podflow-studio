@@ -197,6 +197,7 @@ def _test_state() -> dict:
         },
         "cover_path": "",
         "review_summary": {},
+        "audio_approval": {},
         "publish_outputs": {},
     }
 

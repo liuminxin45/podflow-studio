@@ -56,7 +56,7 @@ export const VOICE_PRESETS: Record<AudioProvider, Array<{
     { id: 'echo', label: 'Echo', description: '清晰、有表现力' },
   ],
   doubao_tts: [
-    { id: 'zh_female_shuangkuaisisi_moon_bigtts', label: '爽快思思', description: '豆包默认预置音色' },
+    { id: 'zh_female_shuangkuaisisi_emo_v2_mars_bigtts', label: '爽快思思多情感', description: 'PodFlow 晨报固定多情感音色' },
   ],
   voice_clone: [],
   azure_speech: [

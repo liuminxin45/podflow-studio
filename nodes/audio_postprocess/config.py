@@ -13,7 +13,7 @@ class AudioPostprocessConfig(NodeConfigBase):
     target_lufs: float = Field(default=-16.0, ge=-30.0, le=-5.0, description="综合响度目标 LUFS")
     true_peak_db: float = Field(default=-1.0, ge=-9.0, le=-1.0, description="最大真峰值 dBTP")
     sample_rate_hz: int = Field(default=48_000, ge=8_000, le=192_000, description="输出采样率")
-    mp3_bitrate: str = Field(default="128k", pattern=r"^(?:128|160|192|256|320)k$", description="MP3 输出码率")
+    mp3_bitrate: str = Field(default="160k", pattern=r"^(?:128|160|192|256|320)k$", description="MP3 输出码率")
     trim_silence: bool = Field(default=False, description="是否裁剪静音（依赖可用时启用）")
     add_bgm: bool = Field(default=False, description="是否添加背景音乐")
     bgm_path: str = Field(default="", description="背景音乐路径")

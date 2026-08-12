@@ -153,10 +153,10 @@ class SpeechDirectionModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     intent: str
-    emotion: str
+    provider_emotion: Literal["happy", "neutral", "surprised", "excited", "coldness"]
+    emotion_scale: int = Field(ge=1, le=5)
     energy: float = Field(ge=0.0, le=1.0)
     pace: float = Field(ge=0.5, le=1.5)
-    pitch: float = Field(ge=-0.5, le=0.5)
     pause_before_ms: int = Field(ge=0, le=5000)
     pause_after_ms: int = Field(ge=0, le=5000)
     emphasis: list[str] = Field(default_factory=list, max_length=2)
@@ -187,36 +187,39 @@ class ProductionJoinModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     after_clip_id: str
-    type: Literal["pause", "transition"] = "pause"
+    type: Literal["pause", "sting", "bridge"] = "pause"
     duration_ms: int = Field(default=600, ge=0, le=15000)
 
 
 class ProductionMusicSlotModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    enabled: bool = False
+    asset_id: str
     path: str = ""
-    volume: float = Field(default=0.15, ge=0.0, le=1.0)
+    gain_db: float = Field(ge=-60.0, le=12.0)
     duration_ms: int = Field(default=5000, ge=0, le=120000)
     fade_in_ms: int = Field(default=500, ge=0, le=15000)
     fade_out_ms: int = Field(default=1000, ge=0, le=15000)
+    voice_overlap_ms: int = Field(default=0, ge=0, le=15000)
+    duck_db: float = Field(default=0.0, ge=0.0, le=30.0)
+    rights_ref: str
 
 
 class ProductionMusicModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    intro: ProductionMusicSlotModel = Field(default_factory=ProductionMusicSlotModel)
-    transition: ProductionMusicSlotModel = Field(
-        default_factory=lambda: ProductionMusicSlotModel(duration_ms=1500, fade_in_ms=150, fade_out_ms=300)
-    )
-    bed: ProductionMusicSlotModel = Field(default_factory=ProductionMusicSlotModel)
-    outro: ProductionMusicSlotModel = Field(default_factory=ProductionMusicSlotModel)
+    intro: ProductionMusicSlotModel | None = None
+    sting: ProductionMusicSlotModel | None = None
+    bridge: ProductionMusicSlotModel | None = None
+    outro: ProductionMusicSlotModel | None = None
 
 
 class ProductionRenderModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     output_format: Literal["mp3", "wav", "opus"] = "mp3"
+    sample_rate_hz: Literal[48000] = 48000
+    mp3_bitrate: Literal["160k"] = "160k"
     normalize_loudness: bool = True
     target_lufs: float = -16.0
     true_peak_db: float = -1.0
@@ -225,7 +228,8 @@ class ProductionRenderModel(BaseModel):
 class ProductionPlanModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: Literal[2] = 2
+    version: Literal[3] | None = None
+    quality_profile: Literal["podflow_morning_v3"] | None = None
     script_hash: str = ""
     clips: list[ProductionClipModel] = Field(default_factory=list)
     joins: list[ProductionJoinModel] = Field(default_factory=list)
@@ -235,10 +239,20 @@ class ProductionPlanModel(BaseModel):
 
     @model_validator(mode="after")
     def require_explicit_version_for_non_empty_plan(self) -> "ProductionPlanModel":
-        non_version_fields = self.model_fields_set - {"version"}
-        if non_version_fields and "version" not in self.model_fields_set:
-            raise ValueError("production_plan.version is required for a non-empty plan")
+        non_version_fields = self.model_fields_set - {"version", "quality_profile"}
+        if non_version_fields and (self.version != 3 or self.quality_profile != "podflow_morning_v3"):
+            raise ValueError("non-empty production_plan requires version=3 and quality_profile=podflow_morning_v3")
         return self
+
+
+class AudioApprovalModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["approved", "rejected"] | None = None
+    audio_sha256: str = Field(default="", pattern=r"^(?:|[a-f0-9]{64})$")
+    reviewed_at: str = ""
+    reviewer: str = ""
+    notes: str = ""
 
 
 class RssValidationModel(BaseModel):
@@ -363,6 +377,7 @@ class EpisodeRunModel(BaseModel):
     cover_path: str = ""
     intro_outro_paths: dict[str, str] = Field(default_factory=dict)
     review_summary: dict[str, Any] = Field(default_factory=dict)
+    audio_approval: AudioApprovalModel = Field(default_factory=AudioApprovalModel)
     publish_outputs: PublishOutputsModel = Field(default_factory=PublishOutputsModel)
     subtitle_path: str = ""
     run_report: RunReportModel = Field(default_factory=RunReportModel)
