@@ -8,7 +8,7 @@
 
 从素材发现、整理与事实卡片，到口播稿、配音、音频成片和 RSS 发布包，一条工作流完成一期节目。
 
-[产品介绍](https://liuminxin45.github.io/works/podflow-studio) · [试听节目](https://liuminxin45.github.io/works/podflow-studio#episodes) · [下载 Windows 0.2.0](https://github.com/liuminxin45/podflow-studio/releases/tag/0.2.0) · [查看源码](https://github.com/liuminxin45/podflow-studio)
+[产品介绍](https://www.liuminxin.cn/works/podflow-studio) · [站内试听](https://www.liuminxin.cn/works/podflow-studio#episode-player) · [订阅 RSS](https://www.liuminxin.cn/podflow-studio/feed.xml) · [下载 Windows 0.2.0](https://github.com/liuminxin45/podflow-studio/releases/tag/0.2.0) · [查看源码](https://github.com/liuminxin45/podflow-studio)
 
 </div>
 
@@ -135,10 +135,12 @@ npm run acceptance:cdp
 发布节点会在本地包中生成 `show-notes.md`、`transcript.vtt`、`chapters.json` 和 `sources.json`。一期节目完成事实、成稿、发音与听感终审后，可以显式导出站点清单：
 
 ```bash
-npm run showcase:export -- --episode-dir <publish-package> --output-dir <site-content> --audio-url <release-mp3-url> --site-base-url <site-episode-base-url> --approved
+npm run showcase:export -- --episode-dir <publish-package> --output-dir <site-content> --audio-url <public-mp3-url> --site-base-url <site-episode-base-url> --approved
 ```
 
-GitHub Release 上传脚本默认只打印计划。必须同时提供原始 `episode.json` 作为非 mock 音频证明，并显式添加 `--publish` 才会写入远端：
+`audio-url` 可以指向与节目页面同域的静态音频，也可以指向独立音频托管地址。官方样片目前把已终审 MP3、章节、文字稿和 RSS 一起部署到 `www.liuminxin.cn`，页面内直接使用浏览器原生播放器播放，不需要跳转到 GitHub 或第三方播客网站。
+
+如果选择 GitHub Releases 托管音频，仓库仍提供显式发布脚本。脚本默认只打印计划；必须同时提供原始 `episode.json` 作为非 mock 音频证明，并添加 `--publish` 才会写入远端：
 
 ```bash
 npm run showcase:publish -- --episode-id 2026-08-11 --audio <final.mp3> --notes <show-notes.md> --episode-json <episode.json>
