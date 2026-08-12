@@ -11,6 +11,7 @@ from nodes.assets.node import run as assets_run
 from nodes.audio_postprocess.config import AudioPostprocessConfig
 from nodes.audio_postprocess.node import (
     _assemble_wav_fallback,
+    _parse_loudnorm_measurement,
     _safe_path_part as audio_safe_path_part,
     run as audio_postprocess_run,
 )
@@ -40,6 +41,26 @@ def _write_wav(path: Path, *, frequency: float, seconds: float = 0.25) -> None:
             value = int(1800 * math.sin(2 * math.pi * frequency * index / sample_rate))
             frames.append(struct.pack("<h", value))
         output.writeframes(b"".join(frames))
+
+
+def test_parse_loudnorm_measurement_uses_final_json_block():
+    stderr = """
+[Parsed_loudnorm_0] {
+  "input_i" : "-20.10",
+  "input_tp" : "-2.30",
+  "input_lra" : "3.10",
+  "input_thresh" : "-30.20",
+  "target_offset" : "0.10"
+}
+"""
+
+    assert _parse_loudnorm_measurement(stderr) == {
+        "input_i": "-20.10",
+        "input_tp": "-2.30",
+        "input_lra": "3.10",
+        "input_thresh": "-30.20",
+        "target_offset": "0.10",
+    }
 
 
 def _public_publish_state(tmp_path: Path, *, engine: str = "doubao_tts") -> tuple[dict, Path]:

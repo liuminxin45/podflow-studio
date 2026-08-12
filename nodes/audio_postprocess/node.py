@@ -1,4 +1,8 @@
+import json
 import math
+import os
+import re
+import subprocess
 import wave
 from pathlib import Path
 from typing import Any
@@ -190,8 +194,6 @@ def _assemble_with_pydub(
         if isinstance(join, dict) and join.get("after_clip_id")
     }
     music = production_plan.get("music") if isinstance(production_plan.get("music"), dict) else {}
-    export_parameters: list[str] = []
-
     combined = AudioSegment.empty()
     for idx, segment in enumerate(segments):
         chunk = AudioSegment.from_file(segment["path"])
@@ -231,10 +233,7 @@ def _assemble_with_pydub(
     if normalize_loudness:
         target_lufs = config.target_lufs
         true_peak_db = config.true_peak_db
-        export_parameters = [
-            "-af",
-            f"loudnorm=I={target_lufs}:TP={true_peak_db}:LRA=11",
-        ]
+        operations.append("two_pass_loudness_measurement")
         operations.append(f"program_loudness_{target_lufs:g}lufs")
         operations.append(f"true_peak_limit_{true_peak_db:g}db")
 
@@ -279,12 +278,130 @@ def _assemble_with_pydub(
 
     combined = combined.set_frame_rate(config.sample_rate_hz)
     operations.append(f"resample_{config.sample_rate_hz}hz")
-    export_kwargs: dict[str, Any] = {"format": output_format, "parameters": export_parameters}
+    export_kwargs: dict[str, Any] = {"format": output_format}
     if output_format == "mp3":
         export_kwargs["bitrate"] = config.mp3_bitrate
         operations.append(f"export_{config.mp3_bitrate}bps")
-    combined.export(str(output_path), **export_kwargs)
+    if normalize_loudness:
+        _export_two_pass_loudnorm(
+            combined,
+            output_path,
+            output_format,
+            config,
+            AudioSegment.converter,
+        )
+    else:
+        combined.export(str(output_path), **export_kwargs)
     return output_path, len(combined) / 1000.0
+
+
+def _export_two_pass_loudnorm(
+    combined,
+    output_path: Path,
+    output_format: str,
+    config: AudioPostprocessConfig,
+    ffmpeg_path: str,
+) -> None:
+    """Measure the fully mixed program before applying final loudness normalization."""
+
+    measurement_path = output_path.with_suffix(".loudnorm-input.wav")
+    combined.export(str(measurement_path), format="wav")
+    base_filter = f"loudnorm=I={config.target_lufs}:TP={config.true_peak_db}:LRA=11"
+    try:
+        measured = subprocess.run(
+            [
+                ffmpeg_path,
+                "-hide_banner",
+                "-nostats",
+                "-i",
+                str(measurement_path),
+                "-af",
+                f"{base_filter}:print_format=json",
+                "-f",
+                "null",
+                os.devnull,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        stats = _parse_loudnorm_measurement(measured.stderr)
+        if not all(math.isfinite(float(value)) for value in stats.values()):
+            _export_single_pass_loudnorm(
+                measurement_path,
+                output_path,
+                output_format,
+                config,
+                ffmpeg_path,
+                base_filter,
+            )
+            return
+        final_filter = (
+            f"{base_filter}:"
+            f"measured_I={stats['input_i']}:"
+            f"measured_TP={stats['input_tp']}:"
+            f"measured_LRA={stats['input_lra']}:"
+            f"measured_thresh={stats['input_thresh']}:"
+            f"offset={stats['target_offset']}:linear=true:print_format=summary"
+        )
+        command = [
+            ffmpeg_path,
+            "-hide_banner",
+            "-nostats",
+            "-y",
+            "-i",
+            str(measurement_path),
+            "-af",
+            final_filter,
+            "-ar",
+            str(config.sample_rate_hz),
+        ]
+        if output_format == "mp3":
+            command.extend(["-b:a", config.mp3_bitrate])
+        command.append(str(output_path))
+        subprocess.run(command, check=True, capture_output=True, text=True)
+    finally:
+        measurement_path.unlink(missing_ok=True)
+
+
+def _export_single_pass_loudnorm(
+    input_path: Path,
+    output_path: Path,
+    output_format: str,
+    config: AudioPostprocessConfig,
+    ffmpeg_path: str,
+    loudnorm_filter: str,
+) -> None:
+    """Handle very short fixtures whose integrated measurement is not finite."""
+
+    command = [
+        ffmpeg_path,
+        "-hide_banner",
+        "-nostats",
+        "-y",
+        "-i",
+        str(input_path),
+        "-af",
+        loudnorm_filter,
+        "-ar",
+        str(config.sample_rate_hz),
+    ]
+    if output_format == "mp3":
+        command.extend(["-b:a", config.mp3_bitrate])
+    command.append(str(output_path))
+    subprocess.run(command, check=True, capture_output=True, text=True)
+
+
+def _parse_loudnorm_measurement(stderr: str) -> dict[str, str]:
+    matches = re.findall(r"\{\s*\"input_i\".*?\}", stderr, flags=re.DOTALL)
+    if not matches:
+        raise RuntimeError("ffmpeg loudness measurement did not return JSON statistics.")
+    payload = json.loads(matches[-1])
+    required = ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset")
+    missing = [key for key in required if key not in payload]
+    if missing:
+        raise RuntimeError(f"ffmpeg loudness measurement is missing: {', '.join(missing)}")
+    return {key: str(payload[key]) for key in required}
 
 
 def _wav_sample_rate(path: Path) -> int:
