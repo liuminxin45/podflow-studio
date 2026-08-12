@@ -179,9 +179,12 @@ export function reconcileProductionPlan(
   const joins = clips.slice(0, -1).map((clip, index) => {
     const fallback = defaultJoin(clip, clips[index + 1])
     const saved = previousJoins.get(clip.id)
+    const savedType = saved?.type
     return {
       after_clip_id: clip.id,
-      type: saved?.type === 'sting' || saved?.type === 'bridge' ? saved.type : 'pause' as const,
+      type: savedType === 'pause' || savedType === 'sting' || savedType === 'bridge'
+        ? savedType
+        : fallback.type,
       duration_ms: Math.min(15000, Math.max(0, Number(saved?.duration_ms ?? fallback.duration_ms))),
     }
   })

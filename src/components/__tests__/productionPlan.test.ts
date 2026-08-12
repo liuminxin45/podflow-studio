@@ -58,15 +58,15 @@ describe('production plan', () => {
     expect(changed.clips[0].source).toBe('tts')
   })
 
-  it('uses shorter pauses within a section and a long lead-in before deep dive', () => {
+  it('uses bounded pauses within a section and a bridge before deep dive', () => {
     const plan = reconcileProductionPlan([
       segment({ id: 'quick', text: '短句。'.repeat(80) }),
       segment({ id: 'deep', type: 'deep_dive', title: '深度', text: '进入深度解读。' }),
     ])
     const beforeDeep = plan.joins.find(join => join.after_clip_id === plan.clips.at(-2)?.id)
 
-    expect(plan.joins.some(join => join.duration_ms === 450)).toBe(true)
-    expect(beforeDeep?.duration_ms).toBe(1200)
+    expect(plan.joins.some(join => join.type === 'pause' && join.duration_ms >= 220 && join.duration_ms <= 380)).toBe(true)
+    expect(beforeDeep).toEqual(expect.objectContaining({ type: 'bridge', duration_ms: 2400 }))
   })
 
   it('adds scene context and deterministic speech direction', () => {
@@ -74,13 +74,15 @@ describe('production plan', () => {
       segment({ text: '第一句。第二句包含 42%。第三句。'.repeat(6) }),
     ])
 
-    expect(plan.version).toBe(2)
+    expect(plan.version).toBe(3)
+    expect(plan.quality_profile).toBe('podflow_morning_v3')
     expect(plan.clips.length).toBeGreaterThan(1)
     expect(plan.clips[0].context_after).not.toBe('')
     expect(plan.clips[1].context_before).not.toBe('')
     expect(plan.clips[0].direction).toEqual(expect.objectContaining({
       intent: 'quick_news',
-      emotion: 'focused',
+      provider_emotion: 'neutral',
+      emotion_scale: 1,
       emphasis: ['42%'],
     }))
   })
@@ -89,7 +91,7 @@ describe('production plan', () => {
     expect(() => reconcileProductionPlan(
       [segment()],
       { version: 1 } as unknown as Parameters<typeof reconcileProductionPlan>[1],
-    )).toThrow('当前版本为 2')
+    )).toThrow('当前版本为 3')
   })
 
   it('carries context across script segment boundaries', () => {
