@@ -8,6 +8,8 @@
 
 从素材发现、整理与事实卡片，到口播稿、配音、音频成片和 RSS 发布包，一条工作流完成一期节目。
 
+**我们虽然追求全自动化，但不生产 AI 垃圾，只输出经过来源核验、编辑门禁、声音质检和人工终审的精品内容。**
+
 [产品介绍](https://www.liuminxin.cn/works/podflow-studio) · [站内试听](https://www.liuminxin.cn/works/podflow-studio#episode-player) · [订阅 RSS](https://www.liuminxin.cn/podflow-studio/feed.xml) · [下载 Windows 0.2.0](https://github.com/liuminxin45/podflow-studio/releases/tag/0.2.0) · [查看源码](https://github.com/liuminxin45/podflow-studio)
 
 </div>
@@ -17,6 +19,8 @@
 PodFlow Studio 面向独立创作者和小型编辑团队，把每天重复的新闻播客生产流程放进一个统一的桌面工作台。默认节目品牌为 `PodFlow 晨报`，采用 6 条快讯加 1 条重点解读的 12 至 15 分钟结构；素材或来源不足时会阻断公开发布，不以无来源内容凑满时长。
 
 它不是一个只会“生成文案”的聊天框。素材会沿着明确的编辑链路前进：先收集和整理来源，再形成事实卡片与可编辑稿件，最后进入配音、音频装配和发布。关键节点保留人工确认，来源与 AI 补充知识也会分开呈现。
+
+自动化负责消除重复劳动，不负责替代编辑判断。任何来源不足、稿件未通过门禁、发音未确认、音频质量不合格或缺少人工终审的节目，都不能作为正式精品内容发布。
 
 ```text
 发现素材 → 整理与研究 → 事实卡片 → 口播稿 → 配音 / 录音 → 音频成片 → RSS / 发布包
