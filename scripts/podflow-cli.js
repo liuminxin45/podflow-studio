@@ -36,7 +36,7 @@ const VALUE_OPTIONS = new Set([
   'mode', 'session', 'cdp', 'window', 'timeout', 'artifacts-dir', 'suite', 'tail',
   'workflow', 'stage', 'audio-sha256', 'reviewer', 'notes', 'output', 'tts-engine',
 ])
-const BOOLEAN_OPTIONS = new Set(['json', 'follow', 'help', 'allow-paid-tts', 'preview'])
+const BOOLEAN_OPTIONS = new Set(['json', 'follow', 'help', 'allow-paid-tts', 'skip-approval'])
 
 class CliError extends Error {
   constructor(message, exitCode) {
@@ -317,7 +317,7 @@ async function produceCommand(options) {
     '--workflow', options.workflow, '--stage', stage,
   ]
   if (options['allow-paid-tts']) args.push('--allow-paid-tts')
-  if (options['preview']) args.push('--preview')
+  if (options['skip-approval']) args.push('--skip-approval')
   for (const name of ['audio-sha256', 'reviewer', 'notes', 'output', 'tts-engine']) {
     if (options[name]) args.push(`--${name}`, options[name])
   }

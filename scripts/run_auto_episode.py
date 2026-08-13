@@ -1,13 +1,14 @@
-"""Run a full auto episode: fetch -> facts -> script -> free TTS -> assembly.
+"""Run a full auto episode: fetch -> facts -> script -> TTS -> assembly.
 
-This is the CLI / GitHub Actions automation path. It produces a *preview*
-episode (free TTS, no human approval) and never touches the formal publish
-gate. LLM calls default to Gemini via Google AI Studio's free tier.
+This is the CLI / GitHub Actions automation path. It produces an episode that
+is explicitly marked ``unreviewed`` (no human approval); it never touches the
+formal publish gate. LLM calls default to Gemini via Google AI Studio's free
+tier and TTS defaults to the free edge-tts engine.
 
 Topic selection is driven by ``PODFLOW_TARGET_TOPIC`` (or ``--topic``). Without
 a topic the pipeline falls back to hotlist clustering.
 
-Exit code 0 on success, non-zero when the preview cannot be assembled.
+Exit code 0 on success, non-zero when the episode cannot be assembled.
 """
 
 # ruff: noqa: E402
@@ -205,10 +206,10 @@ def run_auto_episode(
 
 
 def _finalize(state: dict[str, Any], output_dir: Path) -> None:
-    state.setdefault("run_report", {})["production_mode"] = "preview"
-    state["run_report"]["preview"] = True
-    state["run_report"]["preview_note"] = (
-        "Free-TTS preview, no human approval. Not a formal public release."
+    state.setdefault("run_report", {})["unreviewed"] = True
+    state["run_report"]["automated"] = True
+    state["run_report"]["unreviewed_note"] = (
+        "Automated episode without human approval."
     )
     schema_ok, schema_errors = validate_episode_run_payload(state)
     state["run_report"]["schema_validation"] = {"ok": schema_ok, "errors": schema_errors}
@@ -220,7 +221,7 @@ def _finalize(state: dict[str, Any], output_dir: Path) -> None:
     write_json(output_dir / "run_report.json", build_run_report(state))
 
 
-def preview_failures(state: dict[str, Any]) -> list[str]:
+def assembly_failures(state: dict[str, Any]) -> list[str]:
     failures: list[str] = []
     errors = state.get("errors")
     if not isinstance(errors, list):
@@ -235,7 +236,7 @@ def preview_failures(state: dict[str, Any]) -> list[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run an automated PodFlow preview episode.")
+    parser = argparse.ArgumentParser(description="Run an automated PodFlow episode.")
     parser.add_argument("--topic", default="", help="Target topic for AI selection")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT_ROOT), help="Output directory")
     parser.add_argument("--episode-id", default=_default_episode_id(), help="Episode id")
@@ -253,12 +254,12 @@ def main() -> int:
     report = state.get("run_report", {})
     print("PodFlow Studio auto-episode completed")
     print(f"episode_id: {state.get('episode_id')}")
-    print(f"mode: {report.get('production_mode', 'preview')}")
+    print(f"unreviewed: {report.get('unreviewed', False)}")
     print(f"facts: {report.get('facts', {}).get('total', 0)}")
     print(f"segments: {report.get('script', {}).get('segments', 0)}")
     print(f"audio: {state.get('audio_outputs', {}).get('final_audio_path', '')}")
 
-    failures = preview_failures(state)
+    failures = assembly_failures(state)
     for failure in failures:
         print(f"error: {failure}")
     return 1 if failures else 0

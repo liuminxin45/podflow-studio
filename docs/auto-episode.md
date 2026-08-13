@@ -1,16 +1,19 @@
-# PodFlow 自动出片（预览链路）
+# PodFlow 自动出片（CLI / GitHub Actions）
 
-本文档说明如何在无桌面 UI 的环境（CLI / GitHub Actions）里，用免费额度自动生产一期播客「预览成片」。
+本文档说明如何在无桌面 UI 的环境（CLI / GitHub Actions）里自动生产一期播客。
 
-## 定位
+## 定位：一条链路，显式门禁开关
 
-自动链路产出的是 **预览成片**，不是正式节目：
+生产链路只有一条，与桌面端、`produce` CLI 共用同一套节点。LLM（Gemini）和
+TTS（edge-tts / 豆包）是可替换引擎，不是独立链路。
 
-- 用 Gemini（Google AI Studio 免费额度）做选题与写作；
-- 用 `edge-tts`（免费、免 key）配音；
-- 不经过人工终审，明确标记 `production_mode: preview`，不触碰正式发布门禁。
+自动出片与正式发布**唯一**的区别，是人工终审门禁是否被显式跳过：
 
-正式节目仍走 `produce` 三阶段 + 豆包付费配音 + 人工 SHA256 审批，门禁保持不变。
+- 自动出片：`--skip-approval` 显式跳过人工终审，产物标记 `unreviewed: true` 自证未审。
+- 正式发布：走 `produce` 三阶段 + 豆包付费配音 + 人工 SHA256 审批，门禁不变。
+
+跳过审批是**显式参数 + 产物自证**，不依赖启动方式推断。`approve` 阶段保持人工，
+只是允许显式跳过它。
 
 ## 环境变量
 
@@ -76,6 +79,6 @@ node scripts/python313.js scripts/run_auto_episode.py
 
 ## 免费 TTS 说明
 
-- `edge-tts` 由微软 Edge 免费提供、免 key，适合预览与试听。
+- `edge-tts` 由微软 Edge 免费提供、免 key，适合试听与自动出片。
 - 免费服务无 SLA，偶发失败需重试；专名/数字发音可能不精确。
 - 正式节目仍使用豆包 `zh_female_shuangkuaisisi_emo_v2_mars_bigtts`，配合发音预检与人工终审。

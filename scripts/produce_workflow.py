@@ -154,7 +154,7 @@ def approve(path: Path, envelope: dict[str, Any], state: dict[str, Any], digest:
     return {"stage": "approve", "audioApproval": state["audio_approval"]}
 
 
-def package(state: dict[str, Any], output: Path, preview: bool = False) -> dict[str, Any]:
+def package(state: dict[str, Any], output: Path, skip_approval: bool = False) -> dict[str, Any]:
     artifact = file_fingerprint(state.get("audio_outputs", {}).get("final_audio_path"))
     plan = state.get("production_plan") if isinstance(state.get("production_plan"), dict) else {}
     audio_outputs = state.get("audio_outputs") if isinstance(state.get("audio_outputs"), dict) else {}
@@ -170,7 +170,7 @@ def package(state: dict[str, Any], output: Path, preview: bool = False) -> dict[
     deep_count = sum(region in {"deep_dive", "analysis"} for region in regions)
     if state.get("audio_outputs", {}).get("contains_mock_audio") is not False:
         raise ValueError("Mock audio cannot be packaged")
-    if not preview:
+    if not skip_approval:
         if plan.get("version") != 3 or plan.get("quality_profile") != "podflow_morning_v3":
             raise ValueError("Package requires production_plan v3 / podflow_morning_v3")
         if state.get("review_summary", {}).get("status") != "passed":
@@ -257,9 +257,8 @@ def package(state: dict[str, Any], output: Path, preview: bool = False) -> dict[
                           "edited": "经裁剪、淡入淡出及响度处理"}],
         "approval": state.get("audio_approval", {}),
     }
-    if preview:
-        manifest["preview"] = True
-        manifest["productionMode"] = "preview"
+    if skip_approval:
+        manifest["unreviewed"] = True
     notes = [f"# {manifest['title']}", "", manifest["summary"], "", "## 来源", ""] + [f"- [{item['title']}]({item['url']})" for item in sources]
     (target / "show-notes.md").write_text("\n".join(notes) + "\n", encoding="utf-8")
     (target / "episode.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -271,7 +270,7 @@ def main() -> int:
     parser.add_argument("--workflow", required=True)
     parser.add_argument("--stage", required=True, choices=("render", "approve", "package"))
     parser.add_argument("--allow-paid-tts", action="store_true")
-    parser.add_argument("--preview", action="store_true", help="Skip formal publish gates; produce a preview package")
+    parser.add_argument("--skip-approval", action="store_true", help="Skip the human-approval gate; package is marked unreviewed")
     parser.add_argument("--tts-engine", default="", help="TTS engine override (e.g. edge-tts)")
     parser.add_argument("--audio-sha256", default="")
     parser.add_argument("--reviewer", default="")
@@ -293,7 +292,7 @@ def main() -> int:
     else:
         if args.output is None:
             raise ValueError("package requires --output")
-        result = package(state, args.output.resolve(), preview=args.preview)
+        result = package(state, args.output.resolve(), skip_approval=args.skip_approval)
     print(json.dumps({"ok": True, **result}, ensure_ascii=False))
     return 0
 

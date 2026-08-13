@@ -52,7 +52,7 @@ jobs:
       - name: Run auto episode
         run: node scripts/python313.js scripts/run_auto_episode.py --output out/auto-episode
 
-      - name: Upload preview artifacts
+      - name: Upload automated episode artifacts
         uses: actions/upload-artifact@v4
         with:
           name: podflow-auto-episode
