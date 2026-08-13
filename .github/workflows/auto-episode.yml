@@ -22,9 +22,9 @@ jobs:
   auto-episode:
     runs-on: ubuntu-latest
     env:
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      PODFLOW_LLM_PROVIDER: gemini
-      PODFLOW_LLM_MODEL: gemini-2.5-flash
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      PODFLOW_LLM_PROVIDER: deepseek
+      PODFLOW_LLM_MODEL: ${{ secrets.DEEPSEEK_MODEL || 'deepseek-chat' }}
       PODFLOW_TTS_ENGINE: edge-tts
       PODFLOW_TTS_VOICE: zh-CN-XiaoxiaoNeural
       PODFLOW_TARGET_TOPIC: ${{ inputs.target_topic }}

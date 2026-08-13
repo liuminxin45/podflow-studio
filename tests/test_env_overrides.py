@@ -16,9 +16,9 @@ def test_apply_env_overrides_populates_runtime_config(monkeypatch):
     monkeypatch.setenv("PODFLOW_TIME_RANGE_HOURS", "48")
     monkeypatch.setenv("PODFLOW_MAX_ITEMS", "8")
     monkeypatch.setenv("PODFLOW_ORGANIZE_MODE", "ai")
-    monkeypatch.setenv("PODFLOW_LLM_PROVIDER", "gemini")
-    monkeypatch.setenv("PODFLOW_LLM_MODEL", "gemini-2.5-flash")
-    monkeypatch.setenv("PODFLOW_LLM_API_KEY_ENV_VAR", "GEMINI_API_KEY")
+    monkeypatch.setenv("PODFLOW_LLM_PROVIDER", "deepseek")
+    monkeypatch.setenv("PODFLOW_LLM_MODEL", "deepseek-chat")
+    monkeypatch.setenv("PODFLOW_LLM_API_KEY_ENV_VAR", "DEEPSEEK_API_KEY")
     monkeypatch.setenv("PODFLOW_TTS_ENGINE", "edge-tts")
     monkeypatch.setenv("PODFLOW_TTS_VOICE", "zh-CN-XiaoxiaoNeural")
     monkeypatch.setenv("PODFLOW_FETCH_SOURCES", "newsnow,ai_news_daily")
@@ -32,9 +32,9 @@ def test_apply_env_overrides_populates_runtime_config(monkeypatch):
     assert rc["discover"]["time_range_hours"] == 48
     assert rc["discover"]["max_items"] == 8
     assert rc["organize"]["mode"] == "ai"
-    assert rc["script"]["provider_kind"] == "gemini"
-    assert rc["script"]["llm_model"] == "gemini-2.5-flash"
-    assert rc["script"]["api_key_env_var"] == "GEMINI_API_KEY"
+    assert rc["script"]["provider_kind"] == "deepseek"
+    assert rc["script"]["llm_model"] == "deepseek-chat"
+    assert rc["script"]["api_key_env_var"] == "DEEPSEEK_API_KEY"
     assert rc["tts"]["engine"] == "edge-tts"
     assert rc["tts"]["default_voice"] == "zh-CN-XiaoxiaoNeural"
     assert rc["fetch"]["enabled_sources"] == ["newsnow", "ai_news_daily"]

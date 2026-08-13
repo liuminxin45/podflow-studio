@@ -2,8 +2,8 @@
 
 This is the CLI / GitHub Actions automation path. It produces an episode that
 is explicitly marked ``unreviewed`` (no human approval); it never touches the
-formal publish gate. LLM calls default to Gemini via Google AI Studio's free
-tier and TTS defaults to the free edge-tts engine.
+formal publish gate. LLM calls default to DeepSeek (OpenAI-compatible) and TTS
+defaults to the free edge-tts engine.
 
 Topic selection is driven by ``PODFLOW_TARGET_TOPIC`` (or ``--topic``). Without
 a topic the pipeline falls back to hotlist clustering.
@@ -51,8 +51,8 @@ from protocol.morning_news import build_run_report, write_json
 from protocol.presets import get_default_preset
 
 DEFAULT_OUTPUT_ROOT = ROOT / "out" / "auto-episode"
-DEFAULT_LLM_PROVIDER = "gemini"
-DEFAULT_LLM_MODEL = "gemini-2.5-flash"
+DEFAULT_LLM_PROVIDER = "deepseek"
+DEFAULT_LLM_MODEL = "deepseek-chat"
 DEFAULT_TTS_ENGINE = "edge-tts"
 
 
@@ -81,8 +81,8 @@ def _llm_kwargs() -> dict[str, Any]:
     """LLM config for research / topic_selection / script nodes.
 
     The API key is intentionally left empty: ``protocol.llm_runtime`` resolves
-    it from the environment (``GEMINI_API_KEY`` / ``GOOGLE_API_KEY`` /
-    ``PODFLOW_LLM_API_KEY``) so secrets never persist into the workflow state.
+    it from the environment (``DEEPSEEK_API_KEY`` / ``PODFLOW_LLM_API_KEY``) so
+    secrets never persist into the workflow state.
     """
     return {
         "provider_kind": _env("PODFLOW_LLM_PROVIDER", DEFAULT_LLM_PROVIDER),
@@ -264,7 +264,7 @@ def _write_player(state: dict[str, Any], output_dir: Path) -> None:
     audio_name = audio_rel.name or "final.mp3"
     title = state.get("script", {}).get("title") or state.get("episode_id") or "PodFlow 晨报"
     generated_by = _script_generated_by(state)
-    llm_label = "Gemini" if generated_by == "llm" else f"deterministic 兜底 ({generated_by or 'unknown'})"
+    llm_label = "DeepSeek" if generated_by == "llm" else f"deterministic 兜底 ({generated_by or 'unknown'})"
     segments = state.get("script", {}).get("segments", []) or []
     notes = "".join(
         f"<li><span class='t'>{i:02d}</span> {s.get('title','')}</li>"
@@ -304,7 +304,7 @@ def _finalize(state: dict[str, Any], output_dir: Path) -> None:
     state["run_report"]["unreviewed_note"] = (
         "Automated episode without human approval."
     )
-    # Gemini signal: "llm" means the LLM wrote the script; anything else means a
+    # LLM signal: "llm" means the LLM wrote the script; anything else means a
     # deterministic fallback was used (LLM unavailable/failed).
     generated_by = _script_generated_by(state)
     state["run_report"]["script_generated_by"] = generated_by

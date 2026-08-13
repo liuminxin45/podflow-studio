@@ -4,10 +4,10 @@ Maps ``PODFLOW_*`` process environment variables into a workflow state's
 ``runtime_config`` so the auto-episode entry point can drive topic selection,
 LLM provider, TTS engine and fetch sources without a desktop UI.
 
-LLM secrets are deliberately NOT written into ``runtime_config``. The Gemini
-provider resolves its key from ``GEMINI_API_KEY`` / ``GOOGLE_API_KEY`` /
-``PODFLOW_LLM_API_KEY`` at runtime (see ``protocol.llm_runtime``), so keys never
-persist into the workflow state.
+LLM secrets are deliberately NOT written into ``runtime_config``. The DeepSeek
+provider resolves its key from ``DEEPSEEK_API_KEY`` / ``PODFLOW_LLM_API_KEY`` at
+runtime (see ``protocol.llm_runtime``), so keys never persist into the workflow
+state.
 """
 
 from __future__ import annotations

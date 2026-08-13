@@ -109,11 +109,11 @@ def test_non_openai_provider_does_not_use_openai_env_fallback(monkeypatch):
     monkeypatch.setenv("OPENAI_API_BASE", "https://api.openai.com/v1")
 
     config = SimpleNamespace(
-        provider_kind="gemini",
+        provider_kind="deepseek",
         api_key="",
         api_key_env_var="",
-        api_base="https://generativelanguage.googleapis.com/v1beta/openai",
-        llm_model="gemini-2.0-flash",
+        api_base="https://api.deepseek.com",
+        llm_model="deepseek-chat",
         temperature=0.2,
         timeout=30,
     )
@@ -121,7 +121,7 @@ def test_non_openai_provider_does_not_use_openai_env_fallback(monkeypatch):
     target = resolve_llm_target(config)
 
     assert target.api_key == ""
-    assert target.api_base == "https://generativelanguage.googleapis.com/v1beta/openai"
+    assert target.api_base == "https://api.deepseek.com"
     assert not target.configured
 
 
@@ -212,15 +212,15 @@ def test_local_agent_target_without_command_is_not_silent_openai_fallback():
     assert exc.value.details["local_agent_id"] == "missing_command_agent"
 
 
-def test_gemini_resolves_env_key_and_default_base(monkeypatch):
-    monkeypatch.setenv("GEMINI_API_KEY", "AIza-env-key")
+def test_deepseek_resolves_env_key_and_default_base(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-env-key")
 
     config = SimpleNamespace(
-        provider_kind="gemini",
+        provider_kind="deepseek",
         api_key="",
         api_key_env_var="",
         api_base="",
-        llm_model="gemini-2.5-flash",
+        llm_model="deepseek-chat",
         ai_target="",
         local_agent_id="",
         local_agent_command="",
@@ -232,21 +232,21 @@ def test_gemini_resolves_env_key_and_default_base(monkeypatch):
 
     target = resolve_llm_target(config)
 
-    assert target.provider_kind == "gemini"
-    assert target.api_key == "AIza-env-key"
-    assert target.api_base == "https://generativelanguage.googleapis.com/v1beta/openai"
+    assert target.provider_kind == "deepseek"
+    assert target.api_key == "sk-env-key"
+    assert target.api_base == "https://api.deepseek.com"
     assert target.configured
 
 
-def test_gemini_falls_back_to_google_api_key(monkeypatch):
-    monkeypatch.setenv("GOOGLE_API_KEY", "AIza-google-key")
+def test_deepseek_falls_back_to_podflow_llm_api_key(monkeypatch):
+    monkeypatch.setenv("PODFLOW_LLM_API_KEY", "sk-podflow-key")
 
     config = SimpleNamespace(
-        provider_kind="gemini",
+        provider_kind="deepseek",
         api_key="",
         api_key_env_var="",
         api_base="",
-        llm_model="gemini-2.5-flash",
+        llm_model="deepseek-chat",
         ai_target="",
         local_agent_id="",
         local_agent_command="",
@@ -258,5 +258,5 @@ def test_gemini_falls_back_to_google_api_key(monkeypatch):
 
     target = resolve_llm_target(config)
 
-    assert target.api_key == "AIza-google-key"
+    assert target.api_key == "sk-podflow-key"
     assert target.configured

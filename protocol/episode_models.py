@@ -295,6 +295,11 @@ class RunReportModel(BaseModel):
 
     episode_id: str = ""
     preset_id: str = "morning_news_brief"
+    unreviewed: bool = False
+    automated: bool = False
+    unreviewed_note: str = ""
+    script_generated_by: str = ""
+    llm_used: bool = False
     facts: dict[str, Any] = Field(default_factory=dict)
     script: dict[str, Any] = Field(default_factory=dict)
     audio: dict[str, Any] = Field(default_factory=dict)

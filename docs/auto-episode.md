@@ -4,7 +4,7 @@
 
 ## 定位：一条链路，显式门禁开关
 
-生产链路只有一条，与桌面端、`produce` CLI 共用同一套节点。LLM（Gemini）和
+生产链路只有一条，与桌面端、`produce` CLI 共用同一套节点。LLM（DeepSeek）和
 TTS（edge-tts / 豆包）是可替换引擎，不是独立链路。
 
 自动出片与正式发布**唯一**的区别，是人工终审门禁是否被显式跳过：
@@ -24,10 +24,10 @@ TTS（edge-tts / 豆包）是可替换引擎，不是独立链路。
 | `PODFLOW_MAX_ITEMS` | 最多选取条目数 | 10 |
 | `PODFLOW_AUTO_EXECUTE` | 自动执行模式（`1`/`true`） | 关 |
 | `PODFLOW_ORGANIZE_MODE` | `ai` 启用 AI 整理 | — |
-| `PODFLOW_LLM_PROVIDER` | LLM 提供方（`gemini` / `openai_compatible` 等） | `gemini` |
-| `PODFLOW_LLM_API_BASE` | LLM base URL（gemini 留空自动填 OpenAI 兼容端点） | 空 |
-| `PODFLOW_LLM_MODEL` | 模型名 | `gemini-2.5-flash` |
-| `GEMINI_API_KEY` / `GOOGLE_API_KEY` / `PODFLOW_LLM_API_KEY` | Gemini key（运行时读取，不落盘） | — |
+| `PODFLOW_LLM_PROVIDER` | LLM 提供方（`deepseek` / `openai_compatible` 等） | `deepseek` |
+| `PODFLOW_LLM_API_BASE` | LLM base URL（deepseek 留空自动填 OpenAI 兼容端点） | 空 |
+| `PODFLOW_LLM_MODEL` | 模型名 | `deepseek-chat` |
+| `DEEPSEEK_API_KEY` / `PODFLOW_LLM_API_KEY` | DeepSeek key（运行时读取，不落盘） | — |
 | `PODFLOW_LLM_API_KEY_ENV_VAR` | 自定义 key 环境变量名 | — |
 | `PODFLOW_TTS_ENGINE` | TTS 引擎（`edge-tts` 免费 / `doubao_tts` 付费） | `edge-tts` |
 | `PODFLOW_TTS_VOICE` | 音色 | `zh-CN-XiaoxiaoNeural` |
@@ -38,26 +38,26 @@ TTS（edge-tts / 豆包）是可替换引擎，不是独立链路。
 
 密钥一律通过环境变量注入，运行时由 `protocol.llm_runtime` 解析，**不会写入 workflow state**。
 
-## Gemini 接入
+## DeepSeek 接入
 
-1. 到 [Google AI Studio](https://aistudio.google.com) 创建 key（`AIza...`，免费、无需信用卡）。
-2. 设置环境变量 `GEMINI_API_KEY=<key>`。
-3. `PODFLOW_LLM_PROVIDER=gemini`（默认）时，`api_base` 自动指向
-   `https://generativelanguage.googleapis.com/v1beta/openai`。
+1. 到 [DeepSeek 开放平台](https://platform.deepseek.com) 创建 key（`sk-...`）。
+2. 设置环境变量 `DEEPSEEK_API_KEY=<key>`，可选 `DEEPSEEK_MODEL`（默认 `deepseek-chat`）。
+3. `PODFLOW_LLM_PROVIDER=deepseek`（默认）时，`api_base` 自动指向
+   `https://api.deepseek.com`（OpenAI 兼容端点）。
 
-免费额度约 15 RPM / 每天数百次请求，一期节目的选题 + 写作调用量远在额度内。
-注意：免费 tier 的 prompt 可能被 Google 用于产品改进，敏感内容请勿使用。
+DeepSeek 按 token 计费、无免费额度，但单价低；一期节目的选题 + 写作调用量成本很低。
+国内可直连，无需代理。
 
 ## 本地运行
 
 ```bash
 # 指定主题
 PODFLOW_TARGET_TOPIC="AI 芯片" \
-GEMINI_API_KEY=AIza... \
+DEEPSEEK_API_KEY=sk-... \
 node scripts/python313.js scripts/run_auto_episode.py --output out/auto-episode
 
 # 不指定主题 → 热点聚类选题
-GEMINI_API_KEY=AIza... \
+DEEPSEEK_API_KEY=sk-... \
 node scripts/python313.js scripts/run_auto_episode.py
 ```
 
@@ -74,9 +74,10 @@ node scripts/python313.js scripts/run_auto_episode.py
 
 | Secret | 说明 |
 | --- | --- |
-| `GEMINI_API_KEY` | 必填，Gemini 免费 key |
+| `DEEPSEEK_API_KEY` | 必填，DeepSeek key |
+| `DEEPSEEK_MODEL` | 可选，默认 `deepseek-chat` |
 
-跑完上传 `podflow-auto-episode` artifact（mp3 + json）。
+跑完上传 `podflow-auto-episode` artifact（mp3 + play.html + json）。
 
 ### 数据源可靠性
 
