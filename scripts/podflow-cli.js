@@ -34,9 +34,9 @@ const EXIT = Object.freeze({
 const COMMANDS = new Set(['doctor', 'start', 'run', 'status', 'stop', 'logs', 'accept', 'produce', 'version', 'help'])
 const VALUE_OPTIONS = new Set([
   'mode', 'session', 'cdp', 'window', 'timeout', 'artifacts-dir', 'suite', 'tail',
-  'workflow', 'stage', 'audio-sha256', 'reviewer', 'notes', 'output',
+  'workflow', 'stage', 'audio-sha256', 'reviewer', 'notes', 'output', 'tts-engine',
 ])
-const BOOLEAN_OPTIONS = new Set(['json', 'follow', 'help', 'allow-paid-tts'])
+const BOOLEAN_OPTIONS = new Set(['json', 'follow', 'help', 'allow-paid-tts', 'preview'])
 
 class CliError extends Error {
   constructor(message, exitCode) {
@@ -317,7 +317,8 @@ async function produceCommand(options) {
     '--workflow', options.workflow, '--stage', stage,
   ]
   if (options['allow-paid-tts']) args.push('--allow-paid-tts')
-  for (const name of ['audio-sha256', 'reviewer', 'notes', 'output']) {
+  if (options['preview']) args.push('--preview')
+  for (const name of ['audio-sha256', 'reviewer', 'notes', 'output', 'tts-engine']) {
     if (options[name]) args.push(`--${name}`, options[name])
   }
   const child = spawn(python[0], args, { cwd: projectRoot, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })

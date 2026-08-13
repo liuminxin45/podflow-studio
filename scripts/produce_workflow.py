@@ -120,9 +120,16 @@ def _preflight(state: dict[str, Any], config: TTSConfig, allow_paid: bool) -> di
     return estimate
 
 
-def render(path: Path, envelope: dict[str, Any], state: dict[str, Any], allow_paid: bool) -> dict[str, Any]:
+def render(
+    path: Path,
+    envelope: dict[str, Any],
+    state: dict[str, Any],
+    allow_paid: bool,
+    tts_engine: str = "",
+) -> dict[str, Any]:
     tts = _config(state, "tts", TTSConfig)
-    tts.engine = "doubao_tts"
+    runtime_engine = str((state.get("runtime_config", {}).get("tts", {}) or {}).get("engine") or "").strip()
+    tts.engine = (tts_engine or runtime_engine or "doubao_tts").strip()
     tts.doubao_voice_type = DEFAULT_DOUBAO_VOICE_TYPE
     tts.default_voice = DEFAULT_DOUBAO_VOICE_TYPE
     tts.output_format = "mp3"
@@ -147,7 +154,7 @@ def approve(path: Path, envelope: dict[str, Any], state: dict[str, Any], digest:
     return {"stage": "approve", "audioApproval": state["audio_approval"]}
 
 
-def package(state: dict[str, Any], output: Path) -> dict[str, Any]:
+def package(state: dict[str, Any], output: Path, preview: bool = False) -> dict[str, Any]:
     artifact = file_fingerprint(state.get("audio_outputs", {}).get("final_audio_path"))
     plan = state.get("production_plan") if isinstance(state.get("production_plan"), dict) else {}
     audio_outputs = state.get("audio_outputs") if isinstance(state.get("audio_outputs"), dict) else {}
@@ -161,27 +168,28 @@ def package(state: dict[str, Any], output: Path) -> dict[str, Any]:
     regions = [str(segment.get("type") or segment.get("role") or "") for segment in segments]
     quick_count = sum(region in {"quick_news", "news_brief"} for region in regions)
     deep_count = sum(region in {"deep_dive", "analysis"} for region in regions)
-    if plan.get("version") != 3 or plan.get("quality_profile") != "podflow_morning_v3":
-        raise ValueError("Package requires production_plan v3 / podflow_morning_v3")
-    if state.get("review_summary", {}).get("status") != "passed":
-        raise ValueError("Package requires a passing automatic audio review")
-    if state.get("audio_approval", {}).get("audio_sha256") != artifact.get("sha256"):
-        raise ValueError("Package requires current human approval")
     if state.get("audio_outputs", {}).get("contains_mock_audio") is not False:
         raise ValueError("Mock audio cannot be packaged")
-    public_specs = {
-        "format": audio_outputs.get("format") == "mp3",
-        "sample rate": int(measured.get("sample_rate_hz") or 0) == 48_000,
-        "bitrate": int(measured.get("bitrate_kbps") or 0) in range(156, 165),
-        "loudness": measured.get("integrated_lufs") is not None and -17 <= float(measured["integrated_lufs"]) <= -15,
-        "true peak": measured.get("true_peak_db") is not None and float(measured["true_peak_db"]) <= -1.0,
-        "duration": 720 <= float(measured.get("duration_seconds") or 0) <= 900,
-        "source engine": audio_outputs.get("source_engines") == ["doubao_tts"],
-        "6+1 structure": quick_count == 6 and deep_count == 1,
-    }
-    failed_specs = [name for name, passed in public_specs.items() if not passed]
-    if failed_specs:
-        raise ValueError("Package public audio checks failed: " + ", ".join(failed_specs))
+    if not preview:
+        if plan.get("version") != 3 or plan.get("quality_profile") != "podflow_morning_v3":
+            raise ValueError("Package requires production_plan v3 / podflow_morning_v3")
+        if state.get("review_summary", {}).get("status") != "passed":
+            raise ValueError("Package requires a passing automatic audio review")
+        if state.get("audio_approval", {}).get("audio_sha256") != artifact.get("sha256"):
+            raise ValueError("Package requires current human approval")
+        public_specs = {
+            "format": audio_outputs.get("format") == "mp3",
+            "sample rate": int(measured.get("sample_rate_hz") or 0) == 48_000,
+            "bitrate": int(measured.get("bitrate_kbps") or 0) in range(156, 165),
+            "loudness": measured.get("integrated_lufs") is not None and -17 <= float(measured["integrated_lufs"]) <= -15,
+            "true peak": measured.get("true_peak_db") is not None and float(measured["true_peak_db"]) <= -1.0,
+            "duration": 720 <= float(measured.get("duration_seconds") or 0) <= 900,
+            "source engine": audio_outputs.get("source_engines") == ["doubao_tts"],
+            "6+1 structure": quick_count == 6 and deep_count == 1,
+        }
+        failed_specs = [name for name, passed in public_specs.items() if not passed]
+        if failed_specs:
+            raise ValueError("Package public audio checks failed: " + ", ".join(failed_specs))
     episode_id = str(state.get("episode_id") or "")
     target = output / episode_id
     if target.exists():
@@ -247,8 +255,11 @@ def package(state: dict[str, Any], output: Path) -> dict[str, Any]:
                           "sourceUrl": "https://ondrosik.sk/music/", "license": "CC0 1.0 Universal",
                           "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
                           "edited": "经裁剪、淡入淡出及响度处理"}],
-        "approval": state["audio_approval"],
+        "approval": state.get("audio_approval", {}),
     }
+    if preview:
+        manifest["preview"] = True
+        manifest["productionMode"] = "preview"
     notes = [f"# {manifest['title']}", "", manifest["summary"], "", "## 来源", ""] + [f"- [{item['title']}]({item['url']})" for item in sources]
     (target / "show-notes.md").write_text("\n".join(notes) + "\n", encoding="utf-8")
     (target / "episode.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -260,6 +271,8 @@ def main() -> int:
     parser.add_argument("--workflow", required=True)
     parser.add_argument("--stage", required=True, choices=("render", "approve", "package"))
     parser.add_argument("--allow-paid-tts", action="store_true")
+    parser.add_argument("--preview", action="store_true", help="Skip formal publish gates; produce a preview package")
+    parser.add_argument("--tts-engine", default="", help="TTS engine override (e.g. edge-tts)")
     parser.add_argument("--audio-sha256", default="")
     parser.add_argument("--reviewer", default="")
     parser.add_argument("--notes", default="")
@@ -272,7 +285,7 @@ def main() -> int:
     path = _resolve_workflow(args.workflow)
     envelope, state = _load(path)
     if args.stage == "render":
-        result = render(path, envelope, state, args.allow_paid_tts)
+        result = render(path, envelope, state, args.allow_paid_tts, tts_engine=args.tts_engine)
     elif args.stage == "approve":
         if not args.audio_sha256 or not args.reviewer:
             raise ValueError("approve requires --audio-sha256 and --reviewer")
@@ -280,7 +293,7 @@ def main() -> int:
     else:
         if args.output is None:
             raise ValueError("package requires --output")
-        result = package(state, args.output.resolve())
+        result = package(state, args.output.resolve(), preview=args.preview)
     print(json.dumps({"ok": True, **result}, ensure_ascii=False))
     return 0
 

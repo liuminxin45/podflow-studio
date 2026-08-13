@@ -210,3 +210,53 @@ def test_local_agent_target_without_command_is_not_silent_openai_fallback():
 
     assert exc.value.code == "CONFIG"
     assert exc.value.details["local_agent_id"] == "missing_command_agent"
+
+
+def test_gemini_resolves_env_key_and_default_base(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "AIza-env-key")
+
+    config = SimpleNamespace(
+        provider_kind="gemini",
+        api_key="",
+        api_key_env_var="",
+        api_base="",
+        llm_model="gemini-2.5-flash",
+        ai_target="",
+        local_agent_id="",
+        local_agent_command="",
+        local_agent_args=(),
+        local_agent_output_mode="",
+        temperature=0.3,
+        timeout=30,
+    )
+
+    target = resolve_llm_target(config)
+
+    assert target.provider_kind == "gemini"
+    assert target.api_key == "AIza-env-key"
+    assert target.api_base == "https://generativelanguage.googleapis.com/v1beta/openai"
+    assert target.configured
+
+
+def test_gemini_falls_back_to_google_api_key(monkeypatch):
+    monkeypatch.setenv("GOOGLE_API_KEY", "AIza-google-key")
+
+    config = SimpleNamespace(
+        provider_kind="gemini",
+        api_key="",
+        api_key_env_var="",
+        api_base="",
+        llm_model="gemini-2.5-flash",
+        ai_target="",
+        local_agent_id="",
+        local_agent_command="",
+        local_agent_args=(),
+        local_agent_output_mode="",
+        temperature=0.3,
+        timeout=30,
+    )
+
+    target = resolve_llm_target(config)
+
+    assert target.api_key == "AIza-google-key"
+    assert target.configured

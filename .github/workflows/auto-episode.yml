@@ -1,0 +1,62 @@
+name: Auto Episode
+
+on:
+  schedule:
+    # 每天 UTC 00:00（北京时间 08:00）自动生成一期预览播客
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      target_topic:
+        description: AI 选题主题（留空则按热点聚类自动选题）
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-episode
+  cancel-in-progress: false
+
+jobs:
+  auto-episode:
+    runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      PODFLOW_LLM_PROVIDER: gemini
+      PODFLOW_LLM_MODEL: gemini-2.5-flash
+      PODFLOW_TTS_ENGINE: edge-tts
+      PODFLOW_TTS_VOICE: zh-CN-XiaoxiaoNeural
+      PODFLOW_TARGET_TOPIC: ${{ inputs.target_topic }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install system audio tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto-cjk
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm run setup
+
+      - name: Run auto episode
+        run: node scripts/python313.js scripts/run_auto_episode.py --output out/auto-episode
+
+      - name: Upload preview artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: podflow-auto-episode
+          path: |
+            out/auto-episode/**/*.mp3
+            out/auto-episode/**/*.json
+          if-no-files-found: error

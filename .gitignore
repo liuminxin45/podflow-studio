@@ -23,6 +23,7 @@ build/
 # IDE
 .idea/
 .vscode/
+.workbuddy/
 
 # OS
 .DS_Store

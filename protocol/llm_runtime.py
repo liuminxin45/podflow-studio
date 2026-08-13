@@ -23,6 +23,8 @@ OPENAI_COMPATIBLE_KINDS = {
     "openrouter",
 }
 OPENAI_ENV_FALLBACK_KINDS = {"openai", "openai_compatible"}
+GEMINI_OPENAI_COMPAT_BASE = "https://generativelanguage.googleapis.com/v1beta/openai"
+GEMINI_ENV_KEY_CANDIDATES = ("GEMINI_API_KEY", "GOOGLE_API_KEY", "PODFLOW_LLM_API_KEY")
 LOCAL_AGENT_OUTPUT_MODES = {"stdout", "codex-json"}
 SUPPORTED_PROVIDER_KINDS = OPENAI_COMPATIBLE_KINDS | {"anthropic", "local_agent"}
 DIRECT_CODEX_PROMPT_LIMIT = 24000
@@ -580,9 +582,18 @@ def resolve_llm_target(config: Any) -> LLMRuntimeTarget:
     if not api_key and provider_kind in OPENAI_ENV_FALLBACK_KINDS:
         api_key = os.environ.get("OPENAI_API_KEY", "")
 
+    if not api_key and provider_kind == "gemini":
+        api_key = next(
+            (os.environ.get(name, "") for name in GEMINI_ENV_KEY_CANDIDATES if os.environ.get(name, "")),
+            "",
+        )
+
     api_base = str(getattr(config, "api_base", "") or "").strip().rstrip("/")
     if not api_base and provider_kind in OPENAI_ENV_FALLBACK_KINDS:
         api_base = os.environ.get("OPENAI_API_BASE", "").strip().rstrip("/")
+
+    if not api_base and provider_kind == "gemini":
+        api_base = GEMINI_OPENAI_COMPAT_BASE
 
     model = str(getattr(config, "llm_model", "") or "").strip()
     if provider_kind == "local_agent" and not model:
