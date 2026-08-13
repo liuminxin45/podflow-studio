@@ -307,6 +307,16 @@ def main() -> int:
     print(f"segments: {report.get('script', {}).get('segments', 0)}")
     print(f"audio: {state.get('audio_outputs', {}).get('final_audio_path', '')}")
 
+    # Surface per-node errors so CI logs show the real cause instead of a bare
+    # "script has no segments".
+    node_errors = state.get("errors", [])
+    if node_errors:
+        print(f"node errors: {len(node_errors)}")
+        for err in node_errors:
+            if not isinstance(err, dict):
+                continue
+            print(f"  [{err.get('node', '?')}] {err.get('message', '')}")
+
     failures = assembly_failures(state)
     for failure in failures:
         print(f"error: {failure}")

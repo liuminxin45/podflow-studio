@@ -453,6 +453,9 @@ def run(state: dict[str, Any], config: ScriptConfig = None) -> dict[str, Any]:
             f"facts={len(facts)}"
         )
     except Exception as e:
+        import traceback
+
+        tb = traceback.format_exc()
         request = state.get("generation_request")
         if isinstance(request, dict) and request:
             state["generation_request"] = {
@@ -460,8 +463,9 @@ def run(state: dict[str, Any], config: ScriptConfig = None) -> dict[str, Any]:
                 "status": "failed",
                 "failed_at": datetime.now(timezone.utc).isoformat(),
             }
-        ctx.add_error("script", str(e), detail=str(e))
-        ctx.log(f"错误: {str(e)}")
+        ctx.add_error("script", f"{type(e).__name__}: {e}", detail=tb)
+        ctx.log(f"错误: {type(e).__name__}: {e}")
+        ctx.log(f"Traceback: {tb}")
 
     script = state.get("script", {})
     detail = (
@@ -496,86 +500,103 @@ def _generate_script(
             title=topic.get("title", "PodFlow 晨报"),
         )
 
-    with create_llm_runtime(config, debug_mode=ctx.debug_mode) as client:
-        structure = _resolve_script_structure(facts, preset)
-        ctx.log(f"LLM编排调用: {target.masked_summary()}, timeout={config.timeout}s")
-        plan_response = client.call(
-            [
-                {"role": "system", "content": EDITORIAL_PLAN_SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": build_editorial_plan_prompt(
-                        facts,
-                        target_chars_min=config.episode_chars_min,
-                        target_chars_max=config.episode_chars_max,
-                        deep_dive_count=int(structure["actual_deep_dive_count"]),
-                    ),
-                },
-            ],
-            timeout=config.timeout,
-            logs=ctx.logs,
-        )
-        plan_content = client.extract_content(plan_response)
-        try:
-            editorial_plan = validate_editorial_plan(
-                _parse_json_object(plan_content, "成稿编排"),
-                facts,
-                expected_deep_dive_count=int(structure["actual_deep_dive_count"]),
-            )
-        except ValueError as plan_error:
-            ctx.log(f"成稿编排定向修复调用: {plan_error}")
-            repair_response = client.call(
+    try:
+        with create_llm_runtime(config, debug_mode=ctx.debug_mode) as client:
+            structure = _resolve_script_structure(facts, preset)
+            ctx.log(f"LLM编排调用: {target.masked_summary()}, timeout={config.timeout}s")
+            plan_response = client.call(
                 [
-                    {
-                        "role": "system",
-                        "content": EDITORIAL_PLAN_SYSTEM_PROMPT,
-                    },
+                    {"role": "system", "content": EDITORIAL_PLAN_SYSTEM_PROMPT},
                     {
                         "role": "user",
-                        "content": (
-                            "修复下面的编排 JSON。只修复格式和约束问题，不改变事实 ID 集合，"
-                            "不增加事实。只返回完整 JSON 对象。\n\n"
-                            f"<校验错误>{plan_error}</校验错误>\n"
-                            f"<原编排>{plan_content}</原编排>\n\n"
-                            + build_editorial_plan_prompt(
-                                facts,
-                                target_chars_min=config.episode_chars_min,
-                                target_chars_max=config.episode_chars_max,
-                                deep_dive_count=int(structure["actual_deep_dive_count"]),
-                            )
+                        "content": build_editorial_plan_prompt(
+                            facts,
+                            target_chars_min=config.episode_chars_min,
+                            target_chars_max=config.episode_chars_max,
+                            deep_dive_count=int(structure["actual_deep_dive_count"]),
                         ),
                     },
                 ],
                 timeout=config.timeout,
                 logs=ctx.logs,
             )
-            repaired_plan_content = client.extract_content(repair_response)
-            editorial_plan = validate_editorial_plan(
-                _parse_json_object(repaired_plan_content, "成稿编排修复"),
-                facts,
-                expected_deep_dive_count=int(structure["actual_deep_dive_count"]),
+            plan_content = client.extract_content(plan_response)
+            try:
+                editorial_plan = validate_editorial_plan(
+                    _parse_json_object(plan_content, "成稿编排"),
+                    facts,
+                    expected_deep_dive_count=int(structure["actual_deep_dive_count"]),
+                )
+            except ValueError as plan_error:
+                ctx.log(f"成稿编排定向修复调用: {plan_error}")
+                repair_response = client.call(
+                    [
+                        {
+                            "role": "system",
+                            "content": EDITORIAL_PLAN_SYSTEM_PROMPT,
+                        },
+                        {
+                            "role": "user",
+                            "content": (
+                                "修复下面的编排 JSON。只修复格式和约束问题，不改变事实 ID 集合，"
+                                "不增加事实。只返回完整 JSON 对象。\n\n"
+                                f"<校验错误>{plan_error}</校验错误>\n"
+                                f"<原编排>{plan_content}</原编排>\n\n"
+                                + build_editorial_plan_prompt(
+                                    facts,
+                                    target_chars_min=config.episode_chars_min,
+                                    target_chars_max=config.episode_chars_max,
+                                    deep_dive_count=int(structure["actual_deep_dive_count"]),
+                                )
+                            ),
+                        },
+                    ],
+                    timeout=config.timeout,
+                    logs=ctx.logs,
+                )
+                repaired_plan_content = client.extract_content(repair_response)
+                editorial_plan = validate_editorial_plan(
+                    _parse_json_object(repaired_plan_content, "成稿编排修复"),
+                    facts,
+                    expected_deep_dive_count=int(structure["actual_deep_dive_count"]),
+                )
+            ctx.log(
+                f"成稿编排完成: items={len(editorial_plan['items'])}, "
+                f"order={[item['fact_id'] for item in editorial_plan['items']]}"
             )
+            prompt = _build_news_brief_prompt(
+                topic,
+                config,
+                facts,
+                structure,
+                editorial_plan,
+            )
+            ctx.log(f"LLM成稿调用: {target.masked_summary()}, timeout={config.timeout}s")
+            response = client.call(
+                [
+                    {"role": "system", "content": EPISODE_SCRIPT_SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                timeout=config.timeout,
+                logs=ctx.logs,
+            )
+            content = client.extract_content(response)
+    except Exception as llm_error:
+        # LLM transport/auth/timeout failure. With facts present, never leave
+        # the episode without a script: fall back to the deterministic generator
+        # unless the caller explicitly required an LLM draft.
+        if require_llm:
+            raise RuntimeError(
+                f"成稿 AI 调用失败（{type(llm_error).__name__}: {llm_error}），"
+                "未使用本地模板覆盖初稿"
+            ) from llm_error
         ctx.log(
-            f"成稿编排完成: items={len(editorial_plan['items'])}, "
-            f"order={[item['fact_id'] for item in editorial_plan['items']]}"
+            f"成稿 AI 调用失败（{type(llm_error).__name__}: {llm_error}），"
+            "使用 deterministic 降级输出"
         )
-        prompt = _build_news_brief_prompt(
-            topic,
-            config,
-            facts,
-            structure,
-            editorial_plan,
+        return generate_deterministic_script(
+            facts, preset, episode_id="", title=topic.get("title", "PodFlow 晨报")
         )
-        ctx.log(f"LLM成稿调用: {target.masked_summary()}, timeout={config.timeout}s")
-        response = client.call(
-            [
-                {"role": "system", "content": EPISODE_SCRIPT_SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            timeout=config.timeout,
-            logs=ctx.logs,
-        )
-        content = client.extract_content(response)
 
     try:
         parsed = _parse_json_object(content, "成稿")

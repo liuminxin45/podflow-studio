@@ -10,6 +10,8 @@ URLs come from ``FetchConfig.rss_urls`` (wired from ``PODFLOW_RSS_URLS``).
 When none are configured it falls back to ``DEFAULT_RSS_URLS``.
 """
 
+import html
+import re
 from typing import Any
 from urllib.parse import urlparse
 
@@ -108,7 +110,7 @@ def _fetch_feed(url: str, fetch_logs: list[str] | None) -> list[dict[str, Any]]:
             title = content[:60]
         items.append(
             {
-                "title": title,
+                "title": _strip_html(title),
                 "content": content,
                 "url": link,
                 "published": published,
@@ -129,7 +131,23 @@ def _entry_content(entry: Any) -> str:
         candidate = structured[0].get("value", "") or ""
         if len(candidate) > len(content):
             content = candidate
-    return content.strip()
+    return _strip_html(content)
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
+
+
+def _strip_html(text: str) -> str:
+    """Strip markup and entities; RSS bodies feed TTS, so they must be plain text."""
+    if not text:
+        return ""
+    # Block-level tags become spaces so words don't fuse.
+    no_blocks = re.sub(r"</(p|div|br|li|h[1-6]|blockquote|section)>", " ", text, flags=re.IGNORECASE)
+    no_blocks = re.sub(r"<(br|p|div|li|h[1-6]|blockquote|section)[^>]*>", " ", no_blocks, flags=re.IGNORECASE)
+    no_tags = _TAG_RE.sub(" ", no_blocks)
+    decoded = html.unescape(no_tags)
+    return _WS_RE.sub(" ", decoded).strip()
 
 
 def _host_label(url: str) -> str:
