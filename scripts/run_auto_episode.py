@@ -253,12 +253,62 @@ def run_auto_episode(
     return state
 
 
+def _script_generated_by(state: dict[str, Any]) -> str:
+    return str(state.get("script", {}).get("generated_by") or "")
+
+
+def _write_player(state: dict[str, Any], output_dir: Path) -> None:
+    """Write a self-contained play.html so the downloaded zip opens a local
+    player (GitHub Artifacts cannot stream audio in the browser)."""
+    audio_rel = Path(str(state.get("audio_outputs", {}).get("final_audio_path") or ""))
+    audio_name = audio_rel.name or "final.mp3"
+    title = state.get("script", {}).get("title") or state.get("episode_id") or "PodFlow 晨报"
+    generated_by = _script_generated_by(state)
+    llm_label = "Gemini" if generated_by == "llm" else f"deterministic 兜底 ({generated_by or 'unknown'})"
+    segments = state.get("script", {}).get("segments", []) or []
+    notes = "".join(
+        f"<li><span class='t'>{i:02d}</span> {s.get('title','')}</li>"
+        for i, s in enumerate(segments, 1)
+        if isinstance(s, dict)
+    )
+    html_doc = f"""<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title}</title>
+<style>
+ body{{font-family:-apple-system,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif;
+  background:#0b1020;color:#e8ecf6;margin:0;display:flex;justify-content:center;padding:40px 16px}}
+ .card{{width:100%;max-width:640px;background:#151b30;border:1px solid #26304f;border-radius:16px;padding:28px}}
+ h1{{font-size:20px;margin:0 0 6px}}
+ .meta{{font-size:13px;color:#93a0c0;margin-bottom:20px}}
+ audio{{width:100%;margin-bottom:20px}}
+ ul{{list-style:none;padding:0;margin:0;max-height:320px;overflow:auto}}
+ li{{padding:8px 10px;border-bottom:1px solid #232c4a;font-size:14px}}
+ .t{{color:#5b6cff;font-weight:600;margin-right:8px}}
+ .badge{{display:inline-block;background:#1d2a52;color:#9db0ff;border-radius:999px;
+  padding:2px 10px;font-size:12px;margin-left:6px}}
+</style></head><body>
+<div class="card">
+  <h1>{title}<span class="badge">{llm_label}</span></h1>
+  <div class="meta">{state.get('episode_id','')} · 未人工终审 · 由自动化链路生成</div>
+  <audio controls preload="metadata" src="{audio_name}">此浏览器不支持音频播放。</audio>
+  <ul>{notes}</ul>
+</div>
+</body></html>"""
+    (output_dir / "play.html").write_text(html_doc, encoding="utf-8")
+
+
 def _finalize(state: dict[str, Any], output_dir: Path) -> None:
     state.setdefault("run_report", {})["unreviewed"] = True
     state["run_report"]["automated"] = True
     state["run_report"]["unreviewed_note"] = (
         "Automated episode without human approval."
     )
+    # Gemini signal: "llm" means the LLM wrote the script; anything else means a
+    # deterministic fallback was used (LLM unavailable/failed).
+    generated_by = _script_generated_by(state)
+    state["run_report"]["script_generated_by"] = generated_by
+    state["run_report"]["llm_used"] = generated_by == "llm"
     schema_ok, schema_errors = validate_episode_run_payload(state)
     state["run_report"]["schema_validation"] = {"ok": schema_ok, "errors": schema_errors}
 
@@ -267,6 +317,7 @@ def _finalize(state: dict[str, Any], output_dir: Path) -> None:
     write_json(output_dir / "script.edited.json", state.get("edited_script", {}))
     write_json(output_dir / "state.json", state)
     write_json(output_dir / "run_report.json", build_run_report(state))
+    _write_player(state, output_dir)
 
 
 def assembly_failures(state: dict[str, Any]) -> list[str]:
@@ -305,6 +356,9 @@ def main() -> int:
     print(f"unreviewed: {report.get('unreviewed', False)}")
     print(f"facts: {report.get('facts', {}).get('total', 0)}")
     print(f"segments: {report.get('script', {}).get('segments', 0)}")
+    generated_by = report.get("script_generated_by") or _script_generated_by(state)
+    print(f"llm_used: {report.get('llm_used', generated_by == 'llm')}")
+    print(f"script_generated_by: {generated_by}")
     print(f"audio: {state.get('audio_outputs', {}).get('final_audio_path', '')}")
 
     # Surface per-node errors so CI logs show the real cause instead of a bare

@@ -60,7 +60,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: podflow-auto-episode
-          path: |
-            out/auto-episode/**/*.mp3
-            out/auto-episode/**/*.json
+          # 整包上传：final.mp3 + play.html（本地播放器）+ facts/script/state/run_report.json。
+          # GitHub 网页不内置音频流播放，下载 zip 后打开 play.html 即可播放。
+          path: out/auto-episode/
           if-no-files-found: error

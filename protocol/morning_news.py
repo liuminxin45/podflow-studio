@@ -295,6 +295,8 @@ def build_run_report(state: dict[str, Any]) -> dict[str, Any]:
         "unreviewed": bool(state.get("run_report", {}).get("unreviewed", False)),
         "automated": bool(state.get("run_report", {}).get("automated", False)),
         "unreviewed_note": state.get("run_report", {}).get("unreviewed_note", ""),
+        "script_generated_by": state.get("run_report", {}).get("script_generated_by", ""),
+        "llm_used": bool(state.get("run_report", {}).get("llm_used", False)),
         "preset_id": preset.get("id", "morning_news_brief"),
         "facts": {
             "total": len(facts),
