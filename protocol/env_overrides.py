@@ -81,6 +81,9 @@ def apply_env_overrides(state: dict[str, Any]) -> dict[str, Any]:
     sources = _list_env("PODFLOW_FETCH_SOURCES")
     if sources:
         _nested(rc, "fetch")["enabled_sources"] = sources
+    rss_urls = _list_env("PODFLOW_RSS_URLS")
+    if rss_urls:
+        _nested(rc, "fetch")["rss_urls"] = rss_urls
     newsnow_ids = _list_env("PODFLOW_NEWSNOW_SOURCE_IDS")
     if newsnow_ids:
         _nested(rc, "fetch")["newsnow_source_ids"] = newsnow_ids

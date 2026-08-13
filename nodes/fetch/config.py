@@ -37,6 +37,10 @@ class FetchConfig(NodeConfigBase):
     newsnow_base_url: str = Field(
         default="", description="NewsNow 服务地址，留空时使用 NEWSNOW_BASE_URL 或默认公开服务。"
     )
+    rss_urls: list[str] = Field(
+        default_factory=list,
+        description="RSS/Atom feed URLs (key-free). 自动出片在 CI 的可靠基线源。",
+    )
 
     min_relevance: int = Field(default=3, ge=1, le=5, description="最低相关度要求 1-5")
     allow_duplicates: bool = Field(default=False, description="是否允许重复内容")

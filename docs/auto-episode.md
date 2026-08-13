@@ -32,7 +32,8 @@ TTS（edge-tts / 豆包）是可替换引擎，不是独立链路。
 | `PODFLOW_TTS_ENGINE` | TTS 引擎（`edge-tts` 免费 / `doubao_tts` 付费） | `edge-tts` |
 | `PODFLOW_TTS_VOICE` | 音色 | `zh-CN-XiaoxiaoNeural` |
 | `PODFLOW_DOUBAO_APP_ID` / `PODFLOW_DOUBAO_ACCESS_TOKEN` | 豆包凭证（可选） | — |
-| `PODFLOW_FETCH_SOURCES` | 数据源（逗号分隔：`newsnow,ai_news_daily`） | 全部源 |
+| `PODFLOW_FETCH_SOURCES` | 数据源（逗号分隔：`rss,newsnow,ai_news_daily`） | 全部源 |
+| `PODFLOW_RSS_URLS` | 关键免密钥 RSS 源（逗号分隔），CI 的可靠基线 | 内置 ithome/solidot |
 | `PODFLOW_NEWSNOW_SOURCE_IDS` | NewsNow 子源 ID | 默认子源 |
 
 密钥一律通过环境变量注入，运行时由 `protocol.llm_runtime` 解析，**不会写入 workflow state**。
@@ -76,6 +77,15 @@ node scripts/python313.js scripts/run_auto_episode.py
 | `GEMINI_API_KEY` | 必填，Gemini 免费 key |
 
 跑完上传 `podflow-auto-episode` artifact（mp3 + json）。
+
+### 数据源可靠性
+
+NewsNow 公开实例与 AI 资讯 API 是第三方聚合源，在 GitHub Runner 上可能不可达或被限流，
+导致 fetch 返回 0 条。因此自动出片以 **key-free RSS 源** 作为可靠基线（`PODFLOW_RSS_URLS`），
+NewsNow / AI 资讯只作补充。`run_auto_episode` 在 fetch 为空时会重试一次，并在日志打印每个
+阶段的条目数与 fetch 级错误，便于定位失败（`[stage] fetch: 0 items` 等）。
+
+若 RSS 源也需替换，改 `PODFLOW_RSS_URLS` 为任意可达的公开 RSS/Atom 地址即可。
 
 ## 免费 TTS 说明
 

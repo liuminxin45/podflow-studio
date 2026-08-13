@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -59,6 +60,23 @@ def _env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
 
 
+def _list_env(name: str) -> list[str]:
+    return [part.strip() for part in os.environ.get(name, "").split(",") if part.strip()]
+
+
+def _resolve_rss_urls(state: dict[str, Any]) -> list[str]:
+    urls = _list_env("PODFLOW_RSS_URLS")
+    rc_rss = state.get("runtime_config", {}).get("fetch", {}).get("rss_urls", [])
+    urls.extend(u.strip() for u in (rc_rss or []) if isinstance(u, str) and u.strip())
+    seen: set[str] = set()
+    out: list[str] = []
+    for u in urls:
+        if u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out
+
+
 def _llm_kwargs() -> dict[str, Any]:
     """LLM config for research / topic_selection / script nodes.
 
@@ -90,6 +108,10 @@ def _default_episode_id() -> str:
 
 def _mark_ready(materials: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{**item, "_status": "ready"} for item in materials]
+
+
+def _stage(label: str, count: int) -> None:
+    print(f"[stage] {label}: {count} items", flush=True)
 
 
 def run_auto_episode(
@@ -143,30 +165,53 @@ def run_auto_episode(
     if target_topic:
         state["runtime_config"].setdefault("discover", {})["target_topic"] = target_topic
 
-    # 1. Discover
+    # 1. Discover (with one retry for transient source failures)
     fetch_sources = _env("PODFLOW_FETCH_SOURCES")
+    rss_urls = _resolve_rss_urls(state)
     fetch_config = FetchConfig(
         enabled_sources=[s for s in fetch_sources.split(",") if s.strip()] if fetch_sources else [],
+        rss_urls=rss_urls,
     )
     state = fetch_run(state, fetch_config)
+    if not state.get("fetch_contents"):
+        fetch_errs = [e for e in state.get("errors", []) if e.get("node") == "fetch"]
+        print(
+            f"[retry] fetch returned 0 items; retrying once after cooldown "
+            f"({len(fetch_errs)} fetch error(s))",
+            flush=True,
+        )
+        time.sleep(15)
+        state = fetch_run(state, fetch_config)
+    _stage("fetch", len(state.get("fetch_contents", [])))
 
     # 2. Organize
     state = preprocess_run(state, PreprocessConfig())
+    _stage("preprocess", len(state.get("cleaned_contents", [])))
 
     # 3. Research (auto-execute passes items through; topic_selection filters)
     state = research_run(state, ResearchConfig(**_llm_kwargs()))
+    _stage("research", len(state.get("researched_contents", [])))
 
     # 4. Topic selection (AI-driven, env target_topic or hotlist clustering)
     state = topic_selection_run(state, TopicSelectionConfig(**_llm_kwargs()))
+    _stage("topic_selection", len(state.get("selected_materials", [])))
 
     # 5. Facts
     materials = _mark_ready(state.get("selected_materials", []))
     if not materials:
+        fetch_errs = [e for e in state.get("errors", []) if e.get("node") == "fetch"]
+        fetch_summary = "; ".join(
+            f"{e.get('source', '?')}: {e.get('message', '')}" for e in fetch_errs[:5]
+        )
         state["errors"].append(
             {
                 "node": "run_auto_episode",
                 "message": "No materials survived topic selection; cannot build facts",
-                "detail": "fetch/topic selection produced zero selected_materials",
+                "detail": (
+                    "fetch produced "
+                    f"{len(state.get('fetch_contents', []))} items; "
+                    f"fetch errors: {fetch_summary or 'none'}"
+                ),
             }
         )
         _finalize(state, output_dir)
@@ -179,13 +224,16 @@ def run_auto_episode(
             selected_topic_count=preset.get("recommended_news_item_count", 7),
         ),
     )
+    _stage("facts", len(state.get("facts", [])))
 
     # 6. Script
     state = script_run(state, ScriptConfig(**_llm_kwargs()))
+    _stage("script", len(state.get("script", {}).get("segments", [])))
 
     # 7. TTS (free engine by default; Doubao optional via env)
     engine = (tts_engine or _env("PODFLOW_TTS_ENGINE") or DEFAULT_TTS_ENGINE).strip()
     state = tts_run(state, _tts_config(engine, output_dir))
+    _stage("tts", len(state.get("voice_segments", [])))
 
     # 8. Assembly + cover
     state = audio_run(

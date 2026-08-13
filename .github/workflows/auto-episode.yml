@@ -28,6 +28,10 @@ jobs:
       PODFLOW_TTS_ENGINE: edge-tts
       PODFLOW_TTS_VOICE: zh-CN-XiaoxiaoNeural
       PODFLOW_TARGET_TOPIC: ${{ inputs.target_topic }}
+      # Key-free RSS feeds: the reliability baseline for CI. NewsNow / AI-news
+      # aggregators are supplementary and may be unreachable from GitHub runners.
+      PODFLOW_RSS_URLS: "https://www.ithome.com/rss/,https://www.solidot.org/index.rss"
+      PODFLOW_FETCH_SOURCES: "rss,newsnow,ai_news_daily"
     steps:
       - uses: actions/checkout@v4
 
