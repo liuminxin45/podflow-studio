@@ -52,7 +52,7 @@ from protocol.presets import get_default_preset
 
 DEFAULT_OUTPUT_ROOT = ROOT / "out" / "auto-episode"
 DEFAULT_LLM_PROVIDER = "deepseek"
-DEFAULT_LLM_MODEL = "deepseek-chat"
+DEFAULT_LLM_MODEL = "deepseek-v4-flash"
 DEFAULT_TTS_ENGINE = "edge-tts"
 
 

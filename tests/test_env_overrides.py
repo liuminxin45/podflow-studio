@@ -17,7 +17,7 @@ def test_apply_env_overrides_populates_runtime_config(monkeypatch):
     monkeypatch.setenv("PODFLOW_MAX_ITEMS", "8")
     monkeypatch.setenv("PODFLOW_ORGANIZE_MODE", "ai")
     monkeypatch.setenv("PODFLOW_LLM_PROVIDER", "deepseek")
-    monkeypatch.setenv("PODFLOW_LLM_MODEL", "deepseek-chat")
+    monkeypatch.setenv("PODFLOW_LLM_MODEL", "deepseek-v4-flash")
     monkeypatch.setenv("PODFLOW_LLM_API_KEY_ENV_VAR", "DEEPSEEK_API_KEY")
     monkeypatch.setenv("PODFLOW_TTS_ENGINE", "edge-tts")
     monkeypatch.setenv("PODFLOW_TTS_VOICE", "zh-CN-XiaoxiaoNeural")
@@ -33,7 +33,7 @@ def test_apply_env_overrides_populates_runtime_config(monkeypatch):
     assert rc["discover"]["max_items"] == 8
     assert rc["organize"]["mode"] == "ai"
     assert rc["script"]["provider_kind"] == "deepseek"
-    assert rc["script"]["llm_model"] == "deepseek-chat"
+    assert rc["script"]["llm_model"] == "deepseek-v4-flash"
     assert rc["script"]["api_key_env_var"] == "DEEPSEEK_API_KEY"
     assert rc["tts"]["engine"] == "edge-tts"
     assert rc["tts"]["default_voice"] == "zh-CN-XiaoxiaoNeural"

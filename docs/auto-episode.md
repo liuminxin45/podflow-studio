@@ -26,7 +26,7 @@ TTS（edge-tts / 豆包）是可替换引擎，不是独立链路。
 | `PODFLOW_ORGANIZE_MODE` | `ai` 启用 AI 整理 | — |
 | `PODFLOW_LLM_PROVIDER` | LLM 提供方（`deepseek` / `openai_compatible` 等） | `deepseek` |
 | `PODFLOW_LLM_API_BASE` | LLM base URL（deepseek 留空自动填 OpenAI 兼容端点） | 空 |
-| `PODFLOW_LLM_MODEL` | 模型名 | `deepseek-chat` |
+| `PODFLOW_LLM_MODEL` | 模型名 | `deepseek-v4-flash` |
 | `DEEPSEEK_API_KEY` / `PODFLOW_LLM_API_KEY` | DeepSeek key（运行时读取，不落盘） | — |
 | `PODFLOW_LLM_API_KEY_ENV_VAR` | 自定义 key 环境变量名 | — |
 | `PODFLOW_TTS_ENGINE` | TTS 引擎（`edge-tts` 免费 / `doubao_tts` 付费） | `edge-tts` |
@@ -41,7 +41,7 @@ TTS（edge-tts / 豆包）是可替换引擎，不是独立链路。
 ## DeepSeek 接入
 
 1. 到 [DeepSeek 开放平台](https://platform.deepseek.com) 创建 key（`sk-...`）。
-2. 设置环境变量 `DEEPSEEK_API_KEY=<key>`，可选 `DEEPSEEK_MODEL`（默认 `deepseek-chat`）。
+2. 设置环境变量 `DEEPSEEK_API_KEY=<key>`，可选 `DEEPSEEK_MODEL`（默认 `deepseek-v4-flash`，更强可用 `deepseek-v4-pro`）。
 3. `PODFLOW_LLM_PROVIDER=deepseek`（默认）时，`api_base` 自动指向
    `https://api.deepseek.com`（OpenAI 兼容端点）。
 
@@ -75,7 +75,7 @@ node scripts/python313.js scripts/run_auto_episode.py
 | Secret | 说明 |
 | --- | --- |
 | `DEEPSEEK_API_KEY` | 必填，DeepSeek key |
-| `DEEPSEEK_MODEL` | 可选，默认 `deepseek-chat` |
+| `DEEPSEEK_MODEL` | 可选，默认 `deepseek-v4-flash`，更强可用 `deepseek-v4-pro` |
 
 跑完上传 `podflow-auto-episode` artifact（mp3 + play.html + json）。
 
