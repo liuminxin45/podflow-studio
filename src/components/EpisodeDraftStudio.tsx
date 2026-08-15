@@ -12,8 +12,9 @@ import { settingsRepository } from '../services/settings/repository'
 import { persistCurrentWritingNodeConfigs } from '../services/settings/writingNodeConfig'
 import { readyCandidatesForDraft } from '../utils/workflowDraftGuards'
 import { resolveMorningNewsProfile } from '../services/writing/morningNewsProfile'
+import type { WorkflowFailure } from '../services/workflowFailure'
 import WritingLayer from './writing'
-import WorkflowFailureNotice, { type WorkflowFailure } from './WorkflowFailureNotice'
+import WorkflowFailureNotice from './WorkflowFailureNotice'
 
 type MaterialItem = ContentItem & {
   _source_channel?: 'auto'

@@ -7,7 +7,6 @@ vi.mock('../components/ApprovalModal', () => ({ default: () => null }))
 vi.mock('../components/SoundStudio', () => ({ default: () => null }))
 vi.mock('../components/PublishLayer', () => ({ default: () => null }))
 vi.mock('../components/SettingsPage', () => ({ default: () => null }))
-vi.mock('../components/GlobalSettingsButton', () => ({ default: () => null }))
 vi.mock('../components/WorkflowSidebar', () => ({
   default: ({ onSave }: { onSave: () => Promise<unknown> | unknown }) => (
     <button type="button" onClick={() => void onSave()}>保存节目</button>

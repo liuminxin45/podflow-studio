@@ -13,7 +13,6 @@ vi.mock('../components/OrganizePanel', async () => {
 vi.mock('../components/SoundStudio', () => ({ default: () => null }))
 vi.mock('../components/PublishLayer', () => ({ default: () => null }))
 vi.mock('../components/SettingsPage', () => ({ default: () => null }))
-vi.mock('../components/GlobalSettingsButton', () => ({ default: () => null }))
 vi.mock('../components/EpisodeManager', () => ({
   default: ({ onOpen }: { onOpen: (workflowId: string) => Promise<void> | void }) => (
     <button type="button" onClick={() => void onOpen('workflow-notice-test')}>打开节目</button>

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import WorkflowFailureNotice, { latestWorkflowFailure } from '../WorkflowFailureNotice'
+import { latestWorkflowFailure } from '../../services/workflowFailure'
+import WorkflowFailureNotice from '../WorkflowFailureNotice'
 import type { Workflow } from '../../types/workflow'
 
 const workflow = {
