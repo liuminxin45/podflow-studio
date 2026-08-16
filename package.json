@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "description": "Local-first solo morning news podcast pipeline",
   "author": "PodFlow Studio Contributors",
-  "license": "LGPL-3.0-only",
+  "license": "Apache-2.0",
   "main": "electron/main.js",
   "bin": {
     "podflow": "scripts/podflow-cli.js"
@@ -90,7 +90,8 @@
       "protocol/**/*",
       "scripts/**/*",
       "assets/**/*",
-      "LICENSE"
+      "LICENSE",
+      "NOTICE"
     ],
     "asarUnpack": [
       "node_modules/ffmpeg-static/**"

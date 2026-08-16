@@ -43,9 +43,9 @@ PodFlow Studio 支持 AI 驱动的全流程自动化，但自动化不得以牺�
 
 ## 开源协议与归属信息（强制）
 
-本项目采用 GNU Lesser General Public License v3.0，SPDX 标识为
-`LGPL-3.0-only`，以根目录 `LICENSE`、`package.json`、
-`package-lock.json`、`pyproject.toml` 和 `README.md` 为准。
+本项目采用 Apache License 2.0，SPDX 标识为 `Apache-2.0`，以根目录
+`LICENSE`、`NOTICE`、`package.json`、`package-lock.json`、
+`pyproject.toml` 和 `README.md` 为准。
 
 项目规范仓库地址为：
 
@@ -55,16 +55,16 @@ PodFlow Studio 支持 AI 驱动的全流程自动化，但自动化不得以牺�
 
 必须遵守：
 
-- 保留 `LICENSE` 全文及所有 LGPL-3.0-only 声明。
+- 保留 `LICENSE` 全文、`NOTICE` 归属信息及所有 Apache-2.0 声明。
 - 保留 README、包元数据、发布配置中的项目名称、仓库地址、主页、问题追踪和归属信息。
 - 第三方依赖、图标、字体、模型或示例数据的许可证归其各自权利人所有，不得改写为本项目许可证。
-- 打包和发布时确保许可证文件随源代码或发行物提供。
+- 打包和发布时确保 `LICENSE` 与 `NOTICE` 随源代码或发行物提供。
 
 明确禁止：
 
-- 未经用户明确授权，删除、替换、弱化或规避 LGPL 声明。
+- 未经用户明确授权，删除、替换、弱化或规避 Apache-2.0 声明及 `NOTICE` 归属信息。
 - 在重构、文档精简、脱敏、生成代码或更新包元数据时顺手删除归属信息。
-- 将第三方许可证批量替换为 LGPL，或删除第三方 NOTICE/版权声明。
+- 将第三方许可证批量替换为 Apache-2.0，或删除第三方 NOTICE/版权声明。
 - 仅修改一处许可证字段，造成 README、Python 和 npm 元数据互相冲突。
 
 若用户要求修改许可证或仓库归属，必须先说明当前许可证与受影响文件；只有在用户明确授权后才能统一修改，并检查全部声明面。

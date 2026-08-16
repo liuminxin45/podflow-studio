@@ -126,7 +126,7 @@ npm run cli -- produce --workflow <id或绝对路径> --stage package --output <
 
 ### 音乐与授权
 
-正式品牌 cue 派生自 Ondrosik 的 [Quick Spark](https://freemusicarchive.org/music/Ondrosik/no-words/quick-spark/)。[作者曲库](https://ondrosik.sk/music/)将曲目声明为 CC0；项目保存原始 SHA256、取得日期、裁剪区间与派生文件指纹。素材经裁剪、淡入淡出和响度处理，第三方音乐仍为 CC0，不改写为 LGPL。完整记录见 [音频权利文件](assets/audio/RIGHTS.md)。
+正式品牌 cue 派生自 Ondrosik 的 [Quick Spark](https://freemusicarchive.org/music/Ondrosik/no-words/quick-spark/)。[作者曲库](https://ondrosik.sk/music/)将曲目声明为 CC0；项目保存原始 SHA256、取得日期、裁剪区间与派生文件指纹。素材经裁剪、淡入淡出和响度处理，第三方音乐仍为 CC0，不改写为 Apache-2.0。完整记录见 [音频权利文件](assets/audio/RIGHTS.md)。
 
 命令、退出码、会话目录和 Agent 安全调用模式见 [CLI 文档](docs/cli.md)。
 
@@ -212,5 +212,5 @@ PodFlow Studio 当前优先保证“单人新闻早报”的完整闭环。以�
 
 ## 开源协议
 
-PodFlow Studio 采用 [GNU Lesser General Public License v3.0](LICENSE)，
-对应 SPDX 标识为 `LGPL-3.0-only`。
+PodFlow Studio 采用 [Apache License 2.0](LICENSE)，对应 SPDX 标识为
+`Apache-2.0`。项目归属信息见 [NOTICE](NOTICE)；第三方依赖与素材仍遵循各自许可证。

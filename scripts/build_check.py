@@ -42,6 +42,8 @@ def check_node_modules() -> tuple[bool, str]:
 def check_required_files() -> tuple[bool, str]:
     """Check if all required files exist"""
     required = [
+        "LICENSE",
+        "NOTICE",
         "package.json",
         "pyproject.toml",
         "electron/main.js",
