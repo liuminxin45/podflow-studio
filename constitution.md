@@ -71,11 +71,13 @@ script
 edited_script
 voice_segments
 audio_outputs
+audio_approval
+release_readiness
 publish_outputs
 run_report
 ```
 
-主路径必须产出可落盘中间文件，并且可以从 `run_report.json` 看见 facts 数量、使用数量、未使用数量、脚本来源、音频降级状态和 RSS 是否为本地预览。
+`EpisodeRun.schema_version` 当前唯一有效值为 `2`。v1 工作流不得静默迁移；必须从整理 / 事实阶段重新生成。主路径必须产出可落盘中间文件，并且可以从 `run_report.json` 看见核验模型、规则版本、六项门禁、定向修复次数和真实降级原因。
 
 ## P0 Acceptance Criteria
 
@@ -83,12 +85,13 @@ run_report
 2. 生成过程可以产出结构化事实卡片。
 3. 生成稿件必须可以人工编辑。
 4. 编辑后的稿件必须进入 TTS / 音频成片流程。
-5. 最终必须输出 mp3 和 feed.xml；如果本机缺少 ffmpeg，可以降级为 wav，但必须在 report 中说明。
-6. 最终发布包必须包含 `final.*`、`feed.xml`、`episode.json`、`run_report.json`。
+5. 免凭据 demo 可以输出 `demo_only` 音频与诊断，但不得生成 RSS 或正式发布目录；FFmpeg 缺失时必须明确失败。
+6. 机器门禁通过但尚未人工终审时，只能生成 `preview_unreviewed` 内部预览；内部预览不得包含 RSS、公开 URL 或正式发布目录。
 7. 端到端流程必须有自动化测试或可复现脚本。
 8. 没有外部 API key 时，demo 仍必须跑通。
-9. RSS enclosure 不得只写本地绝对路径；没有 `public_base_url` 时必须标记 local-preview only。
-10. 每个新闻稿件段落必须能追溯到 `source_fact_ids`；无来源段落必须进入 report warning。
+9. 正式 RSS enclosure 必须使用可公开访问的不可变地址，不得使用本地绝对路径。
+10. 每个新闻稿件段落必须同时追溯到 `source_fact_ids` 和已支持的 `source_claim_ids`；任一绑定缺失必须阻断预览与正式发布。
+11. `ReleaseReadinessModel` 只能由 Review 节点生成；CLI、桌面端与 Publish 节点只消费该状态。
 
 ## Non-goals
 

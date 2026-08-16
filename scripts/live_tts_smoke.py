@@ -19,6 +19,7 @@ from nodes.audio_postprocess.node import run as audio_run
 from nodes.tts.config import TTSConfig
 from nodes.tts.node import run as tts_run
 from protocol.morning_news import build_run_report, write_json
+from protocol.episode_models import SCHEMA_VERSION
 from protocol.presets import get_default_preset
 
 
@@ -27,7 +28,7 @@ def run_live_tts_smoke(engine: str, output_dir: Path) -> dict:
     voice_dir = output_dir / "voice_segments"
     voice_dir.mkdir(parents=True, exist_ok=True)
     state = {
-        "schema_version": 1,
+        "schema_version": SCHEMA_VERSION,
         "episode_id": f"live_tts_smoke_{engine.replace('-', '_')}",
         "created_at": datetime.now().isoformat(),
         "preset": get_default_preset(),
@@ -37,12 +38,9 @@ def run_live_tts_smoke(engine: str, output_dir: Path) -> dict:
                 "id": "fact_001",
                 "title": "真实 TTS 验证",
                 "summary": "用于确认真实语音服务可以生成音频。",
-                "source_title": "PodFlow Studio",
-                "source_url": "https://podflow.local/live-tts-smoke",
-                "published_at": datetime.now().isoformat(),
-                "claim": "真实 TTS smoke test 必须产出可读音频文件。",
                 "confidence": "high",
-                "used_in_segments": ["seg_001"],
+                "evidence": [{"id": "evidence_001", "url": "https://podflow.local/live-tts-smoke", "title": "PodFlow Studio", "published_at": datetime.now().isoformat(), "source_role": "primary", "excerpt": "真实 TTS smoke test 必须产出可读音频文件。"}],
+                "claims": [{"id": "claim_001", "text": "真实 TTS smoke test 必须产出可读音频文件。", "evidence_ids": ["evidence_001"], "status": "supported", "confidence": "high", "verifier_model": "manual-smoke-fixture", "verified_at": datetime.now().isoformat()}],
             }
         ],
         "selected_topics": [{"id": "topic_001", "title": "真实 TTS 验证", "fact_id": "fact_001"}],
@@ -62,6 +60,7 @@ def run_live_tts_smoke(engine: str, output_dir: Path) -> dict:
                     "title": "真实语音验证",
                     "text": "这是一段 PodFlow Studio 真实语音合成验证音频。",
                     "source_fact_ids": ["fact_001"],
+                    "source_claim_ids": ["claim_001"],
                     "estimated_seconds": 8,
                     "speaker": "Host A",
                 }

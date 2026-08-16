@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   importWorkflow: () => ipcRenderer.invoke('workflow:import'),
   approveNode: (workflowId, nodeName, approved, modifiedOutput) => 
     ipcRenderer.invoke('workflow:approve', workflowId, nodeName, approved, modifiedOutput),
+  approveAudio: (workflowId, input) => ipcRenderer.invoke('workflow:approveAudio', workflowId, input),
   setAppDirtyState: (dirty) => ipcRenderer.invoke('app:setDirtyState', dirty),
   updateWorkflowState: (workflowId, patch) => ipcRenderer.invoke('workflow:updateState', workflowId, patch),
   appendWorkflowLogs: (workflowId, entries) => ipcRenderer.invoke('workflow:appendLogs', workflowId, entries),

@@ -28,6 +28,15 @@ from protocol.presets import get_default_preset
 
 NEWS_SEGMENT_TYPES = {"quick_news", "deep_dive"}
 ALLOWED_SEGMENT_TYPES = {"opening", "quick_news", "deep_dive", "closing", "custom"}
+EDITORIAL_QUALITY_VERSION = "editorial_quality_v1"
+EDITORIAL_DIMENSIONS = (
+    "relevance",
+    "information_gain",
+    "synthesis",
+    "coherence",
+    "spoken_naturalness",
+    "non_repetition",
+)
 
 
 def _resolve_script_structure(
@@ -96,7 +105,7 @@ def _explicit_deep_dive_text(fact: dict[str, Any], preset: dict[str, Any]) -> st
         " ".join(part.split())
         for part in brief_parts
         if part and str(part).strip()
-    ) or " ".join(str(fact.get("summary") or fact.get("claim") or "").split())
+    ) or " ".join(str(fact.get("summary") or "").split())
     char_range = preset.get("deep_dive_chars") or [1200, 1600]
     try:
         max_chars = max(200, int(char_range[1]))
@@ -197,6 +206,15 @@ def _normalize_script(
         raw_script = {}
 
     fact_ids = {str(fact.get("id")) for fact in facts if isinstance(fact, dict) and fact.get("id")}
+    claim_ids_by_fact = {
+        str(fact.get("id")): [
+            str(claim.get("id"))
+            for claim in fact.get("claims", [])
+            if isinstance(claim, dict) and claim.get("status") == "supported" and claim.get("id")
+        ]
+        for fact in facts
+        if isinstance(fact, dict) and fact.get("id")
+    }
     normalized_segments: list[dict[str, Any]] = []
     raw_segments = raw_script.get("segments") or []
     if isinstance(raw_segments, list):
@@ -228,6 +246,9 @@ def _normalize_script(
                     "title": segment.get("title") or "",
                     "text": text,
                     "source_fact_ids": source_fact_ids,
+                    "source_claim_ids": [
+                        claim_id for fact_id in source_fact_ids for claim_id in claim_ids_by_fact.get(fact_id, [])
+                    ],
                     "estimated_seconds": int(segment.get("estimated_seconds") or max(6, len(text) / 6.5)),
                     "speaker": segment.get("speaker", "Host A"),
                 }
@@ -298,6 +319,11 @@ def _normalize_script(
                 "source_fact_ids": list(
                     (editorial_plan or {}).get("opening", {}).get("fact_ids", [])
                 ),
+                "source_claim_ids": [
+                    claim_id
+                    for fact_id in (editorial_plan or {}).get("opening", {}).get("fact_ids", [])
+                    for claim_id in claim_ids_by_fact.get(str(fact_id), [])
+                ],
                 "estimated_seconds": 8,
                 "speaker": "Host A",
             },
@@ -310,6 +336,7 @@ def _normalize_script(
                 "title": "收尾",
                 "text": "以上是本期内容，我们下期见。",
                 "source_fact_ids": [],
+                "source_claim_ids": [],
                 "estimated_seconds": 6,
                 "speaker": "Host A",
             }
@@ -427,6 +454,14 @@ def run(state: dict[str, Any], config: ScriptConfig = None) -> dict[str, Any]:
             ctx,
             require_llm=bool(request.get("require_llm")),
         )
+        editorial_quality = script.pop("_editorial_quality", {
+            "version": EDITORIAL_QUALITY_VERSION,
+            "status": "failed",
+            "model": "",
+            "scores": {},
+            "hard_errors": ["MODEL_EDITORIAL_EVALUATION_MISSING"],
+            "repair_count": 0,
+        })
         script["id"] = f"{state.get('episode_id', 'episode')}_script_generated"
         generated_at = datetime.now(timezone.utc).isoformat()
 
@@ -441,7 +476,9 @@ def run(state: dict[str, Any], config: ScriptConfig = None) -> dict[str, Any]:
                 "edited_from": script.get("id", "script.generated"),
                 "edit_mode": "regenerated" if is_regeneration else "initial_editable_copy",
             }
-        state["generation_meta"] = _generation_meta(config, script_facts, script, generated_at)
+        state["generation_meta"] = _generation_meta(
+            config, script_facts, script, generated_at, editorial_quality
+        )
         state["generation_request"] = {}
 
         if is_regeneration:
@@ -608,10 +645,12 @@ def _generate_script(
                 )
             return normalized
         quality = assess_script_quality(normalized, facts, editorial_plan)
+        repair_count = 0
         repairable_issues = [
             issue for issue in [*quality["hard"], *quality["soft"]] if issue.get("segment_id")
         ]
         if repairable_issues:
+            repair_count = 1
             repair_ids = {issue["segment_id"] for issue in repairable_issues}
             try:
                 ctx.log(f"成稿定向修复调用: segments={sorted(repair_ids)}")
@@ -659,6 +698,46 @@ def _generate_script(
                 "成稿听感提示: "
                 + "；".join(f"{issue['code']}:{issue['detail']}" for issue in quality["soft"])
             )
+        editorial_quality = _assess_editorial_quality(normalized, facts, config, ctx, repair_count)
+        semantic_issues = editorial_quality.pop("segment_issues", [])
+        if editorial_quality["status"] != "passed" and repair_count == 0 and semantic_issues:
+            repair_ids = {issue["segment_id"] for issue in semantic_issues if issue.get("segment_id")}
+            if repair_ids:
+                repair_count = 1
+                ctx.log(f"编辑质量定向修复调用: segments={sorted(repair_ids)}")
+                with create_llm_runtime(config, debug_mode=ctx.debug_mode) as repair_client:
+                    repair_response = repair_client.call(
+                        [
+                            {"role": "system", "content": "你是中文资讯播客修稿编辑。只返回有效 JSON，不改变事实绑定。"},
+                            {"role": "user", "content": build_script_repair_prompt(normalized, facts, semantic_issues)},
+                        ],
+                        timeout=config.timeout,
+                        logs=ctx.logs,
+                    )
+                    repair_content = repair_client.extract_content(repair_response)
+                repaired = apply_segment_repairs(
+                    normalized,
+                    _parse_json_object(repair_content, "编辑质量修复"),
+                    repair_ids,
+                )
+                normalized = _normalize_script(repaired, topic, facts, config, editorial_plan)
+                if normalized.get("generated_by") == "deterministic_mock":
+                    raise ValueError("编辑质量修复改变了段落结构或事实绑定")
+                repaired_quality = assess_script_quality(normalized, facts, editorial_plan)
+                if repaired_quality["hard"]:
+                    raise ValueError("编辑质量修复未通过完整事实质检")
+                editorial_quality = _assess_editorial_quality(normalized, facts, config, ctx, repair_count)
+                editorial_quality.pop("segment_issues", None)
+        if editorial_quality["status"] != "passed":
+            details = "；".join(editorial_quality.get("hard_errors", [])) or "评分低于 4"
+            if require_llm:
+                raise RuntimeError(f"成稿 AI 未通过 {EDITORIAL_QUALITY_VERSION}：{details}")
+            ctx.log(f"成稿编辑质量评测失败，使用 deterministic 降级输出: {details}")
+            return generate_deterministic_script(
+                facts, preset, episode_id="", title=topic.get("title", "PodFlow 晨报")
+            )
+        editorial_quality["repair_count"] = repair_count
+        normalized["_editorial_quality"] = editorial_quality
         return normalized
     except (ValueError, json.JSONDecodeError) as error:
         if require_llm:
@@ -686,6 +765,73 @@ def _parse_json_object(content: str, label: str) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError(f"{label} AI 必须返回 JSON 对象")
     return parsed
+
+
+def _assess_editorial_quality(
+    script: dict[str, Any],
+    facts: list[dict[str, Any]],
+    config: ScriptConfig,
+    ctx: NodeContext,
+    repair_count: int,
+) -> dict[str, Any]:
+    target = resolve_llm_target(config)
+    prompt = (
+        "按 editorial_quality_v1 评估中文播客稿。只使用输入事实卡，不补充外部事实。"
+        "对 relevance、information_gain、synthesis、coherence、spoken_naturalness、non_repetition "
+        "分别给 1-5 整数分。列出 hard_errors；需要定向修复时列出 segment_issues，"
+        "每项含 segment_id、code、detail。只返回 JSON："
+        '{"scores":{},"hard_errors":[],"segment_issues":[]}。\n\n'
+        f"<事实卡_JSON>{json.dumps(facts, ensure_ascii=False)}</事实卡_JSON>\n"
+        f"<稿件_JSON>{json.dumps(script, ensure_ascii=False)}</稿件_JSON>"
+    )
+    with create_llm_runtime(config, debug_mode=ctx.debug_mode) as client:
+        response = client.call(
+            [
+                {"role": "system", "content": "你是严格、保守的中文播客编辑质量审核员。只返回有效 JSON。"},
+                {"role": "user", "content": prompt},
+            ],
+            timeout=config.timeout,
+            logs=ctx.logs,
+        )
+        payload = _parse_json_object(client.extract_content(response), "编辑质量评测")
+    scores_raw = payload.get("scores")
+    if not isinstance(scores_raw, dict) or set(scores_raw) != set(EDITORIAL_DIMENSIONS):
+        raise ValueError("编辑质量评测缺少完整评分维度")
+    scores: dict[str, int] = {}
+    for dimension in EDITORIAL_DIMENSIONS:
+        value = scores_raw.get(dimension)
+        if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 5:
+            raise ValueError(f"编辑质量评测分数无效: {dimension}")
+        scores[dimension] = value
+    hard_errors_raw = payload.get("hard_errors", [])
+    if not isinstance(hard_errors_raw, list) or any(not isinstance(value, str) for value in hard_errors_raw):
+        raise ValueError("编辑质量评测 hard_errors 无效")
+    segment_issues_raw = payload.get("segment_issues", [])
+    if not isinstance(segment_issues_raw, list):
+        raise ValueError("编辑质量评测 segment_issues 无效")
+    known_segments = {str(segment.get("id") or "") for segment in script.get("segments", []) if isinstance(segment, dict)}
+    segment_issues: list[dict[str, str]] = []
+    for issue in segment_issues_raw:
+        if not isinstance(issue, dict):
+            raise ValueError("编辑质量评测包含无效问题")
+        segment_id = str(issue.get("segment_id") or "")
+        code = str(issue.get("code") or "")
+        detail = str(issue.get("detail") or "")
+        if segment_id not in known_segments or not code or not detail:
+            raise ValueError("编辑质量评测引用未知段落或缺少问题字段")
+        segment_issues.append({"segment_id": segment_id, "code": code, "detail": detail})
+    hard_errors = [value.strip() for value in hard_errors_raw if value.strip()]
+    passed = all(value >= 4 for value in scores.values()) and not hard_errors
+    return {
+        "version": EDITORIAL_QUALITY_VERSION,
+        "status": "passed" if passed else "failed",
+        "model": target.model,
+        "evaluated_at": datetime.now(timezone.utc).isoformat(),
+        "scores": scores,
+        "hard_errors": hard_errors,
+        "repair_count": repair_count,
+        "segment_issues": segment_issues,
+    }
 
 
 def _preset_from_config(config: ScriptConfig) -> dict[str, Any]:
@@ -829,6 +975,7 @@ def _generation_meta(
     facts: list[dict[str, Any]],
     script: dict[str, Any],
     generated_at: str,
+    editorial_quality: dict[str, Any],
 ) -> dict[str, Any]:
     structure = _resolve_script_structure(facts, _preset_from_config(config))
     return {
@@ -838,6 +985,10 @@ def _generation_meta(
         "used_fact_ids": [str(fact.get("id")) for fact in facts if fact.get("id")],
         "structure": structure,
         "actual_news_item_count": script.get("actual_news_item_count", structure["actual_news_item_count"]),
+        "editorial_quality": {
+            **editorial_quality,
+            "generated_by": script.get("generated_by", ""),
+        },
         "settings": {
             "target_duration_minutes": config.target_duration_minutes,
             "editorial_voice": config.editorial_voice,
@@ -859,6 +1010,8 @@ def _invalidate_downstream_outputs(state: dict[str, Any], generated_at: str) -> 
         "audio_outputs",
         "cover_path",
         "review_summary",
+        "release_readiness",
+        "audio_approval",
         "publish_outputs",
         "subtitle_path",
     ]
@@ -873,6 +1026,8 @@ def _invalidate_downstream_outputs(state: dict[str, Any], generated_at: str) -> 
             "audio_outputs": {},
             "cover_path": "",
             "review_summary": {},
+            "release_readiness": {},
+            "audio_approval": {},
             "publish_outputs": {},
             "subtitle_path": "",
             "downstream_stale": {

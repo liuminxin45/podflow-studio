@@ -116,6 +116,13 @@ declare global {
       summary?: WorkflowSummary
     }>
     approveNode: (workflowId: string, nodeName: string, approved: boolean, modifiedOutput?: any) => Promise<{ status: string }>
+    approveAudio: (workflowId: string, input: {
+      reviewer: string
+      notes?: string
+      fullListenConfirmed: boolean
+      pronunciationConfirmed: boolean
+      editorialFinalConfirmed: boolean
+    }) => Promise<Workflow>
     setAppDirtyState: (dirty: boolean) => Promise<{ success: boolean }>
     updateWorkflowState: (id: string, patch: Record<string, any>) => Promise<Workflow>
     appendWorkflowLogs: (id: string, entries: string[]) => Promise<Workflow>

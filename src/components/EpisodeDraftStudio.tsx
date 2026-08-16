@@ -62,6 +62,14 @@ function slotTypeForIndex(index: number, quickNewsCount: number): 'quick_news' |
   return index < quickNewsCount ? 'quick_news' : 'deep_dive'
 }
 
+function primaryEvidence(fact: FactCard) {
+  return fact.evidence[0]
+}
+
+function factClaimText(fact: FactCard): string {
+  return fact.claims.map(claim => claim.text).filter(Boolean).join(' ') || fact.summary
+}
+
 export default function EpisodeDraftStudio({
   visible,
   onBackToOrganize,
@@ -153,7 +161,7 @@ export default function EpisodeDraftStudio({
     }))
   ), [deepDiveFactId, resolvedDeepDiveCount, selectedFacts])
 
-  const sourceIssues = useMemo(() => selectedFacts.filter(fact => !fact.source_url).length, [selectedFacts])
+  const sourceIssues = useMemo(() => selectedFacts.filter(fact => fact.evidence.length === 0).length, [selectedFacts])
 
   const structure = useMemo<MorningNewsStructure>(() => ({
     contentType: 'news_brief',
@@ -167,8 +175,8 @@ export default function EpisodeDraftStudio({
         id: `news_${index + 1}`,
         type: slotTypeForIndex(index, resolvedQuickNewsCount),
         title: fact.title,
-        materials: materials.filter(item => item.title === fact.source_title || item.url === fact.source_url),
-        notes: fact.claim,
+        materials: materials.filter(item => item.title === primaryEvidence(fact)?.title || item.url === primaryEvidence(fact)?.url),
+        notes: factClaimText(fact),
       })),
       { id: 'closing', type: 'closing', title: '结尾总结', materials: [], notes: '' },
     ],
@@ -429,15 +437,30 @@ function deriveFacts(materials: MaterialItem[]): FactCard[] {
     .slice(0, 20)
     .map((item, index) => {
       const content = String(item.summary || item.content || '').replace(/\s+/g, ' ').trim()
+      const factId = `fact_${String(index + 1).padStart(3, '0')}`
+      const evidenceId = `evidence_${String(index + 1).padStart(3, '0')}_001`
       return applyVerifiedMaterialDepth({
-        id: `fact_${String(index + 1).padStart(3, '0')}`,
+        id: factId,
         title: item.title || `事实 ${index + 1}`,
         summary: content.slice(0, 260),
-        source_title: item.source_name || item.source || item.title || '',
-        source_url: item.url || '',
-        published_at: item.published || '',
-        claim: firstSentence(content),
         confidence: (item.url && item.published ? 'high' : item.url ? 'medium' : 'low') as FactCard['confidence'],
+        evidence: [{
+          id: evidenceId,
+          url: item.url || '',
+          title: item.source_name || item.source || item.title || '',
+          published_at: item.published || '',
+          source_role: 'independent',
+          excerpt: content.slice(0, 600),
+        }],
+        claims: [{
+          id: `claim_${String(index + 1).padStart(3, '0')}_001`,
+          text: firstSentence(content),
+          evidence_ids: [evidenceId],
+          status: 'insufficient',
+          confidence: 'low',
+          verifier_model: '',
+          verified_at: '',
+        }],
         used_in_segments: [],
       }, item)
     })
@@ -462,7 +485,7 @@ function factsForCurrentMaterials(initialFacts: FactCard[], materials: MaterialI
   if (initialFacts.length === 0) return deriveFacts(materials)
 
   const matchedFacts = materials.map(material => initialFacts.find(fact => (
-    Boolean(material.url && fact.source_url && material.url === fact.source_url)
+    Boolean(material.url && fact.evidence.some(item => item.url === material.url))
     || Boolean(material.title && fact.title && material.title === fact.title)
   )))
   // Reuse persisted cards only when every current material has one. A partial

@@ -312,6 +312,13 @@
 .publish-result-footer > span { color: var(--text-tertiary); font-size: 10px; }
 .publish-result-footer .ant-btn { min-width: 88px; }
 
+.publish-final-review { display: grid; gap: 12px; padding: 18px; border: 1px solid var(--border-color); background: var(--bg-secondary); }
+.publish-final-review > div:first-child { display: grid; gap: 3px; }
+.publish-final-review > div:first-child span { color: var(--text-secondary); font-size: 11px; }
+.publish-final-review .ant-checkbox-group { display: grid; gap: 8px; }
+.publish-final-review audio { width: 100%; }
+.publish-final-review > .ant-btn { justify-self: end; }
+
 @media (max-width: 980px) {
   .publish-layout { grid-template-columns: 250px minmax(0, 1fr); }
   .publish-ready-view,

@@ -1,13 +1,18 @@
-name: Auto Episode
+name: Generate and Publish Episode
 
 on:
-  schedule:
-    # 每天 UTC 00:00（北京时间 08:00）自动生成一期预览播客
-    - cron: "0 0 * * *"
   workflow_dispatch:
     inputs:
+      episode_id:
+        description: Immutable episode ID (defaults to the current Asia/Shanghai date)
+        required: false
+        default: ""
       target_topic:
-        description: AI 选题主题（留空则按热点聚类自动选题）
+        description: Optional topic; leave empty for evidence-backed automatic selection
+        required: false
+        default: ""
+      llm_model:
+        description: Optional model override
         required: false
         default: ""
 
@@ -15,23 +20,26 @@ permissions:
   contents: read
 
 concurrency:
-  group: auto-episode
+  group: podflow-formal-episode
   cancel-in-progress: false
 
 jobs:
-  auto-episode:
+  generate:
     runs-on: ubuntu-latest
+    outputs:
+      episode_id: ${{ steps.contract.outputs.episode_id }}
+      audio_sha256: ${{ steps.contract.outputs.audio_sha256 }}
     env:
-      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-      PODFLOW_LLM_PROVIDER: deepseek
-      PODFLOW_LLM_MODEL: ${{ secrets.DEEPSEEK_MODEL || 'deepseek-v4-flash' }}
-      PODFLOW_TTS_ENGINE: edge-tts
-      PODFLOW_TTS_VOICE: zh-CN-XiaoxiaoNeural
-      PODFLOW_TARGET_TOPIC: ${{ inputs.target_topic }}
-      # Key-free RSS feeds: the reliability baseline for CI. NewsNow / AI-news
-      # aggregators are supplementary and may be unreachable from GitHub runners.
-      PODFLOW_RSS_URLS: "https://www.ithome.com/rss/,https://www.solidot.org/index.rss"
-      PODFLOW_FETCH_SOURCES: "rss,newsnow,ai_news_daily"
+      PODFLOW_BOCHA_API_KEY: ${{ secrets.PODFLOW_BOCHA_API_KEY }}
+      PODFLOW_BOCHA_API_BASE: ${{ vars.PODFLOW_BOCHA_API_BASE }}
+      PODFLOW_LLM_API_KEY: ${{ secrets.PODFLOW_LLM_API_KEY }}
+      PODFLOW_LLM_PROVIDER: ${{ vars.PODFLOW_LLM_PROVIDER }}
+      PODFLOW_LLM_API_BASE: ${{ vars.PODFLOW_LLM_API_BASE }}
+      PODFLOW_LLM_MODEL: ${{ inputs.llm_model || vars.PODFLOW_LLM_MODEL }}
+      PODFLOW_DOUBAO_APP_ID: ${{ secrets.PODFLOW_DOUBAO_APP_ID }}
+      PODFLOW_DOUBAO_ACCESS_TOKEN: ${{ secrets.PODFLOW_DOUBAO_ACCESS_TOKEN }}
+      PODFLOW_FETCH_SOURCES: ${{ vars.PODFLOW_FETCH_SOURCES || 'rss' }}
+      PODFLOW_RSS_URLS: ${{ vars.PODFLOW_RSS_URLS || 'https://www.ithome.com/rss/,https://www.solidot.org/index.rss' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -53,14 +61,105 @@ jobs:
           npm ci
           npm run setup
 
-      - name: Run auto episode
-        run: node scripts/python313.js scripts/run_auto_episode.py --output out/auto-episode
+      - name: Resolve immutable episode ID
+        id: identity
+        shell: bash
+        run: |
+          episode_id='${{ inputs.episode_id }}'
+          if [ -z "$episode_id" ]; then
+            episode_id="$(TZ=Asia/Shanghai date +%F)"
+          fi
+          if ! [[ "$episode_id" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}(-[a-z0-9]+(-[a-z0-9]+)*)?$ ]]; then
+            echo "Invalid episode ID: $episode_id" >&2
+            exit 2
+          fi
+          echo "episode_id=$episode_id" >> "$GITHUB_OUTPUT"
 
-      - name: Upload automated episode artifacts
+      - name: Generate candidate and run machine gates
+        run: >-
+          npm run cli -- produce
+          --stage generate
+          --episode-id "${{ steps.identity.outputs.episode_id }}"
+          --topic "${{ inputs.target_topic }}"
+          --output out/episodes
+          --allow-paid-tts
+          --json
+
+      - name: Bind candidate contract
+        id: contract
+        shell: bash
+        run: |
+          episode_id='${{ steps.identity.outputs.episode_id }}'
+          workflow="out/episodes/$episode_id/workflow.json"
+          audio_sha256="$(node scripts/python313.js -c "import json; from pathlib import Path; p=json.loads(Path('$workflow').read_text(encoding='utf-8')); print(p['state']['review_summary']['audio_artifact']['sha256'])")"
+          test ${#audio_sha256} -eq 64
+          echo "episode_id=$episode_id" >> "$GITHUB_OUTPUT"
+          echo "audio_sha256=$audio_sha256" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Candidate awaiting human final review"
+            echo "- Episode: \`$episode_id\`"
+            echo "- Audio SHA256: \`$audio_sha256\`"
+            echo "- Download the \`podflow-candidate-$episode_id\` artifact and listen to the complete MP3 before approving the protected environment."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload review candidate
         uses: actions/upload-artifact@v4
         with:
-          name: podflow-auto-episode
-          # 整包上传：final.mp3 + play.html（本地播放器）+ facts/script/state/run_report.json。
-          # GitHub 网页不内置音频流播放，下载 zip 后打开 play.html 即可播放。
-          path: out/auto-episode/
+          name: podflow-candidate-${{ steps.identity.outputs.episode_id }}
+          path: out/episodes/${{ steps.identity.outputs.episode_id }}/
           if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: generate
+    runs-on: ubuntu-latest
+    environment: podflow-production
+    env:
+      PODFLOW_PUBLISH_TOKEN: ${{ secrets.PODFLOW_PUBLISH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm run setup
+
+      - name: Download the exact reviewed candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: podflow-candidate-${{ needs.generate.outputs.episode_id }}
+          path: out/candidate
+
+      - name: Record SHA-bound human approval
+        run: >-
+          npm run cli -- produce
+          --stage approve
+          --workflow out/candidate/workflow.json
+          --audio-sha256 "${{ needs.generate.outputs.audio_sha256 }}"
+          --reviewer "GitHub protected environment approval by ${{ github.actor }}"
+          --notes "podflow-production environment, run ${{ github.run_id }}"
+          --full-listen-confirmed
+          --pronunciation-confirmed
+          --editorial-final-confirmed
+          --json
+
+      - name: Publish immutable Release and trigger the personal site
+        run: >-
+          npm run cli -- produce
+          --stage publish
+          --workflow out/candidate/workflow.json
+          --output out/releases
+          --release-repo liuminxin45/podflow-morning-feed
+          --site-repo liuminxin45/liuminxin45.github.io
+          --confirm-publish
+          --json

@@ -1,6 +1,54 @@
+from types import SimpleNamespace
+
+import pytest
+
 from nodes.facts.config import FactsConfig
-from nodes.facts.node import run as facts_run
+from nodes.facts.node import _verify_claims, run as facts_run
 from tests.mock_data import create_base_state, create_mock_cleaned_contents, create_mock_materials
+
+
+class _FactRuntime:
+    def __init__(self, content: str):
+        self.content = content
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def call(self, *_args, **_kwargs):
+        return self.content
+
+    def extract_content(self, response):
+        return response
+
+
+def _fact_for_verifier() -> list[dict]:
+    return [{
+        "id": "fact_001", "title": "事实", "summary": "证据支持事实", "confidence": "low",
+        "evidence": [{"id": "evidence_001", "url": "https://example.com/fact", "title": "来源", "published_at": "2026-01-01", "source_role": "primary", "excerpt": "证据支持事实"}],
+        "claims": [{"id": "claim_001", "text": "证据支持事实", "evidence_ids": ["evidence_001"], "status": "insufficient", "confidence": "low", "verifier_model": "", "verified_at": ""}],
+    }]
+
+
+def test_fact_verifier_fails_closed_on_invalid_json(monkeypatch):
+    monkeypatch.setattr("nodes.facts.node.has_llm_runtime_config", lambda _config: True)
+    monkeypatch.setattr("nodes.facts.node.create_llm_runtime", lambda *_args, **_kwargs: _FactRuntime("not-json"))
+    config = FactsConfig(api_base="https://llm.example/v1", api_key="secret", llm_model="fact-model", require_semantic_verification=True)
+
+    with pytest.raises(ValueError):
+        _verify_claims(_fact_for_verifier(), config, SimpleNamespace(debug_mode=False, logs=[]))
+
+
+def test_fact_verifier_rejects_unknown_evidence_ids(monkeypatch):
+    payload = '{"facts":[{"fact_id":"fact_001","claims":[{"text":"事实","evidence_ids":["invented"],"status":"supported","confidence":"high"}]}]}'
+    monkeypatch.setattr("nodes.facts.node.has_llm_runtime_config", lambda _config: True)
+    monkeypatch.setattr("nodes.facts.node.create_llm_runtime", lambda *_args, **_kwargs: _FactRuntime(payload))
+    config = FactsConfig(api_base="https://llm.example/v1", api_key="secret", llm_model="fact-model", require_semantic_verification=True)
+
+    with pytest.raises(ValueError, match="unknown evidence"):
+        _verify_claims(_fact_for_verifier(), config, SimpleNamespace(debug_mode=False, logs=[]))
 
 
 def _deep_brief(url: str) -> dict:
@@ -142,7 +190,7 @@ def test_facts_node_keeps_a_late_deep_dive_inside_the_fact_limit_and_matches_by_
     assert len(result["facts"]) == 2
     marked = [fact for fact in result["facts"] if fact.get("is_deep_dive")]
     assert len(marked) == 1
-    assert marked[0]["source_url"] == "https://example.com/deep"
+    assert marked[0]["evidence"][0]["url"] == "https://example.com/deep"
     assert result["selected_topics"][-1]["fact_id"] == marked[0]["id"]
 
 
@@ -169,9 +217,9 @@ def test_facts_node_uses_url_to_disambiguate_same_title_deep_materials():
 
     marked = [fact for fact in result["facts"] if fact.get("is_deep_dive")]
     assert len(marked) == 1
-    assert marked[0]["source_url"] == "https://example.com/deep"
+    assert marked[0]["evidence"][0]["url"] == "https://example.com/deep"
     assert "深度来源证据" in marked[0]["summary"]
-    ordinary = next(fact for fact in result["facts"] if fact["source_url"].endswith("ordinary"))
+    ordinary = next(fact for fact in result["facts"] if fact["evidence"][0]["url"].endswith("ordinary"))
     assert ordinary.get("is_deep_dive") is not True
 
 

@@ -8,6 +8,15 @@ vi.mock('../../services/writing/quickNewsOptimizer', () => ({
 import WritingLayer from '../writing'
 import { optimizeQuickNews } from '../../services/writing/quickNewsOptimizer'
 
+function verifiedFact(id: string, title: string, summary: string, url: string) {
+  const evidenceId = `${id}-evidence`
+  return {
+    id, title, summary, confidence: 'high' as const,
+    evidence: [{ id: evidenceId, title: '官方公告', url, published_at: '2026-07-15', source_role: 'primary' as const, excerpt: summary }],
+    claims: [{ id: `${id}-claim`, text: summary, evidence_ids: [evidenceId], status: 'supported' as const, confidence: 'high' as const, verifier_model: 'test-model', verified_at: '2026-07-15T00:00:00Z' }],
+  }
+}
+
 describe('WritingLayer single quick-news optimization', () => {
   beforeEach(() => {
     vi.mocked(optimizeQuickNews).mockReset()
@@ -28,16 +37,7 @@ describe('WritingLayer single quick-news optimization', () => {
       nodeExecutions: {},
       state: {
         episode_id: 'episode-optimize',
-        facts: [{
-          id: 'fact-1',
-          title: '产品本周开放预约',
-          summary: '官方宣布产品本周开放预约，首批仅支持两个城市。',
-          source_title: '官方公告',
-          source_url: 'https://example.com/official',
-          published_at: '2026-07-15',
-          claim: '本周开放预约，首批仅支持两个城市。',
-          confidence: 'high',
-        }],
+        facts: [verifiedFact('fact-1', '产品本周开放预约', '官方宣布产品本周开放预约，首批仅支持两个城市。', 'https://example.com/official')],
         script: {
           id: 'script-1',
           title: '测试早报',
@@ -86,14 +86,7 @@ describe('WritingLayer single quick-news optimization', () => {
       nodeExecutions: {},
       state: {
         episode_id: 'episode-stale-optimize',
-        facts: [{
-          id: 'fact-1',
-          title: '产品本周开放预约',
-          summary: '官方宣布产品本周开放预约。',
-          source_url: 'https://example.com/official',
-          claim: '本周开放预约。',
-          confidence: 'high',
-        }],
+        facts: [verifiedFact('fact-1', '产品本周开放预约', '官方宣布产品本周开放预约。', 'https://example.com/official')],
         script: {
           id: 'script-stale-1',
           title: '测试早报',
@@ -140,12 +133,7 @@ describe('WritingLayer single quick-news optimization', () => {
       nodeExecutions: {},
       state: {
         episode_id: 'episode-unbound-optimize',
-        facts: [{
-          id: 'fact-1',
-          title: '与段落标题完全相同',
-          summary: '一条存在但未绑定的事实卡。',
-          source_url: 'https://example.com/fact',
-        }],
+        facts: [verifiedFact('fact-1', '与段落标题完全相同', '一条存在但未绑定的事实卡。', 'https://example.com/fact')],
         script: {
           id: 'script-unbound-1',
           segments: [{

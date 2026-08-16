@@ -9,6 +9,7 @@ function segment(overrides: Partial<ScriptSegment> = {}): ScriptSegment {
     title: '新闻',
     text: '第一句。第二句。',
     source_fact_ids: ['fact_001'],
+    source_claim_ids: ['claim_001'],
     estimated_seconds: 12,
     speaker: 'Host A',
     ...overrides,

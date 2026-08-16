@@ -44,6 +44,46 @@ def test_episode_run_payload_validates_with_model():
     assert ok, errors
 
 
+def test_episode_run_v1_is_rejected_without_migration():
+    state = create_base_state()
+    state["schema_version"] = 1
+
+    ok, errors = validate_episode_run_payload(state)
+
+    assert ok is False
+    assert "Input should be 2" in errors[0]
+
+
+def test_fact_card_legacy_source_fields_are_rejected():
+    state = create_base_state()
+    state["facts"] = [{
+        "id": "fact_001", "title": "旧事实", "summary": "旧结构", "confidence": "high",
+        "source_url": "https://example.com/legacy", "claim": "旧字段",
+    }]
+
+    ok, errors = validate_episode_run_payload(state)
+
+    assert ok is False
+    assert "source_url" in errors[0]
+
+
+def test_news_segment_requires_claim_binding_in_both_contracts():
+    state = create_base_state()
+    state["script"] = {
+        "segments": [{
+            "id": "segment_001", "type": "quick_news", "text": "新闻事实。",
+            "source_fact_ids": ["fact_001"], "estimated_seconds": 5,
+        }],
+    }
+
+    schema_errors = list(Draft202012Validator(_episode_run_schema()).iter_errors(state))
+    model_valid, model_errors = validate_episode_run_payload(state)
+
+    assert schema_errors
+    assert model_valid is False
+    assert "source_claim_ids" in model_errors[0]
+
+
 def test_episode_run_accepts_versioned_production_plan():
     state = create_base_state()
     state["production_plan"] = {
@@ -68,9 +108,10 @@ def test_episode_run_accepts_versioned_production_plan():
                 "pause_after_ms": 650,
                 "emphasis": [],
             },
-            "speaker": "Host A",
-            "source_fact_ids": [],
-            "source": "tts",
+                "speaker": "Host A",
+                "source_fact_ids": [],
+                "source_claim_ids": [],
+                "source": "tts",
             "path": "",
             "duration_seconds": 0,
             "trim_start_ms": 0,

@@ -12,7 +12,6 @@
     "setup": "npm run setup:python",
     "setup:python": "node scripts/python313.js --setup",
     "demo:news": "node scripts/python313.js scripts/run_demo_news.py",
-    "showcase:publish": "node scripts/python313.js scripts/publish_showcase.py",
     "assets:brand-audio": "node scripts/python313.js scripts/generate_brand_audio.py",
     "cli": "node scripts/podflow-cli.js",
     "dev": "node scripts/podflow-cli.js run --mode dev --session default --window show",

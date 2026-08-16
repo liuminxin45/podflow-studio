@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, message, Tag, Tooltip } from 'antd'
+import { Alert, Button, Checkbox, Input, message, Tag, Tooltip } from 'antd'
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -76,6 +76,11 @@ export default function PublishLayer({
   const [errorMessage, setErrorMessage] = useState('')
   const [saveErrorMessage, setSaveErrorMessage] = useState('')
   const [savingWorkflow, setSavingWorkflow] = useState(false)
+  const [approving, setApproving] = useState(false)
+  const [reviewer, setReviewer] = useState('')
+  const [reviewNotes, setReviewNotes] = useState('')
+  const [confirmations, setConfirmations] = useState<string[]>([])
+  const [finalAudioUrl, setFinalAudioUrl] = useState('')
   const [outputRoots, setOutputRoots] = useState({ local: 'dist/episodes', rss: 'out/rss' })
 
   const publishOutputs = workflow?.state?.publish_outputs || {}
@@ -96,7 +101,10 @@ export default function PublishLayer({
     ? publishOutputs.platforms as Record<string, string>
     : {}
   const hasPublishedResult = Boolean(publishedAt || rssPath || publishDir)
-  const canPublish = Boolean(finalAudioPath && onRunNodes)
+  const readiness = workflow?.state?.release_readiness
+  const readinessStatus = readiness?.status || 'blocked'
+  const canApprove = readinessStatus === 'preview_ready' && Boolean(finalAudioPath)
+  const canPublish = readinessStatus === 'publish_ready' && Boolean(finalAudioPath && onRunNodes)
   const localReady = platformResults.local === 'success' && Boolean(publishDir)
   const rssReady = platformResults.rss === 'success' && Boolean(rssPath)
 
@@ -117,6 +125,22 @@ export default function PublishLayer({
       .catch(() => undefined)
     return () => { cancelled = true }
   }, [hasPublishedResult, visible])
+
+  useEffect(() => {
+    if (!visible || !workflow?.id || !finalAudioPath || !window.electronAPI?.getMediaUrl) {
+      setFinalAudioUrl('')
+      return
+    }
+    let cancelled = false
+    window.electronAPI.getMediaUrl(workflow.id)
+      .then(result => {
+        if (!cancelled) setFinalAudioUrl(text(result?.url))
+      })
+      .catch(() => {
+        if (!cancelled) setFinalAudioUrl('')
+      })
+    return () => { cancelled = true }
+  }, [finalAudioPath, visible, workflow?.id])
 
   useEffect(() => {
     if (!visible || view !== 'publishing') return
@@ -167,6 +191,29 @@ export default function PublishLayer({
     }
   }, [finalAudioPath, onRunNodes, savePublishedWorkflow])
 
+  const approveFinalAudio = useCallback(async () => {
+    if (!workflow?.id || !window.electronAPI?.approveAudio) {
+      setErrorMessage('当前环境没有最终音频审批接口。')
+      return
+    }
+    setApproving(true)
+    setErrorMessage('')
+    try {
+      await window.electronAPI.approveAudio(workflow.id, {
+        reviewer,
+        notes: reviewNotes,
+        fullListenConfirmed: confirmations.includes('listen'),
+        pronunciationConfirmed: confirmations.includes('pronunciation'),
+        editorialFinalConfirmed: confirmations.includes('editorial'),
+      })
+      message.success('最终音频已终审，正式发布入口已解锁')
+    } catch (error: any) {
+      setErrorMessage(error?.message || String(error) || '最终音频审批失败。')
+    } finally {
+      setApproving(false)
+    }
+  }, [confirmations, reviewNotes, reviewer, workflow?.id])
+
   const openArtifact = useCallback(async (targetPath: string, action: 'open' | 'reveal' = 'open') => {
     if (!targetPath) return
     const result = action === 'reveal'
@@ -212,11 +259,11 @@ export default function PublishLayer({
               {audioSize && <small>{audioSize}</small>}
             </div>
           )}
-          <div className={`publish-readiness ${finalAudioPath ? 'is-ready' : 'is-blocked'}`}>
-            {finalAudioPath ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
+          <div className={`publish-readiness ${readinessStatus !== 'blocked' ? 'is-ready' : 'is-blocked'}`}>
+            {readinessStatus !== 'blocked' ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
             <div>
-              <strong>{finalAudioPath ? '交付条件已满足' : '还不能发布'}</strong>
-              <span>{finalAudioPath ? '不会上传内容，只在本机生成可搬运的发布文件。' : '请返回声音工作台完成最终音频。'}</span>
+              <strong>{readinessStatus === 'publish_ready' ? '终审通过' : readinessStatus === 'preview_ready' ? '机器门禁通过，等待终审' : '还不能发布'}</strong>
+              <span>{readinessStatus === 'blocked' ? '请处理发布门禁中的失败原因。' : '审批与当前最终音频 SHA256 绑定。'}</span>
             </div>
           </div>
           {hasPublishedResult && (
@@ -275,10 +322,29 @@ export default function PublishLayer({
                 <span><strong>本地优先</strong> 此操作不会上传节目，也不会调用任何第三方发布接口。</span>
               </div>
 
+              {canApprove && (
+                <section className="publish-final-review" aria-label="最终音频终审">
+                  <div><strong>人工终审</strong><span>完整试听后确认当前成品可以进入正式发布。</span></div>
+                  {finalAudioUrl
+                    ? <audio controls preload="metadata" src={finalAudioUrl} aria-label="最终音频试听" />
+                    : <Alert type="warning" showIcon message="最终音频暂时无法载入，请返回制作页检查文件。" />}
+                  <Input value={reviewer} onChange={event => setReviewer(event.target.value)} placeholder="审核人" />
+                  <Input.TextArea value={reviewNotes} onChange={event => setReviewNotes(event.target.value)} placeholder="终审备注（可选）" autoSize={{ minRows: 2, maxRows: 4 }} />
+                  <Checkbox.Group value={confirmations} onChange={values => setConfirmations(values.map(String))}>
+                    <Checkbox value="listen">已完整试听最终成片</Checkbox>
+                    <Checkbox value="pronunciation">已确认专名与数字发音</Checkbox>
+                    <Checkbox value="editorial">已确认整体编辑质量</Checkbox>
+                  </Checkbox.Group>
+                  <Button loading={approving} disabled={!reviewer.trim() || confirmations.length !== 3} onClick={() => void approveFinalAudio()}>
+                    绑定当前音频并批准
+                  </Button>
+                </section>
+              )}
+
               <div className="publish-action-panel">
                 <div>
-                  <strong>{canPublish ? '已准备好生成发布文件' : '请先完成音频制作'}</strong>
-                  <span>{canPublish ? '再次生成会更新本期归档和 RSS。' : '最终音频就绪后，发布入口会自动解锁。'}</span>
+                  <strong>{canPublish ? '已准备好生成正式发布文件' : '等待全部质量门禁与人工终审'}</strong>
+                  <span>{canPublish ? '再次生成会更新本期归档和 RSS。' : '仅有最终音频不足以解锁正式发布。'}</span>
                 </div>
                 <Button type="primary" size="large" icon={<ExportOutlined />} disabled={!canPublish} onClick={publishEpisode}>
                   生成发布文件

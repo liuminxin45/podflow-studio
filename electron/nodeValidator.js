@@ -8,7 +8,7 @@ const NODE_EXPECTED_OUTPUTS = {
   'tts': ['voice_segments'],
   'audio_postprocess': ['audio_outputs'],
   'assets': ['cover_path'],
-  'review': ['review_summary'],
+  'review': ['review_summary', 'release_readiness'],
   'publish': ['publish_outputs']
 }
 

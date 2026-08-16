@@ -270,16 +270,21 @@ export default function GlobalPlayer({ episode, workflow, onClose, onPlaybackPer
             {facts.length === 0 ? (
               <p>这个段落没有绑定事实卡。</p>
             ) : facts.map((fact: FactCard) => (
+              (() => {
+                const evidence = fact.evidence?.[0]
+                return (
               <button
                 type="button"
                 className="global-player-fact"
                 key={fact.id}
-                onClick={() => fact.source_url && void window.electronAPI.openExternal(fact.source_url)}
-                disabled={!fact.source_url}
+                onClick={() => evidence?.url && void window.electronAPI.openExternal(evidence.url)}
+                disabled={!evidence?.url}
               >
                 <strong>{fact.title}</strong>
-                <small>{fact.source_title || fact.source_url}</small>
+                <small>{evidence?.title || evidence?.url || '请从事实阶段重新生成'}</small>
               </button>
+                )
+              })()
             ))}
           </div>
         </div>

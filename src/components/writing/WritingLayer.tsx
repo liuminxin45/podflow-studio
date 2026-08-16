@@ -133,10 +133,8 @@ export default function WritingLayer({
       fact.id,
       fact.title,
       fact.summary,
-      fact.claim,
-      fact.source_url,
-      fact.source_title,
-      fact.published_at,
+      fact.claims,
+      fact.evidence,
       fact.confidence,
     ]),
   }), [factCards, workflow?.state?.edited_script?.id, workflow?.state?.episode_id, workflow?.state?.script?.id])

@@ -21,6 +21,23 @@ from scripts.run_demo_news import load_demo_pack, load_demo_pack_manifest, run_d
 from tests.mock_data import create_base_state, create_mock_fetch_contents
 
 
+def _verified_fact(index: int, *, summary: str | None = None, url: str | None = None, **extra) -> dict:
+    fact_id = f"fact_{index:03d}"
+    evidence_id = f"evidence_{index:03d}"
+    claim_id = f"claim_{index:03d}"
+    text = summary or f"第 {index} 条新闻摘要。"
+    source_url = url or f"https://example.com/{index}"
+    return {
+        "id": fact_id,
+        "title": f"新闻 {index}",
+        "summary": text,
+        "confidence": "high",
+        "evidence": [{"id": evidence_id, "url": source_url, "title": f"来源 {index}", "published_at": "2026-01-01", "source_role": "primary", "excerpt": text}],
+        "claims": [{"id": claim_id, "text": f"第 {index} 条新闻发生。", "evidence_ids": [evidence_id], "status": "supported", "confidence": "high", "verifier_model": "test-model", "verified_at": "2026-01-01T00:00:00Z"}],
+        **extra,
+    }
+
+
 def test_default_preset_is_morning_news_brief():
     preset = get_default_preset()
     script_config = ScriptConfig()
@@ -63,7 +80,7 @@ def test_demo_data_generates_fact_cards():
     facts = build_fact_cards(create_mock_fetch_contents(), limit=5)
     assert len(facts) >= 3
     assert facts[0]["id"] == "fact_001"
-    assert {"title", "summary", "source_url", "claim", "confidence"} <= set(facts[0])
+    assert {"title", "summary", "evidence", "claims", "confidence"} <= set(facts[0])
 
 
 def test_fact_cards_build_from_plain_materials():
@@ -122,7 +139,7 @@ def test_fact_cards_use_first_sentence_as_claim():
     )
 
     assert len(facts) == 1
-    assert facts[0]["claim"] == "公司声明称产品将在今年发布。"
+    assert facts[0]["claims"][0]["text"] == "公司声明称产品将在今年发布。"
 
 
 def test_script_segments_reference_fact_ids():
@@ -135,16 +152,7 @@ def test_script_segments_reference_fact_ids():
 
 
 def test_deterministic_script_uses_recommended_quick_plus_deep_structure():
-    facts = [
-        {
-            "id": f"fact_{idx + 1:03d}",
-            "title": f"新闻 {idx + 1}",
-            "summary": f"第 {idx + 1} 条新闻摘要。",
-            "claim": f"第 {idx + 1} 条新闻发生。",
-            "confidence": "high",
-        }
-        for idx in range(10)
-    ]
+    facts = [_verified_fact(idx + 1) for idx in range(10)]
     script = generate_deterministic_script(facts, get_default_preset(), episode_id="test_ep")
     assert [seg["type"] for seg in script["segments"]] == [
         "opening",
@@ -160,16 +168,7 @@ def test_deterministic_script_uses_recommended_quick_plus_deep_structure():
 
 
 def test_deterministic_script_allows_non_recommended_counts():
-    facts = [
-        {
-            "id": f"fact_{idx + 1:03d}",
-            "title": f"新闻 {idx + 1}",
-            "summary": f"第 {idx + 1} 条新闻摘要。",
-            "claim": f"第 {idx + 1} 条新闻发生。",
-            "confidence": "high",
-        }
-        for idx in range(3)
-    ]
+    facts = [_verified_fact(idx + 1) for idx in range(3)]
     state = create_base_state()
     state["facts"] = facts
     state["edited_script"] = generate_deterministic_script(facts, get_default_preset(), episode_id="test_ep")
@@ -206,17 +205,7 @@ def test_morning_news_structure_caps_dense_days_when_custom_count_is_disabled():
 
 
 def test_script_node_honors_more_curated_topics_when_custom_count_is_enabled():
-    facts = [
-        {
-            "id": f"fact_{index + 1:03d}",
-            "title": f"新闻 {index + 1}",
-            "summary": f"新闻 {index + 1} 的事实。",
-            "claim": f"新闻 {index + 1} 已发生。",
-            "confidence": "high",
-            "source_url": f"https://example.com/{index + 1}",
-        }
-        for index in range(12)
-    ]
+    facts = [_verified_fact(index + 1, summary=f"新闻 {index + 1} 的事实。") for index in range(12)]
     state = create_base_state()
     state["facts"] = facts
     state["selected_topics"] = [
@@ -236,16 +225,7 @@ def test_script_node_honors_more_curated_topics_when_custom_count_is_enabled():
 
 
 def test_duration_config_controls_quick_and_deep_structure():
-    facts = [
-        {
-            "id": f"fact_{idx + 1:03d}",
-            "title": f"新闻 {idx + 1}",
-            "summary": f"第 {idx + 1} 条新闻摘要。",
-            "claim": f"第 {idx + 1} 条新闻发生。",
-            "confidence": "high",
-        }
-        for idx in range(9)
-    ]
+    facts = [_verified_fact(idx + 1) for idx in range(9)]
     short_result = script_run(
         {
             **create_base_state(),
@@ -275,15 +255,11 @@ def test_script_node_places_the_user_selected_fact_in_the_deep_dive_slot():
     os.environ.pop("OPENAI_API_KEY", None)
     os.environ.pop("OPENAI_API_BASE", None)
     facts = [
-        {
-            "id": f"fact_{idx + 1:03d}",
-            "title": f"新闻 {idx + 1}",
-            "summary": f"第 {idx + 1} 条新闻的核验资料。",
-            "claim": f"第 {idx + 1} 条新闻发生。",
-            "confidence": "high",
-            "source_url": f"https://example.com/{idx + 1}",
+        _verified_fact(
+            idx + 1,
+            summary=f"第 {idx + 1} 条新闻的核验资料。",
             **({"is_deep_dive": True} if idx == 1 else {}),
-        }
+        )
         for idx in range(4)
     ]
     state = {
@@ -319,12 +295,8 @@ def test_script_node_keeps_an_explicit_deep_dive_when_it_is_the_only_story():
     os.environ.pop("OPENAI_API_KEY", None)
     os.environ.pop("OPENAI_API_BASE", None)
     fact = {
-        "id": "fact_001",
+        **_verified_fact(1, summary="这是整理页提供的、已经核验过的深度资料。" * 40, url="https://example.com/only"),
         "title": "唯一新闻",
-        "summary": "这是整理页提供的、已经核验过的深度资料。" * 40,
-        "claim": "唯一新闻已经发生。",
-        "source_url": "https://example.com/only",
-        "confidence": "high",
         "is_deep_dive": True,
         "deep_dive_brief": {
             "version": 1,
@@ -504,7 +476,7 @@ def test_audio_assembly_outputs_final_artifact(tmp_path: Path):
     assert Path(result["audio_outputs"]["audio_report_path"]).exists()
 
 
-def test_publish_package_outputs_feed_and_marks_local_preview(tmp_path: Path):
+def test_publish_node_blocks_unreviewed_local_package_without_writing_rss(tmp_path: Path):
     audio_path = tmp_path / "final.wav"
     _write_test_wav(audio_path)
     state = create_base_state()
@@ -518,12 +490,10 @@ def test_publish_package_outputs_feed_and_marks_local_preview(tmp_path: Path):
             public_base_url="",
         ),
     )
-    assert Path(result["publish_outputs"]["feed_xml"]).exists()
-    assert result["publish_outputs"]["local_preview_only"] is True
-    assert result["run_report"]["warnings"]
-    feed = Path(result["publish_outputs"]["feed_xml"]).read_text(encoding="utf-8")
-    assert "local-preview only" in feed
-    assert "file://" not in feed
+    assert result["publish_outputs"] == {}
+    assert not (tmp_path / "feed.xml").exists()
+    assert not (tmp_path / "dist" / "episodes" / state["episode_id"]).exists()
+    assert any(error["node"] == "publish" for error in result["errors"])
 
 
 def test_demo_news_e2e_runs_without_external_api_keys(tmp_path: Path):
@@ -537,10 +507,6 @@ def test_demo_news_e2e_runs_without_external_api_keys(tmp_path: Path):
         "script.edited.json",
         "run_report.json",
         "episode.json",
-        "feed.xml",
-        "show-notes.md",
-        "transcript.vtt",
-        "chapters.json",
     ]
     for filename in required:
         assert (output_dir / filename).exists(), filename
@@ -553,12 +519,12 @@ def test_demo_news_e2e_runs_without_external_api_keys(tmp_path: Path):
     assert report["script"]["quick_news_count"] == 6
     assert report["script"]["deep_dive_count"] == 1
     assert report["schema_validation"]["ok"] is True
-    assert report["rss_validation"]["ok"] is True
     assert state["errors"] == []
     assert state["audio_outputs"]["status"] == "ok"
     assert state["audio_outputs"]["contains_mock_audio"] is True
-    assert state["publish_outputs"]["rss_validation"]["ok"] is True
-    assert state["publish_outputs"]["local_preview_only"] is True
+    assert state["publish_outputs"]["status"] == "demo_only"
+    assert state["publish_outputs"]["public"] is False
+    assert state["release_readiness"]["status"] == "blocked"
 
 
 def test_source_verified_demo_packs_are_complete_and_runnable(tmp_path: Path):
@@ -614,16 +580,10 @@ def test_user_requested_ai_generation_fails_without_overwriting_the_existing_dra
     os.environ.pop("OPENAI_API_KEY", None)
     os.environ.pop("OPENAI_API_BASE", None)
     state = create_base_state()
-    state["facts"] = [
-        {
-            "id": "fact_001",
-            "title": "已整理新闻",
-            "summary": "已核验事实。",
-            "claim": "已核验事实。",
-            "confidence": "high",
-            "source_url": "https://example.com/news",
-        }
-    ]
+    state["facts"] = [{
+        **_verified_fact(1, summary="已核验事实。", url="https://example.com/news"),
+        "title": "已整理新闻",
+    }]
     state["selected_topics"] = [
         {"id": "topic_001", "title": "已整理新闻", "fact_id": "fact_001"}
     ]

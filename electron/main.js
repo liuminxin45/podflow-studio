@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, Menu, nativeTheme, net, protocol, s
 const path = require('path')
 const fs = require('fs')
 const { pathToFileURL } = require('url')
-const { randomBytes } = require('crypto')
+const { createHash, randomBytes } = require('crypto')
 const { spawn } = require('child_process')
 const ConfigManager = require('./configManager')
 const { fetchModels, callLLM, stopLLMGateway } = require('./llmService')
@@ -107,7 +107,7 @@ const STORAGE_ROOT = process.env.PODFLOW_DATA_DIR ? path.resolve(process.env.POD
 const WORKFLOW_DIR = process.env.PODFLOW_DATA_DIR
   ? path.join(path.resolve(process.env.PODFLOW_DATA_DIR), 'workflows')
   : path.join(PROJECT_ROOT, 'out', 'workflows')
-const EPISODE_SCHEMA_VERSION = 1
+const EPISODE_SCHEMA_VERSION = 2
 const FETCH_SOURCES_DIR = path.join(PROJECT_ROOT, 'nodes', 'fetch', 'sources')
 let fetchSourcesCache = null
 let fetchSourcesCacheSignature = ''
@@ -138,6 +138,12 @@ function mergeStatePatch(target, patch) {
     }
   }
   return target
+}
+
+function sha256File(filePath) {
+  const target = path.resolve(String(filePath || ''))
+  if (!target || !fs.statSync(target).isFile()) throw new Error('Final audio file is missing')
+  return createHash('sha256').update(fs.readFileSync(target)).digest('hex')
 }
 
 function sanitizePathPart(value, fallback = 'unknown') {
@@ -201,6 +207,7 @@ function createInitialState(episodeId, runtimeConfig) {
     intro_outro_paths: {},
     review_summary: {},
     audio_approval: {},
+    release_readiness: {},
     publish_outputs: {},
     subtitle_path: '',
     run_report: {},
@@ -227,7 +234,7 @@ const CURRENT_STATE_KEYS = new Set([
   'selected_topic', 'selected_topics', 'selected_materials', 'auto_selected_items',
   'auto_rejected_items', 'script', 'edited_script', 'generation_request', 'generation_meta',
   'script_snapshots', 'downstream_stale', 'voice_segments', 'production_plan', 'audio_outputs', 'cover_path',
-  'intro_outro_paths', 'review_summary', 'audio_approval', 'publish_outputs', 'subtitle_path', 'run_report',
+  'intro_outro_paths', 'review_summary', 'audio_approval', 'release_readiness', 'publish_outputs', 'subtitle_path', 'run_report',
   'discover_meta', 'discover_ui', 'organize_ui', 'episode_brief', 'writing_meta', 'series', 'playback', '_manifest',
 ])
 
@@ -246,7 +253,7 @@ function normalizeWorkflow(workflow) {
   const state = workflow.state
   if (!state || typeof state !== 'object') throw new Error('Workflow is missing state')
   if (state.schema_version !== EPISODE_SCHEMA_VERSION) {
-    throw new Error(`Unsupported episode schema: expected ${EPISODE_SCHEMA_VERSION}, got ${String(state.schema_version)}`)
+    throw new Error(`Unsupported episode schema: expected ${EPISODE_SCHEMA_VERSION}, got ${String(state.schema_version)}. Re-run from Organize/Facts; legacy workflows are not migrated.`)
   }
   const unknownStateKeys = Object.keys(state).filter(key => !CURRENT_STATE_KEYS.has(key))
   if (unknownStateKeys.length > 0) {
@@ -341,9 +348,7 @@ function createWorkflowSummary(workflow) {
     .map(topic => String(topic?.title || '').trim().toLocaleLowerCase())
     .filter(Boolean)
   const sourceDomains = [...new Set((normalized.state.facts || []).flatMap(fact => (
-    Array.isArray(fact?.source_urls) && fact.source_urls.length > 0
-      ? fact.source_urls
-      : [fact?.source_url]
+    Array.isArray(fact?.evidence) ? fact.evidence.map(item => item?.url) : []
   )).map(value => {
     try { return new URL(String(value || '')).hostname.replace(/^www\./, '').toLocaleLowerCase() }
     catch { return '' }
@@ -1083,12 +1088,55 @@ ipcMain.handle('workflow:approve', async (event, workflowId, nodeName, approved,
   return { status: 'ok' }
 })
 
+ipcMain.handle('workflow:approveAudio', async (_event, workflowId, input) => {
+  if (!currentWorkflow || currentWorkflow.id !== workflowId) throw new Error('Workflow not found')
+  const reviewer = String(input?.reviewer || '').trim()
+  if (!reviewer) throw new Error('Reviewer is required')
+  const acknowledgements = [
+    input?.fullListenConfirmed && 'full_listen_confirmed',
+    input?.pronunciationConfirmed && 'pronunciation_confirmed',
+    input?.editorialFinalConfirmed && 'editorial_final_confirmed',
+  ].filter(Boolean)
+  if (acknowledgements.length !== 3) throw new Error('All final-review confirmations are required')
+  const audioPath = currentWorkflow.state?.audio_outputs?.final_audio_path
+  const digest = sha256File(audioPath)
+  const review = currentWorkflow.state?.review_summary || {}
+  if (review.status !== 'passed' || review.audio_artifact?.sha256 !== digest) {
+    throw new Error('A passing review bound to the current final audio is required')
+  }
+  currentWorkflow.state.audio_approval = {
+    status: 'approved',
+    audio_sha256: digest,
+    reviewed_at: new Date().toISOString(),
+    reviewer,
+    notes: String(input?.notes || '').trim(),
+    acknowledgements,
+  }
+  currentWorkflowDirty = true
+  saveWorkflow(currentWorkflow)
+  await workflowRunner.run(workflowId, null, ['review'], { preserveHumanApproval: true })
+  return currentWorkflow
+})
+
 ipcMain.handle('workflow:updateState', async (event, workflowId, patch) => {
   if (!currentWorkflow || currentWorkflow.id !== workflowId) {
     throw new Error('Workflow not found')
   }
 
-  currentWorkflow.state = mergeStatePatch({ ...currentWorkflow.state }, patch || {})
+  const safePatch = isPlainObject(patch) ? { ...patch } : {}
+  for (const protectedKey of ['audio_approval', 'release_readiness', 'review_summary', 'publish_outputs']) {
+    delete safePatch[protectedKey]
+  }
+  const invalidatesRelease = [
+    'script', 'edited_script', 'voice_segments', 'production_plan', 'audio_outputs', 'cover_path',
+  ].some(key => Object.hasOwn(safePatch, key))
+  currentWorkflow.state = mergeStatePatch({ ...currentWorkflow.state }, safePatch)
+  if (invalidatesRelease) {
+    currentWorkflow.state.review_summary = {}
+    currentWorkflow.state.audio_approval = {}
+    currentWorkflow.state.release_readiness = {}
+    currentWorkflow.state.publish_outputs = {}
+  }
   currentWorkflow.state.logs = currentWorkflow.state.logs || []
   currentWorkflow.state.logs.push(`[Electron] State updated from UI at ${new Date().toISOString()}`)
   currentWorkflowDirty = true

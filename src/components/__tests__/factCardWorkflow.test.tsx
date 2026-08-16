@@ -9,14 +9,7 @@ vi.mock('antd', async (importOriginal) => {
   const React = await import('react')
   return {
     ...actual,
-    Popconfirm: ({
-      children,
-      title,
-      description,
-      okText = 'OK',
-      cancelText = 'Cancel',
-      onConfirm,
-    }: any) => {
+    Popconfirm: ({ children, title, description, okText = 'OK', cancelText = 'Cancel', onConfirm }: any) => {
       const [open, setOpen] = React.useState(false)
       const child = React.Children.only(children) as any
       const trigger = React.cloneElement(child, {
@@ -31,11 +24,7 @@ vi.mock('antd', async (importOriginal) => {
             { role: 'dialog' },
             React.createElement('div', null, title),
             description ? React.createElement('div', null, description) : null,
-            React.createElement(
-              'button',
-              { type: 'button', onClick: () => setOpen(false) },
-              cancelText,
-            ),
+            React.createElement('button', { type: 'button', onClick: () => setOpen(false) }, cancelText),
             React.createElement(
               'button',
               {
@@ -63,7 +52,7 @@ function createWorkflow(state: Partial<PodcastState>): Workflow {
     state: {
       episode_id: 'episode_test',
       created_at: '2026-07-01T00:00:00.000Z',
-      schema_version: 1,
+      schema_version: 2,
       preset: {},
       source_inputs: [],
       runtime_config: {},
@@ -96,31 +85,82 @@ const facts: FactCard[] = [
     id: 'fact_001',
     title: '央行发布流动性操作',
     summary: '央行公告公开市场操作，维持市场流动性合理充裕。',
-    source_title: '财经日报',
-    source_url: 'https://example.com/a',
-    published_at: '2026-07-01T07:00:00.000Z',
-    claim: '央行公告公开市场操作。',
     confidence: 'high',
+    evidence: [
+      {
+        id: 'e1',
+        title: '财经日报',
+        url: 'https://example.com/a',
+        published_at: '2026-07-01T07:00:00.000Z',
+        source_role: 'independent',
+        excerpt: '央行公告公开市场操作。',
+      },
+    ],
+    claims: [
+      {
+        id: 'c1',
+        text: '央行公告公开市场操作。',
+        evidence_ids: ['e1'],
+        status: 'supported',
+        confidence: 'high',
+        verifier_model: 'test',
+        verified_at: '2026-07-01T07:00:00.000Z',
+      },
+    ],
   },
   {
     id: 'fact_002',
     title: '科技公司更新模型能力',
     summary: '一家科技公司发布新模型能力更新。',
-    source_title: '科技日报',
-    source_url: 'https://example.com/b',
-    published_at: '2026-07-01T07:05:00.000Z',
-    claim: '科技公司发布新模型能力。',
     confidence: 'medium',
+    evidence: [
+      {
+        id: 'e2',
+        title: '科技日报',
+        url: 'https://example.com/b',
+        published_at: '2026-07-01T07:05:00.000Z',
+        source_role: 'independent',
+        excerpt: '科技公司发布新模型能力。',
+      },
+    ],
+    claims: [
+      {
+        id: 'c2',
+        text: '科技公司发布新模型能力。',
+        evidence_ids: ['e2'],
+        status: 'supported',
+        confidence: 'medium',
+        verifier_model: 'test',
+        verified_at: '2026-07-01T07:05:00.000Z',
+      },
+    ],
   },
   {
     id: 'fact_003',
     title: '能源价格小幅波动',
     summary: '能源价格在亚洲早盘小幅波动。',
-    source_title: '市场快讯',
-    source_url: 'https://example.com/c',
-    published_at: '2026-07-01T07:10:00.000Z',
-    claim: '能源价格小幅波动。',
     confidence: 'high',
+    evidence: [
+      {
+        id: 'e3',
+        title: '市场快讯',
+        url: 'https://example.com/c',
+        published_at: '2026-07-01T07:10:00.000Z',
+        source_role: 'independent',
+        excerpt: '能源价格小幅波动。',
+      },
+    ],
+    claims: [
+      {
+        id: 'c3',
+        text: '能源价格小幅波动。',
+        evidence_ids: ['e3'],
+        status: 'supported',
+        confidence: 'high',
+        verifier_model: 'test',
+        verified_at: '2026-07-01T07:10:00.000Z',
+      },
+    ],
   },
 ]
 
@@ -135,16 +175,34 @@ const deepDiveBrief: NonNullable<FactCard['deep_dive_brief']> = {
       title: '更新内容',
       question: '官方实际发布了哪些能力？',
       listenerValue: '分清公告事实与市场解读。',
-      claims: [{ text: '官方发布了新的模型能力。', sourceUrls: ['https://example.com/b'], confidence: 'high' }],
+      claims: [
+        {
+          text: '官方发布了新的模型能力。',
+          sourceUrls: ['https://example.com/b'],
+          confidence: 'high',
+        },
+      ],
     },
     {
       title: '行业影响',
       question: '这次更新会如何影响竞争？',
       listenerValue: '理解变化对行业参与者的意义。',
-      claims: [{ text: '更新提高了产品竞争压力。', sourceUrls: ['https://example.com/b'], confidence: 'medium' }],
+      claims: [
+        {
+          text: '更新提高了产品竞争压力。',
+          sourceUrls: ['https://example.com/b'],
+          confidence: 'medium',
+        },
+      ],
     },
   ],
-  counterpoints: [{ text: '公开信息尚不足以证明长期优势。', sourceUrls: ['https://example.com/b'], confidence: 'medium' }],
+  counterpoints: [
+    {
+      text: '公开信息尚不足以证明长期优势。',
+      sourceUrls: ['https://example.com/b'],
+      confidence: 'medium',
+    },
+  ],
   limitations: ['缺少长期使用数据。'],
   sourceUrls: ['https://example.com/b'],
   generatedAt: '2026-07-01T08:00:00.000Z',
@@ -157,11 +215,13 @@ describe('morning-news writing surfaces', () => {
         visible
         onClose={vi.fn()}
         rawContents={[]}
-        selectedMaterials={[{
-          title: facts[0].title,
-          url: facts[0].source_url,
-          _status: 'needs_context',
-        } as any]}
+        selectedMaterials={[
+          {
+            title: facts[0].title,
+            url: facts[0].evidence[0].url,
+            _status: 'needs_context',
+          } as any,
+        ]}
         initialFacts={facts}
         onRunNodes={vi.fn()}
       />,
@@ -180,11 +240,25 @@ describe('morning-news writing surfaces', () => {
         visible
         onClose={vi.fn()}
         rawContents={[
-          { title: '央行发布流动性操作', summary: '央行公告公开市场操作。', url: 'https://example.com/a', source: '财经日报' },
-          { title: '科技公司更新模型能力', summary: '科技公司发布新模型能力。', url: 'https://example.com/b', source: '科技日报' },
+          {
+            title: '央行发布流动性操作',
+            summary: '央行公告公开市场操作。',
+            url: 'https://example.com/a',
+            source: '财经日报',
+          },
+          {
+            title: '科技公司更新模型能力',
+            summary: '科技公司发布新模型能力。',
+            url: 'https://example.com/b',
+            source: '科技日报',
+          },
         ]}
         initialFacts={facts}
-        initialSelectedTopics={facts.map((fact, index) => ({ id: `topic_${index + 1}`, title: fact.title, fact_id: fact.id }))}
+        initialSelectedTopics={facts.map((fact, index) => ({
+          id: `topic_${index + 1}`,
+          title: fact.title,
+          fact_id: fact.id,
+        }))}
         onRunNodes={onRunNodes}
       />,
     )
@@ -225,12 +299,14 @@ describe('morning-news writing surfaces', () => {
       <EpisodeDraftStudio
         visible
         onClose={vi.fn()}
-        rawContents={[{
-          title: facts[0].title,
-          summary: facts[0].summary,
-          url: facts[0].source_url,
-          source: facts[0].source_title,
-        }]}
+        rawContents={[
+          {
+            title: facts[0].title,
+            summary: facts[0].summary,
+            url: facts[0].evidence[0].url,
+            source: facts[0].evidence[0].title,
+          },
+        ]}
         initialFacts={[facts[0]]}
         workflow={createWorkflow({ facts: [facts[0]] })}
         onRunNodes={onRunNodes}
@@ -253,15 +329,23 @@ describe('morning-news writing surfaces', () => {
         visible
         onClose={vi.fn()}
         rawContents={[
-          { title: facts[0].title, summary: facts[0].summary, url: facts[0].source_url },
+          {
+            title: facts[0].title,
+            summary: facts[0].summary,
+            url: facts[0].evidence[0].url,
+          },
           {
             title: facts[1].title,
             summary: facts[1].summary,
-            url: facts[1].source_url,
+            url: facts[1].evidence[0].url,
             _isDeepDive: true,
             _deepDiveBrief: deepDiveBrief,
           },
-          { title: facts[2].title, summary: facts[2].summary, url: facts[2].source_url },
+          {
+            title: facts[2].title,
+            summary: facts[2].summary,
+            url: facts[2].evidence[0].url,
+          },
         ]}
         initialFacts={facts}
         onStateChange={onStateChange}
@@ -296,10 +380,10 @@ describe('morning-news writing surfaces', () => {
       <EpisodeDraftStudio
         visible
         onClose={vi.fn()}
-        rawContents={facts.map(fact => ({
+        rawContents={facts.map((fact) => ({
           title: fact.title,
           summary: fact.summary,
-          url: fact.source_url,
+          url: fact.evidence[0].url,
         }))}
         initialFacts={facts}
         onStateChange={onStateChange}
@@ -326,7 +410,9 @@ describe('morning-news writing surfaces', () => {
             type: 'opening',
             title: '开场导语',
             text: '大家早上好，欢迎收听今天的 PodFlow 晨报。',
+
             source_fact_ids: [],
+            source_claim_ids: [],
             estimated_seconds: 20,
           },
           {
@@ -334,7 +420,9 @@ describe('morning-news writing surfaces', () => {
             type: 'quick_news',
             title: '央行发布流动性操作',
             text: '第一条新闻，央行公告公开市场操作，维持市场流动性合理充裕。',
+
             source_fact_ids: ['fact_001'],
+            source_claim_ids: ['c1'],
             estimated_seconds: 45,
           },
           {
@@ -342,7 +430,9 @@ describe('morning-news writing surfaces', () => {
             type: 'closing',
             title: '结尾总结',
             text: '以上就是今天的重点，祝你通勤顺利。',
+
             source_fact_ids: [],
+            source_claim_ids: [],
             estimated_seconds: 20,
           },
         ],
@@ -354,28 +444,37 @@ describe('morning-news writing surfaces', () => {
       <EpisodeDraftStudio
         visible
         onClose={vi.fn()}
-        rawContents={[{
-          title: facts[0].title,
-          summary: facts[0].summary,
-          url: facts[0].source_url,
-        }]}
+        rawContents={[
+          {
+            title: facts[0].title,
+            summary: facts[0].summary,
+            url: facts[0].evidence[0].url,
+          },
+        ]}
         initialFacts={facts}
-        initialSelectedTopics={facts.map((fact, index) => ({ id: `topic_${index + 1}`, title: fact.title, fact_id: fact.id }))}
+        initialSelectedTopics={facts.map((fact, index) => ({
+          id: `topic_${index + 1}`,
+          title: fact.title,
+          fact_id: fact.id,
+        }))}
         workflow={workflow}
         onProceedToProduction={onProceedToProduction}
       />,
     )
 
     const scriptEditor = screen.getByDisplayValue('第一条新闻，央行公告公开市场操作，维持市场流动性合理充裕。')
-    fireEvent.change(scriptEditor, { target: { value: '未保存的口播稿修改。' } })
-    fireEvent.change(screen.getByLabelText('本期标题'), { target: { value: '更新后的早报标题' } })
+    fireEvent.change(scriptEditor, {
+      target: { value: '未保存的口播稿修改。' },
+    })
+    fireEvent.change(screen.getByLabelText('本期标题'), {
+      target: { value: '更新后的早报标题' },
+    })
     const quickSegmentCard = scriptEditor.closest('.writing-segment-card') as HTMLElement
-    fireEvent.change(
-      within(quickSegmentCard).getByLabelText('段落标题：央行发布流动性操作'),
-      { target: { value: '央行流动性操作解读' } },
-    )
+    fireEvent.change(within(quickSegmentCard).getByLabelText('段落标题：央行发布流动性操作'), { target: { value: '央行流动性操作解读' } })
     expect(screen.getByDisplayValue('未保存的口播稿修改。')).toBeTruthy()
-    expect(Array.from(document.querySelectorAll('.writing-structure-item-label')).some(item => item.textContent === '央行流动性操作解读')).toBe(true)
+    expect(
+      Array.from(document.querySelectorAll('.writing-structure-item-label')).some((item) => item.textContent === '央行流动性操作解读'),
+    ).toBe(true)
 
     expect(screen.queryByRole('button', { name: '保存稿件' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '进入制作' }))
@@ -404,7 +503,9 @@ describe('morning-news writing surfaces', () => {
             type: 'quick_news',
             title: '科技公司更新模型能力',
             text: '第二条新闻，一家科技公司发布新模型能力更新。',
+
             source_fact_ids: [],
+            source_claim_ids: [],
             estimated_seconds: 45,
           },
         ],
@@ -437,8 +538,24 @@ describe('morning-news writing surfaces', () => {
         id: 'script_for_reorder',
         title: '早报标题',
         segments: [
-          { id: 'seg_opening', type: 'opening', title: '开场导语', text: '第一段内容。', source_fact_ids: [], estimated_seconds: 2 },
-          { id: 'seg_quick_1', type: 'quick_news', title: '快讯一', text: '第二段内容。', source_fact_ids: [], estimated_seconds: 2 },
+          {
+            id: 'seg_opening',
+            type: 'opening',
+            title: '开场导语',
+            text: '第一段内容。',
+            source_fact_ids: [],
+            source_claim_ids: [],
+            estimated_seconds: 2,
+          },
+          {
+            id: 'seg_quick_1',
+            type: 'quick_news',
+            title: '快讯一',
+            text: '第二段内容。',
+            source_fact_ids: [],
+            source_claim_ids: [],
+            estimated_seconds: 2,
+          },
         ],
       },
     })
@@ -457,11 +574,17 @@ describe('morning-news writing surfaces', () => {
 
     fireEvent.dragStart(opening)
     fireEvent.dragOver(quickNews)
-    expect(Array.from(document.querySelectorAll('.writing-structure-item-label')).map(item => item.textContent)).toEqual(['快讯一', '开场导语'])
+    expect(Array.from(document.querySelectorAll('.writing-structure-item-label')).map((item) => item.textContent)).toEqual([
+      '快讯一',
+      '开场导语',
+    ])
     expect(quickNews.classList.contains('is-drop-target')).toBe(true)
     fireEvent.drop(quickNews)
 
-    expect(Array.from(document.querySelectorAll('.writing-structure-item-label')).map(item => item.textContent)).toEqual(['快讯一', '开场导语'])
+    expect(Array.from(document.querySelectorAll('.writing-structure-item-label')).map((item) => item.textContent)).toEqual([
+      '快讯一',
+      '开场导语',
+    ])
   })
 
   it('requires confirmation before deleting a segment from the programme structure', async () => {
@@ -471,28 +594,35 @@ describe('morning-news writing surfaces', () => {
         id: 'script_for_deletion',
         title: '早报标题',
         segments: [
-          { id: 'seg_opening', type: 'opening', title: '开场导语', text: '第一段内容。', source_fact_ids: [], estimated_seconds: 2 },
-          { id: 'seg_quick_1', type: 'quick_news', title: '快讯一', text: '第二段内容。', source_fact_ids: [], estimated_seconds: 2 },
+          {
+            id: 'seg_opening',
+            type: 'opening',
+            title: '开场导语',
+            text: '第一段内容。',
+            source_fact_ids: [],
+            source_claim_ids: [],
+            estimated_seconds: 2,
+          },
+          {
+            id: 'seg_quick_1',
+            type: 'quick_news',
+            title: '快讯一',
+            text: '第二段内容。',
+            source_fact_ids: [],
+            source_claim_ids: [],
+            estimated_seconds: 2,
+          },
         ],
       },
     })
 
     render(
-      <EpisodeDraftStudio
-        visible
-        onClose={vi.fn()}
-        rawContents={[]}
-        workflow={workflow}
-        onProceedToProduction={onProceedToProduction}
-      />,
+      <EpisodeDraftStudio visible onClose={vi.fn()} rawContents={[]} workflow={workflow} onProceedToProduction={onProceedToProduction} />,
     )
 
-    const findQuickNewsEditor = () => Array.from(document.querySelectorAll('textarea'))
-      .find(editor => editor.value === '第二段内容。')
+    const findQuickNewsEditor = () => Array.from(document.querySelectorAll('textarea')).find((editor) => editor.value === '第二段内容。')
     await waitFor(() => expect(findQuickNewsEditor()).toBeTruthy())
-    const deleteButton = document.querySelector<HTMLButtonElement>(
-      'button[aria-label="删除快讯一"]',
-    )
+    const deleteButton = document.querySelector<HTMLButtonElement>('button[aria-label="删除快讯一"]')
     expect(deleteButton).toBeTruthy()
     fireEvent.click(deleteButton!)
 
@@ -511,9 +641,7 @@ describe('morning-news writing surfaces', () => {
     fireEvent.click(within(confirmation!).getByText('确认删除'))
 
     await waitFor(() => expect(findQuickNewsEditor()).toBeUndefined())
-    const proceedButton = document.querySelector<HTMLButtonElement>(
-      '.stage-header-nav-button.next',
-    )
+    const proceedButton = document.querySelector<HTMLButtonElement>('.stage-header-nav-button.next')
     expect(proceedButton).toBeTruthy()
     fireEvent.click(proceedButton!)
 
@@ -534,7 +662,9 @@ describe('morning-news writing surfaces', () => {
             type: 'opening',
             title: '开场导语',
             text: '四字稿件',
+
             source_fact_ids: [],
+            source_claim_ids: [],
             estimated_seconds: 1,
           },
         ],
@@ -545,11 +675,13 @@ describe('morning-news writing surfaces', () => {
       <EpisodeDraftStudio
         visible
         onClose={vi.fn()}
-        rawContents={[{
-          title: facts[0].title,
-          summary: facts[0].summary,
-          url: facts[0].source_url,
-        }]}
+        rawContents={[
+          {
+            title: facts[0].title,
+            summary: facts[0].summary,
+            url: facts[0].evidence[0].url,
+          },
+        ]}
         initialFacts={[facts[0]]}
         workflow={workflow}
         onRunNodes={onRunNodes}
@@ -583,9 +715,21 @@ describe('morning-news writing surfaces', () => {
       edited_script: {
         title: '早报标题',
         description: '早报简介',
-        segments: [{ id: 'seg_news_1', type: 'quick_news', title: '新闻一', text: '第一条新闻。', source_fact_ids: [], estimated_seconds: 5 }],
+        segments: [
+          {
+            id: 'seg_news_1',
+            type: 'quick_news',
+            title: '新闻一',
+            text: '第一条新闻。',
+            source_fact_ids: [],
+            source_claim_ids: [],
+            estimated_seconds: 5,
+          },
+        ],
       },
-      audio_outputs: { final_audio_path: 'out/episodes/episode_test/final.mp3' },
+      audio_outputs: {
+        final_audio_path: 'out/episodes/episode_test/final.mp3',
+      },
       publish_outputs: {
         status: 'success',
         published_at: '2026-07-18T00:20:00.000Z',
@@ -606,14 +750,7 @@ describe('morning-news writing surfaces', () => {
       },
     })
 
-    render(
-      <PublishLayer
-        visible
-        onClose={vi.fn()}
-        workflow={workflow}
-        onRunNodes={vi.fn().mockResolvedValue(undefined)}
-      />,
-    )
+    render(<PublishLayer visible onClose={vi.fn()} workflow={workflow} onRunNodes={vi.fn().mockResolvedValue(undefined)} />)
 
     await waitFor(() => {
       expect(screen.getByText('发布文件已就绪')).toBeTruthy()
@@ -642,9 +779,28 @@ describe('morning-news writing surfaces', () => {
           edited_script: {
             title: '早报标题',
             description: '早报简介',
-            segments: [{ id: 'seg_1', type: 'opening', title: '开场', text: '早上好。', source_fact_ids: [], estimated_seconds: 5 }],
+            segments: [
+              {
+                id: 'seg_1',
+                type: 'opening',
+                title: '开场',
+                text: '早上好。',
+                source_fact_ids: [],
+                source_claim_ids: [],
+                estimated_seconds: 5,
+              },
+            ],
           },
-          audio_outputs: { final_audio_path: 'out/episodes/episode_test/final.mp3' },
+          audio_outputs: {
+            final_audio_path: 'out/episodes/episode_test/final.mp3',
+          },
+          release_readiness: {
+            version: 1,
+            status: 'publish_ready',
+            audio_sha256: 'sha',
+            evaluated_at: '2026-07-01T00:00:00Z',
+            gates: {} as any,
+          },
         })}
         onRunNodes={onRunNodes}
         onSaveWorkflow={onSaveWorkflow}
@@ -663,15 +819,22 @@ describe('morning-news writing surfaces', () => {
 
   it('keeps the publish result open when automatic workflow saving fails', async () => {
     const onClose = vi.fn()
-    const onSaveWorkflow = vi.fn()
-      .mockRejectedValueOnce(new Error('磁盘写入失败'))
-      .mockResolvedValueOnce(undefined)
+    const onSaveWorkflow = vi.fn().mockRejectedValueOnce(new Error('磁盘写入失败')).mockResolvedValueOnce(undefined)
     render(
       <PublishLayer
         visible
         onClose={onClose}
         workflow={createWorkflow({
-          audio_outputs: { final_audio_path: 'out/episodes/episode_test/final.mp3' },
+          audio_outputs: {
+            final_audio_path: 'out/episodes/episode_test/final.mp3',
+          },
+          release_readiness: {
+            version: 1,
+            status: 'publish_ready',
+            audio_sha256: 'sha',
+            evaluated_at: '2026-07-01T00:00:00Z',
+            gates: {} as any,
+          },
         })}
         onRunNodes={vi.fn().mockResolvedValue(undefined)}
         onSaveWorkflow={onSaveWorkflow}
@@ -690,5 +853,58 @@ describe('morning-news writing surfaces', () => {
     await waitFor(() => expect(onSaveWorkflow).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.queryByText('发布文件已生成，但节目尚未保存')).toBeNull())
     expect(completeButton?.hasAttribute('disabled')).toBe(false)
+  })
+
+  it('requires final playback acknowledgements before binding human approval', async () => {
+    const approveAudio = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        approveAudio,
+        getMediaUrl: vi.fn().mockResolvedValue({ url: 'http://127.0.0.1/final.mp3' }),
+        loadNodeConfig: vi.fn().mockResolvedValue({}),
+      },
+    })
+    render(
+      <PublishLayer
+        visible
+        onClose={vi.fn()}
+        workflow={createWorkflow({
+          audio_outputs: {
+            final_audio_path: 'out/episodes/episode_test/final.mp3',
+          },
+          release_readiness: {
+            version: 1,
+            status: 'preview_ready',
+            audio_sha256: 'sha',
+            evaluated_at: '2026-07-01T00:00:00Z',
+            gates: {} as any,
+          },
+        })}
+      />,
+    )
+
+    expect(await screen.findByLabelText('最终音频试听')).toBeTruthy()
+    const approveButton = screen.getByRole('button', {
+      name: '绑定当前音频并批准',
+    })
+    expect(approveButton.hasAttribute('disabled')).toBe(true)
+    fireEvent.change(screen.getByPlaceholderText('审核人'), {
+      target: { value: '编辑甲' },
+    })
+    for (const label of ['已完整试听最终成片', '已确认专名与数字发音', '已确认整体编辑质量']) {
+      fireEvent.click(screen.getByRole('checkbox', { name: label }))
+    }
+    fireEvent.click(approveButton)
+
+    await waitFor(() =>
+      expect(approveAudio).toHaveBeenCalledWith('workflow_test', {
+        reviewer: '编辑甲',
+        notes: '',
+        fullListenConfirmed: true,
+        pronunciationConfirmed: true,
+        editorialFinalConfirmed: true,
+      }),
+    )
   })
 })

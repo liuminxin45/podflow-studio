@@ -25,7 +25,6 @@ def run(state: dict[str, Any], config: PublishConfig = None) -> dict[str, Any]:
     logs.append("[PublishNode] Phase 1: Building publish package")
     try:
         episode_dir = Path(config.local_base_dir) / safe_path_part(episode_id, "unknown")
-        episode_dir.mkdir(parents=True, exist_ok=True)
 
         local_preview_only = not bool((config.public_base_url or "").strip())
         audio_outputs = state.get("audio_outputs")
@@ -34,6 +33,20 @@ def run(state: dict[str, Any], config: PublishConfig = None) -> dict[str, Any]:
         contains_mock_audio = bool(audio_outputs.get("contains_mock_audio"))
         audio_path = Path(str(audio_outputs.get("final_audio_path") or ""))
         audio_artifact = file_fingerprint(audio_path)
+        if not audio_artifact:
+            raise RuntimeError("No readable final audio artifact found for publishing.")
+        if contains_mock_audio:
+            raise RuntimeError("Formal publishing is blocked because final audio contains mock TTS.")
+        review = state.get("review_summary") if isinstance(state.get("review_summary"), dict) else {}
+        if review.get("status") != "passed" or review.get("audio_artifact") != audio_artifact:
+            raise RuntimeError("Formal publishing requires a passing review bound to the final audio fingerprint.")
+        readiness = state.get("release_readiness") if isinstance(state.get("release_readiness"), dict) else {}
+        if readiness.get("audio_sha256") != audio_artifact.get("sha256"):
+            raise RuntimeError("Formal publishing requires release readiness bound to the current audio fingerprint.")
+        if readiness.get("status") != "publish_ready":
+            raise RuntimeError(
+                "Formal publishing is blocked until every machine gate and the current human approval pass."
+            )
         if contains_mock_audio and not local_preview_only:
             raise RuntimeError("Public publishing is blocked because final audio contains mock TTS.")
         if not local_preview_only:
@@ -70,6 +83,8 @@ def run(state: dict[str, Any], config: PublishConfig = None) -> dict[str, Any]:
             raise RuntimeError("No readable final audio artifact found for publishing.")
         if not local_preview_only:
             _validate_public_readiness(state, audio_outputs)
+
+        episode_dir.mkdir(parents=True, exist_ok=True)
 
         stored_audio = ""
         if audio_path.exists() and audio_path.is_file():
@@ -366,13 +381,14 @@ def _collect_sources(raw_facts: Any) -> list[dict[str, str]]:
     for fact in facts:
         if not isinstance(fact, dict):
             continue
-        urls = [str(fact.get("source_url") or ""), *[str(value or "") for value in fact.get("source_urls", [])]]
-        titles = [str(fact.get("source_title") or fact.get("title") or "来源"), *[str(value or "") for value in fact.get("source_titles", [])]]
-        for index, url in enumerate(urls):
+        for evidence in fact.get("evidence", []):
+            if not isinstance(evidence, dict):
+                continue
+            url = str(evidence.get("url") or "")
             if not re.match(r"^https?://", url) or url in seen:
                 continue
             seen.add(url)
-            collected.append({"title": titles[index] if index < len(titles) and titles[index] else "来源", "url": url})
+            collected.append({"title": str(evidence.get("title") or fact.get("title") or "来源"), "url": url})
     return collected
 
 

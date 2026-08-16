@@ -35,8 +35,12 @@ const COMMANDS = new Set(['doctor', 'start', 'run', 'status', 'stop', 'logs', 'a
 const VALUE_OPTIONS = new Set([
   'mode', 'session', 'cdp', 'window', 'timeout', 'artifacts-dir', 'suite', 'tail',
   'workflow', 'stage', 'audio-sha256', 'reviewer', 'notes', 'output', 'tts-engine',
+  'episode-id', 'topic', 'release-repo', 'site-repo',
 ])
-const BOOLEAN_OPTIONS = new Set(['json', 'follow', 'help', 'allow-paid-tts', 'skip-approval'])
+const BOOLEAN_OPTIONS = new Set([
+  'json', 'follow', 'help', 'allow-paid-tts', 'preview-only', 'confirm-publish',
+  'full-listen-confirmed', 'pronunciation-confirmed', 'editorial-final-confirmed',
+])
 
 class CliError extends Error {
   constructor(message, exitCode) {
@@ -309,26 +313,38 @@ async function acceptCommand(options) {
 }
 
 async function produceCommand(options) {
-  if (!options.workflow) throw new CliError('produce requires --workflow', EXIT.ARGUMENT)
-  const stage = validateEnum(options.stage, ['render', 'approve', 'package'], 'stage', '')
+  const stage = validateEnum(options.stage, ['generate', 'render', 'approve', 'package', 'publish'], 'stage', '')
+  if (stage !== 'generate' && !options.workflow) throw new CliError(`${stage} requires --workflow`, EXIT.ARGUMENT)
+  if (stage === 'generate' && !options['episode-id']) throw new CliError('generate requires --episode-id', EXIT.ARGUMENT)
   const python = resolvePythonCommand()
   const args = [
     ...python.slice(1), path.join(projectRoot, 'scripts', 'produce_workflow.py'),
-    '--workflow', options.workflow, '--stage', stage,
+    '--stage', stage,
   ]
+  if (options.workflow) args.push('--workflow', options.workflow)
   if (options['allow-paid-tts']) args.push('--allow-paid-tts')
-  if (options['skip-approval']) args.push('--skip-approval')
-  for (const name of ['audio-sha256', 'reviewer', 'notes', 'output', 'tts-engine']) {
+  for (const name of ['preview-only', 'full-listen-confirmed', 'pronunciation-confirmed', 'editorial-final-confirmed']) {
+    if (options[name]) args.push(`--${name}`)
+  }
+  if (options['confirm-publish']) args.push('--confirm-publish')
+  for (const name of ['audio-sha256', 'reviewer', 'notes', 'output', 'tts-engine', 'episode-id', 'topic', 'release-repo', 'site-repo']) {
     if (options[name]) args.push(`--${name}`, options[name])
   }
   const child = spawn(python[0], args, { cwd: projectRoot, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
-  child.stdout.on('data', chunk => { process.stdout.write(chunk) })
+  let stdout = ''
+  child.stdout.on('data', chunk => { stdout += chunk.toString('utf8') })
   child.stderr.on('data', chunk => { process.stderr.write(chunk) })
   const code = await new Promise((resolve, reject) => {
     child.once('error', reject)
     child.once('exit', value => resolve(value ?? EXIT.PRODUCTION))
   })
-  if (code !== 0) throw new CliError(`Production stage ${stage} failed`, EXIT.PRODUCTION)
+  if (code !== 0) {
+    const payload = stdout.trim().split(/\r?\n/).reverse().map(line => {
+      try { return JSON.parse(line) } catch { return null }
+    }).find(Boolean)
+    throw new CliError(payload?.error || `Production stage ${stage} failed`, EXIT.PRODUCTION)
+  }
+  if (stdout) process.stdout.write(stdout)
   return EXIT.OK
 }
 
@@ -372,11 +388,11 @@ function helpCommand() {
   process.stdout.write('  stop                   Gracefully stop a session owned by its nonce\n')
   process.stdout.write('  logs                   Print or follow the session log\n')
   process.stdout.write('  accept                 Run startup, ui, or e2e-offline acceptance\n')
-  process.stdout.write('  produce                Render, approve, or package one explicit workflow\n')
+  process.stdout.write('  produce                Generate, render, approve, package, or publish one episode\n')
   process.stdout.write('  version                Print the application and CLI version\n\n')
   process.stdout.write('Common options: --session <id> --mode <dev|built> --window <show|hidden> --cdp <off|auto|port> --json\n')
   process.stdout.write('Acceptance:    --suite <startup|ui|e2e-offline> --artifacts-dir <path> --timeout <seconds>\n')
-  process.stdout.write('Production:    --workflow <id|path> --stage <render|approve|package> [--allow-paid-tts]\n')
+  process.stdout.write('Production:    --stage <generate|render|approve|package|publish> [--workflow <id|path>] [--allow-paid-tts]\n')
   process.stdout.write('Logs:          --tail <lines> --follow\n')
   return EXIT.OK
 }

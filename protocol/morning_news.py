@@ -21,11 +21,9 @@ class FactCard:
     id: str
     title: str
     summary: str
-    source_title: str
-    source_url: str
-    published_at: str
-    claim: str
     confidence: str
+    evidence: list[dict[str, Any]]
+    claims: list[dict[str, Any]]
     used_in_segments: list[str] = field(default_factory=list)
 
 
@@ -36,6 +34,7 @@ class ScriptSegment:
     title: str
     text: str
     source_fact_ids: list[str]
+    source_claim_ids: list[str]
     estimated_seconds: int
     speaker: str = "Host A"
 
@@ -77,20 +76,38 @@ def build_fact_cards(source_inputs: list[dict[str, Any]], limit: int = 20) -> li
             continue
         seen.add(dedup_key)
         source_url = str(item.get("url") or "")
+        if not source_url.startswith(("http://", "https://")):
+            continue
         source_title = str(item.get("source_title") or item.get("source_name") or item.get("source") or title)
         published_at = str(item.get("published_at") or item.get("published") or "")
         claim = _first_sentence(body, max_chars=180)
         confidence = "high" if source_url and published_at else "medium" if source_url else "low"
+        fact_index = len(facts) + 1
+        evidence_id = f"evidence_{fact_index:03d}_001"
+        claim_id = f"claim_{fact_index:03d}_001"
         facts.append(
             FactCard(
-                id=f"fact_{len(facts) + 1:03d}",
+                id=f"fact_{fact_index:03d}",
                 title=title,
                 summary=_truncate(body, 260),
-                source_title=source_title,
-                source_url=source_url,
-                published_at=published_at,
-                claim=claim,
                 confidence=confidence,
+                evidence=[{
+                    "id": evidence_id,
+                    "url": source_url,
+                    "title": source_title,
+                    "published_at": published_at,
+                    "source_role": "independent",
+                    "excerpt": _truncate(body, 600),
+                }],
+                claims=[{
+                    "id": claim_id,
+                    "text": claim,
+                    "evidence_ids": [evidence_id],
+                    "status": "insufficient",
+                    "confidence": confidence,
+                    "verifier_model": "",
+                    "verified_at": "",
+                }],
             )
         )
     return [asdict(fact) for fact in facts]
@@ -166,6 +183,7 @@ def generate_deterministic_script(
     content_tendency = str(preset.get("content_tendency", "news"))
     tone_line = _editorial_opening_line(str(preset.get("editorial_voice", "human")))
     source_ids = [str(f.get("id", "")) for f in selected if f.get("id")]
+    all_claim_ids = [claim_id for fact in selected for claim_id in _claim_ids(fact)]
     if not selected:
         return _script_dict(title, preset, [], episode_id, generated_by="deterministic_mock")
 
@@ -179,6 +197,7 @@ def generate_deterministic_script(
             f"其中 {structure['actual_quick_news_count']} 条快讯"
             f"和 {structure['actual_deep_dive_count']} 段重点展开。{tone_line}",
             source_ids,
+            all_claim_ids,
         )
     ]
 
@@ -198,6 +217,7 @@ def generate_deterministic_script(
                 str(fact.get("title", label)),
                 text,
                 [str(fact.get("id", ""))] if fact.get("id") else [],
+                _claim_ids(fact),
             )
         )
 
@@ -208,6 +228,7 @@ def generate_deterministic_script(
             "收束",
             "以上是今天的 PodFlow 晨报。重要事件仍在继续发展，我们会追踪新的公开信息和关键变化。感谢收听，明天早上再见。",
             source_ids,
+            all_claim_ids,
         )
     )
 
@@ -289,14 +310,33 @@ def build_run_report(state: dict[str, Any]) -> dict[str, Any]:
             }
         )
     warnings.extend(_recommendation_warnings(len(news_segments), recommended_count))
+    editorial_quality = (
+        state.get("generation_meta", {}).get("editorial_quality", {})
+        if isinstance(state.get("generation_meta"), dict)
+        else {}
+    )
+    verification_models = sorted({
+        str(claim.get("verifier_model") or "")
+        for fact in facts
+        if isinstance(fact, dict)
+        for claim in fact.get("claims", [])
+        if isinstance(claim, dict) and str(claim.get("verifier_model") or "")
+    })
+    degradation_reasons = [
+        str(error.get("message") or "")
+        for error in state.get("errors", [])
+        if isinstance(error, dict) and str(error.get("message") or "")
+    ]
+    if state.get("publish_outputs", {}).get("reason"):
+        degradation_reasons.append(str(state["publish_outputs"]["reason"]))
 
     report = {
         "episode_id": state.get("episode_id", ""),
         "unreviewed": bool(state.get("run_report", {}).get("unreviewed", False)),
         "automated": bool(state.get("run_report", {}).get("automated", False)),
         "unreviewed_note": state.get("run_report", {}).get("unreviewed_note", ""),
-        "script_generated_by": state.get("run_report", {}).get("script_generated_by", ""),
-        "llm_used": bool(state.get("run_report", {}).get("llm_used", False)),
+        "script_generated_by": str(state.get("script", {}).get("generated_by") or ""),
+        "llm_used": state.get("script", {}).get("generated_by") == "llm",
         "preset_id": preset.get("id", "morning_news_brief"),
         "facts": {
             "total": len(facts),
@@ -321,6 +361,15 @@ def build_run_report(state: dict[str, Any]) -> dict[str, Any]:
         },
         "audio": audio_outputs if isinstance(audio_outputs, dict) else {},
         "publish": state.get("publish_outputs", {}),
+        "release_readiness": state.get("release_readiness", {}),
+        "quality_rules": {
+            "release_readiness": state.get("release_readiness", {}).get("version"),
+            "editorial_quality": editorial_quality.get("version"),
+        },
+        "verification_models": verification_models,
+        "editorial_quality": editorial_quality,
+        "repair_count": int(editorial_quality.get("repair_count") or 0),
+        "degradation_reasons": list(dict.fromkeys(degradation_reasons)),
         "schema_validation": state.get("run_report", {}).get("schema_validation", {}),
         "rss_validation": state.get("publish_outputs", {}).get("rss_validation", {})
         or state.get("run_report", {}).get("rss_validation", {}),
@@ -369,6 +418,7 @@ def _segment(
     title: str,
     text: str,
     source_fact_ids: list[str],
+    source_claim_ids: list[str],
 ) -> dict[str, Any]:
     return asdict(
         ScriptSegment(
@@ -377,6 +427,7 @@ def _segment(
             title=title,
             text=_clean_text(text),
             source_fact_ids=[fact_id for fact_id in source_fact_ids if fact_id],
+            source_claim_ids=[claim_id for claim_id in source_claim_ids if claim_id],
             estimated_seconds=estimate_seconds(text),
         )
     )
@@ -425,6 +476,22 @@ def _impact_sentence(fact: dict[str, Any]) -> str:
     return "来源不足，发布前需要人工确认。"
 
 
+def _claim_ids(fact: dict[str, Any]) -> list[str]:
+    return [
+        str(claim.get("id") or "")
+        for claim in fact.get("claims", [])
+        if isinstance(claim, dict) and claim.get("id")
+    ]
+
+
+def _claim_text(fact: dict[str, Any]) -> str:
+    return " ".join(
+        str(claim.get("text") or "")
+        for claim in fact.get("claims", [])
+        if isinstance(claim, dict) and claim.get("status") == "supported"
+    ).strip() or str(fact.get("summary") or "")
+
+
 def _quick_news_text(fact: dict[str, Any], content_tendency: str = "news") -> str:
     relevance = {
         "commentary": "这条消息对今天的关注重点有直接参考价值。",
@@ -433,7 +500,7 @@ def _quick_news_text(fact: dict[str, Any], content_tendency: str = "news") -> st
     }.get(content_tendency, "重点是先确认事件本身与最新进展。")
     return (
         f"快讯，{fact.get('title', '这条新闻')}。"
-        f"{fact.get('claim') or fact.get('summary', '')} "
+        f"{_claim_text(fact)} "
         f"{relevance} 发布前重点核对来源和时间。"
     )
 
@@ -446,7 +513,7 @@ def _deep_dive_text(fact: dict[str, Any], content_tendency: str = "news") -> str
     }.get(content_tendency, "我们把已知事实和需要继续确认的部分分开来看。")
     return (
         f"深度解读来看，{fact.get('title', '这条新闻')}。"
-        f"{fact.get('claim') or fact.get('summary', '')} "
+        f"{_claim_text(fact)} "
         f"{framing} {_impact_sentence(fact)}"
     )
 

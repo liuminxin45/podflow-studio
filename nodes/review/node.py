@@ -7,6 +7,7 @@ import shutil
 import subprocess
 from nodes.review.config import ReviewConfig
 from protocol.artifact_utils import file_fingerprint
+from protocol.release_readiness import build_release_readiness
 
 # Each check: (condition_ok, fail_level, fail_msg, pass_msg)
 # fail_level is "error" or "warning"
@@ -206,6 +207,7 @@ def run(state: dict[str, Any], config: ReviewConfig = None) -> dict[str, Any]:
         "score": f"{pass_count}/{len(checks)}",
     }
     state["review_summary"] = review
+    state["release_readiness"] = build_release_readiness(state)
     report = {
         "qualityProfile": plan.get("quality_profile"),
         "audioSha256": (audio_artifact or {}).get("sha256", ""),

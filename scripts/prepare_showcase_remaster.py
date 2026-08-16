@@ -38,15 +38,18 @@ def build_workflow(episode_dir: Path, episode_id: str) -> dict:
     if len(cues) != 9 or len(chapters) != 9:
         raise ValueError("Remaster input must contain opening, 6 quick news, deep dive and closing")
     types = ["opening", *("quick_news" for _ in range(6)), "deep_dive", "closing"]
-    facts = [
-        {"id": f"fact_{index:03d}", "title": item["title"], "source_title": item["title"],
-         "source_url": item["url"], "source_urls": [item["url"]], "claims": []}
-        for index, item in enumerate(sources, start=1)
-    ]
+    facts = [{
+        "id": f"fact_{index:03d}", "title": item["title"], "summary": item["title"], "confidence": "low",
+        "evidence": [{"id": f"evidence_{index:03d}", "url": item["url"], "title": item["title"], "published_at": "", "source_role": "background", "excerpt": item["title"]}],
+        "claims": [{"id": f"claim_{index:03d}", "text": item["title"], "evidence_ids": [f"evidence_{index:03d}"], "status": "insufficient", "confidence": "low", "verifier_model": "", "verified_at": ""}],
+    } for index, item in enumerate(sources, start=1)]
     source_ids = [[], *([f"fact_{index:03d}"] for index in range(1, 7)),
                   [f"fact_{index:03d}" for index in range(7, len(facts) + 1)], []]
+    deep_claim_ids = [f"claim_{index:03d}" for index in range(7, len(facts) + 1)]
+    claim_ids = [[], *([f"claim_{index:03d}"] for index in range(1, 7)),
+                 deep_claim_ids, []]
     segments = []
-    for index, (cue, segment_type, fact_ids) in enumerate(zip(cues, types, source_ids), start=1):
+    for index, (cue, segment_type, fact_ids, bound_claim_ids) in enumerate(zip(cues, types, source_ids, claim_ids), start=1):
         start = _seconds(cue.group("start"))
         end = _seconds(cue.group("end"))
         segments.append({
@@ -56,6 +59,7 @@ def build_workflow(episode_dir: Path, episode_id: str) -> dict:
             "text": re.sub(r"\s+", "", cue.group("text")).strip(),
             "speaker": "Host A",
             "source_fact_ids": fact_ids,
+            "source_claim_ids": bound_claim_ids,
             "estimated_seconds": max(1, end - start),
         })
     state = PodcastState().to_dict()

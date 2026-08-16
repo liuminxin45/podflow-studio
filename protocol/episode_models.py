@@ -9,7 +9,30 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from protocol.presets import get_default_preset
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+
+class EvidenceRefModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    url: str
+    title: str
+    published_at: str = ""
+    source_role: Literal["primary", "independent", "background"] = "independent"
+    excerpt: str
+
+
+class VerifiedClaimModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    text: str
+    evidence_ids: list[str] = Field(min_length=1)
+    status: Literal["supported", "conflicted", "insufficient"]
+    confidence: Literal["high", "medium", "low"]
+    verifier_model: str
+    verified_at: str
 
 
 class DeepDiveClaimModel(BaseModel):
@@ -50,13 +73,9 @@ class FactCardModel(BaseModel):
     id: str
     title: str
     summary: str
-    source_title: str = ""
-    source_url: str = ""
-    published_at: str = ""
-    claim: str = ""
     confidence: Literal["high", "medium", "low"] = "medium"
-    source_titles: list[str] = Field(default_factory=list)
-    source_urls: list[str] = Field(default_factory=list)
+    evidence: list[EvidenceRefModel] = Field(min_length=1)
+    claims: list[VerifiedClaimModel] = Field(min_length=1)
     is_deep_dive: bool = False
     deep_dive_brief: DeepDiveBriefModel | None = None
     used_in_segments: list[str] = Field(default_factory=list)
@@ -75,7 +94,8 @@ class ScriptSegmentModel(BaseModel):
     type: Literal["opening", "quick_news", "deep_dive", "closing", "custom"]
     title: str = ""
     text: str
-    source_fact_ids: list[str] = Field(default_factory=list)
+    source_fact_ids: list[str]
+    source_claim_ids: list[str]
     estimated_seconds: int = 0
     speaker: str = "Host A"
 
@@ -122,6 +142,14 @@ class GenerationRequestModel(BaseModel):
         if self.model_fields_set and self.mode is None:
             raise ValueError("generation_request.mode is required for a non-empty request")
         return self
+
+
+class VoiceSegmentModel(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    segment_id: str
+    source_fact_ids: list[str]
+    source_claim_ids: list[str]
 
 
 class AudioOutputsModel(BaseModel):
@@ -174,7 +202,8 @@ class ProductionClipModel(BaseModel):
     context_after: str = ""
     direction: SpeechDirectionModel
     speaker: str = "Host A"
-    source_fact_ids: list[str] = Field(default_factory=list)
+    source_fact_ids: list[str]
+    source_claim_ids: list[str]
     source: Literal["tts", "recording", "local"] = "tts"
     path: str = ""
     duration_seconds: float = 0.0
@@ -253,6 +282,32 @@ class AudioApprovalModel(BaseModel):
     reviewed_at: str = ""
     reviewer: str = ""
     notes: str = ""
+    acknowledgements: list[Literal[
+        "full_listen_confirmed",
+        "pronunciation_confirmed",
+        "editorial_final_confirmed",
+    ]] = Field(default_factory=list)
+
+
+class ReleaseGateModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["passed", "failed", "pending"]
+    codes: list[str] = Field(default_factory=list)
+    messages: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
+
+
+class ReleaseReadinessModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Literal[1] | None = None
+    status: Literal["blocked", "preview_ready", "publish_ready"] | None = None
+    audio_sha256: str = Field(default="", pattern=r"^(?:|[a-f0-9]{64})$")
+    evaluated_at: str = ""
+    gates: dict[Literal[
+        "sources", "facts", "script", "pronunciation", "audio", "human_approval"
+    ], ReleaseGateModel] = Field(default_factory=dict)
 
 
 class RssValidationModel(BaseModel):
@@ -287,6 +342,9 @@ class PublishOutputsModel(BaseModel):
     platforms: dict[str, str] = Field(default_factory=dict)
     rss_validation_ok: bool = False
     warning: str = ""
+    public: bool = False
+    release_status: Literal["demo_only", "preview_unreviewed", "published"] | str = ""
+    reason: str = ""
     rss_validation: RssValidationModel = Field(default_factory=RssValidationModel)
 
 
@@ -308,6 +366,12 @@ class RunReportModel(BaseModel):
     rss_validation: dict[str, Any] = Field(default_factory=dict)
     tts_live_validation: dict[str, Any] = Field(default_factory=dict)
     warnings: list[dict[str, Any]] = Field(default_factory=list)
+    release_readiness: ReleaseReadinessModel = Field(default_factory=ReleaseReadinessModel)
+    quality_rules: dict[str, Any] = Field(default_factory=dict)
+    verification_models: list[str] = Field(default_factory=list)
+    editorial_quality: dict[str, Any] = Field(default_factory=dict)
+    repair_count: int = Field(default=0, ge=0)
+    degradation_reasons: list[str] = Field(default_factory=list)
 
 
 class SeriesDefaultsModel(BaseModel):
@@ -353,7 +417,7 @@ class PlaybackModel(BaseModel):
 class EpisodeRunModel(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    schema_version: Literal[1] = SCHEMA_VERSION
+    schema_version: Literal[2] = SCHEMA_VERSION
     episode_id: str
     created_at: str = ""
     preset: dict[str, Any] = Field(default_factory=get_default_preset)
@@ -376,13 +440,14 @@ class EpisodeRunModel(BaseModel):
     generation_meta: dict[str, Any] = Field(default_factory=dict)
     script_snapshots: list[dict[str, Any]] = Field(default_factory=list)
     downstream_stale: dict[str, Any] = Field(default_factory=dict)
-    voice_segments: list[dict[str, Any]] = Field(default_factory=list)
+    voice_segments: list[VoiceSegmentModel] = Field(default_factory=list)
     production_plan: ProductionPlanModel = Field(default_factory=ProductionPlanModel)
     audio_outputs: AudioOutputsModel = Field(default_factory=AudioOutputsModel)
     cover_path: str = ""
     intro_outro_paths: dict[str, str] = Field(default_factory=dict)
     review_summary: dict[str, Any] = Field(default_factory=dict)
     audio_approval: AudioApprovalModel = Field(default_factory=AudioApprovalModel)
+    release_readiness: ReleaseReadinessModel = Field(default_factory=ReleaseReadinessModel)
     publish_outputs: PublishOutputsModel = Field(default_factory=PublishOutputsModel)
     subtitle_path: str = ""
     run_report: RunReportModel = Field(default_factory=RunReportModel)

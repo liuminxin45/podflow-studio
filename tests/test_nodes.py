@@ -337,8 +337,8 @@ def test_review_node():
 # ---------------------------------------------------------------------------
 
 
-def test_publish_node():
-    """Publish node generates RSS and stores files."""
+def test_publish_node_blocks_unreviewed_audio():
+    """Publish node keeps diagnostics but creates no distributable output."""
     import tempfile
     import wave
 
@@ -359,8 +359,8 @@ def test_publish_node():
         )
         result = _run_node("publish", state, config)
     _assert_no_crash(result, "publish")
-    assert result["publish_outputs"].get("feed_xml")
-    assert result["publish_outputs"].get("local_preview_only") is True
+    assert result["publish_outputs"] == {}
+    assert any(error.get("node") == "publish" for error in result["errors"])
 
 
 # ---------------------------------------------------------------------------

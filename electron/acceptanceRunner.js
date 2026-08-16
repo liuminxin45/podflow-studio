@@ -308,10 +308,14 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
       await window.electronAPI.updateWorkflowState(id, {
         organize_ui: { candidates: [{ ...material, _status: 'ready' }] },
         selected_topic: { title: 'PodFlow 晨报', description: '6 条快讯加 1 条重点解读' },
-        facts: workflow.state.facts?.length ? workflow.state.facts : [{ id: 'podflow-fact-1', claim: 'PodFlow 晨报事实卡片' }],
+        facts: workflow.state.facts?.length ? workflow.state.facts : [{
+          id: 'podflow-fact-1', title: 'PodFlow 晨报事实卡片', summary: '离线验收事实卡片', confidence: 'low',
+          evidence: [{ id: 'podflow-evidence-1', url: 'https://example.com/podflow-acceptance', title: '验收来源', published_at: '', source_role: 'background', excerpt: '离线验收事实卡片' }],
+          claims: [{ id: 'podflow-claim-1', text: '离线验收事实卡片', evidence_ids: ['podflow-evidence-1'], status: 'insufficient', confidence: 'low', verifier_model: '', verified_at: '' }]
+        }],
         edited_script: workflow.state.edited_script?.segments?.length
           ? workflow.state.edited_script
-          : { id: 'podflow-script', title: 'PodFlow 晨报', segments: [{ id: 'podflow-stage-1', text: '这是 PodFlow 晨报的已编辑口播稿。' }] }
+          : { id: 'podflow-script', title: 'PodFlow 晨报', segments: [{ id: 'podflow-stage-1', type: 'quick_news', text: '这是 PodFlow 晨报的已编辑口播稿。', source_fact_ids: ['podflow-fact-1'], source_claim_ids: ['podflow-claim-1'] }] }
       })
     })()`)
 
@@ -323,7 +327,8 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
         id: 'cdp-stage-1',
         text: '这是第一段 CDP 自验收脚本。',
         speaker: 'Host A',
-        source_fact_ids: []
+        source_fact_ids: [],
+        source_claim_ids: []
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
@@ -384,6 +389,7 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
           text: segment.text || '这是第一段 CDP 自验收脚本。',
           speaker: segment.speaker || 'Host A',
           source_fact_ids: segment.source_fact_ids || [],
+          source_claim_ids: segment.source_claim_ids || [],
           engine: 'recording',
           voice: 'recording',
           mime_type: assemblySaved.mimeType,
@@ -425,48 +431,22 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
         podcast_author: 'PodFlow Studio',
         podcast_language: 'zh-CN'
       })
-      await window.electronAPI.runWorkflowNodes(id, ['publish'])
+      try { await window.electronAPI.runWorkflowNodes(id, ['publish']) } catch (_) {}
       return await window.electronAPI.getWorkflow(id)
     })()`)
-    const rssPath = publishWorkflow?.state?.publish_outputs?.feed_xml
-    const publishDir = publishWorkflow?.state?.publish_outputs?.episode_dir
-    const rssFile = await fileInfo(rssPath)
-    const publishDirExists = Boolean(publishDir && fs.existsSync(publishDir))
-    assert('rss_path 存在且文件大于 0', rssFile.exists && rssFile.size > 0, `${rssPath} size=${rssFile.size}`)
-    assert('publish_outputs.episode_dir 存在', publishDirExists, String(publishDir || ''))
-    assert('publish_outputs 标记本地/RSS 成功', publishWorkflow?.state?.publish_outputs?.platforms?.local === 'success' && publishWorkflow?.state?.publish_outputs?.platforms?.rss === 'success', JSON.stringify(publishWorkflow?.state?.publish_outputs || {}))
-    assert('publish_outputs 不包含外部平台结果', Object.keys(publishWorkflow?.state?.publish_outputs?.platforms || {}).every(key => ['local', 'rss'].includes(key)), JSON.stringify(publishWorkflow?.state?.publish_outputs || {}))
-    const rssValidation = publishWorkflow?.state?.publish_outputs?.rss_validation || publishWorkflow?.state?.run_report?.rss_validation || {}
-    assert('RSS validation 通过', rssValidation?.ok === true, JSON.stringify(rssValidation || {}))
-    assert('离线验收只生成本地预览 enclosure', rssValidation?.local_preview_only === true && Boolean(rssValidation?.enclosure_url), JSON.stringify(rssValidation || {}))
-    recordStep('运行本地发布与 RSS 预览导出', 'PASS', `rss=${rssPath}, dir=${publishDir}`)
+    const publishErrors = (publishWorkflow?.state?.errors || []).filter(error => error?.node === 'publish')
+    assert('未通过门禁时 publish_outputs 为空', Object.keys(publishWorkflow?.state?.publish_outputs || {}).length === 0, JSON.stringify(publishWorkflow?.state?.publish_outputs || {}))
+    assert('未通过门禁时保留发布失败原因', publishErrors.length > 0, JSON.stringify(publishErrors))
+    recordStep('验证发布门禁阻断未审产物', 'PASS', publishErrors.at(-1)?.message || '')
 
+    await openWorkflowStage(workflowResult.workflowId, '发布')
     const publishUi = await evaluate(`(async () => {
-      const sourceWorkflow = await window.electronAPI.getWorkflow(window.__acceptanceWorkflowId)
-      const visual = await window.electronAPI.createWorkflow({ autoRun: false, acceptance: true })
-      const material = { title: 'PodFlow 晨报发布素材', _status: 'ready' }
-      await window.electronAPI.updateWorkflowState(visual.workflowId, {
-        fetch_contents: [material],
-        selected_materials: [material],
-        organize_ui: { candidates: [material] },
-        selected_topic: { title: 'PodFlow 晨报', description: '本地优先的节目发布流程' },
-        facts: [{ id: 'podflow-publish-fact', claim: '发布包保留来源与制作信息' }],
-        edited_script: { id: 'podflow-publish-script', title: 'PodFlow 晨报', segments: [{ id: 'podflow-publish-segment', text: 'PodFlow 晨报发布稿。' }] },
-        audio_outputs: sourceWorkflow.state.audio_outputs,
-        publish_outputs: sourceWorkflow.state.publish_outputs
-      })
-      await new Promise(resolve => setTimeout(resolve, 500))
-      const openButton = document.querySelector('[aria-label="打开节目：PodFlow 晨报"]')
-        || [...document.querySelectorAll('[aria-label^="打开节目："]')][0]
-      openButton?.click()
-      await new Promise(resolve => setTimeout(resolve, 400))
       const publishStage = [...document.querySelectorAll('button')].find(button => button.title?.startsWith('发布：'))
-      publishStage?.click()
       await new Promise(resolve => setTimeout(resolve, 400))
       return { body: document.body.innerText, publishStageDisabled: publishStage?.disabled ?? null }
     })()`)
-    assert('发布页只展示节目归档与 RSS', /节目归档/.test(publishUi?.body || '') && /RSS 订阅源/.test(publishUi?.body || ''), String(publishUi?.body || ''))
-    assert('发布页不含外部平台或智能发布入口', !/Apple Podcasts|Spotify|小宇宙|喜马拉雅|微信听书|智能发布|快速发布|AI 建议|风险审查/.test(publishUi?.body || ''), String(publishUi?.body || ''))
+    assert('发布页展示质量门禁阻断', /还不能发布|等待全部质量门禁与人工终审/.test(publishUi?.body || ''), String(publishUi?.body || ''))
+    assert('发布页不提供绕过终审入口', !/跳过审批|skip approval/.test(publishUi?.body || ''), String(publishUi?.body || ''))
     await screenshot('04-publish-state')
 
     const publishReadyUi = await evaluate(`(async () => {

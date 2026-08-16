@@ -265,6 +265,7 @@ def build_production_plan(
                     else direction_for_segment(str(segment.get("type") or "custom"), part),
                     "speaker": str(segment.get("speaker") or "Host A"),
                     "source_fact_ids": list(segment.get("source_fact_ids") or []),
+                    "source_claim_ids": list(segment.get("source_claim_ids") or []),
                     "source": source,
                     "path": str(previous.get("path") or "") if text_matches else "",
                     "duration_seconds": float(previous.get("duration_seconds") or 0) if text_matches else 0.0,
