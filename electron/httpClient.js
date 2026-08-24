@@ -82,4 +82,63 @@ function makeRequest({ url, method = 'GET', headers = {}, body = null, timeout =
   })
 }
 
-module.exports = { resolveProxyUrl, makeRequest }
+function makeNDJSONRequest({ url, headers = {}, body, timeout = 30000, proxyEnv = process.env, signal, onEvent }) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url)
+    const client = urlObj.protocol === 'https:' ? https : http
+    const bodyStr = JSON.stringify(body)
+    let settled = false
+    let result = null
+    const req = client.request({
+      hostname: urlObj.hostname,
+      port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
+      path: urlObj.pathname + urlObj.search,
+      method: 'POST',
+      headers: { ...headers, 'Content-Length': Buffer.byteLength(bodyStr) },
+      agent: createProxyAgent(urlObj, proxyEnv),
+    }, res => {
+      let buffer = ''
+      res.setEncoding('utf8')
+      res.on('data', chunk => {
+        buffer += chunk
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines.map(value => value.trim()).filter(Boolean)) {
+          let item
+          try { item = JSON.parse(line) } catch { return req.destroy(new Error('Invalid AI task event stream')) }
+          if (item.kind === 'event') onEvent?.(item.event)
+          else if (item.kind === 'result') result = item.result
+          else if (item.kind === 'error') {
+            const error = new Error(item.error?.message || 'AI task failed')
+            error.code = item.error?.code || 'UNKNOWN'
+            error.details = item.error?.details || {}
+            return req.destroy(error)
+          }
+        }
+      })
+      res.on('end', () => {
+        cleanup()
+        if (settled) return
+        settled = true
+        if (res.statusCode < 200 || res.statusCode >= 300) return reject(gatewayError(res.statusCode, buffer))
+        if (!result) return reject(new Error('AI task stream ended without a result'))
+        resolve(result)
+      })
+    })
+    const cleanup = () => signal?.removeEventListener('abort', handleAbort)
+    const handleAbort = () => req.destroy(new Error('Request canceled'))
+    req.on('error', error => {
+      cleanup()
+      if (settled) return
+      settled = true
+      reject(error)
+    })
+    req.setTimeout(timeout, () => req.destroy(new Error(`Request timeout (${timeout}ms)`)))
+    if (signal?.aborted) handleAbort()
+    else signal?.addEventListener('abort', handleAbort, { once: true })
+    req.write(bodyStr)
+    req.end()
+  })
+}
+
+module.exports = { resolveProxyUrl, makeRequest, makeNDJSONRequest }

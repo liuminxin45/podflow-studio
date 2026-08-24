@@ -1,4 +1,7 @@
 from types import SimpleNamespace
+import json
+import subprocess
+import sys
 
 import pytest
 from pydantic import ValidationError
@@ -70,3 +73,21 @@ def test_quality_validator_retries_then_fails_closed(monkeypatch) -> None:
         )
 
     assert raised.value.code == "QUALITY_GATE"
+
+
+def test_task_worker_emits_ordered_events_before_contract_error() -> None:
+    payload = _request("settings.connection_test", {"probe": "invalid"})
+    completed = subprocess.run(
+        [sys.executable, "-m", "protocol.ai_task_worker"],
+        input=json.dumps({"request": payload, "target": {}}),
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    items = [json.loads(line) for line in completed.stdout.splitlines()]
+
+    events = [item["event"] for item in items if item["kind"] == "event"]
+    assert [event["sequence"] for event in events] == [0, 1, 2]
+    assert [event["type"] for event in events] == ["started", "progress", "failed"]
+    assert items[-1]["kind"] == "error"
+    assert items[-1]["error"]["code"] == "CONFIG"

@@ -1,18 +1,17 @@
-const { makeRequest } = require('./httpClient')
+const { makeNDJSONRequest, makeRequest } = require('./httpClient')
 const { ensureLLMGateway, stopLLMGateway } = require('./llmGatewayProcess')
 
 
-async function runAITask(request, target, signal) {
+async function runAITask(request, target, signal, onEvent) {
   const gateway = await ensureLLMGateway()
-  const response = await makeRequest({
+  return makeNDJSONRequest({
     url: `${gateway.baseUrl}/ai/tasks/run`,
-    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: { request, target },
     timeout: 240000,
     signal,
+    onEvent,
   })
-  return response.body
 }
 
 async function cancelAITask(requestId) {

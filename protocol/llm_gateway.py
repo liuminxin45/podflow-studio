@@ -12,7 +12,7 @@ import threading
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any
+from typing import Any, Callable
 
 from protocol.ai_provider import LLMError
 
@@ -56,7 +56,10 @@ def _terminate_task_process(process: subprocess.Popen[str]) -> None:
             return
 
 
-def _run_task_in_worker(payload: dict[str, Any]) -> dict[str, Any]:
+def _run_task_in_worker(
+    payload: dict[str, Any],
+    on_event: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
     request = payload.get("request")
     request_id = str(request.get("request_id") or "") if isinstance(request, dict) else ""
     if not request_id:
@@ -78,25 +81,40 @@ def _run_task_in_worker(payload: dict[str, Any]) -> dict[str, Any]:
             raise LLMError(f"Duplicate AI request_id: {request_id}", "CONFIG")
         ACTIVE_TASKS[request_id] = process
     try:
-        stdout, _stderr = process.communicate(json.dumps(payload, ensure_ascii=False))
+        assert process.stdin is not None and process.stdout is not None
+        process.stdin.write(json.dumps(payload, ensure_ascii=False))
+        process.stdin.close()
+        final: dict[str, Any] | None = None
+        for line in process.stdout:
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise LLMError("AI task worker returned an invalid stream event", "UNKNOWN") from error
+            if item.get("kind") == "event":
+                if on_event is not None:
+                    on_event(item["event"])
+            else:
+                final = item
+        process.wait()
+    except Exception:
+        _terminate_task_process(process)
+        raise
     finally:
         with ACTIVE_TASKS_LOCK:
             if ACTIVE_TASKS.get(request_id) is process:
                 ACTIVE_TASKS.pop(request_id, None)
     if process.returncode != 0:
         raise LLMError("AI task was cancelled" if process.returncode else "AI task worker failed", "CANCELLED")
-    try:
-        response = json.loads(stdout)
-    except json.JSONDecodeError as error:
-        raise LLMError("AI task worker returned an invalid response", "UNKNOWN") from error
-    if not response.get("ok"):
-        error = response.get("error") or {}
+    if final is None:
+        raise LLMError("AI task worker omitted its final response", "UNKNOWN")
+    if final.get("kind") == "error":
+        error = final.get("error") or {}
         raise LLMError(
             str(error.get("message") or "AI task failed"),
             str(error.get("code") or "UNKNOWN"),
             error.get("details") or {},
         )
-    result = response.get("result")
+    result = final.get("result")
     if not isinstance(result, dict):
         raise LLMError("AI task worker omitted the result", "UNKNOWN")
     return result
@@ -137,7 +155,7 @@ class LLMGatewayHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": {"message": "Not found", "code": "CONFIG"}}, HTTPStatus.NOT_FOUND)
                 return
             payload = self._read_json()
-            self._send_json(_run_task_in_worker(payload))
+            self._send_task_stream(payload)
         except CLIENT_DISCONNECT_ERRORS:
             return
         except LLMError as error:
@@ -161,6 +179,31 @@ class LLMGatewayHandler(BaseHTTPRequestHandler):
             self._send_json(_json_error(error), PROJECT_ERROR_STATUS.get(error.code, HTTPStatus.INTERNAL_SERVER_ERROR))
         except CLIENT_DISCONNECT_ERRORS:
             return
+
+    def _send_task_stream(self, payload: dict[str, Any]) -> None:
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.end_headers()
+
+        def send_event(event: dict[str, Any]) -> None:
+            self._write_chunk({"kind": "event", "event": event})
+
+        try:
+            result = _run_task_in_worker(payload, on_event=send_event)
+            self._write_chunk({"kind": "result", "result": result})
+        except LLMError as error:
+            self._write_chunk({"kind": "error", **_json_error(error)})
+        finally:
+            self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+
+    def _write_chunk(self, payload: dict[str, Any]) -> None:
+        data = (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8")
+        self.wfile.write(f"{len(data):X}\r\n".encode("ascii"))
+        self.wfile.write(data)
+        self.wfile.write(b"\r\n")
+        self.wfile.flush()
 
     def _send_json(self, payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")

@@ -1,7 +1,8 @@
 import http from 'node:http'
 import { afterEach, describe, expect, it } from 'vitest'
 
-const { makeRequest, resolveProxyUrl } = require('../httpClient') as {
+const { makeNDJSONRequest, makeRequest, resolveProxyUrl } = require('../httpClient') as {
+  makeNDJSONRequest: (options: Record<string, unknown>) => Promise<any>
   makeRequest: (options: Record<string, unknown>) => Promise<{ statusCode: number; body: any }>
   resolveProxyUrl: (url: URL, env: Record<string, string>) => string
 }
@@ -39,5 +40,28 @@ describe('httpClient proxy support', () => {
     expect(resolveProxyUrl(new URL('http://127.0.0.1:5100/models'), env)).toBe('')
     expect(resolveProxyUrl(new URL('https://api.internal.test/search'), env)).toBe('')
     expect(resolveProxyUrl(new URL('https://api.tavily.com/search'), env)).toBe('http://proxy.example:8080')
+  })
+
+  it('forwards ordered NDJSON task events and resolves the final result', async () => {
+    const server = http.createServer((_request, response) => {
+      response.setHeader('Content-Type', 'application/x-ndjson')
+      response.write(`${JSON.stringify({ kind: 'event', event: { sequence: 0, type: 'started' } })}\n`)
+      response.write(`${JSON.stringify({ kind: 'event', event: { sequence: 1, type: 'progress' } })}\n`)
+      response.end(`${JSON.stringify({ kind: 'result', result: { output: { ok: true } } })}\n`)
+    })
+    servers.push(server)
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('Server did not start')
+    const events: any[] = []
+
+    const result = await makeNDJSONRequest({
+      url: `http://127.0.0.1:${address.port}/ai/tasks/run`,
+      body: {},
+      onEvent: (event: any) => events.push(event),
+    })
+
+    expect(events.map(event => event.sequence)).toEqual([0, 1])
+    expect(result.output).toEqual({ ok: true })
   })
 })

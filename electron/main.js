@@ -1514,6 +1514,12 @@ function sendAITaskEvent(entry, type, payload = {}) {
   })
 }
 
+function forwardAITaskEvent(entry, taskEvent) {
+  entry.sequence = Math.max(entry.sequence, Number(taskEvent.sequence) + 1)
+  entry.lastEventType = taskEvent.type
+  entry.sender.send('ai:taskEvent', taskEvent)
+}
+
 ipcMain.handle('ai:runTask', async (event, request) => {
   const controller = new globalThis.AbortController()
   const entry = {
@@ -1522,18 +1528,22 @@ ipcMain.handle('ai:runTask', async (event, request) => {
     requestId: request.request_id,
     taskId: request.task_id,
     sequence: 0,
+    lastEventType: '',
   }
   activeLLMRequests.set(request.request_id, entry)
-  sendAITaskEvent(entry, 'started')
   try {
-    const result = await runAITask(request, resolveAITargetConfig(request.target_id), controller.signal)
-    sendAITaskEvent(entry, 'completed', { usage: result.usage })
-    return result
+    return await runAITask(
+      request,
+      resolveAITargetConfig(request.target_id),
+      controller.signal,
+      taskEvent => forwardAITaskEvent(entry, taskEvent),
+    )
   } catch (error) {
     const cancelled = controller.signal.aborted || error?.code === 'CANCELLED'
-    sendAITaskEvent(entry, cancelled ? 'cancelled' : 'failed', cancelled
-      ? {}
-      : { code: error?.code || 'UNKNOWN', message: error?.message || 'AI task failed' })
+    if (cancelled) sendAITaskEvent(entry, 'cancelled')
+    else if (entry.lastEventType !== 'failed') {
+      sendAITaskEvent(entry, 'failed', { code: error?.code || 'UNKNOWN', message: error?.message || 'AI task failed' })
+    }
     throw error
   } finally {
     if (activeLLMRequests.get(request.request_id) === entry) activeLLMRequests.delete(request.request_id)

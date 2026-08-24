@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 from protocol.ai_provider import LLMError
 from protocol.llm_gateway import ACTIVE_TASKS, LLMGatewayHandler, _cancel_task
@@ -25,13 +25,13 @@ def _post_handler_with_disconnected_writer() -> LLMGatewayHandler:
     return handler
 
 
-def test_post_ignores_disconnect_while_writing_normal_json() -> None:
+def test_post_ignores_disconnect_while_writing_task_stream() -> None:
     handler = _post_handler_with_disconnected_writer()
     with patch("protocol.llm_gateway._run_task_in_worker", return_value={"ok": True}) as run_task:
         handler.do_POST()
 
-    run_task.assert_called_once_with({"request": {}, "target": {}})
-    handler.wfile.write.assert_called_once()
+    run_task.assert_called_once_with({"request": {}, "target": {}}, on_event=ANY)
+    assert handler.wfile.write.call_count >= 1
 
 
 def test_cancel_task_terminates_registered_worker() -> None:
