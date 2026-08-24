@@ -1,9 +1,8 @@
 import type { EditorialVoice } from '../../types/settings'
 import type { FactCard } from '../../types/workflow'
 import type { SegmentTone } from '../../components/writing/types'
-import { llmService } from '../llmService'
+import { runAITask } from '../aiTaskService'
 import {
-  createLLMCallOptions,
   hasUsableLLMConfig,
   llmConfigResolver,
 } from '../settings/llmConfigResolver'
@@ -148,20 +147,18 @@ export function parseQuickNewsOptimizationResult(
 export async function optimizeQuickNews(
   request: QuickNewsOptimizationRequest,
 ): Promise<QuickNewsOptimizationResult> {
-  const messages = buildQuickNewsOptimizationMessages(request)
   const config = llmConfigResolver.getLLMConfig('draft', true)
   if (!hasUsableLLMConfig(config)) {
     throw new Error('请先在设置中配置可用的成稿 AI')
   }
 
-  const response = await llmService.call(createLLMCallOptions(config, {
-    messages,
-    temperature: 0.25,
-    maxTokens: 1600,
-    timeout: 90_000,
-  }))
+  const response = await runAITask<Record<string, unknown>>(
+    'writing.optimize_quick_news',
+    config.aiTarget || '',
+    { request },
+  )
   return parseQuickNewsOptimizationResult(
-    response.choices?.[0]?.message?.content || '',
+    JSON.stringify(response),
     request.sourceFactIds,
     request.factCards,
   )
