@@ -8,7 +8,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from protocol.llm_client import DEFAULT_TEMPERATURE, DEFAULT_TIMEOUT, LLMError
+from protocol.ai_provider import DEFAULT_TEMPERATURE, DEFAULT_TIMEOUT, LLMError
 from protocol.llm_runtime import LLMRuntime, LLMRuntimeTarget, normalize_provider_kind
 
 GATEWAY_VERSION = "1"

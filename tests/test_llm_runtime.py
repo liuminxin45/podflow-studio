@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from protocol.llm_client import LLMError
+from protocol.ai_provider import LLMError, create_pydantic_model
 from protocol.llm_runtime import (
     LLMRuntime,
     LLMRuntimeTarget,
@@ -26,7 +26,30 @@ def test_provider_kind_normalization_and_client_mapping():
     )
 
     assert target.configured
-    assert target.client_provider_kind == "openai_compatible"
+    assert target.supported
+    assert not LLMRuntimeTarget("", "key", "model", "openai_compatible").supported
+    assert not LLMRuntimeTarget("", "key", "model", "lm_studio").supported
+
+
+@pytest.mark.parametrize(
+    ("kind", "class_name"),
+    [
+        ("openai", "OpenAIResponsesModel"),
+        ("anthropic", "AnthropicModel"),
+        ("gemini", "GoogleModel"),
+        ("openrouter", "OpenRouterModel"),
+        ("ollama", "OllamaModel"),
+        ("deepseek", "OpenAIChatModel"),
+    ],
+)
+def test_supported_provider_factory_uses_named_pydantic_ai_models(kind, class_name):
+    target = LLMRuntimeTarget(
+        api_base="http://localhost:11434/v1" if kind == "ollama" else "",
+        api_key="test-key",
+        model="openai/test-model" if kind == "openrouter" else "test-model",
+        provider_kind=kind,
+    )
+    assert type(create_pydantic_model(target)).__name__ == class_name
 
 
 def test_runtime_target_resolves_env_key(monkeypatch):

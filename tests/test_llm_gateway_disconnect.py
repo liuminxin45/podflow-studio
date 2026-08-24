@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from protocol.llm_client import LLMError
+from protocol.ai_provider import LLMError
 from protocol.llm_gateway import LLMGatewayHandler
 
 

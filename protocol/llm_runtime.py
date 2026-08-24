@@ -12,21 +12,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from protocol.llm_client import BATCH_DELAY, BATCH_SIZE, LLMClient, LLMError
+from protocol.ai_provider import (
+    BATCH_DELAY,
+    BATCH_SIZE,
+    LLMError,
+    PydanticAIClient,
+    create_local_agent_model,
+)
 
-OPENAI_COMPATIBLE_KINDS = {
-    "openai",
-    "openai_compatible",
-    "ollama",
-    "lm_studio",
-    "deepseek",
-    "openrouter",
-}
-OPENAI_ENV_FALLBACK_KINDS = {"openai", "openai_compatible"}
+HOSTED_PROVIDER_KINDS = {"openai", "anthropic", "gemini", "openrouter", "ollama", "deepseek"}
+OPENAI_ENV_FALLBACK_KINDS = {"openai"}
 DEEPSEEK_OPENAI_COMPAT_BASE = "https://api.deepseek.com"
 DEEPSEEK_ENV_KEY_CANDIDATES = ("DEEPSEEK_API_KEY", "PODFLOW_LLM_API_KEY")
 LOCAL_AGENT_OUTPUT_MODES = {"stdout", "codex-json"}
-SUPPORTED_PROVIDER_KINDS = OPENAI_COMPATIBLE_KINDS | {"anthropic", "local_agent"}
+SUPPORTED_PROVIDER_KINDS = HOSTED_PROVIDER_KINDS | {"local_agent"}
 DIRECT_CODEX_PROMPT_LIMIT = 24000
 
 
@@ -46,12 +45,6 @@ class LLMRuntimeTarget:
     timeout: int = 60
 
     @property
-    def client_provider_kind(self) -> str:
-        if self.provider_kind == "anthropic":
-            return "anthropic"
-        return "openai_compatible"
-
-    @property
     def configured(self) -> bool:
         if self.provider_kind == "local_agent":
             return bool(
@@ -61,7 +54,9 @@ class LLMRuntimeTarget:
                 and self.local_agent_output_mode in LOCAL_AGENT_OUTPUT_MODES
                 and self.supported
             )
-        return bool(self.api_base and self.api_key and self.model and self.supported)
+        if self.provider_kind == "ollama":
+            return bool(self.api_base and self.model and self.supported)
+        return bool(self.api_key and self.model and self.supported)
 
     @property
     def supported(self) -> bool:
@@ -497,7 +492,7 @@ class LLMRuntime:
         self.target = target
         self.debug_mode = debug_mode
         if target.provider_kind == "local_agent":
-            self._client = LocalAgentRuntimeClient(
+            local_backend = LocalAgentRuntimeClient(
                 target.local_agent_id,
                 target.model,
                 local_agent_command=target.local_agent_command,
@@ -505,15 +500,13 @@ class LLMRuntime:
                 local_agent_output_mode=target.local_agent_output_mode,
                 debug_mode=debug_mode,
             )
-        else:
-            self._client = LLMClient(
-                api_base=target.api_base,
-                api_key=target.api_key,
-                model=target.model,
-                temperature=target.temperature,
+            self._client = PydanticAIClient(
+                target,
                 debug_mode=debug_mode,
-                provider_kind=target.client_provider_kind,
+                model=create_local_agent_model(local_backend, target.local_agent_id),
             )
+        else:
+            self._client = PydanticAIClient(target, debug_mode=debug_mode)
 
     def call(
         self,
@@ -563,11 +556,11 @@ class LLMRuntime:
 
 
 def normalize_provider_kind(provider_kind: Any) -> str:
-    return str(provider_kind or "openai_compatible").strip()
+    return str(provider_kind or "openai").strip()
 
 
 def resolve_llm_target(config: Any) -> LLMRuntimeTarget:
-    provider_kind = normalize_provider_kind(getattr(config, "provider_kind", "openai_compatible"))
+    provider_kind = normalize_provider_kind(getattr(config, "provider_kind", "openai"))
     ai_target = str(getattr(config, "ai_target", "") or "").strip()
     local_agent_id = str(getattr(config, "local_agent_id", "") or "").strip()
     local_agent_command = str(getattr(config, "local_agent_command", "") or "").strip()
@@ -653,7 +646,7 @@ def apply_llm_config_from_mapping(
     config.api_key_env_var = source.get("api_key_env_var", "")
     config.api_base = source.get("api_base", "")
     config.llm_model = source.get("llm_model", default_model)
-    config.provider_kind = source.get("provider_kind", "openai_compatible")
+    config.provider_kind = source.get("provider_kind", "openai")
     config.ai_target = source.get("ai_target", "")
     config.local_agent_id = source.get("local_agent_id", "")
     config.local_agent_command = source.get("local_agent_command", "")
