@@ -13,11 +13,10 @@
 
 import type { ContentItem } from '../types/workflow'
 import { VALID_CATEGORY_IDS, getCategoryById, getCategoryListForPrompt } from '../constants/categories'
-import { llmService } from '../services/llmService'
+import { runAITask } from '../services/aiTaskService'
 import { LLMError } from '../types/llm'
 import { isDebugModeEnabled } from './debugMode'
 import {
-  createLLMCallOptions,
   hasUsableLLMConfig,
   llmConfigResolver,
   type LLMConfig,
@@ -165,17 +164,13 @@ async function callLLM(
   }
 
   try {
-    const response = await llmService.call(createLLMCallOptions(config, {
-      messages: messages.map(m => ({
-        role: m.role as 'system' | 'user' | 'assistant',
-        content: m.content,
-      })),
-      temperature: 0.05,
-      maxTokens: 2000,
-      timeout: REQUEST_TIMEOUT,
-    }))
-
-    return response.choices?.[0]?.message?.content || ''
+    const response = await runAITask<{ categories?: unknown[] }>(
+      'discover.classify_news',
+      config.aiTarget || '',
+      { messages, categories: getCategoryListForPrompt(), timeout: REQUEST_TIMEOUT },
+      signal,
+    )
+    return JSON.stringify(response.categories || [])
   } catch (error: any) {
     if (signal?.aborted || error?.name === 'AbortError') {
       throw new DOMException('Aborted', 'AbortError')

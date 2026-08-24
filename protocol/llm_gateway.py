@@ -10,6 +10,7 @@ from typing import Any
 
 from protocol.ai_provider import DEFAULT_TEMPERATURE, DEFAULT_TIMEOUT, LLMError
 from protocol.llm_runtime import LLMRuntime, LLMRuntimeTarget, normalize_provider_kind
+from protocol.ai_tasks import run_ai_task
 
 GATEWAY_VERSION = "1"
 SERVER_NAME = "PodFlowLLMGateway"
@@ -131,6 +132,9 @@ class LLMGatewayHandler(BaseHTTPRequestHandler):
                 return
             if route == "/chat/completions":
                 self._handle_chat(payload)
+                return
+            if route == "/ai/tasks/run":
+                self._send_json(run_ai_task(payload.get("request", {}), payload.get("target", {})))
                 return
             self._send_json(
                 {"error": {"message": "Not found", "code": "UNKNOWN"}}, HTTPStatus.NOT_FOUND

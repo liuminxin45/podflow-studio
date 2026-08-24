@@ -183,6 +183,8 @@ declare global {
     llmCall: (params: LLMCallParams) => Promise<LLMResponse>
     llmCancel: (requestId: string) => Promise<{ success: boolean }>
     llmFetchModels: (params: { apiBase: string; apiKey: string; apiKeyEnvVar?: string; providerKind?: string }) => Promise<any>
+    aiRunTask: (request: import('./types/llm').AITaskRequest) => Promise<import('./types/llm').AITaskResult>
+    aiCancelTask: (requestId: string) => Promise<{ success: boolean }>
     listDoubaoVoices: (params: {
       kind: 'preset' | 'clone'
       appId?: string

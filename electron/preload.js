@@ -67,6 +67,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   llmCall: (params) => ipcRenderer.invoke('llm:call', params),
   llmCancel: (requestId) => ipcRenderer.invoke('llm:cancel', requestId),
   llmFetchModels: (params) => ipcRenderer.invoke('llm:fetchModels', params),
+  aiRunTask: (request) => ipcRenderer.invoke('ai:runTask', request),
+  aiCancelTask: (requestId) => ipcRenderer.invoke('ai:cancelTask', requestId),
   listDoubaoVoices: (params) => ipcRenderer.invoke('doubao:listVoices', params),
   tavilySearch: (params) => ipcRenderer.invoke('search:tavily', params),
   bochaSearch: (params) => ipcRenderer.invoke('search:bocha', params),

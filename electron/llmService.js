@@ -108,8 +108,22 @@ async function callLLM(params) {
   }
 }
 
+async function runAITask(request, target, signal) {
+  const gateway = await ensureLLMGateway()
+  const response = await makeRequest({
+    url: `${gateway.baseUrl}/ai/tasks/run`,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: { request, target },
+    timeout: 240000,
+    signal,
+  })
+  return response.body
+}
+
 module.exports = {
   fetchModels,
   callLLM,
+  runAITask,
   stopLLMGateway
 }

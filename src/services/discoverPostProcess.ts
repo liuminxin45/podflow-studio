@@ -1,9 +1,8 @@
 import { LLM_DEFAULTS, TOPIC_ANALYSIS } from '../constants/llm'
 import type { ContentItem } from '../types/workflow'
 import { LLMError } from '../types/llm'
-import { llmService } from './llmService'
+import { runAITask } from './aiTaskService'
 import {
-  createLLMCallOptions,
   hasUsableLLMConfig,
   type LLMConfig,
 } from './settings/llmConfigResolver'
@@ -443,19 +442,12 @@ async function analyzeTopicRelevance(
 
   for (let start = 0; start < items.length; start += batchSize) {
     const batch = items.slice(start, start + batchSize)
-    const response = await llmService.call(createLLMCallOptions(llmConfig, {
-      messages: [
-        {
-          role: 'user',
-          content: buildTopicPrompt(batch, topic),
-        },
-      ],
-      temperature: LLM_DEFAULTS.TEMPERATURE,
-      maxTokens: Math.min(4000, Math.max(1000, batch.length * 300)),
-      timeout: llmConfig.timeout,
-    }))
-
-    const parsed = parseTopicAnalysis(response.choices?.[0]?.message?.content || '')
+    const response = await runAITask<{ items?: TopicAnalysisRow[] }>(
+      'discover.analyze_topic',
+      llmConfig.aiTarget || '',
+      { topic, items: batch },
+    )
+    const parsed = parseTopicAnalysis(JSON.stringify(response.items || []))
     const analyzedBatch = applyTopicAnalysis(batch, parsed)
     results.push(...analyzedBatch)
     const matchedCount = results.filter(item => item._topic_decision === 'keep').length
@@ -470,32 +462,6 @@ async function analyzeTopicRelevance(
   }
 
   return results
-}
-
-function buildTopicPrompt(batch: TopicAnalyzedItem[], topic: string): string {
-  return `你是专业的播客内容主编。
-
-# 核心主题
-${topic}
-
-# 待筛选素材
-${batch.map((item, idx) => `${idx + 1}. ${item.title || '无标题'}
-来源：${item.source_name || item.source || '未知'}
-发布时间：${item.published || '未知'}
-摘要：${(item.content || item.summary || '无摘要').slice(0, 240)}`).join('\n\n')}
-
-# 任务
-判断每条素材是否适合围绕核心主题进入后续整理。
-
-# 输出要求
-只输出 JSON 数组，不要 Markdown，不要解释：
-[
-  {"index": 1, "score": 85, "decision": "keep", "reason": "与主题强相关", "angle": "可展开角度"},
-  {"index": 2, "score": 30, "decision": "drop", "reason": "偏离主题", "angle": ""}
-]
-
-评分标准：80-100=强相关，60-79=相关，40-59=弱相关，0-39=不相关。
-decision: score>=${TOPIC_ANALYSIS.MIN_MATCH_SCORE} 用 "keep"，否则 "drop"。`
 }
 
 function parseTopicAnalysis(content: string): TopicAnalysisRow[] {

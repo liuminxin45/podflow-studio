@@ -5,7 +5,7 @@ const { pathToFileURL } = require('url')
 const { createHash, randomBytes } = require('crypto')
 const { spawn } = require('child_process')
 const ConfigManager = require('./configManager')
-const { fetchModels, callLLM, stopLLMGateway } = require('./llmService')
+const { fetchModels, callLLM, runAITask, stopLLMGateway } = require('./llmService')
 const { searchBocha, searchDoubao, searchTavily } = require('./searchService')
 const { detectLocalAgents } = require('./aiTargetManager')
 const { listDoubaoVoices } = require('./services/doubaoVoiceService')
@@ -1529,6 +1529,50 @@ ipcMain.handle('llm:call', async (event, { requestId, apiBase, apiKey, apiKeyEnv
 })
 
 ipcMain.handle('llm:cancel', async (_event, requestId) => {
+  const controller = activeLLMRequests.get(requestId)
+  if (!controller) return { success: false }
+  controller.abort()
+  return { success: true }
+})
+
+function resolveAITargetConfig(targetId) {
+  const settings = configManager?.loadNodeConfig('app_settings')
+  const global = settings?.apiConfig?.global
+  if (!global) throw new Error('AI settings are unavailable; save settings before running an AI task')
+  if (String(targetId).startsWith('agent:')) {
+    const id = String(targetId).slice('agent:'.length)
+    const agent = global.localAgents?.find(item => item.id === id)
+    if (!agent) throw new Error(`Unknown local AI target: ${targetId}`)
+    return {
+      provider_kind: 'local_agent', ai_target: targetId, llm_model: id,
+      local_agent_id: id, local_agent_command: agent.command,
+      local_agent_args: agent.runArgs, local_agent_output_mode: agent.outputMode,
+      api_base: '', api_key: '', api_key_env_var: '', temperature: 0.3, timeout: 180,
+    }
+  }
+  const providerId = String(targetId).replace(/^model:/, '')
+  const provider = global.aiModelProviders?.find(item => item.id === providerId)
+  if (!provider) throw new Error(`Unknown AI model target: ${targetId}`)
+  return {
+    provider_kind: provider.kind, ai_target: targetId, llm_model: provider.model,
+    api_base: provider.apiBase || '', api_key: provider.apiKey || '',
+    api_key_env_var: provider.apiKeyEnvVar || '', temperature: 0.3, timeout: 180,
+    local_agent_id: '', local_agent_command: '', local_agent_args: [],
+    local_agent_output_mode: 'stdout',
+  }
+}
+
+ipcMain.handle('ai:runTask', async (_event, request) => {
+  const controller = new globalThis.AbortController()
+  activeLLMRequests.set(request.request_id, controller)
+  try {
+    return await runAITask(request, resolveAITargetConfig(request.target_id), controller.signal)
+  } finally {
+    if (activeLLMRequests.get(request.request_id) === controller) activeLLMRequests.delete(request.request_id)
+  }
+})
+
+ipcMain.handle('ai:cancelTask', async (_event, requestId) => {
   const controller = activeLLMRequests.get(requestId)
   if (!controller) return { success: false }
   controller.abort()
