@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "default_profile_id": "morning_coffee_warm",
+  "profiles": [
+    {
+      "id": "morning_coffee_warm",
+      "label": "温暖早咖啡",
+      "description": "温暖、轻盈且不过度兴奋的晨间陪伴感。",
+      "query_terms": ["instrumental", "warm", "acoustic", "light", "positive", "lounge"],
+      "required": {
+        "licenses": ["cc0"],
+        "instrumental": true,
+        "duration_seconds": [45, 240]
+      },
+      "preferred": {
+        "bpm": [84, 108],
+        "tags": ["warm", "acoustic", "light", "positive", "lounge", "soft", "jazz"],
+        "instruments": ["piano", "acoustic-guitar", "guitar", "brushes", "marimba"]
+      },
+      "excluded_tags": ["aggressive", "dark", "epic", "metal", "trailer", "dramatic", "hard-rock"]
+    },
+    {
+      "id": "morning_city_commute",
+      "label": "都市通勤",
+      "description": "清晰、有律动但不抢占新闻口播注意力。",
+      "query_terms": ["instrumental", "urban", "light-funk", "nu-jazz", "clean", "upbeat"],
+      "required": {
+        "licenses": ["cc0"],
+        "instrumental": true,
+        "duration_seconds": [45, 240]
+      },
+      "preferred": {
+        "bpm": [96, 118],
+        "tags": ["urban", "funk", "nu-jazz", "electronic", "clean", "upbeat"],
+        "instruments": ["electric-piano", "bass", "synthesizer", "drums"]
+      },
+      "excluded_tags": ["aggressive", "dark", "epic", "metal", "trailer", "dramatic", "heavy-bass"]
+    },
+    {
+      "id": "morning_focus",
+      "label": "清晨专注",
+      "description": "低密度、克制，适合科技与商业新闻。",
+      "query_terms": ["instrumental", "minimal", "focus", "calm", "piano", "soft-electronic"],
+      "required": {
+        "licenses": ["cc0"],
+        "instrumental": true,
+        "duration_seconds": [45, 240]
+      },
+      "preferred": {
+        "bpm": [72, 96],
+        "tags": ["minimal", "focus", "calm", "soft", "ambient", "technology"],
+        "instruments": ["piano", "marimba", "synthesizer", "mallet"]
+      },
+      "excluded_tags": ["aggressive", "dark", "epic", "metal", "trailer", "dramatic", "busy"]
+    },
+    {
+      "id": "weekend_relaxed",
+      "label": "周末松弛",
+      "description": "更舒展的周末晨间氛围，保留轻微律动。",
+      "query_terms": ["instrumental", "relaxed", "acoustic", "lounge", "bossa", "morning"],
+      "required": {
+        "licenses": ["cc0"],
+        "instrumental": true,
+        "duration_seconds": [45, 300]
+      },
+      "preferred": {
+        "bpm": [76, 102],
+        "tags": ["relaxed", "acoustic", "lounge", "bossa", "morning", "easy-listening"],
+        "instruments": ["acoustic-guitar", "guitar", "piano", "percussion"]
+      },
+      "excluded_tags": ["aggressive", "dark", "epic", "metal", "trailer", "dramatic", "hard-rock"]
+    }
+  ]
+}

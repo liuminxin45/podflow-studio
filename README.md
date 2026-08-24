@@ -141,6 +141,8 @@ npm run cli -- produce --workflow <id或绝对路径> --stage package --output <
 
 正式品牌 cue 派生自 Ondrosik 的 [Quick Spark](https://freemusicarchive.org/music/Ondrosik/no-words/quick-spark/)。[作者曲库](https://ondrosik.sk/music/)将曲目声明为 CC0；项目保存原始 SHA256、取得日期、裁剪区间与派生文件指纹。素材经裁剪、淡入淡出和响度处理，第三方音乐仍为 CC0，不改写为 Apache-2.0。完整记录见 [音频权利文件](assets/audio/RIGHTS.md)。
 
+候选音乐发现内置温暖早咖啡、都市通勤、清晨专注和周末松弛四套规则。动态搜索只生成待试听清单，不会自动替换正式 Cue；用法和授权门禁见 [音乐风格发现规则](docs/music-style-profiles.md)。
+
 命令、退出码、会话目录和 Agent 安全调用模式见 [CLI 文档](docs/cli.md)。
 
 ## 关键设计
