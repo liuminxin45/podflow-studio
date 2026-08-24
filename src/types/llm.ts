@@ -3,6 +3,68 @@ export interface LLMMessage {
   content: string
 }
 
+export type AIErrorCode =
+  | 'AUTH'
+  | 'RATE_LIMIT'
+  | 'TIMEOUT'
+  | 'NETWORK'
+  | 'PARSE'
+  | 'CONFIG'
+  | 'PROVIDER'
+  | 'CANCELLED'
+  | 'QUALITY_GATE'
+  | 'UNKNOWN'
+
+export type AITaskEventType =
+  | 'started'
+  | 'progress'
+  | 'text_delta'
+  | 'tool_started'
+  | 'tool_finished'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+
+export interface AITaskRequest {
+  version: 1
+  request_id: string
+  task_id: string
+  target_id: string
+  input: Record<string, unknown>
+  stream: boolean
+}
+
+export interface AIUsage {
+  input_tokens: number
+  output_tokens: number
+  total_tokens: number
+  requests: number
+}
+
+export interface AIErrorPayload {
+  code: AIErrorCode
+  message: string
+  retryable: boolean
+  details: Record<string, unknown>
+}
+
+export interface AITaskResult {
+  version: 1
+  request_id: string
+  task_id: string
+  output: Record<string, unknown>
+  usage: AIUsage
+}
+
+export interface AITaskEvent {
+  version: 1
+  request_id: string
+  task_id: string
+  sequence: number
+  type: AITaskEventType
+  payload: Record<string, unknown>
+}
+
 export interface LLMCallOptions {
   apiBase: string
   apiKey: string
@@ -91,6 +153,8 @@ export class LLMError extends Error {
       | 'PARSE'
       | 'PROVIDER'
       | 'CONFIG'
+      | 'CANCELLED'
+      | 'QUALITY_GATE'
       | 'UNKNOWN',
     public readonly details?: any
   ) {
