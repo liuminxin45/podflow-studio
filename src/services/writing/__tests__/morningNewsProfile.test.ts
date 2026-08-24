@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS } from "../../../types/settings";
 import { resolveMorningNewsProfile } from "../morningNewsProfile";
 
 describe("morning news editorial profile", () => {
-  it("uses the exemplar-derived standard density", () => {
+  it("uses the standard editorial density", () => {
     const profile = resolveMorningNewsProfile(DEFAULT_SETTINGS);
 
     expect(profile.targetDurationMinutes).toBe(14);

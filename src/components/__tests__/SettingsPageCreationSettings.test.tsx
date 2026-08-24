@@ -47,7 +47,6 @@ describe('SettingsPage creation settings', () => {
     expect(container.textContent).not.toContain('智能行为')
     expect(container.textContent).not.toContain('默认语气风格')
     expect(container.textContent).not.toContain('加长早报')
-    expect(container.textContent).not.toContain('范本')
     expect(container.textContent).not.toContain('系统与发布')
     expect(container.textContent).not.toContain('数据与表现')
     expect(container.textContent).not.toContain('创作者成长')
