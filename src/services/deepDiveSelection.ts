@@ -13,9 +13,8 @@ import type {
   OrganizeResearchSession,
   OrganizeResearchTask,
 } from '../types/organize'
-import { llmService } from './llmService'
+import { runAITask } from './aiTaskService'
 import {
-  createLLMCallOptions,
   hasUsableLLMConfig,
   llmConfigResolver,
 } from './settings/llmConfigResolver'
@@ -76,16 +75,6 @@ function textValue(value: unknown, label: string): string {
   return value.trim()
 }
 
-function parseJsonObject(raw: string, label: string): Record<string, unknown> {
-  const trimmed = raw.trim()
-  if (!trimmed) throw new Error(`${label}失败：AI 返回了空响应`)
-  try {
-    return JSON.parse(trimmed) as Record<string, unknown>
-  } catch {
-    throw new Error(`${label}失败：AI 未返回有效 JSON`)
-  }
-}
-
 async function callJson(
   system: string,
   user: string,
@@ -95,22 +84,12 @@ async function callJson(
 ): Promise<Record<string, unknown>> {
   const config = llmConfigResolver.getLLMConfig('organize')
   if (!hasUsableLLMConfig(config)) throw new Error('请先在设置中配置整理阶段使用的模型或本地代理')
-  const response = await llmService.call(createLLMCallOptions(config, {
-    cacheMode: 'bypass',
-    temperature: 0.15,
-    maxTokens,
-    timeout: 240_000,
+  return runAITask<Record<string, unknown>>(
+    'organize.select_deep_dive',
+    config.aiTarget || '',
+    { system_context: system, user_context: user, label, max_tokens: maxTokens },
     signal,
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-  }))
-  const choice = response.choices?.[0]
-  if (choice?.finish_reason === 'length' || choice?.finish_reason === 'max_tokens') {
-    throw new Error(`${label}失败：AI 输出达到长度上限`)
-  }
-  return parseJsonObject(choice?.message?.content || '', label)
+  )
 }
 
 function stableCandidatePayload(units: CandidateItem[]) {

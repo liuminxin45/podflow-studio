@@ -1,7 +1,6 @@
 import type { OrganizeResearchResult, OrganizeSearchProvider } from '../types/organize'
-import { llmService } from './llmService'
+import { runAITask } from './aiTaskService'
 import {
-  createLLMCallOptions,
   hasUsableLLMConfig,
   llmConfigResolver,
 } from './settings/llmConfigResolver'
@@ -23,8 +22,6 @@ export interface OrganizeSearchOptions {
   timeRange?: 'day' | 'week' | 'month' | 'year' | 'noLimit'
   maxResults?: number
 }
-
-const DEFAULT_AI_SEARCH_TIMEOUT_MS = 60_000
 
 let defaultAISearchTail: Promise<void> = Promise.resolve()
 
@@ -103,11 +100,6 @@ async function invokeSearchWithAbort<T>(
     )
     if (signal.aborted) handleAbort()
   })
-}
-
-function parseJsonObject(raw: string): Record<string, any> {
-  const match = raw.match(/\{[\s\S]*\}/)
-  return JSON.parse(match ? match[0] : raw)
 }
 
 function normalizeAIResults(value: unknown, query: string): OrganizeResearchResult[] {
@@ -250,42 +242,14 @@ export async function searchForOrganize(
   const config = llmConfigResolver.getLLMConfig('organize', true)
   if (!hasUsableLLMConfig(config)) throw new Error('当前 AI 不可用，无法复用其联网搜索能力')
   return serializeDefaultAISearch(async () => {
-    const callOptions = createLLMCallOptions(config, {
-      temperature: 0.1,
-      maxTokens: 1800,
-      timeout: DEFAULT_AI_SEARCH_TIMEOUT_MS,
+    onProgress?.({ phase: 'connecting', detail: '正在连接当前 AI Agent' })
+    const response = await runAITask<{ results?: unknown[] }>(
+      'organize.ai_web_search',
+      config.aiTarget || '',
+      { query, time_requirement: searchWindowInstruction, max_results: maxResults },
       signal,
-      messages: [
-        {
-          role: 'system',
-          content: '你必须使用自身可用的联网搜索工具完成任务。只返回 JSON：{"results":[{"title":"","url":"https://...","excerpt":"","publishedAt":""}]}。不得编造 URL；每条结果必须包含网页摘录。',
-        },
-        { role: 'user', content: `搜索并核验这个播客研究问题：${query}\n时间要求：${searchWindowInstruction}\n最多返回 ${maxResults} 条高相关、可核验的独立网页来源。` },
-      ],
-    })
-    let raw = ''
-    if (onProgress) {
-      onProgress({ phase: 'connecting', detail: '正在连接当前 AI' })
-      await llmService.callStreaming(
-        callOptions,
-        chunk => {
-          raw += chunk
-          onProgress({ phase: 'receiving', detail: `正在接收搜索结果（${raw.length} 字）` })
-        },
-        event => {
-          if (event.type === 'tool_start') {
-            onProgress({ phase: 'browsing', detail: '当前 AI 正在调用自身联网工具' })
-          } else if (event.type === 'tool_done') {
-            onProgress({ phase: 'receiving', detail: '联网工具已返回，正在整理来源' })
-          }
-        },
-      )
-    } else {
-      const response = await llmService.call(callOptions)
-      raw = response.choices?.[0]?.message?.content || ''
-    }
-    const parsed = parseJsonObject(raw)
-    const results = normalizeAIResults(parsed.results, query).slice(0, maxResults)
+    )
+    const results = normalizeAIResults(response.results, query).slice(0, maxResults)
     if (results.length === 0) throw new Error('当前 AI 自身联网搜索未返回可核验的网页来源')
     return { provider, query, results }
   }, signal)
@@ -296,16 +260,12 @@ export async function verifyDefaultAISearchCapability(settings?: AppSettings): P
     ? llmConfigResolver.getLLMConfigFromSettings(settings, 'organize', true)
     : llmConfigResolver.getLLMConfig('organize', true)
   if (!hasUsableLLMConfig(config)) throw new Error('当前 AI 不可用，无法验证其联网搜索能力')
-  const response = await llmService.call(createLLMCallOptions(config, {
-    temperature: 0,
-    maxTokens: 1000,
-    messages: [
-      { role: 'system', content: '使用联网搜索工具。只返回 JSON：{"results":[{"title":"","url":"https://...","excerpt":""}]}。' },
-      { role: 'user', content: `搜索今天（${new Date().toISOString().slice(0, 10)}）的两条主要科技新闻，并给出原文 URL 与摘录。` },
-    ],
-  }))
-  const parsed = parseJsonObject(response.choices?.[0]?.message?.content || '')
-  const results = normalizeAIResults(parsed.results, '联网能力验证')
+  const response = await runAITask<{ results?: unknown[] }>(
+    'organize.verify_web_search',
+    config.aiTarget || '',
+    { date: new Date().toISOString().slice(0, 10), minimum_results: 2 },
+  )
+  const results = normalizeAIResults(response.results, '联网能力验证')
   if (results.length < 2) throw new Error('未返回至少两个可核验网页来源')
   return results.length
 }

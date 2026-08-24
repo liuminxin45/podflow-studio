@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SETTINGS } from '../../types/settings'
 import { settingsRepository } from '../settings/repository'
-import { llmService } from '../llmService'
+import * as aiTaskService from '../aiTaskService'
 import { getOrganizeSearchStatus, searchForOrganize } from '../organizeResearch'
 
 describe('organizeResearch', () => {
@@ -65,34 +65,24 @@ describe('organizeResearch', () => {
     await expect(searchForOrganize('核验问题')).rejects.toThrow('尚未通过自身联网搜索能力验证')
   })
 
-  it('streams sanitized default AI search progress without exposing tool payloads', async () => {
+  it('reports sanitized default AI search progress', async () => {
     const settings = settingsRepository.load()
     settings.apiConfig.global.searchProvider = 'default_ai'
     settings.apiConfig.global.defaultAITarget = 'agent:codex'
     settings.apiConfig.global.defaultAISearchVerifiedTarget = 'agent:codex'
     settingsRepository.save(settings)
-    vi.spyOn(llmService, 'callStreaming').mockImplementation(async (_options, onChunk, onEvent) => {
-      onEvent?.({ type: 'tool_start', toolName: 'web_search', input: 'private query payload' })
-      onEvent?.({ type: 'tool_done', output: 'private tool output' })
-      onChunk(JSON.stringify({
-        results: [{ title: '官方来源', url: 'https://example.com/official', excerpt: '可核验摘要' }],
-      }))
+    vi.spyOn(aiTaskService, 'runAITask').mockResolvedValue({
+      results: [{ title: '官方来源', url: 'https://example.com/official', excerpt: '可核验摘要' }],
     })
     const progress: string[] = []
 
     const response = await searchForOrganize('核验问题', event => progress.push(event.detail))
 
     expect(response.results).toHaveLength(1)
-    expect(llmService.callStreaming).toHaveBeenCalledWith(
-      expect.objectContaining({ timeout: 60_000 }),
-      expect.any(Function),
-      expect.any(Function),
+    expect(aiTaskService.runAITask).toHaveBeenCalledWith(
+      'organize.ai_web_search', 'agent:codex', expect.objectContaining({ query: '核验问题' }), undefined,
     )
-    expect(progress).toEqual(expect.arrayContaining([
-      '正在连接当前 AI',
-      '当前 AI 正在调用自身联网工具',
-      '联网工具已返回，正在整理来源',
-    ]))
+    expect(progress).toEqual(['正在连接当前 AI Agent'])
     expect(progress.join(' ')).not.toContain('private')
   })
 
@@ -102,19 +92,17 @@ describe('organizeResearch', () => {
     settings.apiConfig.global.defaultAITarget = 'agent:codex'
     settings.apiConfig.global.defaultAISearchVerifiedTarget = 'agent:codex'
     settingsRepository.save(settings)
-    vi.spyOn(llmService, 'call').mockResolvedValue({
-      choices: [{ message: { content: JSON.stringify({ results: [
+    vi.spyOn(aiTaskService, 'runAITask').mockResolvedValue({ results: [
         { title: '来源一', url: 'https://one.test', excerpt: '摘录一' },
         { title: '来源二', url: 'https://two.test', excerpt: '摘录二' },
         { title: '来源三', url: 'https://three.test', excerpt: '摘录三' },
-      ] }) } }],
-    } as any)
+      ] })
 
     const response = await searchForOrganize('近期事实', undefined, undefined, { timeRange: 'month', maxResults: 2 })
 
-    const callOptions = vi.mocked(llmService.call).mock.calls[0]?.[0]
-    expect(callOptions.messages[1]?.content).toContain('最近 30 天')
-    expect(callOptions.messages[1]?.content).toContain('最多返回 2 条')
+    const context = vi.mocked(aiTaskService.runAITask).mock.calls[0]?.[2]
+    expect(context.time_requirement).toContain('最近 30 天')
+    expect(context.max_results).toBe(2)
     expect(response.results).toHaveLength(2)
   })
 
@@ -127,13 +115,13 @@ describe('organizeResearch', () => {
     let releaseFirst!: () => void
     const firstGate = new Promise<void>(resolve => { releaseFirst = resolve })
     const started: string[] = []
-    vi.spyOn(llmService, 'callStreaming').mockImplementation(async (options, onChunk) => {
-      const query = options.messages[1]?.content.includes('问题一') ? '问题一' : '问题二'
+    vi.spyOn(aiTaskService, 'runAITask').mockImplementation(async (_task, _target, context) => {
+      const query = String(context.query)
       started.push(query)
       if (query === '问题一') await firstGate
-      onChunk(JSON.stringify({
+      return {
         results: [{ title: `${query}来源`, url: `https://example.com/${query}`, excerpt: '可核验摘要' }],
-      }))
+      }
     })
 
     const first = searchForOrganize('问题一', () => undefined)
@@ -154,13 +142,13 @@ describe('organizeResearch', () => {
     let releaseFirst!: () => void
     const firstGate = new Promise<void>(resolve => { releaseFirst = resolve })
     const started: string[] = []
-    vi.spyOn(llmService, 'callStreaming').mockImplementation(async (options, onChunk) => {
-      const query = options.messages[1]?.content.match(/问题[一二三]/)?.[0] || ''
+    vi.spyOn(aiTaskService, 'runAITask').mockImplementation(async (_task, _target, context) => {
+      const query = String(context.query)
       started.push(query)
       if (query === '问题一') await firstGate
-      onChunk(JSON.stringify({
+      return {
         results: [{ title: `${query}来源`, url: `https://example.com/${query}`, excerpt: '可核验摘要' }],
-      }))
+      }
     })
     const queuedController = new AbortController()
 
