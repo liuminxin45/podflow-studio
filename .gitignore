@@ -41,6 +41,7 @@ tests/debug/
 tmp/
 docs/acceptance/acceptance-run.*.log
 docs/acceptance/CDP_ACCEPTANCE_REPORT.md
+docs/acceptance/result.json
 docs/acceptance/screenshots/
 docs/images/
 docs/**/*.gif
