@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VITE_SERVER_WATCH_OPTIONS } from './scripts/viteRuntimeConfig'
 
 export default defineConfig({
   plugins: [react()],
@@ -7,6 +8,7 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5174,
     strictPort: true,
+    watch: VITE_SERVER_WATCH_OPTIONS,
   },
   build: {
     outDir: 'dist',
