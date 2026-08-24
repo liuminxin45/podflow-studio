@@ -1,7 +1,10 @@
+from datetime import UTC, datetime
+import json
 from typing import Any
 
 from nodes.facts.config import FactsConfig
 from protocol.morning_news import build_fact_cards, build_run_report, select_news_topics
+from protocol.llm_runtime import create_llm_runtime, has_llm_runtime_config, resolve_llm_target
 from protocol.node_runner import NodeContext
 
 
@@ -21,7 +24,11 @@ def _fact_for_material(
             fact
             for fact in facts
             if (
-                str(fact.get("source_url") or "") == material_url
+                any(
+                    str(item.get("url") or "") == material_url
+                    for item in fact.get("evidence", [])
+                    if isinstance(item, dict)
+                )
                 if material_url
                 else bool(material_title and str(fact.get("title") or "") == material_title)
             )
@@ -48,33 +55,36 @@ def _enrich_organized_facts(
         references = material.get("_references")
         references = references if isinstance(references, list) else []
         sources = [material, *[item for item in references if isinstance(item, dict)]]
-        source_urls = list(
-            dict.fromkeys(
-                str(item.get("url") or "")
-                for item in sources
-                if item.get("url")
+        source_entries: list[tuple[str, str]] = []
+        for item in sources:
+            url = str(item.get("url") or "")
+            if not url or any(existing_url == url for existing_url, _ in source_entries):
+                continue
+            title = str(
+                item.get("source_title")
+                or item.get("source_name")
+                or item.get("source")
+                or item.get("title")
+                or url
             )
-        )
-        source_titles = list(
-            dict.fromkeys(
-                str(
-                    item.get("source_title")
-                    or item.get("source_name")
-                    or item.get("source")
-                    or item.get("title")
-                    or ""
-                )
-                for item in sources
-                if (
-                    item.get("source_title")
-                    or item.get("source_name")
-                    or item.get("source")
-                    or item.get("title")
-                )
-            )
-        )
-        fact["source_urls"] = source_urls
-        fact["source_titles"] = source_titles
+            source_entries.append((url, title))
+        source_urls = [url for url, _ in source_entries]
+        existing_urls = {
+            str(item.get("url") or "")
+            for item in fact.get("evidence", [])
+            if isinstance(item, dict)
+        }
+        for source_index, (url, title) in enumerate(source_entries, start=1):
+            if url in existing_urls:
+                continue
+            fact.setdefault("evidence", []).append({
+                "id": f"evidence_{str(fact.get('id') or '').removeprefix('fact_')}_{source_index:03d}",
+                "url": url,
+                "title": title,
+                "published_at": str(material.get("published") or material.get("published_at") or ""),
+                "source_role": "independent",
+                "excerpt": evidence[:600],
+            })
         if material.get("_isDeepDive"):
             brief = material.get("_deepDiveBrief")
             if not isinstance(brief, dict):
@@ -99,6 +109,70 @@ def _enrich_organized_facts(
         # provenance it must not be presented as a single-link high-confidence
         # statement, even when the primary item has a URL and timestamp.
         fact["confidence"] = "medium"
+
+
+def _verify_claims(facts: list[dict[str, Any]], config: FactsConfig, ctx: Any) -> None:
+    target = resolve_llm_target(config)
+    if not has_llm_runtime_config(config):
+        if config.require_semantic_verification:
+            raise ValueError(f"Semantic fact verifier is required ({target.masked_summary()})")
+        ctx.log("事实模型核验未启用：产物仅可作为 demo-only 诊断数据")
+        return
+    payload = [{
+        "fact_id": fact.get("id"),
+        "title": fact.get("title"),
+        "summary": fact.get("summary"),
+        "evidence": fact.get("evidence", []),
+    } for fact in facts]
+    prompt = f"""你是事实核验器。只能使用输入 evidence，禁止添加 URL 或外部知识。
+为每个 fact 提取 1-5 条最小事实主张，并判断 supported、conflicted 或 insufficient。
+每条返回 fact_id、id、text、evidence_ids、status、confidence。所有 evidence_ids 必须来自对应 fact。
+只返回 JSON：{{"facts":[{{"fact_id":"fact_001","claims":[...]}}]}}。
+
+<事实与证据>
+{json.dumps(payload, ensure_ascii=False)}
+</事实与证据>"""
+    with create_llm_runtime(config, debug_mode=ctx.debug_mode) as client:
+        response = client.call([{"role": "user", "content": prompt}], timeout=config.timeout, logs=ctx.logs)
+        parsed = json.loads(client.extract_content(response))
+    returned = parsed.get("facts") if isinstance(parsed, dict) else None
+    if not isinstance(returned, list):
+        raise ValueError("Fact verifier returned an invalid facts array")
+    by_id = {str(item.get("fact_id") or ""): item for item in returned if isinstance(item, dict)}
+    verified_at = datetime.now(UTC).isoformat()
+    for fact in facts:
+        fact_id = str(fact.get("id") or "")
+        item = by_id.get(fact_id)
+        claims = item.get("claims") if isinstance(item, dict) else None
+        evidence_ids = {str(value.get("id") or "") for value in fact.get("evidence", []) if isinstance(value, dict)}
+        if not isinstance(claims, list) or not claims:
+            raise ValueError(f"Fact verifier omitted claims for {fact_id}")
+        normalized = []
+        for index, claim in enumerate(claims, start=1):
+            if not isinstance(claim, dict):
+                raise ValueError(f"Fact verifier returned an invalid claim for {fact_id}")
+            referenced = [str(value) for value in claim.get("evidence_ids", [])]
+            status = str(claim.get("status") or "")
+            confidence = str(claim.get("confidence") or "")
+            if not referenced or any(value not in evidence_ids for value in referenced):
+                raise ValueError(f"Fact verifier referenced unknown evidence for {fact_id}")
+            if status not in {"supported", "conflicted", "insufficient"} or confidence not in {"high", "medium", "low"}:
+                raise ValueError(f"Fact verifier returned an invalid decision for {fact_id}")
+            normalized.append({
+                "id": f"claim_{fact_id.removeprefix('fact_')}_{index:03d}",
+                "text": str(claim.get("text") or "").strip(),
+                "evidence_ids": referenced,
+                "status": status,
+                "confidence": confidence,
+                "verifier_model": target.model,
+                "verified_at": verified_at,
+            })
+        if any(not claim["text"] for claim in normalized):
+            raise ValueError(f"Fact verifier returned an empty claim for {fact_id}")
+        fact["claims"] = normalized
+        fact["confidence"] = "low" if any(item["status"] != "supported" for item in normalized) else min(
+            (item["confidence"] for item in normalized), key=("low", "medium", "high").index
+        )
 
 
 def run(state: dict[str, Any], config: FactsConfig = None) -> dict[str, Any]:
@@ -141,6 +215,7 @@ def run(state: dict[str, Any], config: FactsConfig = None) -> dict[str, Any]:
                 ]
         facts = build_fact_cards(fact_materials, limit=config.max_facts)
         _enrich_organized_facts(facts, fact_materials)
+        _verify_claims(facts, config, ctx)
         deep_fact = None
         if isinstance(deep_material, dict):
             deep_url = str(deep_material.get("url") or "")
@@ -150,7 +225,7 @@ def run(state: dict[str, Any], config: FactsConfig = None) -> dict[str, Any]:
                     fact
                     for fact in facts
                     if (
-                        str(fact.get("source_url") or "") == deep_url
+                        any(str(item.get("url") or "") == deep_url for item in fact.get("evidence", []))
                         if deep_url
                         else bool(
                             deep_title

@@ -50,6 +50,7 @@ class PodcastState:
 
     review_summary: dict[str, Any] = field(default_factory=dict)
     audio_approval: dict[str, Any] = field(default_factory=dict)
+    release_readiness: dict[str, Any] = field(default_factory=dict)
 
     publish_outputs: dict[str, Any] = field(default_factory=dict)
     subtitle_path: str = ""

@@ -22,6 +22,30 @@ describe('PodFlow CLI contract', () => {
     expect(() => parseArgs(['launch'])).toThrow(/Unknown command/)
     expect(() => parseArgs(['start', '--mystery'])).toThrow(/Unknown option/)
     expect(() => validateCdp('70000')).toThrow(/cdp/i)
+    expect(() => parseArgs(['produce', '--skip-approval'])).toThrow(/Unknown option/)
+  })
+
+  it('parses explicit preview and final-review confirmations', () => {
+    expect(parseArgs([
+      'produce', '--stage', 'package', '--workflow', 'episode', '--preview-only',
+      '--full-listen-confirmed', '--pronunciation-confirmed', '--editorial-final-confirmed',
+    ]).options).toMatchObject({
+      'preview-only': true,
+      'full-listen-confirmed': true,
+      'pronunciation-confirmed': true,
+      'editorial-final-confirmed': true,
+    })
+  })
+
+  it('parses the formal generate and publish contracts', () => {
+    expect(parseArgs(['produce', '--stage', 'generate', '--episode-id', '2026-08-17', '--topic', 'AI', '--allow-paid-tts', '--json'])).toEqual({
+      command: 'produce',
+      options: { stage: 'generate', 'episode-id': '2026-08-17', topic: 'AI', 'allow-paid-tts': true, json: true },
+    })
+    expect(parseArgs(['produce', '--stage', 'publish', '--workflow', 'workflow.json', '--confirm-publish', '--release-repo', 'liuminxin45/podflow-morning-feed'])).toEqual({
+      command: 'produce',
+      options: { stage: 'publish', workflow: 'workflow.json', 'confirm-publish': true, 'release-repo': 'liuminxin45/podflow-morning-feed' },
+    })
   })
 
   it('publishes stable automation exit codes', () => {

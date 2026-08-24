@@ -11,6 +11,6 @@ PodFlow Studio v3 uses four edited cues derived from **Quick Spark** by **Ondros
 - Edits: cropped into intro, quick-news sting, deep-dive bridge and outro; fades and final loudness processing applied.
 - Provenance: `quick-spark-source.json` records the original SHA256, retrieval date, edit windows and derived hashes.
 
-The source and derived cues remain available under CC0. They are not relicensed as LGPL. The PodFlow source code remains LGPL-3.0-only.
+The source and derived cues remain available under CC0. They are not relicensed as Apache-2.0. The PodFlow source code is licensed under Apache-2.0.
 
 Formal rendering must stop if any cue, this rights file, or the provenance JSON is missing. The retired synthesized sine-wave assets are not valid v3 production cues.

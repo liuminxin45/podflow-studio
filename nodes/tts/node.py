@@ -216,6 +216,7 @@ def _voice_segment(
         "text": segment.get("text", ""),
         "speaker": segment.get("speaker", "Host A"),
         "source_fact_ids": segment.get("source_fact_ids", []),
+        "source_claim_ids": segment.get("source_claim_ids", []),
         "engine": engine,
         "voice": voice,
         "duration_seconds": duration_seconds,

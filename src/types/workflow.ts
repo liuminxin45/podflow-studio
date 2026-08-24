@@ -95,6 +95,19 @@ export interface PodcastState {
     reviewed_at?: string
     reviewer?: string
     notes?: string
+    acknowledgements?: Array<'full_listen_confirmed' | 'pronunciation_confirmed' | 'editorial_final_confirmed'>
+  }
+  release_readiness?: {
+    version?: 1
+    status?: 'blocked' | 'preview_ready' | 'publish_ready'
+    audio_sha256?: string
+    evaluated_at?: string
+    gates?: Record<'sources' | 'facts' | 'script' | 'pronunciation' | 'audio' | 'human_approval', {
+      status: 'passed' | 'failed' | 'pending'
+      codes: string[]
+      messages: string[]
+      evidence: string[]
+    }>
   }
   publish_outputs: Record<string, any>
   subtitle_path: string
@@ -192,13 +205,24 @@ export interface FactCard {
   id: string
   title: string
   summary: string
-  source_title: string
-  source_url: string
-  source_titles?: string[]
-  source_urls?: string[]
-  published_at: string
-  claim: string
   confidence: 'high' | 'medium' | 'low'
+  evidence: Array<{
+    id: string
+    url: string
+    title: string
+    published_at: string
+    source_role: 'primary' | 'independent' | 'background'
+    excerpt: string
+  }>
+  claims: Array<{
+    id: string
+    text: string
+    evidence_ids: string[]
+    status: 'supported' | 'conflicted' | 'insufficient'
+    confidence: 'high' | 'medium' | 'low'
+    verifier_model: string
+    verified_at: string
+  }>
   is_deep_dive?: boolean
   deep_dive_brief?: {
     version: 1
@@ -259,6 +283,7 @@ export interface ScriptSegment {
   title: string
   text: string
   source_fact_ids: string[]
+  source_claim_ids: string[]
   estimated_seconds: number
   speaker?: string
 }
@@ -269,6 +294,7 @@ export interface VoiceSegment {
   text: string
   speaker: string
   source_fact_ids?: string[]
+  source_claim_ids?: string[]
   engine: string
   voice: string
   mime_type?: string
@@ -307,6 +333,7 @@ export interface ProductionClip {
   }
   speaker: string
   source_fact_ids: string[]
+  source_claim_ids: string[]
   source: ProductionClipSource
   path: string
   duration_seconds: number

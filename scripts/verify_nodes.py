@@ -22,6 +22,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from protocol.manifest import NODE_OUTPUT_KEYS  # noqa: E402
 from protocol.node_validator import ALLOW_EMPTY_NODES, NODE_EXPECTED_OUTPUTS  # noqa: E402
+from protocol.episode_models import SCHEMA_VERSION  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -91,12 +92,16 @@ def _test_state() -> dict:
         "id": "fact_001",
         "title": article["title"],
         "summary": article["summary"],
-        "source_title": article["source_name"],
-        "source_url": article["url"],
-        "published_at": article["published"],
-        "claim": "央行公告公开市场操作，维护流动性合理充裕。",
         "confidence": "high",
-        "used_in_segments": ["seg_quick_1"],
+        "evidence": [{
+            "id": "evidence_001", "url": article["url"], "title": article["source_name"],
+            "published_at": article["published"], "source_role": "primary", "excerpt": article["summary"],
+        }],
+        "claims": [{
+            "id": "claim_001", "text": "央行公告公开市场操作，维护流动性合理充裕。",
+            "evidence_ids": ["evidence_001"], "status": "supported", "confidence": "high",
+            "verifier_model": "verify-nodes", "verified_at": article["published"],
+        }],
     }
     script = {
         "id": "test_ep_script",
@@ -113,6 +118,7 @@ def _test_state() -> dict:
                 "title": "开场导语",
                 "text": "早上好，欢迎收听今天的 PodFlow 晨报。",
                 "source_fact_ids": [],
+                "source_claim_ids": [],
                 "estimated_seconds": 12,
                 "speaker": "Host A",
             },
@@ -122,6 +128,7 @@ def _test_state() -> dict:
                 "title": "央行公开市场操作",
                 "text": "第一条新闻，央行公告公开市场操作，维护银行体系流动性合理充裕。",
                 "source_fact_ids": ["fact_001"],
+                "source_claim_ids": ["claim_001"],
                 "estimated_seconds": 18,
                 "speaker": "Host A",
             },
@@ -131,6 +138,7 @@ def _test_state() -> dict:
                 "title": "结尾总结",
                 "text": "以上就是本次测试早报，感谢收听。",
                 "source_fact_ids": [],
+                "source_claim_ids": [],
                 "estimated_seconds": 10,
                 "speaker": "Host A",
             },
@@ -139,7 +147,7 @@ def _test_state() -> dict:
     return {
         "episode_id": "test_ep",
         "created_at": "2026-07-02T00:00:00+08:00",
-        "schema_version": 1,
+        "schema_version": SCHEMA_VERSION,
         "preset": {},
         "source_inputs": [],
         "runtime_config": {
@@ -183,6 +191,7 @@ def _test_state() -> dict:
                 "text": script["segments"][1]["text"],
                 "speaker": "Host A",
                 "source_fact_ids": ["fact_001"],
+                "source_claim_ids": ["claim_001"],
                 "engine": "mock",
                 "voice": "zh-CN-XiaoxiaoNeural",
             }
@@ -198,6 +207,7 @@ def _test_state() -> dict:
         "cover_path": "",
         "review_summary": {},
         "audio_approval": {},
+        "release_readiness": {},
         "publish_outputs": {},
     }
 
@@ -254,6 +264,13 @@ def test_node(node_name: str) -> bool:
                     if isinstance(first_error, dict)
                     else str(first_error)
                 )
+                if (
+                    node_name == "publish"
+                    and result.get("publish_outputs") == {}
+                    and "Formal publishing" in message
+                ):
+                    print("✅ publish: OK (unreviewed smoke input was blocked without outputs)")
+                    return True
                 print(f"❌ {node_name}: Completed with errors: {message}")
                 return False
 

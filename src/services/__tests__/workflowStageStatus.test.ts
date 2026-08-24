@@ -2,11 +2,37 @@ import { describe, expect, it } from 'vitest'
 import { deriveWorkflowStageStatusMap, deriveWorkflowStageStatuses } from '../workflowStageStatus'
 import type { PodcastState, Workflow } from '../../types/workflow'
 
+function factCard(id = 'f1') {
+  return {
+    id,
+    title: 'Fact',
+    summary: 'Summary',
+    confidence: 'high' as const,
+    evidence: [{
+      id: `${id}_evidence_1`,
+      url: 'https://example.com',
+      title: 'Source',
+      published_at: '',
+      source_role: 'primary' as const,
+      excerpt: 'Evidence',
+    }],
+    claims: [{
+      id: `${id}_claim_1`,
+      text: 'Claim',
+      evidence_ids: [`${id}_evidence_1`],
+      status: 'supported' as const,
+      confidence: 'high' as const,
+      verifier_model: 'test-model',
+      verified_at: '2026-07-04T00:00:00.000Z',
+    }],
+  }
+}
+
 function createState(patch: Partial<PodcastState> = {}): PodcastState {
   return {
     episode_id: 'ep_test',
     created_at: '2026-07-04T00:00:00.000Z',
-    schema_version: 1,
+    schema_version: 2,
     preset: {},
     source_inputs: [],
     runtime_config: {},
@@ -47,7 +73,7 @@ describe('workflowStageStatus', () => {
   it('keeps persisted downstream work accessible without marking it stale', () => {
     const statuses = deriveWorkflowStageStatusMap(createWorkflow({
       cleaned_contents: [{ title: 'old organized item' }],
-      facts: [{ id: 'f1', title: 'Fact', summary: 'Summary', source_title: 'Source', source_url: 'https://example.com', published_at: '', claim: 'Claim', confidence: 'high' }],
+      facts: [factCard()],
       selected_topic: { title: 'Old topic' },
     }))
 
@@ -63,7 +89,7 @@ describe('workflowStageStatus', () => {
     const statuses = deriveWorkflowStageStatusMap(createWorkflow({
       fetch_contents: [{ title: 'raw' }],
       cleaned_contents: [],
-      facts: [{ id: 'f1', title: 'Fact', summary: 'Summary', source_title: 'Source', source_url: 'https://example.com', published_at: '', claim: 'Claim', confidence: 'high' }],
+      facts: [factCard()],
       selected_topic: { title: 'Old topic' },
     }))
 
@@ -144,9 +170,10 @@ describe('workflowStageStatus', () => {
         _status: 'ready',
       } as any],
       cleaned_contents: [{ title: 'clean' }],
-      facts: [{ id: 'f1', title: 'Fact', summary: 'Summary', source_title: 'Source', source_url: 'https://example.com', published_at: '', claim: 'Claim', confidence: 'high' }],
+      facts: [factCard()],
       selected_topic: { title: 'Topic' },
-      edited_script: { segments: [{ id: 's1', type: 'quick_news', title: 'Segment', text: 'Text', source_fact_ids: ['f1'], estimated_seconds: 10 }] },
+      edited_script: { segments: [{ id: 's1', type: 'quick_news', title: 'Segment', text: 'Text',
+        source_fact_ids: ['f1'], source_claim_ids: ['f1_claim_1'], estimated_seconds: 10 }] },
     }))
 
     expect(statuses.map(status => status.status)).toEqual([
@@ -169,6 +196,7 @@ describe('workflowStageStatus', () => {
           title: 'Segment',
           text: 'Generated text',
           source_fact_ids: [],
+          source_claim_ids: [],
           estimated_seconds: 10,
         }],
       },
@@ -187,6 +215,7 @@ describe('workflowStageStatus', () => {
           title: 'Segment',
           text: '   ',
           source_fact_ids: [],
+          source_claim_ids: [],
           estimated_seconds: 0,
         }],
       },

@@ -57,7 +57,7 @@ NODE_EXPECTED_OUTPUTS = {
     "audio_postprocess": ["audio_outputs"],
     "assets": ["cover_path"],
     # publish
-    "review": ["review_summary"],
+    "review": ["review_summary", "release_readiness"],
     "publish": ["publish_outputs"],
 }
 

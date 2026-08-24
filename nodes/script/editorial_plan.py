@@ -43,7 +43,7 @@ def build_editorial_plan_prompt(
             "id": fact.get("id"),
             "title": fact.get("title"),
             "summary": fact.get("summary"),
-            "claim": fact.get("claim"),
+            "claims": fact.get("claims", []),
             "confidence": fact.get("confidence"),
             "is_deep_dive": bool(fact.get("is_deep_dive")),
             "deep_dive_brief": fact.get("deep_dive_brief")

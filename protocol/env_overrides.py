@@ -72,6 +72,13 @@ def apply_env_overrides(state: dict[str, Any]) -> dict[str, Any]:
         _nested(rc, "script")["llm_model"] = _env("PODFLOW_LLM_MODEL")
     if _env("PODFLOW_LLM_API_KEY_ENV_VAR"):
         _nested(rc, "script")["api_key_env_var"] = _env("PODFLOW_LLM_API_KEY_ENV_VAR")
+    elif _env("PODFLOW_LLM_API_KEY"):
+        _nested(rc, "script")["api_key_env_var"] = "PODFLOW_LLM_API_KEY"
+
+    if _env("PODFLOW_BOCHA_API_BASE"):
+        _nested(rc, "research")["bocha_api_base"] = _env("PODFLOW_BOCHA_API_BASE")
+    if _env("PODFLOW_BOCHA_MAX_RESULTS"):
+        _nested(rc, "research")["bocha_max_results"] = _int_env("PODFLOW_BOCHA_MAX_RESULTS", 3)
 
     if _env("PODFLOW_TTS_ENGINE"):
         _nested(rc, "tts")["engine"] = _env("PODFLOW_TTS_ENGINE")

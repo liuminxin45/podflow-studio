@@ -54,7 +54,7 @@ NODE_OUTPUT_KEYS: dict[str, list[str]] = {
     "tts": ["voice_segments", "production_plan"],
     "audio_postprocess": ["audio_outputs"],
     "assets": ["cover_path"],
-    "review": ["review_summary"],
+    "review": ["review_summary", "release_readiness"],
     "publish": ["publish_outputs"],
 }
 

@@ -152,7 +152,7 @@ function create(ctx) {
     }
   }
 
-  async function run(workflowId, resumeFrom = null, onlyNodes = null) {
+  async function run(workflowId, resumeFrom = null, onlyNodes = null, options = {}) {
     const currentWorkflow = ctx.getCurrentWorkflow()
     if (!currentWorkflow) return
 
@@ -204,6 +204,17 @@ function create(ctx) {
       const nodeName = nodes[i]
       const stageLabel = NODE_STAGE_LABELS[nodeName] || nodeName
 
+      if (['tts', 'audio_postprocess', 'assets'].includes(nodeName)) {
+        currentWorkflow.state.audio_approval = {}
+        currentWorkflow.state.review_summary = {}
+        currentWorkflow.state.release_readiness = {}
+        currentWorkflow.state.publish_outputs = {}
+      } else if (nodeName === 'review') {
+        if (!options.preserveHumanApproval) currentWorkflow.state.audio_approval = {}
+        currentWorkflow.state.release_readiness = {}
+        currentWorkflow.state.publish_outputs = {}
+      }
+
       console.log(`[Workflow] Starting node: ${nodeName} (${i+1}/${nodes.length})`)
 
       currentWorkflow.currentNode = nodeName
@@ -225,7 +236,20 @@ function create(ctx) {
       try {
         const loadedNodeConfig = configManager ? configManager.loadNodeConfig(nodeName) : null
         const storageConfig = applyRuntimeStorageDefaults(nodeName, loadedNodeConfig)
-        const nodeConfig = applySeriesDefaults(nodeName, storageConfig, currentWorkflow.state)
+        let nodeConfig = applySeriesDefaults(nodeName, storageConfig, currentWorkflow.state)
+
+        if (nodeName === 'facts' && configManager) {
+          nodeConfig = nodeConfig || {}
+          const scriptConfig = configManager.loadNodeConfig('script') || {}
+          const llmKeys = [
+            'provider_kind', 'api_base', 'api_key', 'api_key_env_var', 'llm_model', 'ai_target',
+            'local_agent_id', 'local_agent_command', 'local_agent_args', 'local_agent_output_mode',
+            'temperature', 'timeout',
+          ]
+          for (const key of llmKeys) {
+            if (scriptConfig[key] !== undefined) nodeConfig[key] = scriptConfig[key]
+          }
+        }
 
         if (nodeConfig) {
           currentWorkflow.state.runtime_config = currentWorkflow.state.runtime_config || {}

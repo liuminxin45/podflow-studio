@@ -10,21 +10,17 @@ const factCards: FactCard[] = [
     id: 'fact-1',
     title: '产品本周开放预约',
     summary: '官方宣布产品本周开放预约，首批仅支持两个城市。',
-    source_title: '官方公告',
-    source_url: 'https://example.com/official',
-    published_at: '2026-07-15',
-    claim: '本周开放预约，首批仅支持两个城市。',
     confidence: 'high',
+    evidence: [{ id: 'evidence-1', title: '官方公告', url: 'https://example.com/official', published_at: '2026-07-15', source_role: 'primary', excerpt: '本周开放预约，首批仅支持两个城市。' }],
+    claims: [{ id: 'claim-1', text: '本周开放预约，首批仅支持两个城市。', evidence_ids: ['evidence-1'], status: 'supported', confidence: 'high', verifier_model: 'test-model', verified_at: '2026-07-15T00:00:00Z' }],
   },
   {
     id: 'fact-unrelated',
     title: '另一条新闻',
     summary: '不得进入当前提示词。',
-    source_title: '其他来源',
-    source_url: 'https://example.com/other',
-    published_at: '2026-07-15',
-    claim: '与当前新闻无关。',
     confidence: 'high',
+    evidence: [{ id: 'evidence-other', title: '其他来源', url: 'https://example.com/other', published_at: '2026-07-15', source_role: 'independent', excerpt: '与当前新闻无关。' }],
+    claims: [{ id: 'claim-other', text: '与当前新闻无关。', evidence_ids: ['evidence-other'], status: 'supported', confidence: 'high', verifier_model: 'test-model', verified_at: '2026-07-15T00:00:00Z' }],
   },
 ]
 
@@ -131,7 +127,7 @@ describe('quick news optimizer', () => {
       id: 'fact-official',
       title: '官方报名通知',
       summary: '官方通知要求考生在截止时间前登录系统确认报名。',
-      claim: '考生应在截止时间前登录系统确认报名。',
+      claims: [{ id: 'claim-official', text: '考生应在截止时间前登录系统确认报名。', evidence_ids: ['evidence-1'], status: 'supported', confidence: 'high', verifier_model: 'test-model', verified_at: '2026-07-15T00:00:00Z' }],
     }
     const raw = JSON.stringify({
       title: '报名即将截止',

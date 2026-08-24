@@ -44,6 +44,7 @@ def create_base_state() -> dict[str, Any]:
         "intro_outro_paths": {},
         "review_summary": {},
         "audio_approval": {},
+        "release_readiness": {},
         "publish_outputs": {},
         "subtitle_path": "",
         "run_report": {},

@@ -1,0 +1,11 @@
+[
+  {"id": "passing_machine_gates", "mutation": "none", "expected_status": "preview_ready", "expected_code": "HUMAN_APPROVAL_REQUIRED"},
+  {"id": "missing_source", "mutation": "missing_source", "expected_status": "blocked", "expected_code": "SOURCE_VERIFICATION_INCOMPLETE"},
+  {"id": "conflicted_claim", "mutation": "conflicted_claim", "expected_status": "blocked", "expected_code": "FACT_BINDING_INCOMPLETE"},
+  {"id": "unsupported_number", "mutation": "unsupported_claim", "expected_status": "blocked", "expected_code": "FACT_BINDING_INCOMPLETE"},
+  {"id": "template_repetition", "mutation": "editorial_failed", "expected_status": "blocked", "expected_code": "SCRIPT_QUALITY_INCOMPLETE"},
+  {"id": "pronunciation_unresolved", "mutation": "pronunciation_unresolved", "expected_status": "blocked", "expected_code": "PRONUNCIATION_REVIEW_INCOMPLETE"},
+  {"id": "abnormal_loudness", "mutation": "audio_failed", "expected_status": "blocked", "expected_code": "AUDIO_QUALITY_INCOMPLETE"},
+  {"id": "provider_impersonation", "mutation": "mock_provider", "expected_status": "blocked", "expected_code": "AUDIO_PROVIDER_PROVENANCE_INVALID"},
+  {"id": "stale_approval", "mutation": "stale_approval", "expected_status": "preview_ready", "expected_code": "HUMAN_APPROVAL_REQUIRED"}
+]

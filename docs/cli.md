@@ -29,7 +29,7 @@ After `npm install`, npm also exposes the package bin locally as `podflow`. `npm
 | `stop` | Requests graceful Electron shutdown with the session nonce, then waits for cleanup. |
 | `logs` | Prints the session log; `--follow` waits until the session ends. |
 | `accept` | Runs a layered CDP acceptance suite and writes evidence into the session artifact directory. |
-| `produce` | Runs one explicit workflow through v3 render, SHA256 approval, or immutable packaging. |
+| `produce` | Generates a formal candidate, rerenders it, records SHA256 approval, packages it, or publishes an immutable GitHub Release. |
 | `version` | Prints the PodFlow Studio package version. |
 
 Common options:
@@ -94,23 +94,57 @@ The state machine is `starting -> ready -> stopping -> exited`, or `starting -> 
 | 9 | Internal CLI error |
 | 10 | Production preflight, render, approval, or package failure |
 
-## Production v3
+## Formal production v3
 
 ```powershell
+npm run cli -- produce --stage generate --episode-id 2026-08-17 --topic "可选主题" --output out/episodes --allow-paid-tts --json
 npm run cli -- produce --workflow <id-or-absolute-path> --stage render --allow-paid-tts --json
-npm run cli -- produce --workflow <id-or-absolute-path> --stage approve --audio-sha256 <sha256> --reviewer <name> --json
+npm run cli -- produce --workflow <id-or-absolute-path> --stage package --preview-only --output <directory> --json
+npm run cli -- produce --workflow <id-or-absolute-path> --stage approve --audio-sha256 <sha256> --reviewer <name> --full-listen-confirmed --pronunciation-confirmed --editorial-final-confirmed --json
 npm run cli -- produce --workflow <id-or-absolute-path> --stage package --output <directory> --json
+npm run cli -- produce --workflow <id-or-absolute-path> --stage publish --release-repo liuminxin45/podflow-morning-feed --site-repo liuminxin45/liuminxin45.github.io --confirm-publish --json
 ```
 
-The CLI and desktop app consume the same `production_plan v3` defaults. There is no implicit latest-workflow selection and no v2 fallback.
+The CLI and desktop app consume the same production-plan defaults and EpisodeRun schema v2. There is no implicit latest-workflow selection and no legacy workflow migration. `generate` is the only headless formal generation path: it runs discovery, Bocha research, claim-level model verification, topic selection, LLM writing, `editorial_quality_v1`, pronunciation preflight, TTS, audio assembly, cover generation and automatic audio review.
 
+- `generate` requires `PODFLOW_BOCHA_API_KEY`, `PODFLOW_LLM_API_KEY`, `PODFLOW_LLM_MODEL`, `PODFLOW_DOUBAO_APP_ID` and `PODFLOW_DOUBAO_ACCESS_TOKEN`. OpenAI-compatible providers also require `PODFLOW_LLM_API_BASE`. It rejects deterministic scripts, mock/Edge audio, missing sources and failed machine gates.
 - `render` runs TTS, v3 cue assembly, cover generation and automatic review. It prints total characters, uncached characters and uncached clip count before calling a paid provider.
 - `--allow-paid-tts` is required whenever uncached Doubao clips exist. Missing credentials, unresolved pronunciation items, missing cue files, missing CC0 provenance or a legacy plan fail before the first external call.
 - TTS cache keys include the v3 direction, multi-emotion voice, emotion strength, pace, adjacent context and performance prompt. Re-rendering clears `audio_approval`.
-- `approve` requires a passing automatic review and the exact SHA256 of the current final MP3. The reviewer identity and UTC review time are persisted; secrets are removed before the workflow is written.
-- `package` requires a passing `audio-quality-report.json`, matching human approval, non-mock audio and an immutable output directory. It never overwrites a prior revision.
+- `approve` requires a passing automatic review, the exact SHA256 of the current final MP3, and explicit full-listen, pronunciation and editorial-final acknowledgements. The reviewer identity and UTC review time are persisted; secrets are removed before the workflow is written.
+- `package --preview-only` consumes `preview_ready`, writes `previews/<episode>/<audio-sha-prefix>/`, and never emits RSS or public URLs. It waives only the human-approval gate.
+- Formal `package` consumes `publish_ready`, requires a passing `audio-quality-report.json`, current human approval, non-mock audio and an immutable output directory. It never overwrites a prior revision.
+- `publish` requires `--confirm-publish`. It uploads an eight-asset draft Release, verifies every remote size and SHA256 digest, then publishes it and sends `podflow_release_published` to the personal-site repository. Existing tags are immutable and rejected.
+
+The fixed Release assets are `<episode-id>.mp3`, `episode.json`, `cover.png`, `transcript.vtt`, `chapters.json`, `show-notes.md`, `audio-quality-report.json` and `checksums.sha256`. The MP3 stays in `liuminxin45/podflow-morning-feed`; the personal site downloads only the smaller companion assets during its Pages build.
+
+### Local source installation
+
+On Windows, run the repository-owned bootstrap from a fresh checkout:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/setup-local.ps1
+```
+
+It installs exact Node/Python dependencies and runs `doctor`. It never reads or stores provider keys. Set the variables in the current shell or a user-controlled secret manager before generation. Local publishing also requires an authenticated GitHub CLI or `PODFLOW_PUBLISH_TOKEN`.
+
+### GitHub Actions
+
+`Generate and Publish Episode` is manual-only. Configure these repository secrets:
+
+```text
+PODFLOW_BOCHA_API_KEY
+PODFLOW_LLM_API_KEY
+PODFLOW_DOUBAO_APP_ID
+PODFLOW_DOUBAO_ACCESS_TOKEN
+PODFLOW_PUBLISH_TOKEN
+```
+
+Configure `PODFLOW_LLM_PROVIDER`, `PODFLOW_LLM_API_BASE`, `PODFLOW_LLM_MODEL`, `PODFLOW_FETCH_SOURCES` and `PODFLOW_RSS_URLS` as repository variables. Create a protected `podflow-production` environment with the human reviewer. The generation job uploads a seven-day candidate artifact and publishes its exact audio SHA in the run summary; only the environment-approved job records approval, creates the Release and triggers the site.
 
 If a stage fails, correct the reported preflight or quality issue and rerun the same stage. Do not hand-edit the fingerprint or quality report. A new render intentionally invalidates the earlier approval.
+
+EpisodeRun v1, legacy fact fields and scripts without `source_claim_ids` are rejected. Open the material again from Organize / Facts and regenerate; the CLI does not add aliases or defaults.
 
 ## Agent-safe pattern
 

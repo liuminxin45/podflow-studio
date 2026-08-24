@@ -136,7 +136,11 @@ describe('节目库与播放器', () => {
       id: 'ep-1',
       state: {
         edited_script: { segments: [{ id: 's1', type: 'quick_news', title: '芯片', text: '这是有来源的稿件。', source_fact_ids: ['f1'], estimated_seconds: 20 }] },
-        facts: [{ id: 'f1', title: '官方发布', summary: '', source_title: 'Example', source_url: 'https://example.com/source', published_at: '', claim: '', confidence: 'high' }],
+        facts: [{
+          id: 'f1', title: '官方发布', summary: '', confidence: 'high',
+          evidence: [{ id: 'e1', title: 'Example', url: 'https://example.com/source', published_at: '', source_role: 'primary', excerpt: '' }],
+          claims: [{ id: 'c1', text: '官方发布', evidence_ids: ['e1'], status: 'supported', confidence: 'high', verifier_model: 'test-model', verified_at: '2026-01-01T00:00:00Z' }],
+        }],
       },
     } as unknown as Workflow
     render(<GlobalPlayer episode={episode} workflow={workflow} onClose={vi.fn()} onPlaybackPersisted={vi.fn()} onEnded={vi.fn()} />)

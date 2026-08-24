@@ -2,9 +2,10 @@ import { CheckCircle, GearSix, House, Plus, Radio } from '@phosphor-icons/react'
 import { CloseOutlined } from '../icons/antdCompat'
 import type { Workflow } from '../types/workflow'
 import { deriveWorkflowStageStatuses, type DerivedStageStatus } from '../services/workflowStageStatus'
+import { latestWorkflowFailure } from '../services/workflowFailure'
 import NavigationActionButton from './NavigationActionButton'
 import WorkflowSaveButton from './WorkflowSaveButton'
-import WorkflowFailureNotice, { latestWorkflowFailure } from './WorkflowFailureNotice'
+import WorkflowFailureNotice from './WorkflowFailureNotice'
 
 interface Props {
   workflow: Workflow | null

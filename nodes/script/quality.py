@@ -53,7 +53,11 @@ def assess_script_quality(
     if set(opening_source_ids) != set(planned_opening_ids):
         hard.append(_issue("OPENING_FACT_BINDING", "开场事实绑定与编排不一致", opening))
     opening_fact_text = " ".join(
-        " ".join(str(facts_by_id[fact_id].get(field) or "") for field in ("title", "summary", "claim", "published_at"))
+        " ".join([
+            str(facts_by_id[fact_id].get("title") or ""),
+            str(facts_by_id[fact_id].get("summary") or ""),
+            *[str(claim.get("text") or "") for claim in facts_by_id[fact_id].get("claims", []) if isinstance(claim, dict)],
+        ])
         for fact_id in planned_opening_ids
         if fact_id in facts_by_id
     )
@@ -108,10 +112,11 @@ def assess_script_quality(
             hard.append(_issue("QUICK_NEWS_SOURCE", "每条快讯至少需要一个可追溯来源", segment))
         text = str(segment.get("text") or "")
         lengths.append(len(text))
-        fact_text = " ".join(
-            str(fact.get(field) or "")
-            for field in ("title", "summary", "claim", "published_at")
-        )
+        fact_text = " ".join([
+            str(fact.get("title") or ""),
+            str(fact.get("summary") or ""),
+            *[str(claim.get("text") or "") for claim in fact.get("claims", []) if isinstance(claim, dict)],
+        ])
         _assess_text_integrity(
             segment,
             f"{segment.get('title') or ''} {text}",
@@ -324,8 +329,11 @@ def _assess_text_integrity(
 
 
 def _source_hosts(fact: dict[str, Any]) -> set[str]:
-    urls = [str(fact.get("source_url") or "")]
-    urls.extend(str(value or "") for value in fact.get("source_urls", []))
+    urls = [
+        str(item.get("url") or "")
+        for item in fact.get("evidence", [])
+        if isinstance(item, dict)
+    ]
     brief = fact.get("deep_dive_brief")
     if isinstance(brief, dict):
         urls.extend(str(value or "") for value in brief.get("sourceUrls", []))

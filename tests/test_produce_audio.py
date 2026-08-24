@@ -26,6 +26,8 @@ from nodes.tts.node import (
 )
 from nodes.tts.node import run as tts_run
 from protocol.artifact_utils import file_fingerprint
+from protocol.release_readiness import build_release_readiness
+from scripts.produce_workflow import package as package_release
 from tests.mock_data import create_base_state
 
 
@@ -67,20 +69,39 @@ def _public_publish_state(tmp_path: Path, *, engine: str = "doubao_tts") -> tupl
     final_audio = tmp_path / "2026-08-11-test.mp3"
     _write_wav(final_audio, frequency=440)
     with final_audio.open("r+b") as output:
-        output.truncate(840 * 16_000)
+        output.truncate(840 * 20_000)
     cover = tmp_path / "cover.png"
     cover.write_bytes(b"podflow-cover")
     state = create_base_state()
     state["episode_id"] = "2026-08-11-test"
     state["cover_path"] = str(cover)
-    state["facts"] = [{"id": "fact_001", "title": "公开来源", "source_url": "https://example.com/news"}]
+    state["facts"] = [{
+        "id": "fact_001",
+        "title": "公开来源",
+        "summary": "公开来源支持测试主张。",
+        "confidence": "high",
+        "evidence": [
+            {"id": "evidence_1", "url": "https://example.com/news", "title": "一手来源", "published_at": "2026-08-11", "source_role": "primary", "excerpt": "测试主张。"},
+            {"id": "evidence_2", "url": "https://second.example/news", "title": "独立来源一", "published_at": "2026-08-11", "source_role": "independent", "excerpt": "测试主张。"},
+            {"id": "evidence_3", "url": "https://third.example/news", "title": "独立来源二", "published_at": "2026-08-11", "source_role": "independent", "excerpt": "测试主张。"},
+        ],
+        "claims": [{
+            "id": "claim_001", "text": "测试主张。", "evidence_ids": ["evidence_1", "evidence_2"],
+            "status": "supported", "confidence": "high", "verifier_model": "test-verifier",
+            "verified_at": "2026-08-11T00:00:00Z",
+        }],
+    }]
+    state["script"] = {"generated_by": "llm"}
+    state["generation_meta"] = {"editorial_quality": {
+        "version": "editorial_quality_v1", "status": "passed", "model": "test-editor",
+    }}
     state["edited_script"] = {
         "title": "PodFlow 晨报",
         "description": "6 条快讯加 1 条重点解读",
         "segments": [
-            {"id": f"quick_{index}", "type": "quick_news", "text": "快讯", "source_fact_ids": ["fact_001"]}
+            {"id": f"quick_{index}", "type": "quick_news", "text": "快讯", "source_fact_ids": ["fact_001"], "source_claim_ids": ["claim_001"]}
             for index in range(6)
-        ] + [{"id": "deep_1", "type": "deep_dive", "text": "重点解读", "source_fact_ids": ["fact_001"]}],
+        ] + [{"id": "deep_1", "type": "deep_dive", "text": "重点解读", "source_fact_ids": ["fact_001"], "source_claim_ids": ["claim_001"]}],
     }
     state["audio_outputs"] = {
         "status": "ok",
@@ -98,8 +119,25 @@ def _public_publish_state(tmp_path: Path, *, engine: str = "doubao_tts") -> tupl
     state["production_plan"] = {"version": 3, "quality_profile": "podflow_morning_v3"}
     artifact = state["audio_outputs"]["audio_artifact"]
     state["review_summary"] = {"status": "passed", "audio_artifact": artifact}
-    state["audio_approval"] = {"status": "approved", "audio_sha256": artifact["sha256"], "reviewer": "tester"}
+    state["audio_approval"] = {
+        "status": "approved", "audio_sha256": artifact["sha256"], "reviewer": "tester",
+        "acknowledgements": ["full_listen_confirmed", "pronunciation_confirmed", "editorial_final_confirmed"],
+    }
+    state["voice_segments"] = [{"segment_id": "voice_001", "engine": engine, "path": str(final_audio)}]
+    state["release_readiness"] = build_release_readiness(state)
     return state, final_audio
+
+
+def _attach_measured_quality_report(state: dict, tmp_path: Path) -> None:
+    report = tmp_path / "audio-quality-report.json"
+    report.write_text(json.dumps({"output": {"measured": {
+        "sample_rate_hz": 48_000,
+        "bitrate_kbps": 160,
+        "integrated_lufs": -16.0,
+        "true_peak_db": -1.2,
+        "duration_seconds": 840,
+    }}}), encoding="utf-8")
+    state["review_summary"]["audio_quality_report"] = str(report)
 
 
 def test_audio_postprocess_mixes_bgm_and_isolates_episode_output(tmp_path: Path):
@@ -586,7 +624,7 @@ def test_wav_fallback_does_not_append_pause_after_last_segment(tmp_path: Path):
     assert duration == 0.6
 
 
-def test_mock_audio_provenance_reaches_reports_and_local_publish_package(tmp_path: Path):
+def test_mock_audio_provenance_is_blocked_from_formal_local_publish(tmp_path: Path):
     voice_path = tmp_path / "mock.wav"
     _write_wav(voice_path, frequency=440)
     state = create_base_state()
@@ -611,11 +649,8 @@ def test_mock_audio_provenance_reaches_reports_and_local_publish_package(tmp_pat
             public_base_url="",
         ),
     )
-    episode_payload = json.loads(Path(state["publish_outputs"]["episode_json"]).read_text("utf-8"))
-    assert episode_payload["audio"]["outputs"]["contains_mock_audio"] is True
-    assert state["publish_outputs"]["contains_mock_audio"] is True
-    assert "mock TTS" in state["publish_outputs"]["warning"]
-    assert Path(state["publish_outputs"]["episode_dir"]).name == assets_safe_path_part("mock/demo")
+    assert state["publish_outputs"] == {}
+    assert any(error["node"] == "publish" and "mock TTS" in error["message"] for error in state["errors"])
 
 
 def test_recording_provenance_comes_from_voice_segments(tmp_path: Path):
@@ -719,7 +754,7 @@ def test_public_publish_fails_closed_without_audio_provenance_or_review(tmp_path
 
     assert result["publish_outputs"] == {}
     assert any(
-        error["node"] == "publish" and "provenance is incomplete" in error["message"]
+        error["node"] == "publish" and "final audio" in error["message"]
         for error in result["errors"]
     )
 
@@ -765,3 +800,60 @@ def test_publish_reports_only_local_archive_and_rss(tmp_path: Path):
         "local": "success",
         "rss": "success",
     }
+
+
+def test_internal_preview_only_waives_human_gate_and_uses_true_provider_metadata(tmp_path: Path):
+    state, _ = _public_publish_state(tmp_path, engine="edge-tts")
+    state["audio_approval"] = {}
+    state["release_readiness"] = build_release_readiness(state)
+    _attach_measured_quality_report(state, tmp_path)
+
+    result = package_release(state, tmp_path / "delivery", preview_only=True)
+    manifest = result["manifest"]
+
+    assert Path(result["directory"]).parts[-3:] == (
+        "previews", state["episode_id"], state["audio_outputs"]["audio_artifact"]["sha256"][:12]
+    )
+    assert manifest["releaseStatus"] == "preview_unreviewed"
+    assert manifest["public"] is False
+    assert manifest["ttsProvider"] == "edge-tts"
+    assert not manifest["audioUrl"].startswith("http")
+    assert build_release_readiness(state)["status"] == "preview_ready"
+
+
+def test_formal_package_rejects_missing_or_incomplete_human_approval(tmp_path: Path):
+    state, _ = _public_publish_state(tmp_path)
+    _attach_measured_quality_report(state, tmp_path)
+    state["audio_approval"] = {}
+    state["release_readiness"] = build_release_readiness(state)
+
+    try:
+        package_release(state, tmp_path / "delivery")
+    except ValueError as error:
+        assert "human approval" in str(error)
+    else:
+        raise AssertionError("formal package must reject missing human approval")
+
+
+def test_formal_package_uses_immutable_release_assets_and_checksums(tmp_path: Path):
+    state, _ = _public_publish_state(tmp_path)
+    _attach_measured_quality_report(state, tmp_path)
+
+    result = package_release(state, tmp_path / "delivery")
+    directory = Path(result["directory"])
+    expected = {
+        "2026-08-11-test.mp3", "episode.json", "cover.png", "transcript.vtt",
+        "chapters.json", "show-notes.md", "audio-quality-report.json", "checksums.sha256",
+    }
+    assert {item.name for item in directory.iterdir()} == expected
+    manifest = result["manifest"]
+    assert manifest["audioUrl"] == (
+        "https://github.com/liuminxin45/podflow-morning-feed/releases/download/"
+        "2026-08-11-test/2026-08-11-test.mp3"
+    )
+    assert manifest["ttsProvider"] == "doubao_tts"
+    checksum_names = {
+        line.split("  ", 1)[1]
+        for line in (directory / "checksums.sha256").read_text("utf-8").splitlines()
+    }
+    assert checksum_names == expected - {"checksums.sha256"}

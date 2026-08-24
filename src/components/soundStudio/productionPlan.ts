@@ -158,6 +158,7 @@ export function reconcileProductionPlan(
           : speechDirection(segment.type || 'custom', part),
         speaker: segment.speaker || 'Host A',
         source_fact_ids: segment.source_fact_ids || [],
+        source_claim_ids: segment.source_claim_ids || [],
         source,
         path: textMatches ? previous?.path || voice?.path || '' : voice?.text === part ? voice.path : '',
         duration_seconds: textMatches

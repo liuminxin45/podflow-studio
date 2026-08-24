@@ -19,10 +19,10 @@ const NODE_OUTPUTS = {
   topic_selection: ['selected_topic', 'selected_topics', 'auto_selected_items', 'auto_rejected_items'],
   facts: ['facts', 'episode_brief'],
   script: ['script', 'edited_script', 'generation_request', 'generation_meta', 'script_snapshots', 'writing_meta'],
-  tts: ['voice_segments', 'production_plan'],
-  audio_postprocess: ['audio_outputs', 'subtitle_path'],
-  assets: ['cover_path', 'intro_outro_paths'],
-  review: ['review_summary', 'run_report'],
+  tts: ['voice_segments', 'production_plan', 'audio_approval'],
+  audio_postprocess: ['audio_outputs', 'subtitle_path', 'audio_approval'],
+  assets: ['cover_path', 'intro_outro_paths', 'audio_approval'],
+  review: ['review_summary', 'release_readiness', 'run_report'],
   publish: ['publish_outputs'],
 }
 
@@ -51,6 +51,7 @@ const EMPTY_VALUES = {
   intro_outro_paths: {},
   review_summary: {},
   audio_approval: {},
+  release_readiness: {},
   run_report: {},
   publish_outputs: {},
 }
@@ -79,6 +80,7 @@ const FIELD_LABELS = {
   cover_path: '封面',
   intro_outro_paths: '片头片尾',
   review_summary: '审核结果',
+  release_readiness: '发布就绪状态',
   run_report: '运行报告',
   publish_outputs: '发布包',
 }

@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "description": "Local-first solo morning news podcast pipeline",
   "author": "PodFlow Studio Contributors",
-  "license": "LGPL-3.0-only",
+  "license": "Apache-2.0",
   "main": "electron/main.js",
   "bin": {
     "podflow": "scripts/podflow-cli.js"
@@ -12,7 +12,6 @@
     "setup": "npm run setup:python",
     "setup:python": "node scripts/python313.js --setup",
     "demo:news": "node scripts/python313.js scripts/run_demo_news.py",
-    "showcase:publish": "node scripts/python313.js scripts/publish_showcase.py",
     "assets:brand-audio": "node scripts/python313.js scripts/generate_brand_audio.py",
     "cli": "node scripts/podflow-cli.js",
     "dev": "node scripts/podflow-cli.js run --mode dev --session default --window show",
@@ -44,7 +43,6 @@
     "verify": "npm run verify:offline && npm run verify:tts-live"
   },
   "dependencies": {
-    "@ant-design/icons": "^5.2.6",
     "@phosphor-icons/react": "^2.1.10",
     "antd": "^5.12.8",
     "ffmpeg-static": "5.3.0",
@@ -62,7 +60,6 @@
     "@typescript-eslint/parser": "^8.19.1",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^1.0.4",
-    "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
     "electron": "^40.2.1",
     "electron-builder": "^24.9.1",
@@ -92,7 +89,8 @@
       "protocol/**/*",
       "scripts/**/*",
       "assets/**/*",
-      "LICENSE"
+      "LICENSE",
+      "NOTICE"
     ],
     "asarUnpack": [
       "node_modules/ffmpeg-static/**"

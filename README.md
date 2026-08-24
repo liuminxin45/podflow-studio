@@ -8,7 +8,7 @@
 
 从素材发现、整理与事实卡片，到口播稿、配音、音频成片和 RSS 发布包，一条工作流完成一期节目。
 
-**我们虽然追求全自动化，但不生产 AI 垃圾，只输出经过来源核验、编辑门禁、声音质检和人工终审的精品内容。**
+**PodFlow Studio 支持 AI 驱动的全流程自动化，但自动化不以牺牲内容质量为代价。只有通过来源核验、编辑门禁、声音质检与人工终审的内容，才能进入正式发布。**
 
 [产品介绍](https://www.liuminxin.cn/works/podflow-studio) · [站内试听](https://www.liuminxin.cn/works/podflow-studio#episode-player) · [订阅 RSS](https://www.liuminxin.cn/podflow-studio/feed.xml) · [下载 Windows 0.2.0](https://github.com/liuminxin45/podflow-studio/releases/tag/0.2.0) · [查看源码](https://github.com/liuminxin45/podflow-studio)
 
@@ -20,7 +20,7 @@ PodFlow Studio 面向独立创作者和小型编辑团队，把每天重复的�
 
 它不是一个只会“生成文案”的聊天框。素材会沿着明确的编辑链路前进：先收集和整理来源，再形成事实卡片与可编辑稿件，最后进入配音、音频装配和发布。关键节点保留人工确认，来源与 AI 补充知识也会分开呈现。
 
-自动化负责消除重复劳动，不负责替代编辑判断。任何来源不足、稿件未通过门禁、发音未确认、音频质量不合格或缺少人工终审的节目，都不能作为正式精品内容发布。
+自动化负责消除重复劳动，不负责替代编辑判断。PodFlow Studio 将“精品内容”定义为通过明确机器门禁和人工终审的正式产物；任何来源不足、事实检查未完成、稿件未通过门禁、发音未确认、音频质量不合格或缺少人工终审的节目，都必须阻断发布。
 
 ```text
 发现素材 → 整理与研究 → 事实卡片 → 口播稿 → 配音 / 录音 → 音频成片 → RSS / 发布包
@@ -114,11 +114,24 @@ npm run cli -- stop --session agent-demo --json
 npm run acceptance:cdp
 ```
 
+从源码部署 CLI 可在 Windows 运行 `powershell -ExecutionPolicy Bypass -File scripts/setup-local.ps1`。它会安装锁定依赖并运行环境诊断，但不会读取或保存任何 API Key。
+
+正式候选节目也能从素材发现开始完全由 CLI 生成。该路径强制使用博查补充可追踪证据、实际 LLM 成稿和豆包 BigTTS，并在机器门禁通过后等待绑定最终 MP3 SHA256 的人工终审：
+
+```powershell
+npm run cli -- produce --stage generate --episode-id 2026-08-17 --topic "可选主题" --output out/episodes --allow-paid-tts --json
+npm run cli -- produce --stage approve --workflow <workflow.json> --audio-sha256 <sha256> --reviewer <name> --full-listen-confirmed --pronunciation-confirmed --editorial-final-confirmed --json
+npm run cli -- produce --stage publish --workflow <workflow.json> --release-repo liuminxin45/podflow-morning-feed --site-repo liuminxin45/liuminxin45.github.io --confirm-publish --json
+```
+
+GitHub Actions 提供同一条仅手动触发的链路。生成作业使用仓库 Secrets 中的博查、LLM 和豆包凭据，上传候选成片；受保护的 `podflow-production` Environment 完成人工终审后，发布作业才会创建不可变节目 Release 并触发个人主页部署。密钥不会写入 workflow 状态或 Artifact。
+
 正式制作统一使用 v3 三阶段命令，`--workflow` 必须明确指定一期工作流，不会自动选择“最新一期”：
 
 ```powershell
 npm run cli -- produce --workflow <id或绝对路径> --stage render --allow-paid-tts --json
-npm run cli -- produce --workflow <id或绝对路径> --stage approve --audio-sha256 <sha256> --reviewer <name> --json
+npm run cli -- produce --workflow <id或绝对路径> --stage package --preview-only --output <预览目录> --json
+npm run cli -- produce --workflow <id或绝对路径> --stage approve --audio-sha256 <sha256> --reviewer <name> --full-listen-confirmed --pronunciation-confirmed --editorial-final-confirmed --json
 npm run cli -- produce --workflow <id或绝对路径> --stage package --output <showcase目录> --json
 ```
 
@@ -126,7 +139,7 @@ npm run cli -- produce --workflow <id或绝对路径> --stage package --output <
 
 ### 音乐与授权
 
-正式品牌 cue 派生自 Ondrosik 的 [Quick Spark](https://freemusicarchive.org/music/Ondrosik/no-words/quick-spark/)。[作者曲库](https://ondrosik.sk/music/)将曲目声明为 CC0；项目保存原始 SHA256、取得日期、裁剪区间与派生文件指纹。素材经裁剪、淡入淡出和响度处理，第三方音乐仍为 CC0，不改写为 LGPL。完整记录见 [音频权利文件](assets/audio/RIGHTS.md)。
+正式品牌 cue 派生自 Ondrosik 的 [Quick Spark](https://freemusicarchive.org/music/Ondrosik/no-words/quick-spark/)。[作者曲库](https://ondrosik.sk/music/)将曲目声明为 CC0；项目保存原始 SHA256、取得日期、裁剪区间与派生文件指纹。素材经裁剪、淡入淡出和响度处理，第三方音乐仍为 CC0，不改写为 Apache-2.0。完整记录见 [音频权利文件](assets/audio/RIGHTS.md)。
 
 命令、退出码、会话目录和 Agent 安全调用模式见 [CLI 文档](docs/cli.md)。
 
@@ -134,7 +147,7 @@ npm run cli -- produce --workflow <id或绝对路径> --stage package --output <
 
 ### 事实卡片，而不是素材拼接
 
-`FactCard` 是来源与稿件之间的事实层。写作节点消费经过整理的事实，而不是把网页原文直接拼进 Prompt。这样更容易检查每个结论来自哪里，也便于在成稿前修正。
+`FactCard` 是来源与稿件之间的事实层。当前 schema v2 用 `evidence[]` 保存可追踪证据，用 `claims[]` 保存逐主张模型核验结果；新闻段必须同时绑定 `source_fact_ids` 与已支持的 `source_claim_ids`。写作节点消费经过整理的事实，而不是把网页原文直接拼进 Prompt。
 
 ### 人工编辑稿优先
 
@@ -142,33 +155,25 @@ npm run cli -- produce --workflow <id或绝对路径> --stage package --output <
 
 ### 可解释的降级
 
-外部模型或 TTS 不可用时，流程会尽可能产生可检查的替代结果，并把降级写入 `run_report.json`。FFmpeg 是由 npm 管理的必需运行时；缺失时会明确失败，不会把不完整发布包伪装成成功。
+外部模型不可用时，只能产生标记为 `demo_only` 的诊断产物，并把真实原因写入 `run_report.json`；不会降级成可发布结果。FFmpeg 是由 npm 管理的必需运行时，缺失时会明确失败。
 
 ### 本地预览与公网发布分离
 
-当 `publish.public_base_url` 为空时，生成的 RSS 仅供本地预览，并非公网可订阅 Feed。运行报告会明确给出这一警告。
+机器门禁全部通过但尚未人工终审时，可用 `package --preview-only` 生成内部预览，目录固定为 `out/previews/<episode>/<audio-sha-prefix>/`。预览不生成 RSS、公开 URL 或正式发布目录；人工终审通过且与当前 MP3 SHA256 匹配后，才允许正式打包与发布。
 
-### 导出公开节目包
+### 导出与发布公开节目包
 
 正式节目统一通过 `produce` 三阶段命令渲染、指纹审批并导出站点包：
 
 ```bash
 npm run cli -- produce --workflow <workflow> --stage render --allow-paid-tts --json
-npm run cli -- produce --workflow <workflow> --stage approve --audio-sha256 <sha256> --reviewer <name> --json
+npm run cli -- produce --workflow <workflow> --stage approve --audio-sha256 <sha256> --reviewer <name> --full-listen-confirmed --pronunciation-confirmed --editorial-final-confirmed --json
 npm run cli -- produce --workflow <workflow> --stage package --output <showcase-directory> --json
 ```
 
-`package` 会生成 `episode.json`、`show-notes.md`、`transcript.vtt`、`chapters.json`、封面和质量报告。它只接受 `production_plan v3`、自动终审通过、最终 MP3 指纹一致的人工审批、非 mock 豆包音频、12 至 15 分钟黄金时长及完整来源。
+`package` 会生成 `episode.json`、`show-notes.md`、`transcript.vtt`、`chapters.json`、封面和质量报告。它只消费 Review 节点生成且绑定当前音频的 `publish_ready` 状态；Provider、质量配置、时长与音频指标均从真实产物写入，不使用固定占位值。
 
-官方样片只接受 `www.liuminxin.cn` 同域的静态音频。页面内使用浏览器原生播放器，不跳转 GitHub 或第三方播放器。
-
-如果选择 GitHub Releases 托管音频，仓库仍提供显式发布脚本。脚本默认只打印计划；必须同时提供原始 `episode.json` 作为非 mock 音频证明，并添加 `--publish` 才会写入远端：
-
-```bash
-npm run showcase:publish -- --episode-id 2026-08-11 --audio <final.mp3> --notes <show-notes.md> --episode-json <episode.json>
-```
-
-已存在的日期型 Release 与站点节目目录都不会被覆盖。
+正式 MP3 只存放在公开的 `liuminxin45/podflow-morning-feed` GitHub Release；个人主页在 Pages 构建时读取 Release API、校验固定资产和 SHA256，只复制封面、章节与文字稿等小文件。RSS enclosure 与站内原生播放器直接使用不可变 MP3 Release URL，因此主页 Git 历史不会随每日音频持续膨胀。已存在的日期型 Release 不会被覆盖；同步失败时新部署会被阻断，线上旧版本保持不变。
 
 ## 配置
 
@@ -205,12 +210,12 @@ PodFlow Studio 当前优先保证“单人新闻早报”的完整闭环。以�
 
 - 多主持人节目
 - 长篇故事型播客
-- 云端托管与一键发布到第三方平台
+- 无人工终审的正式云端发布
 - 真实 TTS Provider 在所有网络环境下的生产级稳定性
 
 它不是通用音频剪辑器、新闻 CMS 或海量数据源聚合平台。产品目标是让创作者用一条可检查、可编辑、可恢复的流程稳定完成节目。
 
 ## 开源协议
 
-PodFlow Studio 采用 [GNU Lesser General Public License v3.0](LICENSE)，
-对应 SPDX 标识为 `LGPL-3.0-only`。
+PodFlow Studio 采用 [Apache License 2.0](LICENSE)，对应 SPDX 标识为
+`Apache-2.0`。项目归属信息见 [NOTICE](NOTICE)；第三方依赖与素材仍遵循各自许可证。

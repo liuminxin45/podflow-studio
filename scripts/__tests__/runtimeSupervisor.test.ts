@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const { resolveDevExecutables } = require('../dev') as {
+const { resolveDevExecutables } = require('../runtimeSupervisor') as {
   resolveDevExecutables: (root?: string) => {
     vite: { command: string; argsPrefix: string[] }
     electron: { command: string; argsPrefix: string[] }
