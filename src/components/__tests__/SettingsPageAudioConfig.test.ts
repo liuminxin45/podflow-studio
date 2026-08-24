@@ -31,7 +31,7 @@ describe('SettingsPage audio node config', () => {
     })
   })
 
-  it('keeps local-agent fields out of an HTTP writing-node override', () => {
+  it('rejects stale HTTP override fields by retaining the selected local Agent target', () => {
     const settings = settingsCopy()
     settings.apiConfig.global.defaultAITarget = 'agent:codex'
     settings.apiConfig.nodeOverrides.draft.overrideMode = 'custom'
@@ -41,14 +41,14 @@ describe('SettingsPage audio node config', () => {
     const scriptConfig = buildNodeConfigs(settings).script
 
     expect(scriptConfig).toMatchObject({
-      api_key: 'override-secret',
-      api_base: 'https://api.openai.com/v1',
-      llm_model: 'gpt-4o-mini',
-      provider_kind: 'openai_compatible',
-      ai_target: 'node:draft',
+      api_key: '',
+      api_base: '',
+      llm_model: 'codex',
+      provider_kind: 'local_agent',
+      ai_target: 'agent:codex',
+      local_agent_id: 'codex',
     })
-    expect(scriptConfig).not.toHaveProperty('local_agent_id')
-    expect(scriptConfig).not.toHaveProperty('local_agent_command')
+    expect(scriptConfig.local_agent_command).toBe('codex')
   })
 
   it('uses the dedicated OpenAI-compatible voice credentials', () => {

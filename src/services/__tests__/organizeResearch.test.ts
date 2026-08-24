@@ -100,7 +100,7 @@ describe('organizeResearch', () => {
 
     const response = await searchForOrganize('近期事实', undefined, undefined, { timeRange: 'month', maxResults: 2 })
 
-    const context = vi.mocked(aiTaskService.runAITask).mock.calls[0]?.[2]
+    const context = vi.mocked(aiTaskService.runAITask).mock.calls[0]?.[2] as any
     expect(context.time_requirement).toContain('最近 30 天')
     expect(context.max_results).toBe(2)
     expect(response.results).toHaveLength(2)
@@ -115,7 +115,8 @@ describe('organizeResearch', () => {
     let releaseFirst!: () => void
     const firstGate = new Promise<void>(resolve => { releaseFirst = resolve })
     const started: string[] = []
-    vi.spyOn(aiTaskService, 'runAITask').mockImplementation(async (_task, _target, context) => {
+    vi.spyOn(aiTaskService, 'runAITask').mockImplementation(async (_task, _target, rawContext) => {
+      const context = rawContext as any
       const query = String(context.query)
       started.push(query)
       if (query === '问题一') await firstGate
@@ -142,7 +143,8 @@ describe('organizeResearch', () => {
     let releaseFirst!: () => void
     const firstGate = new Promise<void>(resolve => { releaseFirst = resolve })
     const started: string[] = []
-    vi.spyOn(aiTaskService, 'runAITask').mockImplementation(async (_task, _target, context) => {
+    vi.spyOn(aiTaskService, 'runAITask').mockImplementation(async (_task, _target, rawContext) => {
+      const context = rawContext as any
       const query = String(context.query)
       started.push(query)
       if (query === '问题一') await firstGate

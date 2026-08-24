@@ -1,146 +1,65 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FactCard } from '../../../types/workflow'
-import {
-  buildQuickNewsOptimizationMessages,
-  parseQuickNewsOptimizationResult,
-} from '../quickNewsOptimizer'
+import { runAITask } from '../../aiTaskService'
+import { optimizeQuickNews } from '../quickNewsOptimizer'
 
-const factCards: FactCard[] = [
-  {
-    id: 'fact-1',
-    title: '产品本周开放预约',
-    summary: '官方宣布产品本周开放预约，首批仅支持两个城市。',
-    confidence: 'high',
-    evidence: [{ id: 'evidence-1', title: '官方公告', url: 'https://example.com/official', published_at: '2026-07-15', source_role: 'primary', excerpt: '本周开放预约，首批仅支持两个城市。' }],
-    claims: [{ id: 'claim-1', text: '本周开放预约，首批仅支持两个城市。', evidence_ids: ['evidence-1'], status: 'supported', confidence: 'high', verifier_model: 'test-model', verified_at: '2026-07-15T00:00:00Z' }],
-  },
-  {
-    id: 'fact-unrelated',
-    title: '另一条新闻',
-    summary: '不得进入当前提示词。',
-    confidence: 'high',
-    evidence: [{ id: 'evidence-other', title: '其他来源', url: 'https://example.com/other', published_at: '2026-07-15', source_role: 'independent', excerpt: '与当前新闻无关。' }],
-    claims: [{ id: 'claim-other', text: '与当前新闻无关。', evidence_ids: ['evidence-other'], status: 'supported', confidence: 'high', verifier_model: 'test-model', verified_at: '2026-07-15T00:00:00Z' }],
-  },
-]
+vi.mock('../../aiTaskService', () => ({ runAITask: vi.fn() }))
+vi.mock('../../settings/llmConfigResolver', () => ({
+  hasUsableLLMConfig: () => true,
+  llmConfigResolver: { getLLMConfig: () => ({ aiTarget: 'model:api-openai' }) },
+}))
 
-function request(overrides: Record<string, unknown> = {}) {
-  return {
-    segmentText: '这款产品已经来了，大家都可以买。',
-    factCards,
-    sourceFactIds: ['fact-1'],
-    previousSegmentText: '上一条是天气提醒。',
-    nextSegmentText: '下一条关注出行。',
-    targetChars: { min: 240, max: 360 },
-    editorialVoice: 'human' as const,
-    tone: 'default' as const,
-    ...overrides,
-  }
-}
+const factCards: FactCard[] = [{
+  id: 'fact-1',
+  title: '产品本周开放预约',
+  summary: '官方宣布产品本周开放预约，首批仅支持两个城市。',
+  confidence: 'high',
+  evidence: [{ id: 'evidence-1', title: '官方公告', url: 'https://example.com/official', published_at: '2026-07-15', source_role: 'primary', excerpt: '本周开放预约，首批仅支持两个城市。' }],
+  claims: [{ id: 'claim-1', text: '本周开放预约，首批仅支持两个城市。', evidence_ids: ['evidence-1'], status: 'supported', confidence: 'high', verifier_model: 'test-model', verified_at: '2026-07-15T00:00:00Z' }],
+}]
 
-describe('quick news optimizer', () => {
-  it('keeps the prompt limited to bound facts and carries the text target', () => {
-    const messages = buildQuickNewsOptimizationMessages(request())
-    const prompt = messages[1].content
+const request = (sourceFactIds = ['fact-1']) => ({
+  segmentText: '这款产品已经来了，大家都可以买。',
+  factCards,
+  sourceFactIds,
+  targetChars: { min: 240, max: 360 },
+  editorialVoice: 'human' as const,
+  tone: 'default' as const,
+})
 
-    expect(prompt).toContain('fact-1')
-    expect(prompt).toContain('240–360')
-    expect(prompt).toContain('自然人味体系')
-    expect(prompt).toContain('不对听众下指令')
-    expect(prompt).not.toContain('fact-unrelated')
-    expect(prompt).not.toContain('不得进入当前提示词')
-  })
-
-  it('switches to the professional editorial system explicitly', () => {
-    const messages = buildQuickNewsOptimizationMessages(request({ editorialVoice: 'professional' }))
-
-    expect(messages[1].content).toContain('专业播报体系')
-    expect(messages[1].content).toContain('不替听众做决定')
-  })
-
-  it('fails closed when provenance is absent or cannot be resolved', () => {
-    expect(() => buildQuickNewsOptimizationMessages(request({ sourceFactIds: [] })))
-      .toThrow('没有绑定事实卡')
-    expect(() => buildQuickNewsOptimizationMessages(request({ sourceFactIds: ['missing'] })))
-      .toThrow('找不到这条快讯绑定的事实卡')
-  })
-
-  it('accepts a fact-bound result and rejects changed provenance', () => {
-    const raw = JSON.stringify({
-      title: '本周开放预约，首批限两个城市',
+describe('quick news optimizer typed task boundary', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(runAITask).mockResolvedValue({
+      title: '本周开放预约',
       suggested_text: '官方宣布，这款产品将在本周开放预约，首批只支持两个城市。',
       source_fact_ids: ['fact-1'],
-      change_summary: ['删除无依据的全面开售表述'],
+      change_summary: ['删除无依据表述'],
       unsupported_or_uncertain: ['所有人都可以买'],
+      quality_checks: {
+        answers_what_changed: true,
+        answers_listener_relevance: true,
+        tts_friendly: true,
+        within_fact_boundary: true,
+      },
     })
-
-    expect(parseQuickNewsOptimizationResult(raw, ['fact-1'])).toMatchObject({
-      sourceFactIds: ['fact-1'],
-      unsupportedOrUncertain: ['所有人都可以买'],
-    })
-    expect(() => parseQuickNewsOptimizationResult(
-      raw.replace('fact-1', 'fact-unrelated'),
-      ['fact-1'],
-    )).toThrow('改变了快讯绑定的事实卡')
   })
 
-  it('rejects garbled text but keeps listener-facing wording for editorial review', () => {
-    const result = (suggestedText: string, title = '正常标题') => JSON.stringify({
-      title,
-      suggested_text: suggestedText,
-      source_fact_ids: ['fact-1'],
-      change_summary: [],
-      unsupported_or_uncertain: [],
-    })
+  it('sends business data without constructing prompts or parsing raw JSON', async () => {
+    const result = await optimizeQuickNews(request())
 
-    expect(() => parseQuickNewsOptimizationResult(
-      result('现有材料支持他��已经注册。'),
-      ['fact-1'],
-    )).toThrow('包含乱码')
-    expect(parseQuickNewsOptimizationResult(
-      result('您可能更关心怎么判断，准备报考的家庭应查看招生简章。'),
-      ['fact-1'],
-    ).suggestedText).toContain('招生简章')
-    expect(parseQuickNewsOptimizationResult(
-      result('用户应该安装插件，消费者需要删除账户，听众请订阅服务。'),
-      ['fact-1'],
-      factCards,
-    ).suggestedText).toContain('安装插件')
+    expect(runAITask).toHaveBeenCalledWith(
+      'writing.optimize_quick_news',
+      'model:api-openai',
+      { request: request() },
+    )
+    expect(result.sourceFactIds).toEqual(['fact-1'])
+    expect(result.unsupportedOrUncertain).toEqual(['所有人都可以买'])
   })
 
-  it('accepts the same provenance in a different order', () => {
-    const raw = JSON.stringify({
-      title: '优化标题',
-      suggested_text: '优化正文。',
-      source_fact_ids: ['fact-2', 'fact-1'],
-      change_summary: [],
-      unsupported_or_uncertain: [],
-    })
-
-    expect(parseQuickNewsOptimizationResult(raw, ['fact-1', 'fact-2']).sourceFactIds)
-      .toEqual(['fact-2', 'fact-1'])
-  })
-
-  it('allows a sourced official deadline action', () => {
-    const officialFact: FactCard = {
-      ...factCards[0],
-      id: 'fact-official',
-      title: '官方报名通知',
-      summary: '官方通知要求考生在截止时间前登录系统确认报名。',
-      claims: [{ id: 'claim-official', text: '考生应在截止时间前登录系统确认报名。', evidence_ids: ['evidence-1'], status: 'supported', confidence: 'high', verifier_model: 'test-model', verified_at: '2026-07-15T00:00:00Z' }],
-    }
-    const raw = JSON.stringify({
-      title: '报名即将截止',
-      suggested_text: '官方通知要求，考生应在截止时间前登录系统确认报名。',
-      source_fact_ids: ['fact-official'],
-      change_summary: [],
-      unsupported_or_uncertain: [],
-    })
-
-    expect(parseQuickNewsOptimizationResult(
-      raw,
-      ['fact-official'],
-      [officialFact],
-    ).suggestedText).toContain('登录系统')
+  it('fails before AI when provenance is absent or unknown', async () => {
+    await expect(optimizeQuickNews(request([]))).rejects.toThrow('没有绑定事实卡')
+    await expect(optimizeQuickNews(request(['missing']))).rejects.toThrow('找不到这条快讯绑定的事实卡')
+    expect(runAITask).not.toHaveBeenCalled()
   })
 })

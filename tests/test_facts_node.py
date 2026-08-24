@@ -4,12 +4,13 @@ import pytest
 
 from nodes.facts.config import FactsConfig
 from nodes.facts.node import _verify_claims, run as facts_run
+from protocol.ai_provider import LLMError
 from tests.mock_data import create_base_state, create_mock_cleaned_contents, create_mock_materials
 
 
 class _FactRuntime:
-    def __init__(self, content: str):
-        self.content = content
+    def __init__(self, output):
+        self.output = output
 
     def __enter__(self):
         return self
@@ -17,11 +18,10 @@ class _FactRuntime:
     def __exit__(self, *_args):
         return False
 
-    def call(self, *_args, **_kwargs):
-        return self.content
-
-    def extract_content(self, response):
-        return response
+    def run_task(self, *_args, **_kwargs):
+        if isinstance(self.output, Exception):
+            raise self.output
+        return self.output
 
 
 def _fact_for_verifier() -> list[dict]:
@@ -34,18 +34,18 @@ def _fact_for_verifier() -> list[dict]:
 
 def test_fact_verifier_fails_closed_on_invalid_json(monkeypatch):
     monkeypatch.setattr("nodes.facts.node.has_llm_runtime_config", lambda _config: True)
-    monkeypatch.setattr("nodes.facts.node.create_llm_runtime", lambda *_args, **_kwargs: _FactRuntime("not-json"))
-    config = FactsConfig(api_base="https://llm.example/v1", api_key="secret", llm_model="fact-model", require_semantic_verification=True)
+    monkeypatch.setattr("nodes.facts.node.create_llm_runtime", lambda *_args, **_kwargs: _FactRuntime(LLMError("invalid structured output", "PARSE")))
+    config = FactsConfig(api_base="https://api.openai.com/v1", api_key="secret", llm_model="fact-model", require_semantic_verification=True)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(LLMError):
         _verify_claims(_fact_for_verifier(), config, SimpleNamespace(debug_mode=False, logs=[]))
 
 
 def test_fact_verifier_rejects_unknown_evidence_ids(monkeypatch):
-    payload = '{"facts":[{"fact_id":"fact_001","claims":[{"text":"事实","evidence_ids":["invented"],"status":"supported","confidence":"high"}]}]}'
+    payload = {"facts": [{"fact_id": "fact_001", "claims": [{"text": "事实", "evidence_ids": ["invented"], "status": "supported", "confidence": "high"}]}]}
     monkeypatch.setattr("nodes.facts.node.has_llm_runtime_config", lambda _config: True)
     monkeypatch.setattr("nodes.facts.node.create_llm_runtime", lambda *_args, **_kwargs: _FactRuntime(payload))
-    config = FactsConfig(api_base="https://llm.example/v1", api_key="secret", llm_model="fact-model", require_semantic_verification=True)
+    config = FactsConfig(api_base="https://api.openai.com/v1", api_key="secret", llm_model="fact-model", require_semantic_verification=True)
 
     with pytest.raises(ValueError, match="unknown evidence"):
         _verify_claims(_fact_for_verifier(), config, SimpleNamespace(debug_mode=False, logs=[]))

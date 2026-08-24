@@ -34,7 +34,7 @@ import type {
   WebSearchProvider,
   WebSearchProviderConfig,
 } from '../types/settings'
-import { fetchModels } from '../utils/modelFetcher'
+import { runAITask } from '../services/aiTaskService'
 import { mergeDetectedLocalAgents } from '../services/settings/localAgentDetection'
 import { verifyDefaultAISearchCapability } from '../services/organizeResearch'
 
@@ -91,8 +91,8 @@ const TARGET_KIND_OPTIONS: Array<{
   icon: React.ReactNode
 }> = [
   { key: 'local_agent', label: '本地代理', desc: '调用已安装的 CLI 代理', icon: <CodeOutlined /> },
-  { key: 'local_model', label: '本地模型', desc: 'Ollama 或 LM Studio', icon: <RobotOutlined /> },
-  { key: 'api_model', label: 'API 模型', desc: '云端或兼容接口', icon: <CloudUploadOutlined /> },
+  { key: 'local_model', label: '本地模型', desc: 'Ollama', icon: <RobotOutlined /> },
+  { key: 'api_model', label: 'API 模型', desc: '官方云端接口', icon: <CloudUploadOutlined /> },
 ]
 
 const PROVIDER_KIND_COPY: Record<AIModelProviderConfig['kind'], {
@@ -108,13 +108,6 @@ const PROVIDER_KIND_COPY: Record<AIModelProviderConfig['kind'], {
     desc: '默认监听 localhost:11434/v1',
     mark: 'Ol',
     accent: '#242529',
-  },
-  lm_studio: {
-    label: 'LM Studio',
-    badge: '本地模型',
-    desc: '默认监听 127.0.0.1:1234/v1',
-    mark: 'LM',
-    accent: '#4f5156',
   },
   openai: {
     label: 'OpenAI',
@@ -144,11 +137,11 @@ const PROVIDER_KIND_COPY: Record<AIModelProviderConfig['kind'], {
     mark: 'OR',
     accent: '#4f5156',
   },
-  openai_compatible: {
-    label: 'OpenAI 兼容',
+  deepseek: {
+    label: 'DeepSeek',
     badge: 'API 模型',
-    desc: '适配自建或第三方兼容接口',
-    mark: 'OC',
+    desc: 'DeepSeek 官方接口',
+    mark: 'DS',
     accent: '#4f5156',
   },
 }
@@ -498,14 +491,14 @@ function NodeOverrideCard({ stageId, settings, updateSettings }: {
     const provider = target.startsWith('model:')
       ? global.aiModelProviders.find(item => target === `model:${item.id}`)
       : undefined
-    const hasCustomEndpoint = Boolean(nodeConfig.apiBase || nodeConfig.apiKey)
+    const hasCustomEndpoint = false
 
     if (agent && !hasCustomEndpoint) {
-      return { kind: 'local_agent' as const, available: agent.available, label: agent.name }
+      return { kind: 'local_agent' as const, id: agent.id, available: agent.available, label: agent.name }
     }
 
     return {
-      kind: hasCustomEndpoint ? 'openai_compatible' as const : provider?.kind || 'openai_compatible' as const,
+      kind: provider?.kind || 'openai' as const,
       apiBase: nodeConfig.apiBase || provider?.apiBase || (hasCustomEndpoint ? 'https://api.openai.com/v1' : ''),
       apiKey: nodeConfig.apiKey || (provider ? providerRuntimeApiKey(provider) : ''),
       apiKeyEnvVar: nodeConfig.apiKey ? '' : provider ? providerRuntimeApiKeyEnvVar(provider) : '',
@@ -536,12 +529,15 @@ function NodeOverrideCard({ stageId, settings, updateSettings }: {
       const effective = resolveEffectiveConnection()
       if (effective.kind === 'local_agent') {
         if (!effective.available) throw new Error(`${effective.label} 未安装或不可用`)
+        await window.electronAPI.saveNodeConfig('app_settings', settings)
+        await runAITask('settings.connection_test', `agent:${effective.id}`, { probe: 'ready' })
         success = true
       } else {
         if (!effective.apiBase || (!effective.apiKey && !effective.apiKeyEnvVar)) {
           throw new Error('请先配置可用的默认 AI，或补充节点 API Base 与密钥')
         }
-        await fetchModels(effective.apiBase, effective.apiKey, effective.kind, effective.apiKeyEnvVar)
+        await window.electronAPI.saveNodeConfig('app_settings', settings)
+        await runAITask('settings.connection_test', settings.apiConfig.global.defaultAITarget, { probe: 'ready' })
         success = true
       }
     } catch {
@@ -562,29 +558,26 @@ function NodeOverrideCard({ stageId, settings, updateSettings }: {
     } else {
       message.error({ content: `${meta.label}连接失败，请检查 API Base 与密钥`, duration: 3, style: { marginTop: 60 } })
     }
-  }, [stageId, meta.label, resolveEffectiveConnection, updateSettings])
+  }, [stageId, meta.label, resolveEffectiveConnection, settings, updateSettings])
 
-  const handleFetchModels = useCallback(async () => {
+  const handleRestoreModelSuggestions = useCallback(async () => {
     const effective = resolveEffectiveConnection()
     if (effective.kind === 'local_agent') {
       message.info('本地代理不提供模型列表，请直接使用当前代理')
       return
     }
-    if (!effective.apiBase || (!effective.apiKey && !effective.apiKeyEnvVar)) {
-      message.warning('请先配置可用的默认 AI，或补充节点 API Base 与密钥')
-      return
-    }
     setModelLoading(prev => ({ ...prev, [modelKey]: true }))
     try {
-      const models = await fetchModels(effective.apiBase, effective.apiKey, effective.kind, effective.apiKeyEnvVar)
+      const provider = settings.apiConfig.global.aiModelProviders.find(item => item.model === effective.model)
+      const models = provider?.modelOptions || (effective.model ? [effective.model] : [])
       setModelOptions(prev => ({ ...prev, [modelKey]: models }))
-      message.success(`已获取 ${models.length} 个模型`)
+      message.success(`已恢复 ${models.length} 个内置模型建议`)
     } catch (error: any) {
-      message.error(`获取模型失败：${error?.message || '未知错误'}`)
+      message.error(`恢复模型建议失败：${error?.message || '未知错误'}`)
     } finally {
       setModelLoading(prev => ({ ...prev, [modelKey]: false }))
     }
-  }, [modelKey, resolveEffectiveConnection])
+  }, [modelKey, resolveEffectiveConnection, settings.apiConfig.global.aiModelProviders])
 
   return (
     <div style={{
@@ -726,63 +719,6 @@ function NodeOverrideCard({ stageId, settings, updateSettings }: {
 
               {remoteEnabled && (
                 <>
-                  {/* API Key for this node */}
-                  <div style={{ marginBottom: 14 }}>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                      接入密钥（可选，留空则继承默认 AI）
-                    </div>
-                    <APIKeyInput
-                      value={nodeConfig.apiKeyMasked}
-                      status={nodeConfig.connectionStatus}
-                      onClear={() => updateSettings('apiConfig', c => ({
-                        ...c,
-                        nodeOverrides: {
-                          ...c.nodeOverrides,
-                          [stageId]: { ...c.nodeOverrides[stageId], apiKey: '', apiKeySet: false, apiKeyMasked: '', connectionStatus: 'untested' },
-                        },
-                      }))}
-                      onSave={(key) => {
-                        const masked = key.slice(0, 4) + '····' + key.slice(-4)
-                        updateSettings('apiConfig', c => ({
-                          ...c,
-                          nodeOverrides: {
-                            ...c.nodeOverrides,
-                            [stageId]: {
-                              ...c.nodeOverrides[stageId],
-                              apiKey: key,
-                              apiKeySet: true,
-                              apiKeyMasked: masked,
-                              connectionStatus: 'untested',
-                            },
-                          },
-                        }))
-                      }}
-                    />
-                  </div>
-
-                  {/* API Base */}
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                      API Base URL
-                    </div>
-                    <Input
-                      value={nodeConfig.apiBase}
-                      onChange={e => updateSettings('apiConfig', c => ({
-                        ...c,
-                        nodeOverrides: {
-                          ...c.nodeOverrides,
-                          [stageId]: {
-                            ...c.nodeOverrides[stageId],
-                            apiBase: e.target.value,
-                            connectionStatus: 'untested',
-                          },
-                        },
-                      }))}
-                      placeholder="https://api.openai.com/v1"
-                      style={{ borderRadius: 8, fontSize: 12 }}
-                    />
-                  </div>
-
                   {/* Model */}
                   <div style={{ marginBottom: 14 }}>
                     <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
@@ -803,7 +739,7 @@ function NodeOverrideCard({ stageId, settings, updateSettings }: {
                             },
                           },
                         }))}
-                        placeholder="输入或自动获取模型"
+                        placeholder="输入模型 ID，或使用内置建议"
                         style={{ flex: 1 }}
                         filterOption={(inputValue, option) =>
                           option?.value.toLowerCase().includes(inputValue.toLowerCase()) || false
@@ -813,10 +749,10 @@ function NodeOverrideCard({ stageId, settings, updateSettings }: {
                         size="small"
                         icon={<SearchOutlined />}
                         loading={modelLoading[modelKey]}
-                        onClick={handleFetchModels}
+                        onClick={handleRestoreModelSuggestions}
                         style={{ height: 32, borderRadius: 8, fontSize: 12 }}
                       >
-                        自动获取
+                        恢复建议
                       </Button>
                     </div>
                   </div>
@@ -883,6 +819,7 @@ function ProviderConfigFields({
           </div>
           <Input
             value={provider.apiBase}
+            disabled={provider.targetKind !== 'local_model'}
             onChange={event => updateProvider(provider.id, {
               apiBase: event.target.value,
               connectionStatus: 'untested',
@@ -916,7 +853,7 @@ function ProviderConfigFields({
               onClick={() => handleFetchProviderModels(provider)}
               style={{ height: 32, flexShrink: 0, borderRadius: 7, fontSize: 11 }}
             >
-              获取模型
+              恢复建议
             </Button>
           </div>
         </div>
@@ -1558,31 +1495,18 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
 
   const handleFetchProviderModels = useCallback(async (provider: AIModelProviderConfig) => {
     const modelKey = `provider-${provider.id}`
-    if (!provider.apiBase) {
-      message.warning('请先填写 API Base URL')
-      return
-    }
-    if (provider.targetKind === 'api_model' && !providerKeyReady(provider)) {
-      message.warning('请先填写 API Key 或环境变量名')
-      return
-    }
     setModelLoading(prev => ({ ...prev, [modelKey]: true }))
     try {
-      const models = await fetchModels(
-        provider.apiBase,
-        providerRuntimeApiKey(provider),
-        provider.kind,
-        providerRuntimeApiKeyEnvVar(provider),
-      )
+      const models = provider.modelOptions
       updateProvider(provider.id, {
         modelOptions: models,
         model: provider.model || models[0] || provider.model,
         connectionStatus: 'connected',
       })
-      message.success(`已获取 ${models.length} 个模型`)
+      message.success(`已恢复 ${models.length} 个内置模型建议`)
     } catch (error: any) {
       updateProvider(provider.id, { connectionStatus: 'failed' })
-      message.error(`获取模型失败：${error?.message || '未知错误'}`)
+      message.error(`恢复模型建议失败：${error?.message || '未知错误'}`)
     } finally {
       setModelLoading(prev => ({ ...prev, [modelKey]: false }))
     }
@@ -1593,19 +1517,15 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
     try {
       if (!provider.apiBase) throw new Error('请先填写 API Base URL')
       if (provider.targetKind === 'api_model' && !providerKeyReady(provider)) throw new Error('请先填写 API Key 或环境变量名')
-      await fetchModels(
-        provider.apiBase,
-        providerRuntimeApiKey(provider),
-        provider.kind,
-        providerRuntimeApiKeyEnvVar(provider),
-      )
+      await window.electronAPI.saveNodeConfig('app_settings', settings)
+      await runAITask('settings.connection_test', `model:${provider.id}`, { probe: 'ready' })
       updateProvider(provider.id, { connectionStatus: 'connected' })
       message.success({ content: `${provider.name} 连接成功`, duration: 2, style: { marginTop: 60 } })
     } catch (error: any) {
       updateProvider(provider.id, { connectionStatus: 'failed' })
       message.error({ content: error?.message || `${provider.name} 连接失败`, duration: 3, style: { marginTop: 60 } })
     }
-  }, [updateProvider])
+  }, [settings, updateProvider])
 
   return (
     <div>
@@ -1914,7 +1834,7 @@ export default function SettingsAPIConfig({ settings, updateSettings }: Props) {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
                   {API_KEY_STORAGE_OPTIONS
-                    .filter(option => option.key !== 'none' || selectedApiModelProvider.kind === 'openai_compatible')
+                    .filter(option => option.key !== 'none' || selectedApiModelProvider.kind === 'ollama')
                     .map(option => {
                     const selected = selectedApiModelProvider.apiKeyStorage === option.key
                     return (

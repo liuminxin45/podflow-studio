@@ -541,59 +541,41 @@ def _generate_script(
         with create_llm_runtime(config, debug_mode=ctx.debug_mode) as client:
             structure = _resolve_script_structure(facts, preset)
             ctx.log(f"LLM编排调用: {target.masked_summary()}, timeout={config.timeout}s")
-            plan_response = client.call(
-                [
-                    {"role": "system", "content": EDITORIAL_PLAN_SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": build_editorial_plan_prompt(
-                            facts,
-                            target_chars_min=config.episode_chars_min,
-                            target_chars_max=config.episode_chars_max,
-                            deep_dive_count=int(structure["actual_deep_dive_count"]),
-                        ),
-                    },
-                ],
+            editorial_plan_payload = client.run_task(
+                "script.plan",
+                f"{EDITORIAL_PLAN_SYSTEM_PROMPT}\n\n" + build_editorial_plan_prompt(
+                    facts,
+                    target_chars_min=config.episode_chars_min,
+                    target_chars_max=config.episode_chars_max,
+                    deep_dive_count=int(structure["actual_deep_dive_count"]),
+                ),
                 timeout=config.timeout,
                 logs=ctx.logs,
             )
-            plan_content = client.extract_content(plan_response)
             try:
                 editorial_plan = validate_editorial_plan(
-                    _parse_json_object(plan_content, "成稿编排"),
+                    editorial_plan_payload,
                     facts,
                     expected_deep_dive_count=int(structure["actual_deep_dive_count"]),
                 )
             except ValueError as plan_error:
                 ctx.log(f"成稿编排定向修复调用: {plan_error}")
-                repair_response = client.call(
-                    [
-                        {
-                            "role": "system",
-                            "content": EDITORIAL_PLAN_SYSTEM_PROMPT,
-                        },
-                        {
-                            "role": "user",
-                            "content": (
-                                "修复下面的编排 JSON。只修复格式和约束问题，不改变事实 ID 集合，"
-                                "不增加事实。只返回完整 JSON 对象。\n\n"
-                                f"<校验错误>{plan_error}</校验错误>\n"
-                                f"<原编排>{plan_content}</原编排>\n\n"
-                                + build_editorial_plan_prompt(
-                                    facts,
-                                    target_chars_min=config.episode_chars_min,
-                                    target_chars_max=config.episode_chars_max,
-                                    deep_dive_count=int(structure["actual_deep_dive_count"]),
-                                )
-                            ),
-                        },
-                    ],
+                repaired_plan_payload = client.run_task(
+                    "script.plan_repair",
+                    "修复下面的编排，只修复格式和约束，不改变事实 ID 集合，不增加事实。\n\n"
+                    f"<校验错误>{plan_error}</校验错误>\n"
+                    f"<原编排>{json.dumps(editorial_plan_payload, ensure_ascii=False)}</原编排>\n\n"
+                    + build_editorial_plan_prompt(
+                        facts,
+                        target_chars_min=config.episode_chars_min,
+                        target_chars_max=config.episode_chars_max,
+                        deep_dive_count=int(structure["actual_deep_dive_count"]),
+                    ),
                     timeout=config.timeout,
                     logs=ctx.logs,
                 )
-                repaired_plan_content = client.extract_content(repair_response)
                 editorial_plan = validate_editorial_plan(
-                    _parse_json_object(repaired_plan_content, "成稿编排修复"),
+                    repaired_plan_payload,
                     facts,
                     expected_deep_dive_count=int(structure["actual_deep_dive_count"]),
                 )
@@ -609,15 +591,12 @@ def _generate_script(
                 editorial_plan,
             )
             ctx.log(f"LLM成稿调用: {target.masked_summary()}, timeout={config.timeout}s")
-            response = client.call(
-                [
-                    {"role": "system", "content": EPISODE_SCRIPT_SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
+            content = client.run_task(
+                "script.write",
+                f"{EPISODE_SCRIPT_SYSTEM_PROMPT}\n\n{prompt}",
                 timeout=config.timeout,
                 logs=ctx.logs,
             )
-            content = client.extract_content(response)
     except Exception as llm_error:
         # LLM transport/auth/timeout failure. With facts present, never leave
         # the episode without a script: fall back to the deterministic generator
@@ -655,26 +634,15 @@ def _generate_script(
             try:
                 ctx.log(f"成稿定向修复调用: segments={sorted(repair_ids)}")
                 with create_llm_runtime(config, debug_mode=ctx.debug_mode) as repair_client:
-                    repair_response = repair_client.call(
-                        [
-                            {
-                                "role": "system",
-                                "content": "你是中文资讯播客的事实约束修稿编辑。只返回有效 JSON。",
-                            },
-                            {
-                                "role": "user",
-                                "content": build_script_repair_prompt(
-                                    normalized, facts, repairable_issues
-                                ),
-                            },
-                        ],
+                    repair_payload = repair_client.run_task(
+                        "script.repair",
+                        build_script_repair_prompt(normalized, facts, repairable_issues),
                         timeout=config.timeout,
                         logs=ctx.logs,
                     )
-                    repair_content = repair_client.extract_content(repair_response)
                 repaired = apply_segment_repairs(
                     normalized,
-                    _parse_json_object(repair_content, "成稿修复"),
+                    repair_payload,
                     repair_ids,
                 )
                 normalized = _normalize_script(repaired, topic, facts, config, editorial_plan)
@@ -706,18 +674,15 @@ def _generate_script(
                 repair_count = 1
                 ctx.log(f"编辑质量定向修复调用: segments={sorted(repair_ids)}")
                 with create_llm_runtime(config, debug_mode=ctx.debug_mode) as repair_client:
-                    repair_response = repair_client.call(
-                        [
-                            {"role": "system", "content": "你是中文资讯播客修稿编辑。只返回有效 JSON，不改变事实绑定。"},
-                            {"role": "user", "content": build_script_repair_prompt(normalized, facts, semantic_issues)},
-                        ],
+                    repair_payload = repair_client.run_task(
+                        "script.repair",
+                        build_script_repair_prompt(normalized, facts, semantic_issues),
                         timeout=config.timeout,
                         logs=ctx.logs,
                     )
-                    repair_content = repair_client.extract_content(repair_response)
                 repaired = apply_segment_repairs(
                     normalized,
-                    _parse_json_object(repair_content, "编辑质量修复"),
+                    repair_payload,
                     repair_ids,
                 )
                 normalized = _normalize_script(repaired, topic, facts, config, editorial_plan)
@@ -785,15 +750,12 @@ def _assess_editorial_quality(
         f"<稿件_JSON>{json.dumps(script, ensure_ascii=False)}</稿件_JSON>"
     )
     with create_llm_runtime(config, debug_mode=ctx.debug_mode) as client:
-        response = client.call(
-            [
-                {"role": "system", "content": "你是严格、保守的中文播客编辑质量审核员。只返回有效 JSON。"},
-                {"role": "user", "content": prompt},
-            ],
+        payload = client.run_task(
+            "script.quality",
+            prompt,
             timeout=config.timeout,
             logs=ctx.logs,
         )
-        payload = _parse_json_object(client.extract_content(response), "编辑质量评测")
     scores_raw = payload.get("scores")
     if not isinstance(scores_raw, dict) or set(scores_raw) != set(EDITORIAL_DIMENSIONS):
         raise ValueError("编辑质量评测缺少完整评分维度")

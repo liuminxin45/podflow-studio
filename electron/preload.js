@@ -64,24 +64,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('discover:progress')
   },
   detectLocalAgents: () => ipcRenderer.invoke('aiTargets:detectLocalAgents'),
-  llmCall: (params) => ipcRenderer.invoke('llm:call', params),
-  llmCancel: (requestId) => ipcRenderer.invoke('llm:cancel', requestId),
-  llmFetchModels: (params) => ipcRenderer.invoke('llm:fetchModels', params),
   aiRunTask: (request) => ipcRenderer.invoke('ai:runTask', request),
   aiCancelTask: (requestId) => ipcRenderer.invoke('ai:cancelTask', requestId),
+  onAITaskEvent: (callback) => {
+    const listener = (_event, taskEvent) => callback(taskEvent)
+    ipcRenderer.on('ai:taskEvent', listener)
+    return () => ipcRenderer.removeListener('ai:taskEvent', listener)
+  },
   listDoubaoVoices: (params) => ipcRenderer.invoke('doubao:listVoices', params),
   tavilySearch: (params) => ipcRenderer.invoke('search:tavily', params),
   bochaSearch: (params) => ipcRenderer.invoke('search:bocha', params),
   doubaoSearch: (params) => ipcRenderer.invoke('search:doubao', params),
-  searchCancel: (requestId) => ipcRenderer.invoke('search:cancel', requestId),
-  onLLMStreamEvent: (callback) => ipcRenderer.on('llm:stream:event', (_, data) => callback(data)),
-  onLLMStreamChunk: (callback) => ipcRenderer.on('llm:stream:chunk', (_, data) => callback(data)),
-  onLLMStreamDone: (callback) => ipcRenderer.on('llm:stream:done', () => callback()),
-  onLLMStreamError: (callback) => ipcRenderer.on('llm:stream:error', (_, error) => callback(error)),
-  removeLLMStreamListeners: () => {
-    ipcRenderer.removeAllListeners('llm:stream:event')
-    ipcRenderer.removeAllListeners('llm:stream:chunk')
-    ipcRenderer.removeAllListeners('llm:stream:done')
-    ipcRenderer.removeAllListeners('llm:stream:error')
-  }
+  searchCancel: (requestId) => ipcRenderer.invoke('search:cancel', requestId)
 })

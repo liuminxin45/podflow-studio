@@ -76,12 +76,8 @@ class _EditorialRuntime:
     def __exit__(self, *_args):
         return False
 
-    def call(self, *_args, **_kwargs):
+    def run_task(self, *_args, **_kwargs):
         return self.payload
-
-    def extract_content(self, response):
-        import json
-        return json.dumps(response, ensure_ascii=False)
 
 
 def test_editorial_quality_v1_requires_all_six_scores_and_records_model(monkeypatch):
@@ -93,7 +89,7 @@ def test_editorial_quality_v1_requires_all_six_scores_and_records_model(monkeypa
         "segment_issues": [],
     }
     monkeypatch.setattr("nodes.script.node.create_llm_runtime", lambda *_args, **_kwargs: _EditorialRuntime(payload))
-    config = ScriptConfig(api_base="https://llm.example/v1", api_key="secret", llm_model="editor-model")
+    config = ScriptConfig(api_base="https://api.openai.com/v1", api_key="secret", llm_model="editor-model")
     report = _assess_editorial_quality(
         {"segments": [{"id": "segment_1", "text": "测试稿"}]},
         [_verified_fact("fact_001", "事实", "已核验事实", "https://example.com/fact")],
@@ -110,7 +106,7 @@ def test_editorial_quality_v1_requires_all_six_scores_and_records_model(monkeypa
 def test_editorial_quality_v1_fails_closed_on_incomplete_model_result(monkeypatch):
     payload = {"scores": {"relevance": 5}, "hard_errors": [], "segment_issues": []}
     monkeypatch.setattr("nodes.script.node.create_llm_runtime", lambda *_args, **_kwargs: _EditorialRuntime(payload))
-    config = ScriptConfig(api_base="https://llm.example/v1", api_key="secret", llm_model="editor-model")
+    config = ScriptConfig(api_base="https://api.openai.com/v1", api_key="secret", llm_model="editor-model")
 
     with pytest.raises(ValueError, match="缺少完整评分维度"):
         _assess_editorial_quality(

@@ -156,7 +156,7 @@ def _initial_state(episode_id: str, output_dir: Path, topic: str) -> dict[str, A
 
 
 def _llm_config_kwargs() -> dict[str, Any]:
-    provider = _env("PODFLOW_LLM_PROVIDER", "openai_compatible")
+    provider = _env("PODFLOW_LLM_PROVIDER", "openai")
     model = _env("PODFLOW_LLM_MODEL")
     api_base = _env("PODFLOW_LLM_API_BASE")
     if not _env("PODFLOW_LLM_API_KEY"):

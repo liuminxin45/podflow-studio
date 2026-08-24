@@ -1,8 +1,3 @@
-export interface LLMMessage {
-  role: 'system' | 'user' | 'assistant'
-  content: string
-}
-
 export type AIErrorCode =
   | 'AUTH'
   | 'RATE_LIMIT'
@@ -65,82 +60,45 @@ export interface AITaskEvent {
   payload: Record<string, unknown>
 }
 
-export interface LLMCallOptions {
-  apiBase: string
-  apiKey: string
-  apiKeyEnvVar?: string
-  model: string
-  providerKind?: string
-  localAgentId?: string
-  localAgentCommand?: string
-  localAgentArgs?: string[]
-  localAgentOutputMode?: string
-  aiTarget?: string
-  messages: LLMMessage[]
-  temperature?: number
-  maxTokens?: number
-  timeout?: number
-  signal?: AbortSignal
-  cacheMode?: 'default' | 'bypass'
+export interface AITaskInputs {
+  'discover.classify_news': { titles: string[]; categories: Array<{ id: string; label: string }> }
+  'discover.analyze_topic': { topic: string; items: object[] }
+  'organize.plan_research': { topic: string; is_deep_dive: boolean; query_limit: number; sources: object[] }
+  'organize.expand_knowledge': { topic: string; is_deep_dive: boolean; mode: 'hybrid' | 'web_only' | 'ai_knowledge'; research_plan: object; sources: object[] }
+  'organize.assess_evidence': { core_subject: string; report_type: 'event' | 'explanatory' | 'trend'; research_tasks: object[]; knowledge_candidates: object[]; results: object[] }
+  'organize.synthesize_research': { topic: string; core_subject: string; report_type: 'event' | 'explanatory' | 'trend'; is_deep_dive: boolean; sources: object[]; knowledge_candidates: object[] }
+  'organize.verify_claim': { statement: string; web_results: object[] }
+  'organize.ai_web_search': { query: string; time_requirement: string; max_results: number }
+  'organize.verify_web_search': { date: string; minimum_results: number }
+  'organize.select_deep_dive': { user_topic: string; preferred_unit_id?: number; candidates: object[] }
+  'organize.plan_deep_dive': { user_topic: string; core_question: string; listener_value: string; source_material: object[]; probe_results: object[] }
+  'organize.screen_deep_dive_evidence': { source_material: object[]; research_tasks: object[]; results: object[] }
+  'organize.build_deep_dive_brief': { core_question: string; why_interesting: string; listener_value: string; evidence: object[] }
+  'writing.optimize_quick_news': { request: unknown }
+  'settings.connection_test': { probe: 'ready' }
 }
 
-export interface LLMResponse {
-  id: string
-  object: string
-  created: number
-  model: string
-  choices: Array<{
-    index: number
-    message: LLMMessage
-    finish_reason: string
-  }>
-  usage?: {
-    prompt_tokens: number
-    completion_tokens: number
-    total_tokens: number
-  }
+type GenericTaskOutput = Record<string, unknown>
+
+export interface AITaskOutputs {
+  'discover.classify_news': { categories: string[] }
+  'discover.analyze_topic': { items: Array<{ index: number; score: number; decision: 'keep' | 'drop'; reason: string; angle: string }> }
+  'organize.plan_research': GenericTaskOutput
+  'organize.expand_knowledge': GenericTaskOutput
+  'organize.assess_evidence': GenericTaskOutput
+  'organize.synthesize_research': GenericTaskOutput
+  'organize.verify_claim': { supportedIndexes: number[]; relation: string; limitations: string[] }
+  'organize.ai_web_search': { results: unknown[] }
+  'organize.verify_web_search': { results: unknown[] }
+  'organize.select_deep_dive': GenericTaskOutput
+  'organize.plan_deep_dive': GenericTaskOutput
+  'organize.screen_deep_dive_evidence': GenericTaskOutput
+  'organize.build_deep_dive_brief': GenericTaskOutput
+  'writing.optimize_quick_news': { title: string; suggested_text: string; source_fact_ids: string[]; change_summary: string[]; unsupported_or_uncertain: string[]; quality_checks: Record<string, boolean> }
+  'settings.connection_test': { ok: true; message: string }
 }
 
-export type LLMAgentStreamEvent =
-  | { type: 'init'; sessionId?: string }
-  | { type: 'text_delta'; text: string }
-  | { type: 'tool_start'; toolName: string; toolId?: string; input?: string }
-  | { type: 'tool_done'; toolId?: string; output?: string }
-  | { type: 'error'; message: string }
-  | { type: 'done' }
-
-export interface ModelInfo {
-  id: string
-  object: string
-  created?: number
-  owned_by?: string
-}
-
-export interface ModelsResponse {
-  object: string
-  data: ModelInfo[]
-}
-
-export interface LLMServiceConfig {
-  useElectronProxy: boolean
-  defaultTimeout: number
-  retryAttempts: number
-}
-
-export interface PerformanceMetrics {
-  totalCalls: number
-  successfulCalls: number
-  failedCalls: number
-  totalDuration: number
-  averageResponseTime: number
-  failureRate: number
-}
-
-export interface RateLimitConfig {
-  maxTokens: number
-  refillRate: number
-  refillInterval: number
-}
+export type AITaskId = keyof AITaskInputs & keyof AITaskOutputs
 
 export class LLMError extends Error {
   constructor(

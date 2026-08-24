@@ -47,6 +47,7 @@ research:
   enable_web_search: false
   max_search_results: 5
   llm_model: "gpt-4o-mini"
+  provider_kind: "openai"
   api_key: ""
   api_base: ""
   temperature: 0.5
@@ -57,6 +58,7 @@ topic_selection:
   max_topics: 1
   use_llm_scoring: false
   llm_model: "gpt-4o-mini"
+  provider_kind: "openai"
   api_key: ""
   api_base: ""
   temperature: 0.3
@@ -85,6 +87,7 @@ script:
   require_approval: true
   words_per_minute: 240
   llm_model: "gpt-4o"
+  provider_kind: "openai"
   api_key: ""
   api_base: ""
   temperature: 0.5

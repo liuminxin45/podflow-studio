@@ -10,11 +10,6 @@ export function setDebugMode(enabled: boolean): void {
   if (typeof window !== 'undefined') {
     window.__DEBUG_MODE__ = enabled
     console.info(`[DebugMode] ${enabled ? 'ENABLED' : 'DISABLED'}`)
-    
-    // Also update llmService
-    import('../services/llmService').then(({ llmService }) => {
-      llmService.setDebugMode(enabled)
-    })
   }
 }
 

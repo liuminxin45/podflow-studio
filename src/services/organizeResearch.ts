@@ -243,7 +243,7 @@ export async function searchForOrganize(
   if (!hasUsableLLMConfig(config)) throw new Error('当前 AI 不可用，无法复用其联网搜索能力')
   return serializeDefaultAISearch(async () => {
     onProgress?.({ phase: 'connecting', detail: '正在连接当前 AI Agent' })
-    const response = await runAITask<{ results?: unknown[] }>(
+    const response = await runAITask(
       'organize.ai_web_search',
       config.aiTarget || '',
       { query, time_requirement: searchWindowInstruction, max_results: maxResults },
@@ -260,7 +260,7 @@ export async function verifyDefaultAISearchCapability(settings?: AppSettings): P
     ? llmConfigResolver.getLLMConfigFromSettings(settings, 'organize', true)
     : llmConfigResolver.getLLMConfig('organize', true)
   if (!hasUsableLLMConfig(config)) throw new Error('当前 AI 不可用，无法验证其联网搜索能力')
-  const response = await runAITask<{ results?: unknown[] }>(
+  const response = await runAITask(
     'organize.verify_web_search',
     config.aiTarget || '',
     { date: new Date().toISOString().slice(0, 10), minimum_results: 2 },

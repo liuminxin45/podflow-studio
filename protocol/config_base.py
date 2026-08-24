@@ -24,7 +24,7 @@ class LLMConfigMixin(BaseModel):
     api_key: str = Field(default="", description="API key (empty = use env)")
     api_key_env_var: str = Field(default="", description="Environment variable name for API key")
     api_base: str = Field(default="", description="API base URL (empty = use env)")
-    provider_kind: str = Field(default="openai_compatible", description="LLM provider kind")
+    provider_kind: str = Field(default="openai", description="LLM provider kind")
     ai_target: str = Field(default="", description="Selected AI target identifier")
     local_agent_id: str = Field(default="", description="Selected local agent id")
     local_agent_command: str = Field(default="", description="Selected local agent command")

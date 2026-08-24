@@ -26,7 +26,7 @@ function llmRuntimeFields(config: LLMConfig | null): Record<string, unknown> {
     // selected. Missing credentials are still rejected by the strict
     // generation request before any draft can be overwritten.
     llm_model: config?.model || 'gpt-4o-mini',
-    provider_kind: isLocalAgent ? 'local_agent' : config?.providerKind || 'openai_compatible',
+    provider_kind: isLocalAgent ? 'local_agent' : config?.providerKind || 'openai',
     ai_target: config?.aiTarget || '',
     local_agent_id: config?.localAgentId || '',
     local_agent_command: config?.localAgentCommand || '',

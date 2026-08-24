@@ -1,8 +1,10 @@
 from types import SimpleNamespace
 
 import pytest
+from pydantic import BaseModel, ConfigDict
+from pydantic_ai import Agent
 
-from protocol.ai_provider import LLMError, create_pydantic_model
+from protocol.ai_provider import LLMError, create_local_agent_model, create_pydantic_model
 from protocol.llm_runtime import (
     LLMRuntime,
     LLMRuntimeTarget,
@@ -70,21 +72,6 @@ def test_runtime_target_resolves_env_key(monkeypatch):
     assert target.configured
     assert target.provider_kind == "anthropic"
     assert target.api_key == "env-key"
-
-
-def test_anthropic_runtime_exposes_static_models_without_network():
-    runtime = LLMRuntime(
-        LLMRuntimeTarget(
-            api_base="https://api.anthropic.com/v1",
-            api_key="test-key",
-            model="claude-3-5-sonnet-latest",
-            provider_kind="anthropic",
-        )
-    )
-
-    models = [item["id"] for item in runtime.fetch_models()["data"]]
-
-    assert "claude-3-5-sonnet-latest" in models
 
 
 def test_codex_local_agent_target_requires_the_current_explicit_fields():
@@ -169,32 +156,21 @@ def test_openai_provider_still_uses_openai_env_fallback(monkeypatch):
     assert target.configured
 
 
-def test_local_agent_batch_analyze_preserves_per_batch_errors():
-    runtime = LLMRuntime(
-        LLMRuntimeTarget(
-            api_base="",
-            api_key="",
-            model="codex",
-            provider_kind="local_agent",
-            ai_target="agent:codex",
-            local_agent_id="codex",
-            local_agent_command="codex",
-            local_agent_output_mode="codex-json",
-        )
-    )
-    runtime._client.call = lambda *args, **kwargs: {
-        "choices": [{"message": {"content": "not json"}}]
-    }
-
-    results = runtime.batch_analyze(
-        [{"title": "a"}],
-        lambda batch: "prompt",
-        lambda batch, parsed: [{**batch[0], "parsed": parsed}],
-        logs=[],
+def test_official_provider_rejects_custom_api_base():
+    config = SimpleNamespace(
+        provider_kind="openai",
+        api_key="key",
+        api_key_env_var="",
+        api_base="https://proxy.example/v1",
+        llm_model="gpt-4o-mini",
+        temperature=0.2,
+        timeout=30,
     )
 
-    assert len(results) == 1
-    assert "JSON parse error" in results[0]["_error"]
+    with pytest.raises(LLMError) as raised:
+        resolve_llm_target(config)
+
+    assert raised.value.code == "CONFIG"
 
 
 def test_non_codex_local_agent_target_is_configured_without_api_credentials():
@@ -211,10 +187,31 @@ def test_non_codex_local_agent_target_is_configured_without_api_credentials():
     )
 
     assert target.configured
-    runtime = LLMRuntime(target)
-    models = [item["id"] for item in runtime.fetch_models()["data"]]
+    assert LLMRuntime(target).target.local_agent_id == "custom_agent"
 
-    assert models == ["custom_agent"]
+
+def test_runtime_rejects_unregistered_internal_tasks_before_model_call():
+    runtime = LLMRuntime(
+        LLMRuntimeTarget("", "", "codex", "local_agent", local_agent_id="codex", local_agent_command="codex")
+    )
+
+    with pytest.raises(LLMError, match="Unknown internal AI task"):
+        runtime.run_task("raw.messages", "prompt")
+
+
+def test_local_cli_custom_model_returns_typed_agent_output():
+    class Output(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        ok: bool
+
+    class Backend:
+        def call(self, prompt):
+            assert "Return only one JSON object" in prompt
+            return '{"ok": true}'
+
+    result = Agent(create_local_agent_model(Backend(), "test-cli"), output_type=Output).run_sync("probe")
+
+    assert result.output.ok is True
 
 
 def test_local_agent_target_without_command_is_not_silent_openai_fallback():

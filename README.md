@@ -183,7 +183,8 @@ npm run cli -- produce --workflow <workflow> --stage package --output <showcase-
 
 当前可接入的能力包括：
 
-- OpenAI-compatible LLM
+- 由 Python / Pydantic AI Agent 统一执行的 OpenAI、Anthropic、Gemini、OpenRouter、Ollama 与 DeepSeek
+- Codex、Claude Code 等已配置的本地 CLI Agent
 - Edge TTS 与 OpenAI-compatible TTS
 - RSS / 网页内容源
 - AI News Daily 与 NewsNow 聚合源
@@ -204,7 +205,7 @@ npm run acceptance:cdp # 运行隔离的 Electron/CDP 主路径验收
 
 README 主图来自 Electron/CDP 离线验收捕获的真实素材发现界面，产品界面没有经过重绘。
 
-项目主要由 Electron、React、TypeScript 和 Python 组成。Electron 负责桌面编排与 IPC，React 提供编辑工作台，Python 节点负责采集、研究、写作、语音、音频和发布流水线。
+项目主要由 Electron、React、TypeScript 和 Python 组成。React 只提交类型化 AI 任务；Electron 负责凭据边界、Python Gateway 生命周期、IPC 和取消传播；Python 的 Agent Registry 与 Pydantic AI Runtime 是唯一 AI 执行中心。跨进程只传 PodFlow JSON 契约，不公开任意 Prompt/messages 接口。
 
 ## 当前边界
 

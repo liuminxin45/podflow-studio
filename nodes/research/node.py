@@ -7,7 +7,6 @@ from protocol.llm_runtime import (
     resolve_llm_target,
 )
 from protocol.node_runner import NodeContext
-import json
 
 
 def run(state: dict[str, Any], config: ResearchConfig = None) -> dict[str, Any]:
@@ -124,15 +123,13 @@ Respond in JSON format:
 }}"""
 
                 try:
-                    response = client.call(
-                        [{"role": "user", "content": prompt}],
+                    result = client.run_task(
+                        "research.extract",
+                        prompt,
                         timeout=20 if debug_mode else 30,
                         max_tokens=100 if debug_mode else None,
                         logs=logs,
                     )
-
-                    content = client.extract_content(response)
-                    result = json.loads(content)
 
                     if debug_mode:
                         researched_item = {
@@ -151,14 +148,6 @@ Respond in JSON format:
                     logs.append(
                         f"[ResearchNode] ✓ Extracted {len(researched_item['key_points'])} key points"
                     )
-                except json.JSONDecodeError:
-                    logs.append("[ResearchNode] ⚠ JSON parse failed, using raw response")
-                    researched_item = {
-                        **item,
-                        "research_notes": content[:200] if content else "",
-                        "key_points": [],
-                        "verified": False,
-                    }
                 except Exception as e:
                     logs.append(f"[ResearchNode] ✗ LLM call failed for item {idx + 1}: {str(e)}")
                     researched_item = {

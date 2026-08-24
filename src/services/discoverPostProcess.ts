@@ -442,7 +442,7 @@ async function analyzeTopicRelevance(
 
   for (let start = 0; start < items.length; start += batchSize) {
     const batch = items.slice(start, start + batchSize)
-    const response = await runAITask<{ items?: TopicAnalysisRow[] }>(
+    const response = await runAITask(
       'discover.analyze_topic',
       llmConfig.aiTarget || '',
       { topic, items: batch },

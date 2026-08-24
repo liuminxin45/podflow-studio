@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mergeAppSettings, settingsRepository } from '../settings/repository'
 import { LLMConfigResolver } from '../settings/llmConfigResolver'
-import { DEFAULT_LOCAL_AGENTS } from '../../types/settings'
+import { DEFAULT_LOCAL_AGENTS, DEFAULT_SETTINGS } from '../../types/settings'
 
 describe('LLMConfigResolver local agents', () => {
   afterEach(() => {
@@ -49,7 +49,7 @@ describe('LLMConfigResolver local agents', () => {
     })
   })
 
-  it('does not leak local-agent routing into an HTTP node override', () => {
+  it('rejects custom HTTP overrides by retaining the selected named target', () => {
     const settings = mergeAppSettings({
       apiConfig: {
         global: {
@@ -68,38 +68,21 @@ describe('LLMConfigResolver local agents', () => {
 
     const config = new LLMConfigResolver().getLLMConfig('draft')
 
-    expect(config).toMatchObject({
-      providerKind: 'openai_compatible',
-      apiBase: 'https://api.openai.com/v1',
-      apiKey: 'override-key',
-      model: 'gpt-4o-mini',
-    })
-    expect(config?.apiBase).not.toContain('local-agent://')
-    expect(config?.localAgentId).toBeUndefined()
+    expect(config).toMatchObject({ providerKind: 'local_agent', localAgentId: 'codex' })
   })
 
   it('can resolve the current unsaved settings snapshot', () => {
-    const settings = mergeAppSettings({
-      apiConfig: {
-        global: {
-          defaultAITarget: 'model:api-openai-compatible',
-          aiModelProviders: [
-            {
-              id: 'api-openai-compatible',
-              apiBase: 'https://draft.example/v1',
-              apiKey: 'draft-key',
-              apiKeySet: true,
-              model: 'draft-model',
-            },
-          ],
-        },
-      },
-    } as any)
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.apiConfig.global.defaultAITarget = 'model:api-openai'
+    const provider = settings.apiConfig.global.aiModelProviders.find(item => item.id === 'api-openai')!
+    provider.apiKey = 'draft-key'
+    provider.apiKeySet = true
+    provider.model = 'draft-model'
 
     const config = new LLMConfigResolver().getLLMConfigFromSettings(settings, 'organize', true)
 
     expect(config).toMatchObject({
-      apiBase: 'https://draft.example/v1',
+      apiBase: 'https://api.openai.com/v1',
       apiKey: 'draft-key',
       model: 'draft-model',
     })

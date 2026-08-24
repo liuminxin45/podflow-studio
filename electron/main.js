@@ -5,7 +5,8 @@ const { pathToFileURL } = require('url')
 const { createHash, randomBytes } = require('crypto')
 const { spawn } = require('child_process')
 const ConfigManager = require('./configManager')
-const { fetchModels, callLLM, runAITask, stopLLMGateway } = require('./llmService')
+const { runAITask, cancelAITask, stopLLMGateway } = require('./llmService')
+const { mergeAISecrets, redactAISecrets } = require('./aiSettingsSecrets')
 const { searchBocha, searchDoubao, searchTavily } = require('./searchService')
 const { detectLocalAgents } = require('./aiTargetManager')
 const { listDoubaoVoices } = require('./services/doubaoVoiceService')
@@ -1412,21 +1413,27 @@ ipcMain.handle('config:save', async (event, nodeName, config) => {
   if (!configManager) {
     return { success: false, error: 'Config manager not initialized' }
   }
-  return configManager.saveNodeConfig(nodeName, config)
+  const persisted = nodeName === 'app_settings'
+    ? mergeAISecrets(configManager.loadNodeConfig(nodeName), config)
+    : config
+  return configManager.saveNodeConfig(nodeName, persisted)
 })
 
 ipcMain.handle('config:load', async (event, nodeName) => {
   if (!configManager) {
     return null
   }
-  return configManager.loadNodeConfig(nodeName)
+  const config = configManager.loadNodeConfig(nodeName)
+  return nodeName === 'app_settings' ? redactAISecrets(config) : config
 })
 
 ipcMain.handle('config:loadAll', async (event) => {
   if (!configManager) {
     return {}
   }
-  return configManager.loadAllConfigs()
+  const configs = configManager.loadAllConfigs()
+  if (configs.app_settings) configs.app_settings = redactAISecrets(configs.app_settings)
+  return configs
 })
 
 ipcMain.handle('config:delete', async (event, nodeName) => {
@@ -1441,14 +1448,6 @@ ipcMain.handle('config:resetAll', async (event) => {
     return { success: false, error: 'Config manager not initialized' }
   }
   return configManager.resetAllConfigs()
-})
-
-ipcMain.handle('llm:fetchModels', async (event, { apiBase, apiKey, apiKeyEnvVar, providerKind }) => {
-  try {
-    return await fetchModels({ apiBase, apiKey, apiKeyEnvVar, providerKind })
-  } catch (error) {
-    throw new Error(`Failed to fetch models: ${error.message}`)
-  }
 })
 
 ipcMain.handle('doubao:listVoices', async (_event, params) => {
@@ -1472,64 +1471,6 @@ ipcMain.handle('search:bocha', async (_event, params) => runCancellableSearch(pa
 ipcMain.handle('search:doubao', async (_event, params) => runCancellableSearch(params, searchDoubao))
 ipcMain.handle('search:cancel', async (_event, requestId) => {
   const controller = activeSearchRequests.get(requestId)
-  if (!controller) return { success: false }
-  controller.abort()
-  return { success: true }
-})
-
-ipcMain.handle('llm:call', async (event, { requestId, apiBase, apiKey, apiKeyEnvVar, model, messages, temperature, maxTokens, timeout, stream, providerKind, localAgentId, localAgentCommand, localAgentArgs, localAgentOutputMode, aiTarget }) => {
-  const controller = new globalThis.AbortController()
-  if (requestId) activeLLMRequests.set(requestId, controller)
-  try {
-    console.log('[LLM][IPC] call start', {
-      model,
-      stream: !!stream,
-      messageCount: Array.isArray(messages) ? messages.length : 0,
-      temperature,
-      maxTokens,
-      timeout,
-    })
-
-    return await callLLM({
-      apiBase,
-      apiKey,
-      apiKeyEnvVar,
-      model,
-      providerKind,
-      messages,
-      temperature,
-      maxTokens,
-      timeout,
-      stream,
-      localAgentId,
-      localAgentCommand,
-      localAgentArgs,
-      localAgentOutputMode,
-      aiTarget,
-      signal: controller.signal,
-      eventSender: stream ? event.sender : null
-    })
-  } catch (error) {
-    const rawMessage = String(error?.message || 'Unknown error')
-    const normalizedMessage = rawMessage.replace(/^LLM call failed:\s*/i, '')
-    console.error('[LLM][IPC] call failed', {
-      model,
-      stream: !!stream,
-      timeout,
-      maxTokens,
-      message: normalizedMessage,
-    })
-    throw new Error(normalizedMessage)
-  } finally {
-    if (requestId && activeLLMRequests.get(requestId) === controller) {
-      activeLLMRequests.delete(requestId)
-    }
-    console.log('[LLM][IPC] call end', { model, stream: !!stream })
-  }
-})
-
-ipcMain.handle('llm:cancel', async (_event, requestId) => {
-  const controller = activeLLMRequests.get(requestId)
   if (!controller) return { success: false }
   controller.abort()
   return { success: true }
@@ -1562,21 +1503,49 @@ function resolveAITargetConfig(targetId) {
   }
 }
 
-ipcMain.handle('ai:runTask', async (_event, request) => {
+function sendAITaskEvent(entry, type, payload = {}) {
+  entry.sender.send('ai:taskEvent', {
+    version: 1,
+    request_id: entry.requestId,
+    task_id: entry.taskId,
+    sequence: entry.sequence++,
+    type,
+    payload,
+  })
+}
+
+ipcMain.handle('ai:runTask', async (event, request) => {
   const controller = new globalThis.AbortController()
-  activeLLMRequests.set(request.request_id, controller)
+  const entry = {
+    controller,
+    sender: event.sender,
+    requestId: request.request_id,
+    taskId: request.task_id,
+    sequence: 0,
+  }
+  activeLLMRequests.set(request.request_id, entry)
+  sendAITaskEvent(entry, 'started')
   try {
-    return await runAITask(request, resolveAITargetConfig(request.target_id), controller.signal)
+    const result = await runAITask(request, resolveAITargetConfig(request.target_id), controller.signal)
+    sendAITaskEvent(entry, 'completed', { usage: result.usage })
+    return result
+  } catch (error) {
+    const cancelled = controller.signal.aborted || error?.code === 'CANCELLED'
+    sendAITaskEvent(entry, cancelled ? 'cancelled' : 'failed', cancelled
+      ? {}
+      : { code: error?.code || 'UNKNOWN', message: error?.message || 'AI task failed' })
+    throw error
   } finally {
-    if (activeLLMRequests.get(request.request_id) === controller) activeLLMRequests.delete(request.request_id)
+    if (activeLLMRequests.get(request.request_id) === entry) activeLLMRequests.delete(request.request_id)
   }
 })
 
 ipcMain.handle('ai:cancelTask', async (_event, requestId) => {
-  const controller = activeLLMRequests.get(requestId)
-  if (!controller) return { success: false }
-  controller.abort()
-  return { success: true }
+  const entry = activeLLMRequests.get(requestId)
+  if (!entry) return { success: false }
+  const result = await cancelAITask(requestId)
+  if (result.success) entry.controller.abort()
+  return result
 })
 
 ipcMain.handle('aiTargets:detectLocalAgents', async () => {

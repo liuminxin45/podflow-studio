@@ -133,8 +133,12 @@ def _verify_claims(facts: list[dict[str, Any]], config: FactsConfig, ctx: Any) -
 {json.dumps(payload, ensure_ascii=False)}
 </事实与证据>"""
     with create_llm_runtime(config, debug_mode=ctx.debug_mode) as client:
-        response = client.call([{"role": "user", "content": prompt}], timeout=config.timeout, logs=ctx.logs)
-        parsed = json.loads(client.extract_content(response))
+        parsed = client.run_task(
+            "facts.build",
+            prompt,
+            timeout=config.timeout,
+            logs=ctx.logs,
+        )
     returned = parsed.get("facts") if isinstance(parsed, dict) else None
     if not isinstance(returned, list):
         raise ValueError("Fact verifier returned an invalid facts array")

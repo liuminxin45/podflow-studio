@@ -24,7 +24,6 @@ import {
 
 export const MAX_NEWS_ITEMS = 500
 const BATCH_SIZE = 20
-const REQUEST_TIMEOUT = 60000 // 60s for larger batches
 
 export type PriorityLevel = 'high' | 'normal' | 'low'
 
@@ -115,48 +114,9 @@ function applyTag(item: ContentItem, classification: LLMClassification) {
   }
 }
 
-/**
- * Build a compact system prompt. The LLM receives a JSON array of titles
- * and returns a JSON array of category IDs in the same order.
- *
- * Token budget per batch:
- *   System: ~150 tokens (sent once per batch)
- *   User:   ~20 titles × ~15 tokens = ~300 tokens
- *   Response: ~20 IDs × ~3 tokens = ~60 tokens
- *   Total: ~510 tokens per 20 items (vs ~2000+ in old approach)
- */
-/** Cached system prompt — built once, reused across batches */
-let _cachedSystemPrompt: string | null = null
-
-function buildBatchSystemPrompt(): string {
-  if (_cachedSystemPrompt) return _cachedSystemPrompt
-
-  const cats = getCategoryListForPrompt()
-    .map(c => `${c.id}(${c.label})`)
-    .join(', ')
-
-  _cachedSystemPrompt = `你是新闻分类器。将每条新闻标题归入最匹配的一个类别。
-
-可选类别ID: ${cats}
-
-规则:
-1. 输入是JSON字符串数组（新闻标题列表）
-2. 输出必须是同等长度的JSON字符串数组，元素是类别英文ID
-3. 输出数组长度必须与输入完全一致，顺序一一对应
-4. 每个元素只能是上述类别ID之一
-5. 如果标题无法明确归类，使用 "other"
-6. 只返回JSON数组，不要任何其他文字、解释或markdown
-
-示例:
-输入: ["OpenAI发布GPT-5","欧盟通过AI监管法案","英伟达股价创新高"]
-输出: ["breakthrough","regulation","market"]`
-
-  return _cachedSystemPrompt
-}
-
 async function callLLM(
   config: LLMConfig,
-  messages: Array<{ role: string; content: string }>,
+  titles: string[],
   signal?: AbortSignal,
 ): Promise<string> {
   if (signal?.aborted) {
@@ -164,10 +124,10 @@ async function callLLM(
   }
 
   try {
-    const response = await runAITask<{ categories?: unknown[] }>(
+    const response = await runAITask(
       'discover.classify_news',
       config.aiTarget || '',
-      { messages, categories: getCategoryListForPrompt(), timeout: REQUEST_TIMEOUT },
+      { titles, categories: getCategoryListForPrompt() },
       signal,
     )
     return JSON.stringify(response.categories || [])
@@ -271,29 +231,19 @@ async function classifyBatchLLM(
   
   if (debugMode && batchItems.length === 1) {
     const title = (batchItems[0].title || '无标题').slice(0, 50)
-    const prompt = `标题：${title}\n分类(regulation/breakthrough/market/other)，输出JSON: {"category":"xxx"}`
-    
     try {
-      const response = await callLLM(config, [
-        { role: 'user', content: prompt },
-      ], signal)
-      
-      const parsed = JSON.parse(response)
-      const categoryId = parsed.category || null
-      return [VALID_CATEGORY_IDS.has(categoryId) ? categoryId : null]
+      const response = await callLLM(config, [title], signal)
+      const parsed = JSON.parse(response) as unknown[]
+      const categoryId = typeof parsed[0] === 'string' ? parsed[0] : null
+      return [categoryId && VALID_CATEGORY_IDS.has(categoryId) ? categoryId : null]
     } catch {
       return [null]
     }
   }
   
   const titles = batchItems.map(item => item.title || '无标题')
-  const userPrompt = JSON.stringify(titles)
-
   try {
-    const response = await callLLM(config, [
-      { role: 'system', content: buildBatchSystemPrompt() },
-      { role: 'user', content: userPrompt },
-    ], signal)
+    const response = await callLLM(config, titles, signal)
 
     const results = parseBatchResponse(response, batchItems.length)
 

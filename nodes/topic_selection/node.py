@@ -393,7 +393,7 @@ def _llm_batch_analyze(
 文章：{title}
 摘要：{content}
 
-输出JSON: {{"decision":"keep"或"drop","score":0-100}}"""
+输出JSON数组: [{{"index":1,"decision":"keep"或"drop","score":0-100}}]"""
             return prompt
 
         prompt = f"""你是专业的内容主编。当前选题任务：{config.target_topic}
@@ -423,9 +423,10 @@ def _llm_batch_analyze(
     def parse_results(batch: list[dict], parsed: list[dict]) -> list[dict]:
         if client.debug_mode:
             item = batch[0]
-            if isinstance(parsed, dict):
-                item["_topic_score"] = parsed.get("score", 0)
-                item["_topic_decision"] = parsed.get("decision", "drop")
+            first = parsed[0] if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict) else {}
+            if first:
+                item["_topic_score"] = first.get("score", 0)
+                item["_topic_decision"] = first.get("decision", "drop")
                 item["_topic_reason"] = ""
                 item["_topic_angle"] = ""
             else:
@@ -446,4 +447,18 @@ def _llm_batch_analyze(
             item["_topic_angle"] = result.get("angle", "")
         return batch
 
-    return client.batch_analyze(contents, create_prompt, parse_results, logs)
+    batch_size = 1 if client.debug_mode else 10
+    analyzed: list[dict] = []
+    for start in range(0, len(contents), batch_size):
+        batch = contents[start : start + batch_size]
+        try:
+            parsed = client.run_task(
+                "topic_selection.score",
+                create_prompt(batch),
+                logs=logs,
+            )
+            analyzed.extend(parse_results(batch, parsed))
+        except Exception as error:
+            logs.append(f"[TopicSelectionNode] AI batch failed: {type(error).__name__}: {error}")
+            analyzed.extend(parse_results(batch, []))
+    return analyzed

@@ -1,23 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   isCurrentKnowledgeCandidate,
-  knowledgeExpansionInstruction,
   parseKnowledgeCandidates,
   promoteKnowledgeCandidates,
 } from '../organizeKnowledge'
 
 describe('organizeKnowledge', () => {
-  it('uses a dedicated current-only contract for AI knowledge expansion', () => {
-    const prompt = knowledgeExpansionInstruction('hybrid', false)
-
-    expect(prompt).toContain('只返回 JSON 对象')
-    expect(prompt).toContain('不得返回研究计划')
-    expect(prompt).toContain('3-5 条')
-    expect(prompt).toContain('temporalRisk 和 confidence 都只能是 low、medium 或 high')
-    expect(prompt).toContain('limitations 必须是字符串数组')
-    expect(() => knowledgeExpansionInstruction('web_only', false)).toThrow('纯联网模式不应调用 AI 知识扩展')
-  })
-
   it('parses the complete model contract without allowing the model to self-verify it', () => {
     const candidates = parseKnowledgeCandidates(Array.from({ length: 3 }, (_, index) => ({
         id: 'history',

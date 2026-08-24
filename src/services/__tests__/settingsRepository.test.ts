@@ -80,16 +80,29 @@ describe('settings repository current contract', () => {
     expect(stored.apiConfig.nodeOverrides).not.toHaveProperty('publish')
   })
 
-  it('loads current credentials from local storage even when removed fields are present', () => {
+  it('does not persist text AI secrets in renderer localStorage', () => {
+    window.localStorage.clear()
+    const settings = structuredClone(DEFAULT_SETTINGS)
+    settings.apiConfig.global.aiModelProviders[1].apiKey = 'renderer-secret'
+    settings.apiConfig.global.aiModelProviders[1].apiKeySet = true
+
+    settingsRepository.save(settings)
+
+    const stored = JSON.parse(window.localStorage.getItem('podflow.settings.v1') || '{}')
+    expect(stored.apiConfig.global.aiModelProviders[1].apiKey).toBe('')
+    expect(stored.apiConfig.global.aiModelProviders[1].apiKeySet).toBe(true)
+  })
+
+  it('rejects removed AI provider kinds without migration', () => {
     const saved = structuredClone(DEFAULT_SETTINGS) as any
-    saved.capability.text = { mode: 'deep' }
-    saved.apiConfig.global.aiModelProviders[6].apiKey = 'compatible-provider-key'
+    saved.apiConfig.global.aiModelProviders.push({
+      ...saved.apiConfig.global.aiModelProviders[1],
+      id: 'legacy-compatible',
+      kind: 'openai_compatible',
+    })
     window.localStorage.setItem('podflow.settings.v1', JSON.stringify(saved))
 
-    const loaded = settingsRepository.load()
-
-    expect(loaded.apiConfig.global.aiModelProviders[6].apiKey).toBe('compatible-provider-key')
-    expect((loaded.capability as any).text).toBeUndefined()
+    expect(() => settingsRepository.load()).toThrow('不支持旧 AI Provider 配置')
   })
 
   it('resets transient connection checks while preserving target-scoped search verification', () => {

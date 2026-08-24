@@ -22,8 +22,8 @@ npm run cli -- produce --stage publish --workflow out/episodes/2026-08-17/workfl
 | `PODFLOW_BOCHA_API_KEY` | 博查搜索密钥；只在进程环境读取 |
 | `PODFLOW_BOCHA_API_BASE` | 可选博查兼容端点 |
 | `PODFLOW_LLM_API_KEY` | LLM 密钥；只在进程环境读取 |
-| `PODFLOW_LLM_PROVIDER` | `openai_compatible`、`deepseek` 等 |
-| `PODFLOW_LLM_API_BASE` | OpenAI-compatible base URL |
+| `PODFLOW_LLM_PROVIDER` | `openai`、`anthropic`、`gemini`、`openrouter`、`ollama` 或 `deepseek` |
+| `PODFLOW_LLM_API_BASE` | 仅 Ollama 可配置本地服务地址；官方 Provider 端点固定 |
 | `PODFLOW_LLM_MODEL` | 正式写作模型名 |
 | `PODFLOW_DOUBAO_APP_ID` | 豆包 BigTTS App ID |
 | `PODFLOW_DOUBAO_ACCESS_TOKEN` | 豆包 BigTTS Access Token |

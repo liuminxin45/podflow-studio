@@ -25,12 +25,11 @@ export type LocalAgentId =
 export type LocalAgentOutputMode = 'stdout' | 'codex-json'
 export type AIModelProviderKind =
   | 'ollama'
-  | 'lm_studio'
   | 'openai'
   | 'anthropic'
   | 'gemini'
   | 'openrouter'
-  | 'openai_compatible'
+  | 'deepseek'
 export type APIKeyStorageMode = 'local' | 'env' | 'none'
 
 export interface AudioCapabilitySettings {
@@ -247,21 +246,6 @@ export const DEFAULT_AI_MODEL_PROVIDERS: AIModelProviderConfig[] = [
     connectionStatus: 'untested',
   },
   {
-    id: 'local-lm-studio',
-    name: 'LM Studio',
-    kind: 'lm_studio',
-    targetKind: 'local_model',
-    apiBase: 'http://127.0.0.1:1234/v1',
-    apiKey: '',
-    apiKeySet: false,
-    apiKeyMasked: '',
-    apiKeyStorage: 'none',
-    apiKeyEnvVar: '',
-    model: 'local-model',
-    modelOptions: ['local-model'],
-    connectionStatus: 'untested',
-  },
-  {
     id: 'api-openai',
     name: 'OpenAI',
     kind: 'openai',
@@ -322,18 +306,18 @@ export const DEFAULT_AI_MODEL_PROVIDERS: AIModelProviderConfig[] = [
     connectionStatus: 'untested',
   },
   {
-    id: 'api-openai-compatible',
-    name: 'OpenAI 兼容',
-    kind: 'openai_compatible',
+    id: 'api-deepseek',
+    name: 'DeepSeek',
+    kind: 'deepseek',
     targetKind: 'api_model',
-    apiBase: 'https://api.openai.com/v1',
+    apiBase: 'https://api.deepseek.com',
     apiKey: '',
     apiKeySet: false,
     apiKeyMasked: '',
     apiKeyStorage: 'local',
-    apiKeyEnvVar: 'OPENAI_API_KEY',
-    model: 'gpt-4o-mini',
-    modelOptions: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini'],
+    apiKeyEnvVar: 'DEEPSEEK_API_KEY',
+    model: 'deepseek-chat',
+    modelOptions: ['deepseek-chat', 'deepseek-reasoner'],
     connectionStatus: 'untested',
   },
 ]

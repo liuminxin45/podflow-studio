@@ -1,13 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LLMError } from '../../types/llm'
 import type { ContentItem } from '../../types/workflow'
-import { llmService } from '../llmService'
+import { runAITask } from '../aiTaskService'
 import { postProcessDiscoverItems, type DiscoverPostProcessProgress } from '../discoverPostProcess'
 
-vi.mock('../llmService', () => ({
-  llmService: {
-    call: vi.fn(),
-  },
+vi.mock('../aiTaskService', () => ({
+  runAITask: vi.fn(),
 }))
 
 describe('discoverPostProcess', () => {
@@ -62,7 +60,7 @@ describe('discoverPostProcess', () => {
     expect(result.audit.rawItems).toHaveLength(3)
     expect(result.audit.stages.find(stage => stage.id === 'recency')?.failedCount).toBe(1)
     expect(result.audit.stages.find(stage => stage.id === 'limit')?.failedCount).toBe(0)
-    expect(llmService.call).not.toHaveBeenCalled()
+    expect(runAITask).not.toHaveBeenCalled()
   })
 
   it('limits results independently for each source', async () => {
@@ -87,23 +85,10 @@ describe('discoverPostProcess', () => {
   })
 
   it('uses LLM to apply the configured core topic', async () => {
-    vi.mocked(llmService.call).mockResolvedValue({
-      id: 'topic-filter',
-      object: 'chat.completion',
-      created: Date.now(),
-      model: 'codex',
-      choices: [
-        {
-          index: 0,
-          message: {
-            role: 'assistant',
-            content: JSON.stringify([
+    vi.mocked(runAITask).mockResolvedValue({
+      items: [
               { index: 1, score: 92, decision: 'keep', reason: 'AI related', angle: 'launch' },
               { index: 2, score: 25, decision: 'drop', reason: 'not AI', angle: '' },
-            ]),
-          },
-          finish_reason: 'stop',
-        },
       ],
     })
 
@@ -119,7 +104,7 @@ describe('discoverPostProcess', () => {
     expect(result.topicRejectedCount).toBe(1)
     expect(result.audit.rejectedItems.some(entry => entry.stageId === 'topic' && entry.reason === 'not AI')).toBe(true)
     expect(result.audit.passedItems[0].item.title).toBe('Fresh AI launch')
-    expect(llmService.call).toHaveBeenCalledTimes(1)
+    expect(runAITask).toHaveBeenCalledTimes(1)
   })
 
   it('uses a local display summary without calling LLM when topic is empty', async () => {
@@ -138,7 +123,7 @@ describe('discoverPostProcess', () => {
 
     expect(result.items).toHaveLength(1)
     expect(result.items[0].summary).toContain('阿里云推出 Qoder 企业版')
-    expect(llmService.call).not.toHaveBeenCalled()
+    expect(runAITask).not.toHaveBeenCalled()
   })
 
   it('keeps retained items visible after recency and source limit processing', async () => {

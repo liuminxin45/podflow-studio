@@ -1,6 +1,5 @@
 import { settingsRepository } from './repository'
 import type { AIModelProviderConfig, AppSettings, GlobalAPIConfig, LocalAgentConfig, StageId } from '../../types/settings'
-import type { LLMCallOptions } from '../../types/llm'
 
 export interface LLMConfig {
   apiBase: string
@@ -59,7 +58,7 @@ function providerCredential(provider: AIModelProviderConfig): Pick<LLMConfig, 'a
       apiKeyEnvVar: provider.apiKeyEnvVar || '',
     }
   }
-  return { apiKey: provider.apiKey }
+  return { apiKey: provider.apiKey || (provider.apiKeySet ? 'stored-in-main' : '') }
 }
 
 export function isLocalAgentLLMConfig(config: LLMConfig | null | undefined): boolean {
@@ -75,28 +74,8 @@ export function hasUsableLLMConfig(config: LLMConfig | null | undefined): config
 export function llmTargetLabel(config: LLMConfig | null | undefined): string {
   if (!config) return '未配置'
   if (isLocalAgentLLMConfig(config)) return `本地代理：${config.localAgentId || config.model}`
-  if (config.providerKind === 'ollama' || config.providerKind === 'lm_studio') return `本地模型：${config.model}`
+  if (config.providerKind === 'ollama') return `本地模型：${config.model}`
   return `API 模型：${config.model}`
-}
-
-export function createLLMCallOptions(
-  config: LLMConfig,
-  options: Omit<LLMCallOptions, 'apiBase' | 'apiKey' | 'apiKeyEnvVar' | 'model' | 'providerKind' | 'localAgentId' | 'localAgentCommand' | 'localAgentArgs' | 'localAgentOutputMode' | 'aiTarget'>,
-): LLMCallOptions {
-  return {
-    ...options,
-    apiBase: config.apiBase,
-    apiKey: config.apiKey,
-    apiKeyEnvVar: config.apiKeyEnvVar,
-    model: config.model,
-    providerKind: config.providerKind,
-    localAgentId: config.localAgentId,
-    localAgentCommand: config.localAgentCommand,
-    localAgentArgs: config.localAgentArgs,
-    localAgentOutputMode: config.localAgentOutputMode,
-    aiTarget: config.aiTarget,
-    timeout: options.timeout ?? config.timeout,
-  }
 }
 
 export class LLMConfigResolver {
@@ -115,17 +94,12 @@ export class LLMConfigResolver {
 
     if (!useDefaultTarget && nodeConfig?.overrideMode === 'custom') {
       const inherited = this.getLLMConfigFromSettings(settings, nodeId, true)
-      const inheritedRemote = inherited?.providerKind === 'local_agent' ? null : inherited
-      const hasCustomEndpoint = Boolean(nodeConfig.apiKey || nodeConfig.apiBase)
       const hasModelOverride = Boolean(nodeConfig.apiModel) && inherited?.providerKind !== 'local_agent'
-      if (!hasCustomEndpoint && !hasModelOverride) return inherited
+      if (!hasModelOverride) return inherited
+      if (!inherited) return null
       return {
-        ...inheritedRemote,
-        apiBase: nodeConfig.apiBase || inheritedRemote?.apiBase || 'https://api.openai.com/v1',
-        apiKey: nodeConfig.apiKey || inheritedRemote?.apiKey || '',
-        apiKeyEnvVar: nodeConfig.apiKey ? undefined : inheritedRemote?.apiKeyEnvVar,
-        model: nodeConfig.apiModel || inheritedRemote?.model || 'gpt-4o-mini',
-        providerKind: hasCustomEndpoint ? 'openai_compatible' : inheritedRemote?.providerKind || 'openai_compatible',
+        ...inherited,
+        model: nodeConfig.apiModel || inherited?.model || 'gpt-4o-mini',
       }
     }
 
@@ -160,6 +134,7 @@ export class LLMConfigResolver {
           apiKeyEnvVar: credential.apiKeyEnvVar,
           model: defaultProvider.model,
           providerKind: defaultProvider.kind,
+          aiTarget: defaultTarget,
         }
       }
     }
@@ -170,7 +145,7 @@ export class LLMConfigResolver {
           apiBase: global.audioApiBase || 'https://api.openai.com/v1',
           apiKey: global.audioApiKey,
           model: global.audioApiModel || 'gpt-4o-mini',
-          providerKind: 'openai_compatible',
+          providerKind: 'openai',
         }
       }
     }

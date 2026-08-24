@@ -1,7 +1,7 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from protocol.ai_provider import LLMError
-from protocol.llm_gateway import LLMGatewayHandler
+from protocol.llm_gateway import ACTIVE_TASKS, LLMGatewayHandler, _cancel_task
 
 
 def test_project_error_ignores_client_disconnect() -> None:
@@ -15,8 +15,8 @@ def test_project_error_ignores_client_disconnect() -> None:
 
 def _post_handler_with_disconnected_writer() -> LLMGatewayHandler:
     handler = object.__new__(LLMGatewayHandler)
-    handler.path = "/chat/completions"
-    handler._read_json = Mock(return_value={})
+    handler.path = "/ai/tasks/run"
+    handler._read_json = Mock(return_value={"request": {}, "target": {}})
     handler.send_response = Mock()
     handler.send_header = Mock()
     handler.end_headers = Mock()
@@ -27,19 +27,19 @@ def _post_handler_with_disconnected_writer() -> LLMGatewayHandler:
 
 def test_post_ignores_disconnect_while_writing_normal_json() -> None:
     handler = _post_handler_with_disconnected_writer()
-    handler._handle_chat = Mock(side_effect=lambda _payload: handler._send_json({"ok": True}))
+    with patch("protocol.llm_gateway._run_task_in_worker", return_value={"ok": True}) as run_task:
+        handler.do_POST()
 
-    handler.do_POST()
-
-    handler._handle_chat.assert_called_once_with({})
+    run_task.assert_called_once_with({"request": {}, "target": {}})
     handler.wfile.write.assert_called_once()
 
 
-def test_post_ignores_disconnect_while_writing_sse() -> None:
-    handler = _post_handler_with_disconnected_writer()
-    handler._handle_chat = Mock(side_effect=lambda _payload: handler._write_sse({"delta": "text"}))
-
-    handler.do_POST()
-
-    handler._handle_chat.assert_called_once_with({})
-    handler.wfile.write.assert_called_once()
+def test_cancel_task_terminates_registered_worker() -> None:
+    process = Mock()
+    ACTIVE_TASKS["request-1"] = process
+    try:
+        with patch("protocol.llm_gateway._terminate_task_process") as terminate:
+            assert _cancel_task("request-1") is True
+        terminate.assert_called_once_with(process)
+    finally:
+        ACTIVE_TASKS.pop("request-1", None)

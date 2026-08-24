@@ -9,41 +9,6 @@ import type {
 } from './types/workflow'
 
 declare global {
-  interface LLMCallParams {
-    apiBase: string
-    apiKey: string
-    apiKeyEnvVar?: string
-    model: string
-    providerKind?: string
-    localAgentId?: string
-    localAgentCommand?: string
-    localAgentArgs?: string[]
-    localAgentOutputMode?: string
-    aiTarget?: string
-    messages: Array<{ role: string; content: string }>
-    temperature?: number
-    maxTokens?: number
-    timeout?: number
-    stream?: boolean
-    requestId?: string
-  }
-
-  type LLMAgentStreamEvent =
-    | { type: 'init'; sessionId?: string }
-    | { type: 'text_delta'; text: string }
-    | { type: 'tool_start'; toolName: string; toolId?: string; input?: string }
-    | { type: 'tool_done'; toolId?: string; output?: string }
-    | { type: 'error'; message: string }
-    | { type: 'done' }
-
-  interface LLMResponse {
-    choices: Array<{
-      message: {
-        content: string
-      }
-    }>
-  }
-
   interface DiscoverProgressData {
     runId: string
     type: string
@@ -180,11 +145,9 @@ declare global {
       available: boolean
       statusText: string
     }>>
-    llmCall: (params: LLMCallParams) => Promise<LLMResponse>
-    llmCancel: (requestId: string) => Promise<{ success: boolean }>
-    llmFetchModels: (params: { apiBase: string; apiKey: string; apiKeyEnvVar?: string; providerKind?: string }) => Promise<any>
     aiRunTask: (request: import('./types/llm').AITaskRequest) => Promise<import('./types/llm').AITaskResult>
     aiCancelTask: (requestId: string) => Promise<{ success: boolean }>
+    onAITaskEvent: (callback: (event: import('./types/llm').AITaskEvent) => void) => () => void
     listDoubaoVoices: (params: {
       kind: 'preset' | 'clone'
       appId?: string
@@ -237,11 +200,6 @@ declare global {
       results: Array<{ id: string; title: string; url: string; excerpt: string; publishedAt?: string }>
     }>
     searchCancel?: (requestId: string) => Promise<{ success: boolean }>
-    onLLMStreamEvent: (callback: (event: LLMAgentStreamEvent) => void) => void
-    onLLMStreamChunk: (callback: (chunk: string) => void) => void
-    onLLMStreamDone: (callback: () => void) => void
-    onLLMStreamError: (callback: (error: string) => void) => void
-    removeLLMStreamListeners: () => void
   }
 
   interface Window {

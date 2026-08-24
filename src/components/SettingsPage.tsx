@@ -79,19 +79,18 @@ function resolveApiSettings(settings: AppSettings, stageId: NodeOverrideStageId)
   if (override.overrideMode === 'custom') {
     const inherited = resolveGlobalApiSettings(settings)
     const inheritedRemote = inherited.provider_kind === 'local_agent' ? null : inherited
-    const hasCustomEndpoint = Boolean(override.apiKey || override.apiBase)
-    const canOverrideModel = inherited.provider_kind !== 'local_agent' || hasCustomEndpoint
-    if (!hasCustomEndpoint && !canOverrideModel) return inherited
+    const canOverrideModel = inherited.provider_kind !== 'local_agent'
+    if (!canOverrideModel) return inherited
     return {
       ...inheritedRemote,
-      api_key: override.apiKey || inheritedRemote?.api_key || '',
-      api_key_env_var: override.apiKey ? '' : inheritedRemote?.api_key_env_var || '',
-      api_base: override.apiBase || inheritedRemote?.api_base || 'https://api.openai.com/v1',
+      api_key: inheritedRemote?.api_key || '',
+      api_key_env_var: inheritedRemote?.api_key_env_var || '',
+      api_base: inheritedRemote?.api_base || '',
       llm_model: canOverrideModel
         ? override.apiModel || inheritedRemote?.llm_model || DEFAULT_MODEL_BY_PREFIX[CAPABILITY_TO_GLOBAL_PREFIX[override.capabilityType]]
         : inherited.llm_model,
-      provider_kind: hasCustomEndpoint ? 'openai_compatible' : inheritedRemote?.provider_kind || 'openai_compatible',
-      ai_target: `node:${stageId}`,
+      provider_kind: inheritedRemote?.provider_kind || 'openai',
+      ai_target: inheritedRemote?.ai_target || '',
     }
   }
 
@@ -137,7 +136,7 @@ function resolveGlobalApiSettings(settings: AppSettings) {
     api_key_env_var: '',
     api_base: '',
     llm_model: DEFAULT_MODEL_BY_PREFIX.text,
-    provider_kind: 'openai_compatible',
+    provider_kind: 'openai',
     ai_target: '',
   }
 }
