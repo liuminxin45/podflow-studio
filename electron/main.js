@@ -7,7 +7,6 @@ const { spawn } = require('child_process')
 const ConfigManager = require('./configManager')
 const { fetchModels, callLLM, stopLLMGateway } = require('./llmService')
 const { searchBocha, searchDoubao, searchTavily } = require('./searchService')
-const { stopLocalAgentProcesses } = require('./localAgentService')
 const { detectLocalAgents } = require('./aiTargetManager')
 const { listDoubaoVoices } = require('./services/doubaoVoiceService')
 const { resolvePythonCommand } = require('../scripts/python313')
@@ -794,7 +793,6 @@ function cleanupBeforeQuit() {
   isQuitting = true
   mediaTokens.clear()
   stopLLMGateway()
-  stopLocalAgentProcesses()
   stopActivePythonProcesses()
 }
 

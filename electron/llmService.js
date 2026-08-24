@@ -1,6 +1,5 @@
 const { makeRequest, makeStreamingRequest } = require('./httpClient')
 const { ensureLLMGateway, stopLLMGateway } = require('./llmGatewayProcess')
-const { callLocalAgentLLM, callLocalAgentLLMStream } = require('./localAgentService')
 
 const DEFAULT_TIMEOUT = 30000
 const STREAMING_TIMEOUT = 180000
@@ -58,27 +57,6 @@ async function callLLM(params) {
     providerKind = 'openai_compatible',
     signal,
   } = params
-  if (providerKind === 'local_agent') {
-    if (stream) {
-      if (!eventSender) {
-        throw new Error('eventSender is required for local agent streaming mode')
-      }
-      try {
-        const response = await callLocalAgentLLMStream(params, {
-          onEvent: (event) => eventSender.send('llm:stream:event', event),
-          onChunk: (content) => eventSender.send('llm:stream:chunk', content),
-        })
-        eventSender.send('llm:stream:done')
-        return response
-      } catch (error) {
-        const message = error?.message || 'Local agent stream failed'
-        eventSender.send('llm:stream:error', message)
-        throw error
-      }
-    }
-    return callLocalAgentLLM(params)
-  }
-
   const gateway = await ensureLLMGateway()
   const url = `${gateway.baseUrl}/chat/completions`
   const headers = { 'Content-Type': 'application/json' }
@@ -89,6 +67,12 @@ async function callLLM(params) {
     api_key: runtimeApiKey,
     model,
     provider_kind: providerKind,
+    request_id: params.requestId,
+    local_agent_id: params.localAgentId,
+    local_agent_command: params.localAgentCommand,
+    local_agent_args: params.localAgentArgs,
+    local_agent_output_mode: params.localAgentOutputMode,
+    ai_target: params.aiTarget,
     messages,
     temperature,
     timeout: Math.ceil(requestTimeout / 1000),
