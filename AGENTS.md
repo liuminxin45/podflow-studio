@@ -37,7 +37,7 @@ PodFlow Studio 支持 AI 驱动的全流程自动化，但自动化不得以牺�
 - `protocol/`：共享状态、schema、manifest 与 LLM runtime。
 - `tests/`：Python 单元、契约和端到端测试。
 - `scripts/`：开发启动、验收、demo 与发布校验脚本。
-- `docs/`：并行开发、设计系统、编辑规范和验收报告。
+- `docs/`：CLI、音频、设计系统、编辑规范和发布说明。
 - `examples/demo-news/`：无需外部密钥的离线完整链路。
 - `out/`、`dist/`、`tmp/`：运行或构建产物，不作为源代码编辑。
 
@@ -73,7 +73,7 @@ PodFlow Studio 支持 AI 驱动的全流程自动化，但自动化不得以牺�
 
 1. 执行 `git status --short --branch` 和 `git diff --name-only`。
 2. 将已有未提交改动视为用户或其他任务的工作，禁止覆盖、回滚、移动或顺手提交。
-3. 阅读本文件；跨模块或共享契约任务还必须阅读 `docs/parallel-development.md`。
+3. 阅读本文件；跨模块或共享契约任务还必须执行下述“并行协调协议”。
 4. 选择且只选择一个主 workstream，并声明预计修改的文件范围。
 5. 检查目标文件的调用者、消费者和测试；编辑前再次读取该文件的最新内容。
 6. 若目标文件已有并行改动或职责重叠，先缩小边界或协调，不得以覆盖方式解决冲突。
@@ -126,11 +126,45 @@ PodFlow Studio 支持 AI 驱动的全流程自动化，但自动化不得以牺�
 
 ### QA / Release
 
-- 范围：`tests/**`、`scripts/**`、`docs/acceptance/**`、CI、版本和发行元数据。
+- 范围：`tests/**`、`scripts/**`、`docs/**`、CI、版本和发行元数据。
 - 输出：回归测试、验收证据、构建与发布门禁。
 - 最低验证：与改动相称的最高可行门禁，不能用局部成功冒充全链路成功。
 
 跨 workstream 修改必须有明确理由。若必须修改共享契约，Contract / Protocol 为主 workstream，并在交接中列出全部受影响消费者。
+
+## 并行协调协议
+
+完成程度必须按实际验证范围报告：局部进展、改动面验证、来源闭环、消费者闭环和最终完成
+逐级递进。未检查下游消费者时必须明确说明，不能将局部测试通过报告为完整完成。
+
+涉及状态键、schema 字段、节点顺序、配置字段、IPC payload、生成产物或发布包布局时：
+
+1. 由 Contract / Protocol workstream 单独负责共享面，列出精确文件和所有已知的 Python、Electron、TypeScript、demo 与测试消费者。
+2. 只维护一个当前 shape，不得通过别名、双写、静默默认值或旧分支拆分并行工作。
+3. 先完成共享契约和定向测试，再启动依赖该契约的模块改动。
+4. 每次交接后重新读取共享文件；消费者全部落地后扫描旧字段、常量、路径和夹具。
+5. 即使源代码编辑并行，`add`、`commit`、`merge`、`rebase` 和 `push` 仍必须串行。
+
+分派并行任务时使用以下工作包，且一个文件同一时间只有一个负责人：
+
+```text
+Workstream:
+Goal:
+Allowed paths:
+Do not touch:
+Inputs consumed:
+Outputs produced:
+Shared contract changes allowed: no
+Preflight:
+  - git status --short --branch
+  - git diff --name-only
+  - read AGENTS.md
+Narrow verification:
+Integration verification:
+Handoff notes required:
+```
+
+若允许修改共享契约，工作包必须补充目标当前 shape、精确契约文件和必须同步更新的全部消费者。
 
 ## 当前契约优先（强制）
 

@@ -108,33 +108,20 @@ PodFlow CLI 为人工操作和 AI Agent 提供同一套进程控制与验收入�
 
 ```bash
 npm run cli -- doctor --json
-npm run cli -- start --mode dev --session agent-demo --window hidden --cdp auto --json
-npm run cli -- status --session agent-demo --json
-npm run cli -- stop --session agent-demo --json
-npm run acceptance:cdp
 ```
 
 从源码部署 CLI 可在 Windows 运行 `powershell -ExecutionPolicy Bypass -File scripts/setup-local.ps1`。它会安装锁定依赖并运行环境诊断，但不会读取或保存任何 API Key。
 
 正式候选节目也能从素材发现开始完全由 CLI 生成。该路径强制使用可追踪证据、实际
-LLM 成稿和正式 TTS，并在机器门禁通过后等待绑定最终 MP3 SHA256 的人工终审：
-
-```powershell
-npm run cli -- produce --stage generate --episode-id 2026-08-17 --topic "可选主题" --output out/episodes --allow-paid-tts --json
-npm run cli -- produce --stage approve --workflow <workflow.json> --audio-sha256 <sha256> --reviewer <name> --full-listen-confirmed --pronunciation-confirmed --editorial-final-confirmed --json
-npm run cli -- produce --stage publish --workflow <workflow.json> --release-repo liuminxin45/podflow-morning-feed --site-repo liuminxin45/liuminxin45.github.io --confirm-publish --json
-```
-
-`--workflow` 必须明确指定一期工作流，不会自动选择“最新一期”。命令、退出码和生产
-阶段见 [CLI 参考](docs/cli.md)；GitHub Actions、Secrets 和发布权限配置见
-[正式自动化](docs/auto-episode.md)；当前声音、混音和审核门禁见
-[晨报音频生产规范](docs/morning-news-audio-spec.md)。
+LLM 成稿和正式 TTS，并在机器门禁通过后等待绑定最终 MP3 SHA256 的人工终审。命令、
+验收、生产阶段和 GitHub Actions 配置见 [CLI 参考](docs/cli.md)；当前声音、混音和审核
+门禁见 [晨报音频生产规范](docs/morning-news-audio-spec.md)。
 
 ### 音乐与授权
 
 正式品牌 cue 派生自 Ondrosik 的 [Quick Spark](https://freemusicarchive.org/music/Ondrosik/no-words/quick-spark/)。[作者曲库](https://ondrosik.sk/music/)将曲目声明为 CC0；项目保存原始 SHA256、取得日期、裁剪区间与派生文件指纹。素材经裁剪、淡入淡出和响度处理，第三方音乐仍为 CC0，不改写为 Apache-2.0。完整记录见 [音频权利文件](assets/audio/RIGHTS.md)。
 
-候选音乐发现内置温暖早咖啡、都市通勤、清晨专注和周末松弛四套规则。动态搜索只生成待试听清单，不会自动替换正式 Cue；用法和授权门禁见 [音乐风格发现规则](docs/music-style-profiles.md)。
+候选音乐发现内置温暖早咖啡、都市通勤、清晨专注和周末松弛四套规则。动态搜索只生成待试听清单，不会自动替换正式 Cue；用法和授权门禁见 [晨报音频生产规范](docs/morning-news-audio-spec.md)。
 
 全部贡献者与使用者文档见 [文档索引](docs/README.md)。
 

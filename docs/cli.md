@@ -63,6 +63,11 @@ screenshots/<timestamp>/*.png
 
 Use `--artifacts-dir <path>` only when a caller intentionally wants evidence elsewhere. The CLI does not update tracked acceptance documentation implicitly.
 
+Acceptance evidence is local diagnostic output, not maintained project documentation. Reports and
+screenshots may contain absolute paths, workflow identifiers, episode content, recording paths, or
+settings. Do not commit them. When evidence must be published, prefer the CI run; otherwise remove
+local paths, credentials, private workflows, recordings, and unlicensed third-party content first.
+
 ## Session contract
 
 Every session lives below `.podflow/sessions/<session>/` and contains:
@@ -141,6 +146,12 @@ PODFLOW_PUBLISH_TOKEN
 ```
 
 Configure `PODFLOW_LLM_PROVIDER`, `PODFLOW_LLM_MODEL`, `PODFLOW_FETCH_SOURCES` and `PODFLOW_RSS_URLS` as repository variables. Set `PODFLOW_LLM_API_BASE` only for Ollama. Create a protected `podflow-production` environment with the human reviewer. The generation job uploads a seven-day candidate artifact and publishes its exact audio SHA in the run summary; only the environment-approved job records approval, creates the Release and triggers the site.
+
+The workflow installs Node 22, Python 3.13, FFmpeg, and Chinese fonts before generation. The publish
+token should grant only Contents access to `podflow-morning-feed` and the permission needed to dispatch
+the `liuminxin45.github.io` deployment. Uploads remain drafts until all eight fixed assets match their
+expected sizes and GitHub SHA256 digests. A failed draft keeps its diagnostics and does not trigger the
+site deployment.
 
 If a stage fails, correct the reported preflight or quality issue and rerun the same stage. Do not hand-edit the fingerprint or quality report. A new render intentionally invalidates the earlier approval.
 
