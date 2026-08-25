@@ -243,7 +243,7 @@ async function supervise(config) {
     })
     rendererReadyTimer = setTimeout(() => {
       if (ready) return
-      startupFailure = `Renderer did not report readiness within ${config.startupTimeoutMs}ms`
+      startupFailure = `Renderer did not report readiness within ${config.startupTimeoutMs}ms after Electron started`
       requestStop('renderer-timeout')
     }, config.startupTimeoutMs)
 

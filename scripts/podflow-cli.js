@@ -101,6 +101,14 @@ function validateCdp(value) {
   return String(port)
 }
 
+function resolveStartupTimeouts(timeoutSeconds, mode) {
+  const phaseTimeoutMs = parsePositiveInteger(timeoutSeconds, 300, 'timeout') * 1000
+  return {
+    phaseTimeoutMs,
+    waitTimeoutMs: mode === 'dev' ? phaseTimeoutMs * 2 : phaseTimeoutMs,
+  }
+}
+
 function output(options, payload, textMessage) {
   if (options.json) process.stdout.write(`${JSON.stringify(payload)}\n`)
   else process.stdout.write(`${textMessage}\n`)
@@ -139,7 +147,7 @@ function buildLaunch(command, options) {
     : null
   const cdp = acceptance ? validateCdp(options.cdp || 'auto') : validateCdp(options.cdp)
   if (acceptance && cdp === 'off') throw new CliError('Acceptance requires CDP; use --cdp auto or a loopback port', EXIT.ARGUMENT)
-  const startupTimeoutMs = parsePositiveInteger(options.timeout, 60, 'timeout') * 1000
+  const { phaseTimeoutMs: startupTimeoutMs, waitTimeoutMs: startupWaitTimeoutMs } = resolveStartupTimeouts(options.timeout, mode)
   const requestedArtifactDir = options['artifacts-dir']
     ? path.resolve(projectRoot, options['artifacts-dir'])
     : paths.artifactDir
@@ -165,6 +173,7 @@ function buildLaunch(command, options) {
     cdp,
     acceptanceSuite: suite,
     startupTimeoutMs,
+    startupWaitTimeoutMs,
     vitePort: Number(process.env.VITE_PORT || 5174),
     sessionDir: paths.sessionDir,
     manifestPath: paths.manifestPath,
@@ -199,14 +208,14 @@ async function startCommand(options) {
   const manifest = await waitForManifest(
     paths.manifestPath,
     (value) => ['ready', 'failed', 'exited'].includes(value.status),
-    launch.startupTimeoutMs,
+    launch.startupWaitTimeoutMs,
   )
   if (manifest?.status === 'ready') {
     output(options, { ok: true, command: 'start', session: manifest }, `PodFlow session ${manifest.sessionId} is ready`)
     return EXIT.OK
   }
   atomicWriteJson(paths.stopRequestPath, { nonce: launch.nonce, reason: 'startup-timeout', requestedAt: new Date().toISOString() })
-  const reason = manifest?.exit?.reason || `Startup timed out after ${launch.startupTimeoutMs}ms`
+  const reason = manifest?.exit?.reason || `Startup timed out after ${launch.startupWaitTimeoutMs}ms`
   throw new CliError(reason, manifest?.status === 'failed' ? EXIT.CRASH : EXIT.STARTUP_TIMEOUT)
 }
 
@@ -438,5 +447,6 @@ module.exports = {
   buildLaunch,
   main,
   parseArgs,
+  resolveStartupTimeouts,
   validateCdp,
 }

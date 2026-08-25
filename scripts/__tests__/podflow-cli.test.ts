@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-const { EXIT, parseArgs, validateCdp } = require('../podflow-cli')
+const { EXIT, parseArgs, resolveStartupTimeouts, validateCdp } = require('../podflow-cli')
 
 describe('PodFlow CLI contract', () => {
   it('parses Agent-oriented startup options without shell-specific behavior', () => {
@@ -60,6 +60,21 @@ describe('PodFlow CLI contract', () => {
       STOP: 8,
       INTERNAL: 9,
       PRODUCTION: 10,
+    })
+  })
+
+  it('allows separate Vite and renderer startup budgets in development', () => {
+    expect(resolveStartupTimeouts(undefined, 'dev')).toEqual({
+      phaseTimeoutMs: 300_000,
+      waitTimeoutMs: 600_000,
+    })
+    expect(resolveStartupTimeouts('15', 'dev')).toEqual({
+      phaseTimeoutMs: 15_000,
+      waitTimeoutMs: 30_000,
+    })
+    expect(resolveStartupTimeouts(undefined, 'built')).toEqual({
+      phaseTimeoutMs: 300_000,
+      waitTimeoutMs: 300_000,
     })
   })
 })
