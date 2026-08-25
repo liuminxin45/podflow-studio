@@ -1,6 +1,8 @@
-# PodFlow 晨报音频质量 v3
+# PodFlow 晨报音频生产规范
 
-本文件是桌面端、CLI 和后续自动化执行的唯一正式节目规范。
+本文件描述当前晨报正式节目的音频生产和发布约束。可执行规则由
+`protocol/production_plan.py`、音频节点、审核节点和相关测试共同落实；文档与实现不一致时，
+必须同步修正两者，不能用文档绕过机器门禁。
 
 ## 口播
 
@@ -26,8 +28,11 @@
 - 检查片段时长、区域语速、前后静音、异常长停顿、剪切、爆音、缺失、重复指纹以及 8 个音乐事件。
 - `audio-quality-report.json` 必须为 `passed`。
 - 人工全程试听后用最终 MP3 SHA256 审批。重新渲染后旧审批无效。
-- 公开打包同时依赖自动终审与人工审批；mock、v2、缺来源、缺授权或不符合公开音频规格一律拒绝。
+- 公开打包同时依赖自动终审与人工审批；mock、旧生产计划、缺来源、缺授权或不符合公开音频规格一律拒绝。
 
 ## 音乐权利
 
-四个 cue 仅由 Ondrosik 的 Quick Spark 派生。作者曲库与 FMA 曲目页记录 CC0 1.0。原始文件 SHA256、取得日期、裁剪区间和派生文件指纹保存在 `assets/audio/quick-spark-source.json`，完整说明见 `assets/audio/RIGHTS.md`。
+四个 cue 仅由 Ondrosik 的 Quick Spark 派生。作者曲库与 FMA 曲目页记录 CC0 1.0。
+原始文件 SHA256、取得日期、裁剪区间和派生文件指纹保存在
+[`assets/audio/quick-spark-source.json`](../assets/audio/quick-spark-source.json)，完整说明见
+[`assets/audio/RIGHTS.md`](../assets/audio/RIGHTS.md)。

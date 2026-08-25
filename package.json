@@ -38,8 +38,9 @@
     "verify:build": "node scripts/python313.js scripts/build_check.py",
     "test:nodes": "node scripts/python313.js scripts/test_all_nodes.py",
     "test:integration": "node scripts/python313.js scripts/integration_test.py",
+    "verify:docs": "node scripts/verify_docs.js",
     "verify:ui-system": "node scripts/verify_ui_system.js",
-    "verify:offline": "npm run verify:ui-system && npm run verify:config && npm run verify:nodes",
+    "verify:offline": "npm run verify:docs && npm run verify:ui-system && npm run verify:config && npm run verify:nodes",
     "verify": "npm run verify:offline && npm run verify:tts-live"
   },
   "dependencies": {

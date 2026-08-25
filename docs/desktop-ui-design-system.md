@@ -1,9 +1,11 @@
 # PodFlow Studio 桌面端 UI 设计系统
 
-状态：**生效中**
+状态：**当前规范**
 
 适用范围：Electron / React 工作台
-最后更新：2026-07-28
+
+`src/index.css`、`src/App.tsx` 和 `scripts/verify_ui_system.js` 是可执行来源。本文件解释
+设计意图和贡献规则，不使用手工更新时间表示实现新旧。
 
 ## 设计基线
 

@@ -94,7 +94,7 @@ The state machine is `starting -> ready -> stopping -> exited`, or `starting -> 
 | 9 | Internal CLI error |
 | 10 | Production preflight, render, approval, or package failure |
 
-## Formal production v3
+## Formal production
 
 ```powershell
 npm run cli -- produce --stage generate --episode-id 2026-08-17 --topic "可选主题" --output out/episodes --allow-paid-tts --json
@@ -105,7 +105,7 @@ npm run cli -- produce --workflow <id-or-absolute-path> --stage package --output
 npm run cli -- produce --workflow <id-or-absolute-path> --stage publish --release-repo liuminxin45/podflow-morning-feed --site-repo liuminxin45/liuminxin45.github.io --confirm-publish --json
 ```
 
-The CLI and desktop app consume the same production-plan defaults and EpisodeRun schema v2. There is no implicit latest-workflow selection and no legacy workflow migration. `generate` is the only headless formal generation path: it runs discovery, Bocha research, claim-level model verification, topic selection, LLM writing, `editorial_quality_v1`, pronunciation preflight, TTS, audio assembly, cover generation and automatic audio review.
+The CLI and desktop app consume the same current production-plan defaults and EpisodeRun schema. There is no implicit latest-workflow selection and no legacy workflow migration. `generate` is the only headless formal generation path: it runs discovery, Bocha research, claim-level model verification, topic selection, LLM writing, `editorial_quality_v1`, pronunciation preflight, TTS, audio assembly, cover generation and automatic audio review. The current audio requirements are documented in the [morning-news audio production specification](morning-news-audio-spec.md).
 
 - `generate` requires `PODFLOW_BOCHA_API_KEY`, `PODFLOW_LLM_API_KEY`, `PODFLOW_LLM_MODEL`, `PODFLOW_DOUBAO_APP_ID` and `PODFLOW_DOUBAO_ACCESS_TOKEN`. `PODFLOW_LLM_PROVIDER` must name one supported Pydantic AI provider; only Ollama accepts `PODFLOW_LLM_API_BASE`. It rejects arbitrary OpenAI-compatible endpoints, deterministic scripts, mock/Edge audio, missing sources and failed machine gates.
 - `render` runs TTS, v3 cue assembly, cover generation and automatic review. It prints total characters, uncached characters and uncached clip count before calling a paid provider.

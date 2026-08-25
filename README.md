@@ -116,7 +116,8 @@ npm run acceptance:cdp
 
 从源码部署 CLI 可在 Windows 运行 `powershell -ExecutionPolicy Bypass -File scripts/setup-local.ps1`。它会安装锁定依赖并运行环境诊断，但不会读取或保存任何 API Key。
 
-正式候选节目也能从素材发现开始完全由 CLI 生成。该路径强制使用博查补充可追踪证据、实际 LLM 成稿和豆包 BigTTS，并在机器门禁通过后等待绑定最终 MP3 SHA256 的人工终审：
+正式候选节目也能从素材发现开始完全由 CLI 生成。该路径强制使用可追踪证据、实际
+LLM 成稿和正式 TTS，并在机器门禁通过后等待绑定最终 MP3 SHA256 的人工终审：
 
 ```powershell
 npm run cli -- produce --stage generate --episode-id 2026-08-17 --topic "可选主题" --output out/episodes --allow-paid-tts --json
@@ -124,18 +125,10 @@ npm run cli -- produce --stage approve --workflow <workflow.json> --audio-sha256
 npm run cli -- produce --stage publish --workflow <workflow.json> --release-repo liuminxin45/podflow-morning-feed --site-repo liuminxin45/liuminxin45.github.io --confirm-publish --json
 ```
 
-GitHub Actions 提供同一条仅手动触发的链路。生成作业使用仓库 Secrets 中的博查、LLM 和豆包凭据，上传候选成片；受保护的 `podflow-production` Environment 完成人工终审后，发布作业才会创建不可变节目 Release 并触发个人主页部署。密钥不会写入 workflow 状态或 Artifact。
-
-正式制作统一使用 v3 三阶段命令，`--workflow` 必须明确指定一期工作流，不会自动选择“最新一期”：
-
-```powershell
-npm run cli -- produce --workflow <id或绝对路径> --stage render --allow-paid-tts --json
-npm run cli -- produce --workflow <id或绝对路径> --stage package --preview-only --output <预览目录> --json
-npm run cli -- produce --workflow <id或绝对路径> --stage approve --audio-sha256 <sha256> --reviewer <name> --full-listen-confirmed --pronunciation-confirmed --editorial-final-confirmed --json
-npm run cli -- produce --workflow <id或绝对路径> --stage package --output <showcase目录> --json
-```
-
-`render` 会先报告总字符、未缓存字符和调用片段数；存在未缓存的豆包片段时，缺少 `--allow-paid-tts` 会在首次外部调用前失败。`approve` 与 `package` 均绑定最终 MP3 SHA256，重新渲染会自动使旧审批失效。
+`--workflow` 必须明确指定一期工作流，不会自动选择“最新一期”。命令、退出码和生产
+阶段见 [CLI 参考](docs/cli.md)；GitHub Actions、Secrets 和发布权限配置见
+[正式自动化](docs/auto-episode.md)；当前声音、混音和审核门禁见
+[晨报音频生产规范](docs/morning-news-audio-spec.md)。
 
 ### 音乐与授权
 
@@ -143,7 +136,7 @@ npm run cli -- produce --workflow <id或绝对路径> --stage package --output <
 
 候选音乐发现内置温暖早咖啡、都市通勤、清晨专注和周末松弛四套规则。动态搜索只生成待试听清单，不会自动替换正式 Cue；用法和授权门禁见 [音乐风格发现规则](docs/music-style-profiles.md)。
 
-命令、退出码、会话目录和 Agent 安全调用模式见 [CLI 文档](docs/cli.md)。
+全部贡献者与使用者文档见 [文档索引](docs/README.md)。
 
 ## 关键设计
 
@@ -165,15 +158,10 @@ npm run cli -- produce --workflow <id或绝对路径> --stage package --output <
 
 ### 导出与发布公开节目包
 
-正式节目统一通过 `produce` 三阶段命令渲染、指纹审批并导出站点包：
-
-```bash
-npm run cli -- produce --workflow <workflow> --stage render --allow-paid-tts --json
-npm run cli -- produce --workflow <workflow> --stage approve --audio-sha256 <sha256> --reviewer <name> --full-listen-confirmed --pronunciation-confirmed --editorial-final-confirmed --json
-npm run cli -- produce --workflow <workflow> --stage package --output <showcase-directory> --json
-```
-
-`package` 会生成 `episode.json`、`show-notes.md`、`transcript.vtt`、`chapters.json`、封面和质量报告。它只消费 Review 节点生成且绑定当前音频的 `publish_ready` 状态；Provider、质量配置、时长与音频指标均从真实产物写入，不使用固定占位值。
+正式节目统一通过 `podflow produce` 完成渲染、指纹审批、打包和发布。发布包只消费
+Review 节点生成且绑定当前音频的 `publish_ready` 状态；Provider、质量配置、时长与
+音频指标均来自真实产物，不使用固定占位值。完整阶段和固定资产列表见
+[CLI 参考](docs/cli.md)。
 
 正式 MP3 只存放在公开的 `liuminxin45/podflow-morning-feed` GitHub Release；个人主页在 Pages 构建时读取 Release API、校验固定资产和 SHA256，只复制封面、章节与文字稿等小文件。RSS enclosure 与站内原生播放器直接使用不可变 MP3 Release URL，因此主页 Git 历史不会随每日音频持续膨胀。已存在的日期型 Release 不会被覆盖；同步失败时新部署会被阻断，线上旧版本保持不变。
 
