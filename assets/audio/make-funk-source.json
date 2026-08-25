@@ -1,0 +1,38 @@
+{
+  "title": "Make Funk",
+  "artist": "HoliznaCC0",
+  "license": "CC0 1.0 Universal",
+  "sourceUrl": "https://freemusicarchive.org/music/holiznacc0/",
+  "trackUrl": "https://freemusicarchive.org/music/holiznacc0/bassic/make-funk/",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "downloadedAt": "2026-08-25",
+  "originalFilename": "Make Funk.mp3",
+  "originalSha256": "4631f55b7fc2a021f24b22f60ec87735cf9163638b3a79ac1719ea3515949f9c",
+  "edits": "Cropped, faded and loudness-adjusted during final mixing.",
+  "cues": [
+    {
+      "filename": "podflow-intro.wav",
+      "startMs": 0,
+      "durationMs": 12000,
+      "sha256": "2383bdd4a6a7f02651906c8b68c95e4d8bf2d72b13f1ee0557bdcfa821e37f52"
+    },
+    {
+      "filename": "podflow-transition.wav",
+      "startMs": 42000,
+      "durationMs": 1350,
+      "sha256": "109ce28488aea6f35b0f1de680b49fe73793d575656dc4175a0d58294d925707"
+    },
+    {
+      "filename": "podflow-bridge.wav",
+      "startMs": 82000,
+      "durationMs": 2400,
+      "sha256": "29f878e692ba6fade522aeb90306702f6ddd98a3e2d18af937c769e96ae713d6"
+    },
+    {
+      "filename": "podflow-outro.wav",
+      "startMs": 153000,
+      "durationMs": 10000,
+      "sha256": "7c05759623da31a696534f625022d8df464c142b89c3e6f5ae6f1e9d22c1b6e6"
+    }
+  ]
+}

@@ -87,8 +87,8 @@ def test_news_segment_requires_claim_binding_in_both_contracts():
 def test_episode_run_accepts_versioned_production_plan():
     state = create_base_state()
     state["production_plan"] = {
-        "version": 3,
-        "quality_profile": "podflow_morning_v3",
+        "version": 4,
+        "quality_profile": "podflow_morning_v4",
         "script_hash": "script-hash",
         "clips": [{
             "id": "seg_001__001",
@@ -121,7 +121,7 @@ def test_episode_run_accepts_versioned_production_plan():
         "joins": [],
         "music": {
             name: {
-                "asset_id": f"quick-spark-{name}",
+                "asset_id": f"make-funk-{name}",
                 "path": "",
                 "gain_db": -4,
                 "duration_ms": 1500,
@@ -129,7 +129,7 @@ def test_episode_run_accepts_versioned_production_plan():
                 "fade_out_ms": 300,
                 "voice_overlap_ms": 0,
                 "duck_db": 0,
-                "rights_ref": "assets/audio/RIGHTS.md#quick-spark",
+                "rights_ref": "assets/audio/RIGHTS.md#make-funk",
             }
             for name in ("intro", "sting", "bridge", "outro")
         },
@@ -159,7 +159,7 @@ def test_episode_run_rejects_unversioned_non_empty_production_plan():
     schema_errors = list(Draft202012Validator(_episode_run_schema()).iter_errors(state))
 
     assert not ok
-    assert "version=3" in "\n".join(errors)
+    assert "version=4" in "\n".join(errors)
     assert schema_errors
 
 

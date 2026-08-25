@@ -75,8 +75,8 @@ describe('production plan', () => {
       segment({ text: '第一句。第二句包含 42%。第三句。'.repeat(6) }),
     ])
 
-    expect(plan.version).toBe(3)
-    expect(plan.quality_profile).toBe('podflow_morning_v3')
+    expect(plan.version).toBe(4)
+    expect(plan.quality_profile).toBe('podflow_morning_v4')
     expect(plan.clips.length).toBeGreaterThan(1)
     expect(plan.clips[0].context_after).not.toBe('')
     expect(plan.clips[1].context_before).not.toBe('')
@@ -92,7 +92,7 @@ describe('production plan', () => {
     expect(() => reconcileProductionPlan(
       [segment()],
       { version: 1 } as unknown as Parameters<typeof reconcileProductionPlan>[1],
-    )).toThrow('当前版本为 3')
+    )).toThrow('当前版本为 4')
   })
 
   it('carries context across script segment boundaries', () => {

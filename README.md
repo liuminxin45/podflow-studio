@@ -119,7 +119,7 @@ LLM 成稿和正式 TTS，并在机器门禁通过后等待绑定最终 MP3 SHA2
 
 ### 音乐与授权
 
-正式品牌 cue 派生自 Ondrosik 的 [Quick Spark](https://freemusicarchive.org/music/Ondrosik/no-words/quick-spark/)。[作者曲库](https://ondrosik.sk/music/)将曲目声明为 CC0；项目保存原始 SHA256、取得日期、裁剪区间与派生文件指纹。素材经裁剪、淡入淡出和响度处理，第三方音乐仍为 CC0，不改写为 Apache-2.0。完整记录见 [音频权利文件](assets/audio/RIGHTS.md)。
+正式品牌 cue 派生自 HoliznaCC0 的 [Make Funk](https://freemusicarchive.org/music/holiznacc0/bassic/make-funk/)，曲目页明确标注 CC0 1.0 与纯音乐。项目保存原始 SHA256、取得日期、裁剪区间与派生文件指纹。素材经裁剪、淡入淡出和响度处理，第三方音乐仍为 CC0，不改写为 Apache-2.0。完整记录见 [音频权利文件](assets/audio/RIGHTS.md)。
 
 全部贡献者与使用者文档见 [文档索引](docs/README.md)。
 

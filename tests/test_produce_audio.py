@@ -116,7 +116,7 @@ def _public_publish_state(tmp_path: Path, *, engine: str = "doubao_tts") -> tupl
         "true_peak_db": -1.0,
         "duration_seconds": 840,
     }
-    state["production_plan"] = {"version": 3, "quality_profile": "podflow_morning_v3"}
+    state["production_plan"] = {"version": 4, "quality_profile": "podflow_morning_v4"}
     artifact = state["audio_outputs"]["audio_artifact"]
     state["review_summary"] = {"status": "passed", "audio_artifact": artifact}
     state["audio_approval"] = {
@@ -257,8 +257,8 @@ def test_audio_postprocess_renders_clip_trims_and_individual_joins(tmp_path: Pat
         {"segment_id": "clip_2", "path": str(second), "engine": "mock"},
     ]
     state["production_plan"] = {
-        "version": 3,
-        "quality_profile": "podflow_morning_v3",
+        "version": 4,
+        "quality_profile": "podflow_morning_v4",
         "clips": [
             {
                 "id": "clip_1",
@@ -270,7 +270,7 @@ def test_audio_postprocess_renders_clip_trims_and_individual_joins(tmp_path: Pat
         ],
         "joins": [{"after_clip_id": "clip_1", "type": "pause", "duration_ms": 100}],
         "music": {
-            name: {"asset_id": f"quick-spark-{name}", "path": str(first), "gain_db": -4,
+            name: {"asset_id": f"make-funk-{name}", "path": str(first), "gain_db": -4,
                    "duration_ms": 100, "fade_in_ms": 10, "fade_out_ms": 10,
                    "voice_overlap_ms": 0, "duck_db": 0, "rights_ref": "RIGHTS.md"}
             for name in ("intro", "sting", "bridge", "outro")
@@ -285,7 +285,7 @@ def test_audio_postprocess_renders_clip_trims_and_individual_joins(tmp_path: Pat
 
     assert result["audio_outputs"]["status"] == "ok"
     assert result["audio_outputs"]["source_engines"] == ["mock", "recording"]
-    assert "production_plan_v3" in result["audio_outputs"]["operations"]
+    assert "production_plan_v4" in result["audio_outputs"]["operations"]
     assert "trim_clip_clip_1" in result["audio_outputs"]["operations"]
     assert "pause_clip_1_100ms" in result["audio_outputs"]["operations"]
     assert result["audio_outputs"]["duration_seconds"] == 0.7
@@ -299,7 +299,7 @@ def test_audio_postprocess_renders_intro_sting_bridge_and_outro(tmp_path: Path):
     state = create_base_state()
     state["voice_segments"] = [{"segment_id": "clip_1", "path": str(voice), "engine": "recording"}]
     slot = {
-        "asset_id": "quick-spark-sting",
+        "asset_id": "make-funk-sting",
         "path": str(music),
         "gain_db": -4,
         "duration_ms": 100,
@@ -310,11 +310,11 @@ def test_audio_postprocess_renders_intro_sting_bridge_and_outro(tmp_path: Path):
         "rights_ref": "RIGHTS.md",
     }
     state["production_plan"] = {
-        "version": 3,
-        "quality_profile": "podflow_morning_v3",
+        "version": 4,
+        "quality_profile": "podflow_morning_v4",
         "clips": [{"id": "clip_1", "path": str(voice), "trim_start_ms": 0, "trim_end_ms": 0}],
         "joins": [],
-        "music": {"intro": {**slot, "asset_id": "quick-spark-intro"}, "sting": slot, "bridge": {**slot, "asset_id": "quick-spark-bridge"}, "outro": {**slot, "asset_id": "quick-spark-outro"}},
+        "music": {"intro": {**slot, "asset_id": "make-funk-intro"}, "sting": slot, "bridge": {**slot, "asset_id": "make-funk-bridge"}, "outro": {**slot, "asset_id": "make-funk-outro"}},
         "render": {"output_format": "wav", "sample_rate_hz": 48000, "mp3_bitrate": "160k", "normalize_loudness": False},
     }
 
@@ -325,8 +325,8 @@ def test_audio_postprocess_renders_intro_sting_bridge_and_outro(tmp_path: Path):
 
     operations = result["audio_outputs"]["operations"]
     assert result["audio_outputs"]["status"] == "ok"
-    assert "mix_intro_music_5500ms_solo_2500ms_voice_overlap" in operations
-    assert "mix_outro_music_2500ms_voice_overlap_4500ms_tail" in operations
+    assert "mix_intro_music_100ms_solo_0ms_voice_overlap" in operations
+    assert "mix_outro_music_0ms_voice_overlap_100ms_tail" in operations
 
 
 def test_tts_splits_long_script_and_reuses_unchanged_clips(tmp_path: Path, monkeypatch):

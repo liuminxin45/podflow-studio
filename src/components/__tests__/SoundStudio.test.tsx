@@ -237,7 +237,7 @@ describe('SoundStudio production workflow', () => {
     const { rerender } = render(<SoundStudio {...props} />)
 
     await waitFor(() => expect((screen.getByRole('button', { name: /制作成品/ }) as HTMLButtonElement).disabled).toBe(false))
-    expect(screen.getByText('正式节目固定使用 Quick Spark 派生 cue，正文不持续铺底乐。')).toBeTruthy()
+    expect(screen.getByText('正式节目固定使用 Make Funk 派生 cue，正文不持续铺底乐。')).toBeTruthy()
     expect(screen.queryByRole('switch', { name: '叠加背景音乐' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /制作成品/ }))
 
@@ -256,13 +256,13 @@ describe('SoundStudio production workflow', () => {
     }))
     expect(onUpdateWorkflow).toHaveBeenCalledWith(expect.objectContaining({
       production_plan: expect.objectContaining({
-        version: 3,
-        quality_profile: 'podflow_morning_v3',
+        version: 4,
+        quality_profile: 'podflow_morning_v4',
         music: expect.objectContaining({
-          intro: expect.objectContaining({ asset_id: 'quick-spark-intro' }),
-          sting: expect.objectContaining({ asset_id: 'quick-spark-sting' }),
-          bridge: expect.objectContaining({ asset_id: 'quick-spark-bridge' }),
-          outro: expect.objectContaining({ asset_id: 'quick-spark-outro' }),
+          intro: expect.objectContaining({ asset_id: 'make-funk-intro' }),
+          sting: expect.objectContaining({ asset_id: 'make-funk-sting' }),
+          bridge: expect.objectContaining({ asset_id: 'make-funk-bridge' }),
+          outro: expect.objectContaining({ asset_id: 'make-funk-outro' }),
         }),
       }),
       audio_outputs: {},

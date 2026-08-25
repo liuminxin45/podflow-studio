@@ -15,10 +15,10 @@
 
 ## 时间线和混音
 
-- 片头 8.0 秒：前 5.5 秒独立播放，后 2.5 秒与开场人声重叠并下压 11dB。
+- 片头 12.0 秒：前 8.0 秒独立播放，后 4.0 秒与开场人声重叠并下压 11dB。
 - 6 条快讯之间必须恰好有 5 个 1.35 秒 sting。
 - 第 6 条快讯与重点解读之间必须有 1 个 2.4 秒 bridge。
-- 片尾 7.0 秒：最后一句剩余约 2.5 秒时淡入并下压 11dB，人声结束后继续约 4.5 秒。
+- 片尾 10.0 秒：最后一句剩余约 4.0 秒时淡入并下压 11dB，人声结束后继续约 6.0 秒。
 - 正文不得持续铺底乐。先分别校准人声与 cue，再对总线限幅和响度归一化。
 - 最终 MP3：48 kHz、160 kbps、-16 LUFS ±1、真峰值不高于 -1 dBTP。
 
@@ -32,7 +32,7 @@
 
 ## 音乐权利
 
-四个 cue 仅由 Ondrosik 的 Quick Spark 派生。作者曲库与 FMA 曲目页记录 CC0 1.0。
+四个 cue 仅由 HoliznaCC0 的 Make Funk 派生，FMA 单曲页记录 CC0 1.0 且标记为纯音乐。
 原始文件 SHA256、取得日期、裁剪区间和派生文件指纹保存在
-[`assets/audio/quick-spark-source.json`](../assets/audio/quick-spark-source.json)，完整说明见
+[`assets/audio/make-funk-source.json`](../assets/audio/make-funk-source.json)，完整说明见
 [`assets/audio/RIGHTS.md`](../assets/audio/RIGHTS.md)。

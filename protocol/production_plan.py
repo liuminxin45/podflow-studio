@@ -10,8 +10,8 @@ import re
 from typing import Any
 
 
-PRODUCTION_PLAN_VERSION = 3
-QUALITY_PROFILE = "podflow_morning_v3"
+PRODUCTION_PLAN_VERSION = 4
+QUALITY_PROFILE = "podflow_morning_v4"
 MAX_TTS_CHARS = 140
 MAX_TTS_SENTENCES = 2
 
@@ -40,20 +40,20 @@ def _music_slot(*, asset_id: str, path: str, gain_db: float, duration_ms: int,
         "fade_out_ms": fade_out_ms,
         "voice_overlap_ms": voice_overlap_ms,
         "duck_db": duck_db,
-        "rights_ref": "assets/audio/RIGHTS.md#quick-spark",
+        "rights_ref": "assets/audio/RIGHTS.md#make-funk",
     }
 
 
 def default_music() -> dict[str, Any]:
     return {
-        "intro": _music_slot(asset_id="quick-spark-intro", path="assets/audio/podflow-intro.wav", gain_db=-2.0,
-                             duration_ms=8000, fade_in_ms=120, fade_out_ms=700, voice_overlap_ms=2500, duck_db=11.0),
-        "sting": _music_slot(asset_id="quick-spark-sting", path="assets/audio/podflow-transition.wav", gain_db=-4.0,
+        "intro": _music_slot(asset_id="make-funk-intro", path="assets/audio/podflow-intro.wav", gain_db=-2.0,
+                             duration_ms=12_000, fade_in_ms=120, fade_out_ms=1000, voice_overlap_ms=4000, duck_db=11.0),
+        "sting": _music_slot(asset_id="make-funk-sting", path="assets/audio/podflow-transition.wav", gain_db=-4.0,
                              duration_ms=1350, fade_in_ms=50, fade_out_ms=220),
-        "bridge": _music_slot(asset_id="quick-spark-bridge", path="assets/audio/podflow-bridge.wav", gain_db=-4.0,
+        "bridge": _music_slot(asset_id="make-funk-bridge", path="assets/audio/podflow-bridge.wav", gain_db=-4.0,
                               duration_ms=2400, fade_in_ms=80, fade_out_ms=350),
-        "outro": _music_slot(asset_id="quick-spark-outro", path="assets/audio/podflow-outro.wav", gain_db=-2.0,
-                             duration_ms=7000, fade_in_ms=700, fade_out_ms=900, voice_overlap_ms=2500, duck_db=11.0),
+        "outro": _music_slot(asset_id="make-funk-outro", path="assets/audio/podflow-outro.wav", gain_db=-2.0,
+                             duration_ms=10_000, fade_in_ms=900, fade_out_ms=1200, voice_overlap_ms=4000, duck_db=11.0),
     }
 
 

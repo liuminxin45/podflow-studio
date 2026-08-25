@@ -297,9 +297,9 @@ def _preflight(state: dict[str, Any], config: TTSConfig, allow_paid: bool) -> di
         if not path.is_file() or not (ROOT / slot["rights_ref"].split("#", 1)[0]).is_file():
             raise ValueError(f"Formal cue or rights record is missing: {slot['asset_id']}")
         slot["path"] = str(path.resolve())
-    provenance = ROOT / "assets" / "audio" / "quick-spark-source.json"
+    provenance = ROOT / "assets" / "audio" / "make-funk-source.json"
     if not provenance.is_file():
-        raise ValueError("Quick Spark SHA256 provenance is missing")
+        raise ValueError("Make Funk SHA256 provenance is missing")
     if config.engine == "doubao_tts" and uncached and not all((config.doubao_app_id, config.doubao_access_token)):
         raise ValueError("Doubao credentials are missing; no external request was made")
     if config.engine == "doubao_tts" and uncached and not allow_paid:
@@ -469,8 +469,8 @@ def package(
         "releaseStatus": "preview_unreviewed" if preview_only else "publish_ready",
         "public": not preview_only,
         "releaseReadiness": readiness,
-        "musicCredits": [{"title": "Quick Spark", "artist": "Ondrosik",
-                          "sourceUrl": "https://ondrosik.sk/music/", "license": "CC0 1.0 Universal",
+        "musicCredits": [{"title": "Make Funk", "artist": "HoliznaCC0",
+                          "sourceUrl": "https://freemusicarchive.org/music/holiznacc0/bassic/make-funk/", "license": "CC0 1.0 Universal",
                           "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
                           "edited": "经裁剪、淡入淡出及响度处理"}],
         "approval": state.get("audio_approval", {}),

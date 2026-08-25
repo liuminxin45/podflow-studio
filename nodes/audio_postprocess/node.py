@@ -64,9 +64,9 @@ def run(state: dict[str, Any], config: AudioPostprocessConfig = None) -> dict[st
         degraded = False
         operations = ["merge_voice_segments"]
         if has_production_plan:
-            if production_plan.get("version") != 3 or production_plan.get("quality_profile") != "podflow_morning_v3":
-                raise RuntimeError("Audio rendering requires production_plan v3 / podflow_morning_v3. Regenerate the plan.")
-            operations.append("production_plan_v3")
+            if production_plan.get("version") != 4 or production_plan.get("quality_profile") != "podflow_morning_v4":
+                raise RuntimeError("Audio rendering requires production_plan v4 / podflow_morning_v4. Regenerate the plan.")
+            operations.append("production_plan_v4")
         else:
             operations.append(f"segment_pause_{config.segment_pause_ms}ms")
 
@@ -247,7 +247,7 @@ def _assemble_with_pydub(
         intro_solo = intro[: len(intro) - intro_overlap]
         intro_ducked = intro[len(intro) - intro_overlap :].apply_gain(-float(intro_slot.get("duck_db") or 0))
         combined = intro_solo + intro_ducked.overlay(combined[:intro_overlap]) + combined[intro_overlap:]
-        operations.append("mix_intro_music_5500ms_solo_2500ms_voice_overlap")
+        operations.append(f"mix_intro_music_{len(intro_solo)}ms_solo_{intro_overlap}ms_voice_overlap")
 
         outro_slot = music.get("outro") if isinstance(music.get("outro"), dict) else {}
         outro = _music_clip(AudioSegment, outro_slot)
@@ -255,7 +255,7 @@ def _assemble_with_pydub(
         overlap_at = len(combined) - outro_overlap
         outro_ducked = outro[:outro_overlap].apply_gain(-float(outro_slot.get("duck_db") or 0))
         combined = combined[:overlap_at] + combined[overlap_at:].overlay(outro_ducked) + outro[outro_overlap:]
-        operations.append("mix_outro_music_2500ms_voice_overlap_4500ms_tail")
+        operations.append(f"mix_outro_music_{outro_overlap}ms_voice_overlap_{len(outro) - outro_overlap}ms_tail")
     elif config.add_bgm:
         if bgm_path is None:
             raise RuntimeError("Configured BGM path was not resolved.")

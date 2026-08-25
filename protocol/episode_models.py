@@ -257,8 +257,8 @@ class ProductionRenderModel(BaseModel):
 class ProductionPlanModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: Literal[3] | None = None
-    quality_profile: Literal["podflow_morning_v3"] | None = None
+    version: Literal[4] | None = None
+    quality_profile: Literal["podflow_morning_v4"] | None = None
     script_hash: str = ""
     clips: list[ProductionClipModel] = Field(default_factory=list)
     joins: list[ProductionJoinModel] = Field(default_factory=list)
@@ -269,8 +269,8 @@ class ProductionPlanModel(BaseModel):
     @model_validator(mode="after")
     def require_explicit_version_for_non_empty_plan(self) -> "ProductionPlanModel":
         non_version_fields = self.model_fields_set - {"version", "quality_profile"}
-        if non_version_fields and (self.version != 3 or self.quality_profile != "podflow_morning_v3"):
-            raise ValueError("non-empty production_plan requires version=3 and quality_profile=podflow_morning_v3")
+        if non_version_fields and (self.version != 4 or self.quality_profile != "podflow_morning_v4"):
+            raise ValueError("non-empty production_plan requires version=4 and quality_profile=podflow_morning_v4")
         return self
 
 

@@ -19,6 +19,8 @@ MIN_AUDIO_DURATION_ERROR = 10  # seconds – error below this
 MIN_SEGMENTS = 2  # at least 2 segments for meaningful content
 MIN_AVG_SEGMENT_CHARS = 20  # average chars per segment; below this suggests placeholder text
 MAX_CLIP_SECONDS = 30.0
+INTRO_OPERATION = "mix_intro_music_8000ms_solo_4000ms_voice_overlap"
+OUTRO_OPERATION = "mix_outro_music_4000ms_voice_overlap_6000ms_tail"
 
 
 def _measure_final_audio(path: str) -> dict[str, Any]:
@@ -95,13 +97,13 @@ def _build_checks(
             f"Too few segments ({len(segments)}); min={MIN_SEGMENTS}",
             f"{len(segments)} segments ready",
         ),
-        (plan.get("version") == 3 and plan.get("quality_profile") == "podflow_morning_v3", "error", "Production plan is not v3", "Production plan v3 ready"),
+        (plan.get("version") == 4 and plan.get("quality_profile") == "podflow_morning_v4", "error", "Production plan is not v4", "Production plan v4 ready"),
         (not overlong, "error", f"TTS clips exceed 30 seconds: {', '.join(map(str, overlong))}", "All TTS clips are at most 30 seconds"),
         (not prosody_failures, "error", f"Prosody checks require review: {', '.join(map(str, prosody_failures))}", "Speech rate and non-silent dynamics passed"),
         (expected_stings == 5 and rendered_stings == 5, "error", f"Expected/rendered quick-news stings: {expected_stings}/{rendered_stings}", "Exactly 5 quick-news stings rendered"),
         (expected_bridges == 1 and rendered_bridges == 1, "error", f"Expected/rendered deep-dive bridges: {expected_bridges}/{rendered_bridges}", "Exactly 1 deep-dive bridge rendered"),
-        ("mix_intro_music_5500ms_solo_2500ms_voice_overlap" in operations, "error", "Intro cue is missing from final timeline", "Intro cue rendered with voice overlap"),
-        ("mix_outro_music_2500ms_voice_overlap_4500ms_tail" in operations, "error", "Outro cue is missing from final timeline", "Outro cue rendered with voice overlap"),
+        (INTRO_OPERATION in operations, "error", "Intro cue is missing from final timeline", "Intro cue rendered with voice overlap"),
+        (OUTRO_OPERATION in operations, "error", "Outro cue is missing from final timeline", "Outro cue rendered with voice overlap"),
         (measured_audio.get("codec") == "mp3", "error", "Final audio codec is not MP3", "Final codec is MP3"),
         (measured_audio.get("sample_rate_hz") == 48_000, "error", "Final audio sample rate is not 48 kHz", "Final sample rate is 48 kHz"),
         (measured_audio.get("bitrate_kbps") in range(156, 165), "error", f"Final MP3 bitrate is not 160 kbps: {measured_audio.get('bitrate_kbps')}", "Final MP3 bitrate is 160 kbps"),
@@ -219,9 +221,9 @@ def run(state: dict[str, Any], config: ReviewConfig = None) -> dict[str, Any]:
             }
             for segment in clip_metrics
         ],
-        "musicEvents": {"intro": 1 if "mix_intro_music_5500ms_solo_2500ms_voice_overlap" in operations else 0,
+        "musicEvents": {"intro": 1 if INTRO_OPERATION in operations else 0,
                         "stings": rendered_stings, "bridge": rendered_bridges,
-                        "outro": 1 if "mix_outro_music_2500ms_voice_overlap_4500ms_tail" in operations else 0},
+                        "outro": 1 if OUTRO_OPERATION in operations else 0},
         "output": {**{key: audio_outputs.get(key) for key in ("duration_seconds", "sample_rate_hz", "bitrate_kbps", "target_lufs", "true_peak_db", "file_size")},
                    "measured": measured_audio},
         "status": review["status"],

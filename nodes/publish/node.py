@@ -255,8 +255,8 @@ def _validate_public_readiness(state: dict[str, Any], audio_outputs: dict[str, A
     if int(audio_artifact.get("size_bytes") or 0) < duration_seconds * 16_000:
         raise RuntimeError("Public publishing requires at least a 128 kbps MP3 payload size.")
     plan = state.get("production_plan") if isinstance(state.get("production_plan"), dict) else {}
-    if plan.get("version") != 3 or plan.get("quality_profile") != "podflow_morning_v3":
-        raise RuntimeError("Public publishing requires production_plan v3 / podflow_morning_v3.")
+    if plan.get("version") != 4 or plan.get("quality_profile") != "podflow_morning_v4":
+        raise RuntimeError("Public publishing requires production_plan v4 / podflow_morning_v4.")
     review = state.get("review_summary") if isinstance(state.get("review_summary"), dict) else {}
     if review.get("status") != "passed" or review.get("audio_artifact") != audio_artifact:
         raise RuntimeError("Public publishing requires a passing review bound to the final audio fingerprint.")

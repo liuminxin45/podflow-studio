@@ -361,8 +361,8 @@ export interface ProductionMusicSlot {
 }
 
 export interface ProductionPlan {
-  version: 3
-  quality_profile: 'podflow_morning_v3'
+  version: 4
+  quality_profile: 'podflow_morning_v4'
   script_hash: string
   clips: ProductionClip[]
   joins: ProductionJoin[]

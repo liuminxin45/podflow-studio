@@ -1682,7 +1682,7 @@ export default function ProductionStudio({
                     </div>
                   )
                 })}
-                <p className="produce-field-help">正式节目固定使用 Quick Spark 派生 cue，正文不持续铺底乐。</p>
+                <p className="produce-field-help">正式节目固定使用 Make Funk 派生 cue，正文不持续铺底乐。</p>
               </section>
 
               <section className="produce-settings-section">

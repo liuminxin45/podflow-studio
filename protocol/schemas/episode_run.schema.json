@@ -488,8 +488,8 @@
         }
       ],
       "properties": {
-        "version": { "const": 3 },
-        "quality_profile": { "const": "podflow_morning_v3" },
+        "version": { "const": 4 },
+        "quality_profile": { "const": "podflow_morning_v4" },
         "script_hash": { "type": "string" },
         "clips": {
           "type": "array",

@@ -20,7 +20,7 @@ function musicSlot(overrides: Partial<ProductionMusicSlot> = {}): ProductionMusi
     fade_out_ms: 1000,
     voice_overlap_ms: 0,
     duck_db: 0,
-    rights_ref: 'assets/audio/RIGHTS.md#quick-spark',
+    rights_ref: 'assets/audio/RIGHTS.md#make-funk',
     ...overrides,
   }
 }
@@ -127,8 +127,8 @@ export function reconcileProductionPlan(
   existing?: Partial<ProductionPlan> | null,
   voices: VoiceSegment[] = [],
 ): ProductionPlan {
-  if (existing?.version != null && existing.version !== 3) {
-    throw new Error(`不支持制作计划版本 ${existing.version}，当前版本为 3，请重新生成制作计划。`)
+  if (existing?.version != null && existing.version !== 4) {
+    throw new Error(`不支持制作计划版本 ${existing.version}，当前版本为 4，请重新生成制作计划。`)
   }
   const previousClips = new Map((existing?.clips || []).map(clip => [clip.id, clip]))
   const voiceById = new Map(voices.map(voice => [voice.segment_id, voice]))
@@ -191,16 +191,16 @@ export function reconcileProductionPlan(
   })
 
   return {
-    version: 3,
-    quality_profile: 'podflow_morning_v3',
+    version: 4,
+    quality_profile: 'podflow_morning_v4',
     script_hash: scriptHash(segments),
     clips,
     joins,
     music: {
-      intro: musicSlot({ asset_id: 'quick-spark-intro', path: 'assets/audio/podflow-intro.wav', gain_db: -2, duration_ms: 8000, fade_in_ms: 120, fade_out_ms: 700, voice_overlap_ms: 2500, duck_db: 11, ...existing?.music?.intro }),
-      sting: musicSlot({ asset_id: 'quick-spark-sting', path: 'assets/audio/podflow-transition.wav', duration_ms: 1350, fade_in_ms: 50, fade_out_ms: 220, ...existing?.music?.sting }),
-      bridge: musicSlot({ asset_id: 'quick-spark-bridge', path: 'assets/audio/podflow-bridge.wav', duration_ms: 2400, fade_in_ms: 80, fade_out_ms: 350, ...existing?.music?.bridge }),
-      outro: musicSlot({ asset_id: 'quick-spark-outro', path: 'assets/audio/podflow-outro.wav', gain_db: -2, duration_ms: 7000, fade_in_ms: 700, fade_out_ms: 900, voice_overlap_ms: 2500, duck_db: 11, ...existing?.music?.outro }),
+      intro: musicSlot({ asset_id: 'make-funk-intro', path: 'assets/audio/podflow-intro.wav', gain_db: -2, duration_ms: 12000, fade_in_ms: 120, fade_out_ms: 1000, voice_overlap_ms: 4000, duck_db: 11, ...existing?.music?.intro }),
+      sting: musicSlot({ asset_id: 'make-funk-sting', path: 'assets/audio/podflow-transition.wav', duration_ms: 1350, fade_in_ms: 50, fade_out_ms: 220, ...existing?.music?.sting }),
+      bridge: musicSlot({ asset_id: 'make-funk-bridge', path: 'assets/audio/podflow-bridge.wav', duration_ms: 2400, fade_in_ms: 80, fade_out_ms: 350, ...existing?.music?.bridge }),
+      outro: musicSlot({ asset_id: 'make-funk-outro', path: 'assets/audio/podflow-outro.wav', gain_db: -2, duration_ms: 10000, fade_in_ms: 900, fade_out_ms: 1200, voice_overlap_ms: 4000, duck_db: 11, ...existing?.music?.outro }),
     },
     render: {
       output_format: existing?.render?.output_format || 'mp3',
