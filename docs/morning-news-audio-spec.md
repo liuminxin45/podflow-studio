@@ -32,28 +32,6 @@
 
 ## 音乐权利
 
-### 候选音乐发现
-
-`protocol/music_profiles.json` 是候选音乐风格的规则注册表，只负责在线发现和排序，
-不会把搜索结果直接用于正式节目。内置风格包括温暖早咖啡、都市通勤、清晨专注和
-周末松弛，候选必须满足以下门禁：
-
-- 来源提供 CC0 标识、原始作品页面和可读取音频 URL。
-- 时长满足风格规则，能够从同一作品制作完整 Cue Pack。
-- 人声、激烈、黑暗、预告片或其他排除风格直接拒绝。
-- BPM 或纯音乐状态缺失时只能进入人工复核，不能自动批准。
-
-```bash
-node scripts/python313.js scripts/discover_music.py --list-styles
-node scripts/python313.js scripts/discover_music.py --style morning_coffee_warm --limit 10
-```
-
-Openverse 只是发现索引，不是权利担保方。候选进入正式 Cue Pack 前必须回到原始作品页
-核验授权，保存来源、原始文件 SHA256 和裁剪记录，并完成人工试听。发现失败或元数据
-不完整时必须保留真实原因，不得回退到未审核音乐。
-
-### 当前品牌音乐
-
 四个 cue 仅由 Ondrosik 的 Quick Spark 派生。作者曲库与 FMA 曲目页记录 CC0 1.0。
 原始文件 SHA256、取得日期、裁剪区间和派生文件指纹保存在
 [`assets/audio/quick-spark-source.json`](../assets/audio/quick-spark-source.json)，完整说明见
