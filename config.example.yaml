@@ -129,11 +129,6 @@ audio_postprocess:
   trim_silence: false
   add_bgm: false
 
-assets:
-  output_dir: "out/assets"
-  generate_cover: true
-  cover_size: [1400, 1400]
-
 publish:
   local_base_dir: "dist/episodes"
   rss_output_dir: "out/rss"

@@ -18,8 +18,6 @@ if str(ROOT) not in sys.path:
 
 from nodes.audio_postprocess.config import AudioPostprocessConfig
 from nodes.audio_postprocess.node import run as audio_run
-from nodes.assets.config import AssetsConfig
-from nodes.assets.node import run as assets_run
 from nodes.review.config import ReviewConfig
 from nodes.review.node import run as review_run
 from nodes.facts.config import FactsConfig
@@ -112,7 +110,6 @@ def run_demo_news(
         "edited_script": {},
         "voice_segments": [],
         "audio_outputs": {},
-        "cover_path": "",
         "intro_outro_paths": {},
         "review_summary": {},
         "audio_approval": {},
@@ -161,10 +158,6 @@ def run_demo_news(
             final_basename="final",
         ),
     )
-    state = assets_run(
-        state,
-        AssetsConfig(output_dir=str(output_dir / "assets"), generate_cover=True),
-    )
     state = review_run(state, ReviewConfig())
     state["publish_outputs"] = {
         "status": "demo_only",
@@ -206,7 +199,6 @@ def _episode_summary(state: dict[str, Any]) -> dict[str, Any]:
         "voice_segments": state.get("voice_segments", []),
         "production_plan": state.get("production_plan", {}),
         "audio_outputs": state.get("audio_outputs", {}),
-        "cover_path": state.get("cover_path", ""),
         "publish_outputs": state.get("publish_outputs", {}),
     }
 

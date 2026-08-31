@@ -18,7 +18,6 @@ function workflow(overrides: Partial<Workflow> = {}, stateOverrides: Record<stri
       ] },
       voice_segments: [],
       audio_outputs: {},
-      cover_path: '',
       errors: [],
       ...stateOverrides,
     },
@@ -45,7 +44,7 @@ describe('SoundStudio production workflow', () => {
         normalize_loudness: true,
       }
     }
-    return { output_dir: 'out/assets', generate_cover: true }
+    return {}
   })
   const saveNodeConfig = vi.fn(async () => ({ success: true }))
   const selectAudioFile = vi.fn(async () => ({ success: true, path: 'D:\\Music\\podcast-bed.wav' }))
@@ -69,7 +68,7 @@ describe('SoundStudio production workflow', () => {
   it('renders only production-backed controls and the real script', async () => {
     render(<SoundStudio visible onClose={vi.fn()} workflow={workflow()} />)
 
-    await waitFor(() => expect(loadNodeConfig).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(loadNodeConfig).toHaveBeenCalledTimes(2))
     fireEvent.click(screen.getByText('正文'))
     expect(screen.getByText('声音制作')).toBeTruthy()
     expect(screen.getByText('这是经过事实核验的节目正文。')).toBeTruthy()
@@ -92,7 +91,6 @@ describe('SoundStudio production workflow', () => {
         segment_pause_ms: 0,
         normalize_loudness: true,
       })
-      .mockResolvedValueOnce({ generate_cover: true })
     const onRunNodes = vi.fn(async () => undefined)
     render(
       <SoundStudio
@@ -172,7 +170,6 @@ describe('SoundStudio production workflow', () => {
         doubao_resource_id: 'volc.service_type.10029',
       })
       .mockResolvedValueOnce({ output_format: 'mp3', segment_pause_ms: 600 })
-      .mockResolvedValueOnce({ generate_cover: true })
     const onRunNodes = vi.fn(async () => undefined)
     render(
       <SoundStudio
@@ -209,7 +206,6 @@ describe('SoundStudio production workflow', () => {
         doubao_resource_id: 'volc.service_type.10029',
       })
       .mockResolvedValueOnce({ output_format: 'mp3', segment_pause_ms: 600 })
-      .mockResolvedValueOnce({ generate_cover: true })
 
     render(<SoundStudio visible onClose={vi.fn()} workflow={workflow()} />)
 
@@ -241,7 +237,7 @@ describe('SoundStudio production workflow', () => {
     expect(screen.queryByRole('switch', { name: '叠加背景音乐' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /制作成品/ }))
 
-    await waitFor(() => expect(onRunNodes).toHaveBeenCalledWith(['tts', 'audio_postprocess', 'assets']))
+    await waitFor(() => expect(onRunNodes).toHaveBeenCalledWith(['tts', 'audio_postprocess']))
     expect(onRunNodes).not.toHaveBeenCalledWith(expect.arrayContaining(['review']))
     expect(saveNodeConfig).toHaveBeenCalledWith('tts', expect.objectContaining({
       engine: 'edge-tts',
@@ -272,7 +268,6 @@ describe('SoundStudio production workflow', () => {
     const unverifiable = workflow(
       { status: 'completed' },
       {
-        cover_path: 'out/episodes/episode-produce-test/cover.url',
         voice_segments: [{
           segment_id: 'seg_1',
           path: 'out/episodes/episode-produce-test/voice.cmd',
@@ -293,7 +288,6 @@ describe('SoundStudio production workflow', () => {
     expect(await screen.findByText('已有成品记录无法验证')).toBeTruthy()
     expect(screen.queryByText('payload.exe')).toBeNull()
     expect(screen.queryByRole('button', { name: '制作报告' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '查看封面' })).toBeNull()
     expect(screen.queryByRole('button', { name: '试听真实文件' })).toBeNull()
     expect((screen.getByRole('button', { name: '进入发布' }) as HTMLButtonElement).disabled).toBe(true)
 
@@ -330,7 +324,6 @@ describe('SoundStudio production workflow', () => {
         file_size: 32000,
         audio_report_path: 'out/old/audio_report.json',
       },
-      cover_path: 'out/old/cover.png',
     }
     const onUpdateWorkflow = vi.fn(async () => undefined)
     const onRunNodes = vi.fn(async () => { throw new Error('TTS service unavailable') })
@@ -385,7 +378,7 @@ describe('SoundStudio production workflow', () => {
       await Promise.resolve()
     })
 
-    await waitFor(() => expect(onRunNodes).toHaveBeenCalledWith(['tts', 'audio_postprocess', 'assets']))
+    await waitFor(() => expect(onRunNodes).toHaveBeenCalledWith(['tts', 'audio_postprocess']))
     expect(onUpdateWorkflow).toHaveBeenCalledWith(expect.objectContaining({
       production_plan: expect.objectContaining({
         clips: expect.arrayContaining([
@@ -590,7 +583,7 @@ describe('SoundStudio production workflow', () => {
       await waitFor(() => expect(screen.getByText('2/2')).toBeTruthy())
 
       fireEvent.click(screen.getByRole('button', { name: /制作成品/ }))
-      await waitFor(() => expect(onRunNodes).toHaveBeenCalledWith(['audio_postprocess', 'assets']))
+      await waitFor(() => expect(onRunNodes).toHaveBeenCalledWith(['audio_postprocess']))
       expect(onUpdateWorkflow).toHaveBeenLastCalledWith(expect.objectContaining({
         voice_segments: [
           expect.objectContaining({ segment_id: 'seg_1', engine: 'recording' }),

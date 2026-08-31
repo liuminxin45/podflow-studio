@@ -40,7 +40,6 @@ def create_base_state() -> dict[str, Any]:
         "voice_segments": [],
         "production_plan": {},
         "audio_outputs": {},
-        "cover_path": "",
         "intro_outro_paths": {},
         "review_summary": {},
         "audio_approval": {},
@@ -213,15 +212,9 @@ def create_state_for_node(node_name: str) -> dict[str, Any]:
         state["voice_segments"] = []
         return state
 
-    if node_name == "assets":
-        state["script"] = create_mock_script()
-        state["audio_outputs"] = {"final_audio_path": "out/episodes/test_ep_001.mp3"}
-        return state
-
     if node_name == "review":
         state["edited_script"] = create_mock_script()
         state["audio_outputs"] = {"final_audio_path": "out/episodes/test_ep_001.mp3"}
-        state["cover_path"] = "out/assets/test_ep_001_cover.jpg"
         return state
 
     if node_name == "publish":

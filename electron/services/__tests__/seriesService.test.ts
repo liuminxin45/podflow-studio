@@ -45,4 +45,18 @@ describe('seriesService', () => {
     expect(() => service.upsert({ title: '周报', defaults: { targetDurationMinutes: 241 } })).toThrow('between 1 and 240')
     expect(() => service.upsert({ title: '周报', defaults: { targetDurationMinutes: Number.NaN } })).toThrow('between 1 and 240')
   })
+
+  it('imports an optional cover into managed series storage', () => {
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'podflow-series-'))
+    created.push(projectRoot)
+    const source = path.join(projectRoot, 'source cover.png')
+    fs.writeFileSync(source, 'png-placeholder')
+    const service = create({ projectRoot })
+
+    const series = service.upsert({ title: '有封面的栏目', coverPath: source })
+
+    expect(series.coverPath).toBe(path.join(projectRoot, 'out', 'series', series.id, 'cover.png'))
+    expect(fs.readFileSync(series.coverPath, 'utf8')).toBe('png-placeholder')
+    expect(service.upsert({ id: series.id, title: series.title, coverPath: '' }).coverPath).toBe('')
+  })
 })

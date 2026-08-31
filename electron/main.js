@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, nativeTheme, net, protocol, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, Menu, nativeImage, nativeTheme, net, protocol, shell } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { pathToFileURL } = require('url')
@@ -107,7 +107,7 @@ const STORAGE_ROOT = process.env.PODFLOW_DATA_DIR ? path.resolve(process.env.POD
 const WORKFLOW_DIR = process.env.PODFLOW_DATA_DIR
   ? path.join(path.resolve(process.env.PODFLOW_DATA_DIR), 'workflows')
   : path.join(PROJECT_ROOT, 'out', 'workflows')
-const EPISODE_SCHEMA_VERSION = 2
+const EPISODE_SCHEMA_VERSION = 3
 const FETCH_SOURCES_DIR = path.join(PROJECT_ROOT, 'nodes', 'fetch', 'sources')
 let fetchSourcesCache = null
 let fetchSourcesCacheSignature = ''
@@ -203,7 +203,6 @@ function createInitialState(episodeId, runtimeConfig) {
     voice_segments: [],
     production_plan: {},
     audio_outputs: {},
-    cover_path: series.coverPath || '',
     intro_outro_paths: {},
     review_summary: {},
     audio_approval: {},
@@ -233,7 +232,7 @@ const CURRENT_STATE_KEYS = new Set([
   'logs', 'errors', 'fetch_contents', 'cleaned_contents', 'researched_contents', 'facts',
   'selected_topic', 'selected_topics', 'selected_materials', 'auto_selected_items',
   'auto_rejected_items', 'script', 'edited_script', 'generation_request', 'generation_meta',
-  'script_snapshots', 'downstream_stale', 'voice_segments', 'production_plan', 'audio_outputs', 'cover_path',
+  'script_snapshots', 'downstream_stale', 'voice_segments', 'production_plan', 'audio_outputs',
   'intro_outro_paths', 'review_summary', 'audio_approval', 'release_readiness', 'publish_outputs', 'subtitle_path', 'run_report',
   'discover_meta', 'discover_ui', 'organize_ui', 'episode_brief', 'writing_meta', 'series', 'playback', '_manifest',
 ])
@@ -362,7 +361,6 @@ function createWorkflowSummary(workflow) {
     status: normalized.status,
     createdAt: normalized.state.created_at,
     updatedAt,
-    previewPath: normalized.state.cover_path || '',
     audioPath: normalized.state.audio_outputs?.final_audio_path || normalized.state.publish_outputs?.audio_path || '',
     durationSeconds: Number(normalized.state.audio_outputs?.duration_seconds || playback?.durationSeconds || 0),
     playback,
@@ -931,9 +929,6 @@ ipcMain.handle('workflow:updateMeta', async (event, workflowId, meta) => {
     workflow.state.selected_topic.description = meta.description
     workflow.state.script.description = meta.description
   }
-  if (typeof meta?.previewPath === 'string') {
-    workflow.state.cover_path = meta.previewPath
-  }
   workflow.state.logs = workflow.state.logs || []
   workflow.state.logs.push(`[Electron] Workflow metadata updated at ${new Date().toISOString()}`)
 
@@ -1127,7 +1122,7 @@ ipcMain.handle('workflow:updateState', async (event, workflowId, patch) => {
     delete safePatch[protectedKey]
   }
   const invalidatesRelease = [
-    'script', 'edited_script', 'voice_segments', 'production_plan', 'audio_outputs', 'cover_path',
+    'script', 'edited_script', 'voice_segments', 'production_plan', 'audio_outputs',
   ].some(key => Object.hasOwn(safePatch, key))
   currentWorkflow.state = mergeStatePatch({ ...currentWorkflow.state }, safePatch)
   if (invalidatesRelease) {
@@ -1407,6 +1402,23 @@ ipcMain.handle('file:selectAudio', async () => {
     return { success: false, canceled: true }
   }
   return { success: true, path: result.filePaths[0] }
+})
+
+ipcMain.handle('file:selectSeriesCover', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择栏目封面',
+    properties: ['openFile'],
+    filters: [{ name: '图片文件', extensions: ['png', 'jpg', 'jpeg'] }],
+  })
+  if (result.canceled || !result.filePaths?.[0]) return { success: false, canceled: true }
+  const selectedPath = result.filePaths[0]
+  const image = nativeImage.createFromPath(selectedPath)
+  if (image.isEmpty()) return { success: false, error: '无法读取所选图片，请选择有效的 PNG 或 JPEG 文件。' }
+  const { width, height } = image.getSize()
+  if (width !== height || width < 1400 || width > 3000) {
+    return { success: false, error: '栏目封面必须是 1400–3000 像素的正方形图片。' }
+  }
+  return { success: true, path: selectedPath, width, height }
 })
 
 ipcMain.handle('config:save', async (event, nodeName, config) => {

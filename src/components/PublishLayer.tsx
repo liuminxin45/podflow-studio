@@ -86,7 +86,6 @@ export default function PublishLayer({
   const publishOutputs = workflow?.state?.publish_outputs || {}
   const audioOutputs = workflow?.state?.audio_outputs || {}
   const finalAudioPath = text(audioOutputs.final_audio_path)
-  const coverPath = text(workflow?.state?.cover_path)
   const script = workflow?.state?.edited_script || {}
   const title = text(script.title) || episodeTitle || '未命名节目'
   const description = text(script.description) || episodeDesc || '未填写节目简介'
@@ -250,7 +249,6 @@ export default function PublishLayer({
           <dl className="publish-summary-stats">
             <div><dt><SoundOutlined />音频</dt><dd>{finalAudioPath ? formatDuration(duration) : '未生成'}</dd></div>
             <div><dt><FileTextOutlined />稿件</dt><dd>{segments.length} 段</dd></div>
-            <div><dt><CheckCircleOutlined />封面</dt><dd>{coverPath ? '已生成' : '未生成'}</dd></div>
           </dl>
           {finalAudioPath && (
             <div className="publish-source-file">

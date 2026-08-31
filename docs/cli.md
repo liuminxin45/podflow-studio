@@ -51,7 +51,7 @@ npm run cli -- accept --suite e2e-offline --window hidden --json
 
 - `startup` verifies Electron launch, React DOM visibility, preload IPC, and media APIs.
 - `ui` adds real settings navigation and guards the library against duplicate primary creation actions.
-- `e2e-offline` runs the repository's full local workflow acceptance through discovery, research, facts, writing, recording, audio, assets, local publishing, RSS validation, and UI checks. It does not authorize external LLM, search, TTS, or publishing calls.
+- `e2e-offline` runs the repository's full local workflow acceptance through discovery, research, facts, writing, recording, audio, local publishing, RSS validation, and UI checks. It does not authorize external LLM, search, TTS, or publishing calls.
 
 Each acceptance run creates a unique session unless `--session` is supplied. Evidence is written below `.podflow/sessions/<session>/artifacts/`:
 
@@ -119,9 +119,9 @@ The CLI and desktop app consume the same current production-plan defaults and Ep
 - `approve` requires a passing automatic review, the exact SHA256 of the current final MP3, and explicit full-listen, pronunciation and editorial-final acknowledgements. The reviewer identity and UTC review time are persisted; secrets are removed before the workflow is written.
 - `package --preview-only` consumes `preview_ready`, writes `previews/<episode>/<audio-sha-prefix>/`, and never emits RSS or public URLs. It waives only the human-approval gate.
 - Formal `package` consumes `publish_ready`, requires a passing `audio-quality-report.json`, current human approval, non-mock audio and an immutable output directory. It never overwrites a prior revision.
-- `publish` requires `--confirm-publish`. It uploads an eight-asset draft Release, verifies every remote size and SHA256 digest, then publishes it and sends `podflow_release_published` to the personal-site repository. Existing tags are immutable and rejected.
+- `publish` requires `--confirm-publish`. It uploads a seven-asset draft Release, verifies every remote size and SHA256 digest, then publishes it and sends `podflow_release_published` to the personal-site repository. Existing tags are immutable and rejected.
 
-The fixed Release assets are `<episode-id>.mp3`, `episode.json`, `cover.png`, `transcript.vtt`, `chapters.json`, `show-notes.md`, `audio-quality-report.json` and `checksums.sha256`. The MP3 stays in `liuminxin45/podflow-morning-feed`; the personal site downloads only the smaller companion assets during its Pages build.
+The fixed Release assets are `<episode-id>.mp3`, `episode.json`, `transcript.vtt`, `chapters.json`, `show-notes.md`, `audio-quality-report.json` and `checksums.sha256`. The MP3 stays in `liuminxin45/podflow-morning-feed`; the personal site downloads only the smaller companion assets during its Pages build.
 
 ### Local source installation
 
@@ -149,13 +149,13 @@ Configure `PODFLOW_LLM_PROVIDER`, `PODFLOW_LLM_MODEL`, `PODFLOW_FETCH_SOURCES` a
 
 The workflow installs Node 22, Python 3.13, FFmpeg, and Chinese fonts before generation. The publish
 token should grant only Contents access to `podflow-morning-feed` and the permission needed to dispatch
-the `liuminxin45.github.io` deployment. Uploads remain drafts until all eight fixed assets match their
+the `liuminxin45.github.io` deployment. Uploads remain drafts until all seven fixed assets match their
 expected sizes and GitHub SHA256 digests. A failed draft keeps its diagnostics and does not trigger the
 site deployment.
 
 If a stage fails, correct the reported preflight or quality issue and rerun the same stage. Do not hand-edit the fingerprint or quality report. A new render intentionally invalidates the earlier approval.
 
-EpisodeRun v1, legacy fact fields and scripts without `source_claim_ids` are rejected. Open the material again from Organize / Facts and regenerate; the CLI does not add aliases or defaults.
+EpisodeRun v1/v2, legacy fact fields and scripts without `source_claim_ids` are rejected. Open the material again from Organize / Facts and regenerate; the CLI does not add aliases or defaults.
 
 ## Agent-safe pattern
 

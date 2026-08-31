@@ -4,10 +4,6 @@ import struct
 import wave
 from pathlib import Path
 
-from nodes.assets.config import AssetsConfig
-from nodes.assets.node import _load_cover_font
-from nodes.assets.node import _safe_path_part as assets_safe_path_part
-from nodes.assets.node import run as assets_run
 from nodes.audio_postprocess.config import AudioPostprocessConfig
 from nodes.audio_postprocess.node import (
     _assemble_wav_fallback,
@@ -70,11 +66,8 @@ def _public_publish_state(tmp_path: Path, *, engine: str = "doubao_tts") -> tupl
     _write_wav(final_audio, frequency=440)
     with final_audio.open("r+b") as output:
         output.truncate(840 * 20_000)
-    cover = tmp_path / "cover.png"
-    cover.write_bytes(b"podflow-cover")
     state = create_base_state()
     state["episode_id"] = "2026-08-11-test"
-    state["cover_path"] = str(cover)
     state["facts"] = [{
         "id": "fact_001",
         "title": "公开来源",
@@ -548,7 +541,7 @@ def test_cosyvoice_tts_sends_instruct_payload(tmp_path: Path, monkeypatch):
 
 
 def test_produce_path_sanitizers_preserve_unicode_and_block_windows_reserved_names():
-    for sanitizer in (tts_safe_path_part, audio_safe_path_part, assets_safe_path_part):
+    for sanitizer in (tts_safe_path_part, audio_safe_path_part):
         assert sanitizer("plain-safe", "unknown") == "plain-safe"
         assert sanitizer("中文节目 早报", "unknown").startswith("中文节目_早报_")
         assert sanitizer("../安全/节目", "unknown").startswith("安全_节目_")
@@ -561,7 +554,7 @@ def test_produce_path_sanitizers_preserve_unicode_and_block_windows_reserved_nam
 
 
 def test_produce_path_sanitizers_do_not_collapse_lossy_inputs():
-    for sanitizer in (tts_safe_path_part, audio_safe_path_part, assets_safe_path_part):
+    for sanitizer in (tts_safe_path_part, audio_safe_path_part):
         assert sanitizer("episode/a") != sanitizer("episode\\a")
         assert sanitizer("CON") != sanitizer("_CON")
         assert sanitizer("../a") != sanitizer("a")
@@ -569,43 +562,6 @@ def test_produce_path_sanitizers_do_not_collapse_lossy_inputs():
         assert sanitizer("Episode") != sanitizer("episode")
         unicode_value = "节目" * 100
         assert len(sanitizer(unicode_value).encode("utf-8")) <= 120
-
-
-def test_assets_skip_clears_stale_cover():
-    state = create_base_state()
-    state["cover_path"] = "out/assets/old-cover.png"
-
-    result = assets_run(state, AssetsConfig(generate_cover=False))
-
-    assert result["cover_path"] == ""
-
-
-def test_assets_isolates_and_sanitizes_episode_output(tmp_path: Path):
-    state = create_base_state()
-    state["episode_id"] = "../unsafe episode"
-
-    result = assets_run(state, AssetsConfig(output_dir=str(tmp_path), generate_cover=True))
-    cover_path = Path(result["cover_path"])
-
-    assert cover_path.exists()
-    assert cover_path == tmp_path / assets_safe_path_part("../unsafe episode") / "cover.png"
-
-    from PIL import Image
-
-    with Image.open(cover_path) as cover:
-        assert cover.size == (1400, 1400)
-        colors = cover.convert("RGB").getcolors(maxcolors=1400 * 1400)
-        assert colors is not None
-        color_counts = {color: count for count, color in colors}
-        assert color_counts[(244, 241, 234)] > 1_000_000
-        assert color_counts[(35, 38, 36)] > 1_000
-        assert color_counts[(218, 104, 72)] > 1_000
-
-
-def test_cover_font_renders_distinct_chinese_glyphs():
-    font = _load_cover_font(80, bold=True, sample_text="通勤")
-
-    assert bytes(font.getmask("通")) != bytes(font.getmask("勤"))
 
 
 def test_wav_fallback_does_not_append_pause_after_last_segment(tmp_path: Path):
@@ -842,7 +798,7 @@ def test_formal_package_uses_immutable_release_assets_and_checksums(tmp_path: Pa
     result = package_release(state, tmp_path / "delivery")
     directory = Path(result["directory"])
     expected = {
-        "2026-08-11-test.mp3", "episode.json", "cover.png", "transcript.vtt",
+        "2026-08-11-test.mp3", "episode.json", "transcript.vtt",
         "chapters.json", "show-notes.md", "audio-quality-report.json", "checksums.sha256",
     }
     assert {item.name for item in directory.iterdir()} == expected

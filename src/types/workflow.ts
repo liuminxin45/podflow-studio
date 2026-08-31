@@ -86,7 +86,6 @@ export interface PodcastState {
   voice_segments: VoiceSegment[]
   production_plan?: ProductionPlan
   audio_outputs: Record<string, any>
-  cover_path: string
   intro_outro_paths: Record<string, string>
   review_summary: Record<string, any>
   audio_approval?: {
@@ -440,7 +439,6 @@ export interface WorkflowSummary {
   status: Workflow['status']
   createdAt: string
   updatedAt?: string
-  previewPath?: string
   isCurrent?: boolean
   isSaved?: boolean
   audioPath?: string

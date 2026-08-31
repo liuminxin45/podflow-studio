@@ -1,5 +1,5 @@
 """
-E2E Pipeline Test — runs the active 11-node pipeline without external services.
+E2E Pipeline Test — runs the active 10-node pipeline without external services.
 
 Verifies that state flows correctly through all nodes and that the
 pipeline manifest tracks completion properly.
@@ -28,7 +28,6 @@ from nodes.facts.node import run as facts_run
 from nodes.script.node import run as script_run
 from nodes.tts.node import run as tts_run
 from nodes.audio_postprocess.node import run as audio_postprocess_run
-from nodes.assets.node import run as assets_run
 from nodes.review.node import run as review_run
 from nodes.publish.node import run as publish_run
 
@@ -127,14 +126,7 @@ def test_full_pipeline_no_external_services():
         f"final_audio_path={state.get('audio_outputs', {}).get('final_audio_path', '')}",
     )
 
-    # ---- 9. Assets (skip cover generation flag) ----
-    from nodes.assets.config import AssetsConfig
-
-    assets_config = AssetsConfig(generate_cover=False)
-    state = assets_run(state, config=assets_config)
-    check("assets (generate_cover=False)", True)
-
-    # ---- 10. Review ----
+    # ---- 9. Review ----
     state = review_run(state)
     check(
         "review",
@@ -142,7 +134,7 @@ def test_full_pipeline_no_external_services():
         f"review_summary keys={list(state.get('review_summary', {}).keys())}",
     )
 
-    # ---- 11. Publish ----
+    # ---- 10. Publish ----
     state = publish_run(state)
     check("publish", "publish_outputs" in state)
 

@@ -66,7 +66,6 @@ def main():
         ("script", "ScriptConfig"),
         ("tts", "TTSConfig"),
         ("audio_postprocess", "AudioPostprocessConfig"),
-        ("assets", "AssetsConfig"),
         ("review", "ReviewConfig"),
         ("publish", "PublishConfig"),
     ]

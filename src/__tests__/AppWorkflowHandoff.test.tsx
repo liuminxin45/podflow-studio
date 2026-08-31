@@ -195,7 +195,6 @@ describe('App discover-to-draft handoff', () => {
         voice_segments: [{ segment_id: 'old', path: 'old.mp3', text: '旧正文' }],
         production_plan: { clips: [{ id: 'old' }] },
         audio_outputs: { final_audio_path: 'old-final.mp3' },
-        cover_path: 'old-cover.png',
         review_summary: { status: 'passed' },
         publish_outputs: { rss_path: 'old.xml' },
         subtitle_path: 'old.srt',
@@ -214,7 +213,6 @@ describe('App discover-to-draft handoff', () => {
       expect(currentWorkflow.state.voice_segments).toEqual([])
       expect(currentWorkflow.state.production_plan).toEqual({})
       expect(currentWorkflow.state.audio_outputs).toEqual({})
-      expect(currentWorkflow.state.cover_path).toBe('')
       expect(currentWorkflow.state.review_summary).toEqual({})
       expect(currentWorkflow.state.publish_outputs).toEqual({})
       expect(currentWorkflow.state.subtitle_path).toBe('')

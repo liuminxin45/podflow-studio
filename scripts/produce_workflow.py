@@ -16,8 +16,6 @@ import sys
 from typing import Any
 from urllib.parse import urlparse
 
-from nodes.assets.config import AssetsConfig
-from nodes.assets.node import run as run_assets
 from nodes.audio_postprocess.config import AudioPostprocessConfig
 from nodes.audio_postprocess.node import run as run_audio
 from nodes.facts.config import FactsConfig
@@ -129,7 +127,7 @@ def _initial_state(episode_id: str, output_dir: Path, topic: str) -> dict[str, A
         "auto_rejected_items": [], "script": {}, "edited_script": {},
         "generation_request": {}, "generation_meta": {}, "script_snapshots": [],
         "downstream_stale": {}, "voice_segments": [], "production_plan": {},
-        "audio_outputs": {}, "cover_path": "", "intro_outro_paths": {},
+        "audio_outputs": {}, "intro_outro_paths": {},
         "review_summary": {}, "audio_approval": {}, "release_readiness": {}, "publish_outputs": {},
         "subtitle_path": "", "run_report": {}, "runtime_config": {},
         "errors": [], "logs": [],
@@ -149,7 +147,6 @@ def _initial_state(episode_id: str, output_dir: Path, topic: str) -> dict[str, A
         "output_format": "mp3",
         "final_basename": "final",
     })
-    runtime.setdefault("assets", {})["output_dir"] = str((output_dir / "assets").resolve())
     if topic:
         runtime.setdefault("discover", {})["target_topic"] = topic
     return state
@@ -327,7 +324,6 @@ def render(
     state["audio_approval"] = {}
     state = run_tts(state, tts)
     state = run_audio(state, _config(state, "audio_postprocess", AudioPostprocessConfig))
-    state = run_assets(state, _config(state, "assets", AssetsConfig))
     state = run_review(state, ReviewConfig(require_approval=True))
     _persist(path, envelope, state)
     return {"stage": "render", "estimate": estimate, "review": state.get("review_summary", {})}
@@ -392,9 +388,6 @@ def package(
     if not preview_only:
         if readiness.get("status") != "publish_ready":
             raise ValueError("Formal package requires current human approval")
-    cover = Path(str(state.get("cover_path") or ""))
-    if not cover.is_file():
-        raise ValueError("Package requires a generated cover")
     quality_report = Path(str(state.get("review_summary", {}).get("audio_quality_report") or ""))
     if not quality_report.is_file():
         raise ValueError("Package requires audio-quality-report.json")
@@ -424,8 +417,6 @@ def package(
     audio = Path(artifact["path"])
     audio_name = f"{episode_id}.mp3"
     shutil.copy2(audio, target / audio_name)
-    cover_name = "cover.png"
-    shutil.copy2(cover, target / cover_name)
     shutil.copy2(quality_report, target / "audio-quality-report.json")
     duration = int(float(state.get("audio_outputs", {}).get("duration_seconds") or 0))
     weights = [max(1, int(segment.get("estimated_seconds") or len(str(segment.get("text") or "")) / 4)) for segment in segments]
@@ -449,10 +440,9 @@ def package(
             return f"{hours:02d}:{minutes:02d}:{seconds:02d}.000"
         vtt.extend([str(index + 1), f"{stamp(start)} --> {stamp(max(start + 1, end))}", str(segment.get("text") or ""), ""])
     (target / "transcript.vtt").write_text("\n".join(vtt), encoding="utf-8")
-    site_base = f"https://www.liuminxin.cn/podflow-studio/episodes/{episode_id}"
     release_base = f"https://github.com/{release_repository}/releases/download/{episode_id}"
     audio_name_ref = audio_name if preview_only else f"{release_base}/{audio_name}"
-    cover_name_ref = cover_name if preview_only else f"{site_base}/{cover_name}"
+    site_base = f"https://www.liuminxin.cn/podflow-studio/episodes/{episode_id}"
     transcript_ref = "transcript.vtt" if preview_only else f"{site_base}/transcript.vtt"
     chapters_ref = "chapters.json" if preview_only else f"{site_base}/chapters.json"
     source_engines = [str(value) for value in audio_outputs.get("source_engines", [])]
@@ -461,7 +451,7 @@ def package(
         "summary": str(script.get("description") or "6 条快讯和 1 条重点解读。"),
         "publishedAt": str(state.get("created_at") or datetime.now(timezone.utc).isoformat()),
         "durationSeconds": duration, "audioUrl": audio_name_ref,
-        "audioBytes": artifact["size_bytes"], "coverUrl": cover_name_ref,
+        "audioBytes": artifact["size_bytes"],
         "transcriptUrl": transcript_ref, "chaptersUrl": chapters_ref,
         "sources": sources, "credits": [{"role": "制作", "name": "PodFlow Studio"}],
         "ttsProvider": ", ".join(source_engines), "aiAssisted": True, "explicit": False,
@@ -481,7 +471,7 @@ def package(
     (target / "show-notes.md").write_text("\n".join(notes) + "\n", encoding="utf-8")
     (target / "episode.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     checksum_names = [
-        audio_name, "episode.json", "cover.png", "transcript.vtt", "chapters.json",
+        audio_name, "episode.json", "transcript.vtt", "chapters.json",
         "show-notes.md", "audio-quality-report.json",
     ]
     checksum_lines = [

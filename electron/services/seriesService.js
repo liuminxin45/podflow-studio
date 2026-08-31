@@ -2,6 +2,8 @@ const fs = require('fs')
 const path = require('path')
 const { randomUUID } = require('crypto')
 
+const COVER_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png'])
+
 function create({ projectRoot }) {
   const seriesFile = path.join(projectRoot, 'out', 'series.json')
 
@@ -25,11 +27,27 @@ function create({ projectRoot }) {
     if (!Number.isInteger(targetDurationMinutes) || targetDurationMinutes < 1 || targetDurationMinutes > 240) {
       throw new Error('Series target duration must be an integer between 1 and 240 minutes')
     }
+    const id = String(existing.id || input?.id || `series_${randomUUID()}`)
+    const requestedCoverPath = String(input?.coverPath ?? existing.coverPath ?? '').trim()
+    let coverPath = String(existing.coverPath || '')
+    if (!requestedCoverPath) {
+      coverPath = ''
+    } else if (!coverPath || path.resolve(requestedCoverPath) !== path.resolve(coverPath)) {
+      const source = path.resolve(requestedCoverPath)
+      const extension = path.extname(source).toLowerCase()
+      if (!COVER_EXTENSIONS.has(extension)) throw new Error('Series cover must be a PNG or JPEG image')
+      if (!fs.existsSync(source) || !fs.statSync(source).isFile()) throw new Error('Series cover image is not readable')
+      const coverDir = path.join(projectRoot, 'out', 'series', id.replace(/[^a-zA-Z0-9_-]/g, '_'))
+      fs.mkdirSync(coverDir, { recursive: true })
+      const target = path.join(coverDir, `cover${extension === '.jpeg' ? '.jpg' : extension}`)
+      fs.copyFileSync(source, target)
+      coverPath = target
+    }
     return {
-      id: String(existing.id || input?.id || `series_${randomUUID()}`),
+      id,
       title,
       description: String(input?.description ?? existing.description ?? '').trim(),
-      coverPath: String(input?.coverPath ?? existing.coverPath ?? ''),
+      coverPath,
       cadence: input?.cadence === 'weekly' ? 'weekly' : 'daily',
       defaults: {
         language: String(input?.defaults?.language ?? existing.defaults?.language ?? 'zh-CN'),

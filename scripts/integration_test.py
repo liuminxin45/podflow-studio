@@ -93,7 +93,6 @@ def test_review_node():
         ],
     }
     state["audio_outputs"] = {"final_audio_path": "out/episodes/test.mp3", "duration_seconds": 60}
-    state["cover_path"] = "out/assets/test_cover.png"
 
     state = review_run(state, ReviewConfig())
     review = state.get("review_summary", {})

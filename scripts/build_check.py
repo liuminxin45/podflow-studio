@@ -85,7 +85,6 @@ def check_node_structure() -> tuple[bool, str]:
         # produce
         "tts",
         "audio_postprocess",
-        "assets",
         # publish
         "review",
         "publish",

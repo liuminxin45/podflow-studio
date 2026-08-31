@@ -38,7 +38,6 @@ NODES = [
     # produce
     "tts",
     "audio_postprocess",
-    "assets",
     # publish
     "review",
     "publish",

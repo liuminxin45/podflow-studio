@@ -43,7 +43,6 @@ NODES = [
     # produce
     "tts",
     "audio_postprocess",
-    "assets",
     # publish
     "review",
     "publish",
@@ -56,7 +55,6 @@ VERIFY_EXPECTED_OUTPUTS = {
 FILE_OUTPUTS = {
     "tts": ["voice_segments"],
     "audio_postprocess": ["audio_outputs"],
-    "assets": ["cover_path"],
     "publish": ["publish_outputs"],
 }
 
@@ -163,7 +161,6 @@ def _test_state() -> dict:
                 "output_dir": str(SMOKE_DIR / "episodes"),
                 "output_format": "wav",
             },
-            "assets": {"output_dir": str(SMOKE_DIR / "assets")},
             "publish": {
                 "local_base_dir": str(SMOKE_DIR / "dist" / "episodes"),
                 "rss_output_dir": str(SMOKE_DIR / "rss"),
@@ -204,7 +201,6 @@ def _test_state() -> dict:
             "file_size": smoke_audio.stat().st_size,
             "segments_count": 1,
         },
-        "cover_path": "",
         "review_summary": {},
         "audio_approval": {},
         "release_readiness": {},

@@ -4,7 +4,6 @@ import {
   AudioOutlined,
   CheckCircleOutlined,
   CloseOutlined,
-  FileImageOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
   LoadingOutlined,
@@ -74,7 +73,7 @@ const DEFAULT_POSTPROCESS: PostprocessSettings = {
 }
 
 const IDLE_RUN: ProductionRunState = { status: 'idle', message: '', error: '' }
-const PRODUCE_NODES = new Set(['tts', 'audio_postprocess', 'assets'])
+const PRODUCE_NODES = new Set(['tts', 'audio_postprocess'])
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -103,11 +102,10 @@ function fileName(targetPath: string): string {
   return parts[parts.length - 1] || targetPath
 }
 
-type ArtifactKind = 'audio' | 'image' | 'report'
+type ArtifactKind = 'audio' | 'report'
 
 const ARTIFACT_EXTENSIONS: Record<ArtifactKind, Set<string>> = {
   audio: new Set(['.aac', '.flac', '.m4a', '.mp3', '.oga', '.ogg', '.opus', '.wav', '.webm']),
-  image: new Set(['.jpeg', '.jpg', '.png', '.webp']),
   report: new Set(['.json']),
 }
 
@@ -291,9 +289,7 @@ export default function ProductionStudio({
   const [rate, setRate] = useState('+0%')
   const [ttsConfig, setTtsConfig] = useState<Record<string, any>>({})
   const [postprocessConfig, setPostprocessConfig] = useState<Record<string, any>>({})
-  const [assetsConfig, setAssetsConfig] = useState<Record<string, any>>({})
   const [postprocess, setPostprocess] = useState<PostprocessSettings>(DEFAULT_POSTPROCESS)
-  const [generateCover, setGenerateCover] = useState(true)
   const [configLoading, setConfigLoading] = useState(false)
   const [configReady, setConfigReady] = useState(false)
   const [configLoadAttempt, setConfigLoadAttempt] = useState(0)
@@ -321,9 +317,7 @@ export default function ProductionStudio({
   const hasUnverifiedFinalAudio = Boolean(storedFinalAudioPath && !finalAudioPath)
   const audioOutputs = workflow?.state?.audio_outputs || {}
   const storedAudioReportPath = text(workflow?.state?.audio_outputs?.audio_report_path)
-  const storedCoverPath = text(workflow?.state?.cover_path)
   const audioReportPath = isAllowedArtifactPath(storedAudioReportPath, 'report') ? storedAudioReportPath : ''
-  const coverPath = isAllowedArtifactPath(storedCoverPath, 'image') ? storedCoverPath : ''
   const reconciliation = useMemo(
     () => {
       try {
@@ -415,13 +409,11 @@ export default function ProductionStudio({
     Promise.all([
       window.electronAPI.loadNodeConfig('tts'),
       window.electronAPI.loadNodeConfig('audio_postprocess'),
-      window.electronAPI.loadNodeConfig('assets'),
     ])
-      .then(([savedTts, savedPostprocess, savedAssets]) => {
+      .then(([savedTts, savedPostprocess]) => {
         if (cancelled) return
         const nextTts = savedTts || {}
         const nextPostprocess = savedPostprocess || {}
-        const nextAssets = savedAssets || {}
         const savedEngine = text(nextTts.engine || 'edge-tts').toLowerCase()
         const detectedProvider = providerFromEngine(savedEngine)
         const nextProvider: AudioProvider = detectedProvider || 'edge-tts'
@@ -431,7 +423,6 @@ export default function ProductionStudio({
 
         setTtsConfig(nextTts)
         setPostprocessConfig(nextPostprocess)
-        setAssetsConfig(nextAssets)
         setAudioProvider(nextProvider)
         setUnsupportedEngine(nextUnsupportedEngine)
         setVoice(savedVoice || availableVoices[0]?.id || '')
@@ -451,7 +442,6 @@ export default function ProductionStudio({
           bgmPath: text(nextPostprocess.bgm_path),
           bgmVolume: clamp(finiteNumber(nextPostprocess.bgm_volume, DEFAULT_POSTPROCESS.bgmVolume), 0.01, 1),
         })
-        setGenerateCover(nextAssets.generate_cover !== false)
         setConfigReady(true)
       })
       .catch(error => {
@@ -951,7 +941,6 @@ export default function ProductionStudio({
       voice_segments: structuredClone(workflow?.state?.voice_segments || []),
       production_plan: structuredClone(savedProductionPlan || {}),
       audio_outputs: structuredClone(workflow?.state?.audio_outputs || {}),
-      cover_path: workflow?.state?.cover_path || '',
     }
     let artifactsCleared = false
     try {
@@ -965,16 +954,12 @@ export default function ProductionStudio({
         add_bgm: false,
         bgm_path: '',
       }
-      const nextAssetsConfig = { ...assetsConfig, generate_cover: generateCover }
-
       await saveConfigBatch([
         ...(currentTtsClipCount > 0 ? [{ nodeName: 'tts', next: nextTtsConfig, previous: ttsConfig }] : []),
         { nodeName: 'audio_postprocess', next: nextPostprocessConfig, previous: postprocessConfig },
-        { nodeName: 'assets', next: nextAssetsConfig, previous: assetsConfig },
       ])
       setTtsConfig(nextTtsConfig)
       setPostprocessConfig(nextPostprocessConfig)
-      setAssetsConfig(nextAssetsConfig)
 
       const recordingItems = toPersistedRecordings(recordingsRef.current, currentPlan.clips)
       const recordingIds = new Set(recordingItems.map(item => item.segment_id))
@@ -986,7 +971,6 @@ export default function ProductionStudio({
         production_plan: { ...currentPlan, updated_at: new Date().toISOString() },
         voice_segments: nextVoiceSegments,
         audio_outputs: {},
-        ...(generateCover ? {} : { cover_path: '' }),
       })
       artifactsCleared = true
 
@@ -996,7 +980,6 @@ export default function ProductionStudio({
       }
       setRunState({ status: 'running', message: currentTtsClipCount > 0 ? '生成或复用语音块' : '合成真人录音', error: '' })
       const nodes = currentTtsClipCount > 0 ? ['tts', 'audio_postprocess'] : ['audio_postprocess']
-      if (generateCover) nodes.push('assets')
       await onRunNodes(nodes)
       if (awaitedRunRef.current) awaitedRunRef.current.executionComplete = true
       setRunState(current => current.status === 'failed' || current.status === 'succeeded'
@@ -1016,12 +999,10 @@ export default function ProductionStudio({
       message.error({ content: `制作失败：${detail}`, duration: 3, style: { marginTop: 60 } })
     }
   }, [
-    assetsConfig,
     buildTtsConfig,
     configError,
     configLoading,
     configReady,
-    generateCover,
     onRunNodes,
     onUpdateWorkflow,
     postprocess,
@@ -1034,7 +1015,6 @@ export default function ProductionStudio({
     unsupportedEngine,
     workflow?.state?.errors?.length,
     workflow?.state?.audio_outputs,
-    workflow?.state?.cover_path,
     workflow?.state?.voice_segments,
   ])
 
@@ -1046,9 +1026,7 @@ export default function ProductionStudio({
         ? 30
         : workflow?.currentNode === 'audio_postprocess'
           ? 65
-          : workflow?.currentNode === 'assets'
-            ? 88
-            : runState.status === 'succeeded'
+          : runState.status === 'succeeded'
               ? 100
               : isBusy
                 ? 18
@@ -1272,11 +1250,6 @@ export default function ProductionStudio({
                 {audioReportPath && (
                   <Button icon={<FileTextOutlined />} onClick={() => openArtifact(audioReportPath, 'open', 'report')}>
                     制作报告
-                  </Button>
-                )}
-                {coverPath && (
-                  <Button icon={<FileImageOutlined />} onClick={() => openArtifact(coverPath, 'open', 'image')}>
-                    查看封面
                   </Button>
                 )}
               </div>
@@ -1508,7 +1481,6 @@ export default function ProductionStudio({
                   </span>
                 </li>
                 <li><ReloadOutlined /><span><strong>音频合成</strong><small>按装配单中的裁剪、停顿和音乐渲染</small></span></li>
-                <li><FileImageOutlined /><span><strong>节目资产</strong><small>{generateCover ? '同步生成封面' : '本次不生成封面'}</small></span></li>
               </ol>
             </section>
           )}
@@ -1685,12 +1657,6 @@ export default function ProductionStudio({
                 <p className="produce-field-help">正式节目固定使用 Make Funk 派生 cue，正文不持续铺底乐。</p>
               </section>
 
-              <section className="produce-settings-section">
-                <div className="produce-switch-row">
-                  <span><strong>生成节目封面</strong><small>运行资产节点并写入 cover_path</small></span>
-                  <Switch aria-label="生成节目封面" checked={generateCover} disabled={isBusy} onChange={setGenerateCover} />
-                </div>
-              </section>
             </>
           )}
         </aside>

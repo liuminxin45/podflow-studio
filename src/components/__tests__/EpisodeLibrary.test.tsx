@@ -48,6 +48,7 @@ describe('节目库与播放器', () => {
       getMediaUrl: vi.fn(async () => ({ url: 'podflow-media://audio/token' })),
       updatePlayback: vi.fn(async () => episode.playback),
       openExternal: vi.fn(async () => ({ success: true })),
+      selectSeriesCover: vi.fn(async () => ({ success: true, path: 'C:\\covers\\series.png', width: 1400, height: 1400 })),
     }
   })
 
@@ -129,6 +130,9 @@ describe('节目库与播放器', () => {
     expect(screen.getByRole('navigation', { name: '栏目列表' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '每日科技' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '生成 RSS' })).toBeTruthy()
+    expect(screen.getByText('栏目封面（可选）')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '选择图片' }))
+    await waitFor(() => expect(window.electronAPI.selectSeriesCover).toHaveBeenCalledTimes(1))
   })
 
   it('links the current script segment to its fact source', async () => {

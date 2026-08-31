@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from protocol.presets import get_default_preset
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 class EvidenceRefModel(BaseModel):
@@ -417,7 +417,7 @@ class PlaybackModel(BaseModel):
 class EpisodeRunModel(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    schema_version: Literal[2] = SCHEMA_VERSION
+    schema_version: Literal[3] = SCHEMA_VERSION
     episode_id: str
     created_at: str = ""
     preset: dict[str, Any] = Field(default_factory=get_default_preset)
@@ -443,7 +443,6 @@ class EpisodeRunModel(BaseModel):
     voice_segments: list[VoiceSegmentModel] = Field(default_factory=list)
     production_plan: ProductionPlanModel = Field(default_factory=ProductionPlanModel)
     audio_outputs: AudioOutputsModel = Field(default_factory=AudioOutputsModel)
-    cover_path: str = ""
     intro_outro_paths: dict[str, str] = Field(default_factory=dict)
     review_summary: dict[str, Any] = Field(default_factory=dict)
     audio_approval: AudioApprovalModel = Field(default_factory=AudioApprovalModel)

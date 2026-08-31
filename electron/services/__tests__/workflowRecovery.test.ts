@@ -15,7 +15,6 @@ function workflow() {
       edited_script: { segments: [{ id: 's1' }] },
       voice_segments: [{ segment_id: 's1' }],
       audio_outputs: { final_audio_path: 'final.mp3' },
-      cover_path: 'cover.png',
       review_summary: { ok: true },
       publish_outputs: { status: 'success' },
       downstream_stale: { is_stale: true },
@@ -39,8 +38,8 @@ describe('workflowRecovery', () => {
 
   it('previews only the selected node and downstream impact', () => {
     const plan = buildRecoveryPlan(workflow(), 'tts')
-    expect(plan.rerunNodes).toEqual(['tts', 'audio_postprocess', 'assets', 'review', 'publish'])
-    expect(plan.populatedFields).toEqual(expect.arrayContaining(['voice_segments', 'audio_outputs', 'cover_path', 'publish_outputs']))
+    expect(plan.rerunNodes).toEqual(['tts', 'audio_postprocess', 'review', 'publish'])
+    expect(plan.populatedFields).toEqual(expect.arrayContaining(['voice_segments', 'audio_outputs', 'publish_outputs']))
     expect(plan.clearFields).not.toContain('facts')
     expect(plan.clearFields).not.toContain('edited_script')
   })

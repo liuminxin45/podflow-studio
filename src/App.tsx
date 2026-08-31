@@ -67,7 +67,6 @@ function hasDiscoveryDependentContent(state?: Workflow['state'] | null): boolean
     state.voice_segments,
     state.production_plan,
     state.audio_outputs,
-    state.cover_path,
     state.intro_outro_paths,
     state.review_summary,
     state.release_readiness,
@@ -92,7 +91,6 @@ function buildDiscoveryRerunResetPatch(): Record<string, any> {
     voice_segments: [],
     production_plan: {},
     audio_outputs: {},
-    cover_path: '',
     intro_outro_paths: {},
     review_summary: {},
     audio_approval: {},
@@ -124,7 +122,6 @@ function buildOrganizeSelectionChangeResetPatch(): Record<string, any> {
     voice_segments: [],
     production_plan: {},
     audio_outputs: {},
-    cover_path: '',
     intro_outro_paths: {},
     review_summary: {},
     audio_approval: {},
@@ -140,7 +137,6 @@ function buildWritingChangeResetPatch(): Record<string, any> {
     voice_segments: [],
     production_plan: {},
     audio_outputs: {},
-    cover_path: '',
     review_summary: {},
     audio_approval: {},
     release_readiness: {},
@@ -731,7 +727,7 @@ function App() {
 
   const handleEditWorkflow = async (
     workflowId: string,
-    patch: { title: string; description: string; previewPath: string }
+    patch: { title: string; description: string }
   ) => {
     if (!window.electronAPI?.updateWorkflowMeta) {
       showNotice('warning', '当前浏览器预览没有 Electron 后端，无法编辑节目')
@@ -1044,7 +1040,7 @@ function App() {
                   options={[
                     ['fetch', '发现抓取'], ['preprocess', '内容清洗'], ['research', '补充研究'],
                     ['topic_selection', '选题结构'], ['facts', '事实卡'], ['script', '口播稿'],
-                    ['tts', '语音合成'], ['audio_postprocess', '音频装配'], ['assets', '封面资产'],
+                    ['tts', '语音合成'], ['audio_postprocess', '音频装配'],
                     ['review', '发布审核'], ['publish', '发布包'],
                   ].map(([value, label]) => ({ value, label }))}
                 />

@@ -22,7 +22,6 @@ import type { Series, WorkflowSummary } from '../types/workflow'
 interface EpisodeMetaPatch {
   title: string
   description: string
-  previewPath: string
 }
 
 interface Props {
@@ -105,8 +104,8 @@ export default function EpisodeManager({
   const [editing, setEditing] = useState<WorkflowSummary | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
-  const [editPreviewPath, setEditPreviewPath] = useState('')
   const [previewSources, setPreviewSources] = useState<Record<string, string>>({})
+  const [seriesCoverPreview, setSeriesCoverPreview] = useState('')
   const [query, setQuery] = useState('')
   const [playbackFilter, setPlaybackFilter] = useState<'all' | 'continue' | 'completed'>('all')
   const [seriesFilter, setSeriesFilter] = useState<string>('all')
@@ -134,7 +133,7 @@ export default function EpisodeManager({
     let disposed = false
     async function loadPreviewSources() {
       const entries = await Promise.all(episodes.map(async episode => {
-        const previewPath = episode.previewPath || ''
+        const previewPath = episode.series?.coverPath || ''
         if (!previewPath) return [episode.id, ''] as const
         if (/^(https?:|data:|blob:)/i.test(previewPath)) return [episode.id, previewPath] as const
         if (!window.electronAPI?.readImageAsDataUrl) return [episode.id, ''] as const
@@ -178,7 +177,30 @@ export default function EpisodeManager({
     setEditing(episode)
     setEditTitle(episode.title || '')
     setEditDescription(episode.description || '')
-    setEditPreviewPath(episode.previewPath || '')
+  }
+
+  useEffect(() => {
+    let disposed = false
+    async function loadSeriesCoverPreview() {
+      if (!seriesCoverPath || !window.electronAPI?.readImageAsDataUrl) {
+        setSeriesCoverPreview('')
+        return
+      }
+      const result = await window.electronAPI.readImageAsDataUrl(seriesCoverPath)
+      if (!disposed) setSeriesCoverPreview(result.success && result.dataUrl ? result.dataUrl : '')
+    }
+    void loadSeriesCoverPreview()
+    return () => { disposed = true }
+  }, [seriesCoverPath])
+
+  const selectSeriesCover = async () => {
+    const result = await window.electronAPI.selectSeriesCover()
+    if (result.success && result.path) {
+      setSeriesCoverPath(result.path)
+      setSeriesError('')
+    } else if (!result.canceled && result.error) {
+      setSeriesError(result.error)
+    }
   }
 
   const populateSeries = (value?: Series) => {
@@ -426,11 +448,10 @@ export default function EpisodeManager({
         </div>
       </Modal>
 
-      <Modal title="编辑节目信息" open={Boolean(editing)} onOk={async () => { if (!editing) return; await onEdit(editing.id, { title: editTitle.trim() || '未命名节目', description: editDescription.trim(), previewPath: editPreviewPath.trim() }); setEditing(null) }} onCancel={() => setEditing(null)} okText="保存" cancelText="取消">
+      <Modal title="编辑节目信息" open={Boolean(editing)} onOk={async () => { if (!editing) return; await onEdit(editing.id, { title: editTitle.trim() || '未命名节目', description: editDescription.trim() }); setEditing(null) }} onCancel={() => setEditing(null)} okText="保存" cancelText="取消">
         <div className="ui-form-stack">
           <label className="ui-field"><span>节目标题</span><Input value={editTitle} onChange={event => setEditTitle(event.target.value)} /></label>
           <label className="ui-field"><span>节目描述</span><Input.TextArea value={editDescription} onChange={event => setEditDescription(event.target.value)} autoSize={{ minRows: 3, maxRows: 5 }} /></label>
-          <label className="ui-field"><span>预览图片路径</span><Input value={editPreviewPath} onChange={event => setEditPreviewPath(event.target.value)} prefix={<DownloadSimple />} /></label>
         </div>
       </Modal>
 
@@ -456,7 +477,19 @@ export default function EpisodeManager({
             <div className="ui-form-stack">
               <label className="ui-field"><span>栏目名称</span><Input value={seriesTitle} onChange={event => setSeriesTitle(event.target.value)} /></label>
               <label className="ui-field"><span>栏目简介</span><Input.TextArea value={seriesDescription} onChange={event => setSeriesDescription(event.target.value)} autoSize={{ minRows: 2, maxRows: 4 }} /></label>
-              <label className="ui-field"><span>默认封面路径</span><Input value={seriesCoverPath} onChange={event => setSeriesCoverPath(event.target.value)} /></label>
+              <div className="ui-field">
+                <span>栏目封面（可选）</span>
+                <div className="series-cover-editor">
+                  <span className="series-cover-preview">
+                    {seriesCoverPreview ? <img src={seriesCoverPreview} alt="栏目封面预览" /> : <FileImage aria-hidden="true" />}
+                  </span>
+                  <Space>
+                    <Button onClick={() => void selectSeriesCover()}>{seriesCoverPath ? '替换图片' : '选择图片'}</Button>
+                    {seriesCoverPath && <Button type="text" onClick={() => setSeriesCoverPath('')}>移除</Button>}
+                  </Space>
+                </div>
+                <small>PNG 或 JPEG，1400–3000 像素正方形；未设置时使用占位图。</small>
+              </div>
               <div className="series-manager-defaults">
                 <label className="ui-field"><span>更新节奏</span><Select value={seriesCadence} onChange={setSeriesCadence} options={[{ value: 'daily', label: '每日' }, { value: 'weekly', label: '每周' }]} /></label>
                 <label className="ui-field"><span>默认时长（分钟）</span><Input type="number" min={1} max={240} value={seriesDuration} onChange={event => setSeriesDuration(Number(event.target.value || 14))} /></label>

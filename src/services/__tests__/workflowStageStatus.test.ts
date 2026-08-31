@@ -32,7 +32,7 @@ function createState(patch: Partial<PodcastState> = {}): PodcastState {
   return {
     episode_id: 'ep_test',
     created_at: '2026-07-04T00:00:00.000Z',
-    schema_version: 2,
+    schema_version: 3,
     preset: {},
     source_inputs: [],
     runtime_config: {},
@@ -49,7 +49,6 @@ function createState(patch: Partial<PodcastState> = {}): PodcastState {
     edited_script: {},
     voice_segments: [],
     audio_outputs: {},
-    cover_path: '',
     intro_outro_paths: {},
     review_summary: {},
     publish_outputs: {},

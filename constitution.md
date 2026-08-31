@@ -77,7 +77,7 @@ publish_outputs
 run_report
 ```
 
-`EpisodeRun.schema_version` 当前唯一有效值为 `2`。v1 工作流不得静默迁移；必须从整理 / 事实阶段重新生成。主路径必须产出可落盘中间文件，并且可以从 `run_report.json` 看见核验模型、规则版本、六项门禁、定向修复次数和真实降级原因。
+`EpisodeRun.schema_version` 当前唯一有效值为 `3`。旧版工作流不得静默迁移；必须从整理 / 事实阶段重新生成。主路径必须产出可落盘中间文件，并且可以从 `run_report.json` 看见核验模型、规则版本、六项门禁、定向修复次数和真实降级原因。
 
 ## P0 Acceptance Criteria
 

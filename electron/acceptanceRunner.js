@@ -411,7 +411,7 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
 
     const audioWorkflow = await evaluate(`(async () => {
       const id = window.__acceptanceWorkflowId
-      await window.electronAPI.runWorkflowNodes(id, ['audio_postprocess', 'assets'])
+      await window.electronAPI.runWorkflowNodes(id, ['audio_postprocess'])
       return await window.electronAPI.getWorkflow(id)
     })()`)
     const finalAudioPath = audioWorkflow?.state?.audio_outputs?.final_audio_path

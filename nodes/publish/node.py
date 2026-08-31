@@ -94,13 +94,6 @@ def run(state: dict[str, Any], config: PublishConfig = None) -> dict[str, Any]:
         else:
             raise RuntimeError("No final audio artifact found for publish package.")
 
-        cover_path = Path(state.get("cover_path", ""))
-        stored_cover = ""
-        if cover_path.exists() and cover_path.is_file():
-            stored_cover_path = episode_dir / cover_path.name
-            shutil.copy2(cover_path, stored_cover_path)
-            stored_cover = str(stored_cover_path)
-
         enclosure_url = _build_enclosure_url(stored_audio, episode_dir, config, local_preview_only)
         public_artifacts = _write_public_artifacts(
             episode_dir,
@@ -108,13 +101,11 @@ def run(state: dict[str, Any], config: PublishConfig = None) -> dict[str, Any]:
             config,
             enclosure_url,
             stored_audio,
-            stored_cover,
         )
         episode_json = _episode_payload(
             state,
             config,
             stored_audio,
-            stored_cover,
             enclosure_url,
             public_artifacts,
         )
@@ -188,7 +179,6 @@ def _episode_payload(
     state: dict[str, Any],
     config: PublishConfig,
     stored_audio: str,
-    stored_cover: str,
     enclosure_url: str,
     public_artifacts: dict[str, str],
 ) -> dict[str, Any]:
@@ -196,7 +186,6 @@ def _episode_payload(
     audio_outputs = state.get("audio_outputs", {})
     sources = _collect_sources(state.get("facts", []))
     episode_dir = Path(public_artifacts["chapters_json"]).parent
-    cover_url = _public_asset_url(config.public_base_url, episode_dir.name, Path(stored_cover).name) if stored_cover else ""
     return {
         "episode_id": state.get("episode_id", ""),
         "preset": state.get("preset", {}),
@@ -208,7 +197,6 @@ def _episode_payload(
         "edited_script": state.get("edited_script", {}),
         "audio": {
             "final_audio_path": stored_audio,
-            "cover_path": stored_cover,
             "outputs": state.get("audio_outputs", {}),
         },
         "created_at": state.get("created_at", ""),
@@ -220,7 +208,6 @@ def _episode_payload(
             "durationSeconds": audio_outputs.get("duration_seconds", 0),
             "audioUrl": enclosure_url,
             "audioBytes": Path(stored_audio).stat().st_size,
-            "coverUrl": cover_url,
             "transcriptUrl": _public_asset_url(config.public_base_url, episode_dir.name, "transcript.vtt"),
             "chaptersUrl": _public_asset_url(config.public_base_url, episode_dir.name, "chapters.json"),
             "sources": sources,
@@ -269,9 +256,6 @@ def _validate_public_readiness(state: dict[str, Any], audio_outputs: dict[str, A
     deep_count = sum(segment.get("type") == "deep_dive" for segment in segments)
     if (quick_count, deep_count) != (6, 1):
         raise RuntimeError("Public PodFlow 晨报 episodes require exactly 6 quick news segments and 1 deep dive.")
-    cover_path = Path(str(state.get("cover_path") or ""))
-    if not cover_path.is_file():
-        raise RuntimeError("Public publishing requires a generated PodFlow 晨报 cover.")
     if not _collect_sources(state.get("facts", [])):
         raise RuntimeError("Public publishing requires at least one traceable source.")
     pending_terms = sorted({
@@ -292,7 +276,6 @@ def _write_public_artifacts(
     config: PublishConfig,
     enclosure_url: str,
     stored_audio: str,
-    stored_cover: str,
 ) -> dict[str, str]:
     script = state.get("edited_script") if isinstance(state.get("edited_script"), dict) else {}
     segments = [segment for segment in script.get("segments", []) if isinstance(segment, dict)]
@@ -315,7 +298,6 @@ def _write_public_artifacts(
             sources=sources,
             enclosure_url=enclosure_url,
             stored_audio=stored_audio,
-            stored_cover=stored_cover,
             tts_provider=_tts_provider_label(state.get("audio_outputs", {}).get("source_engines", [])),
         ),
         encoding="utf-8",
@@ -411,7 +393,6 @@ def _build_show_notes(
     sources: list[dict[str, str]],
     enclosure_url: str,
     stored_audio: str,
-    stored_cover: str,
     tts_provider: str,
 ) -> str:
     chapter_lines = "\n".join(
@@ -436,7 +417,6 @@ def _build_show_notes(
 - 配音服务：{tts_provider or '真人录音'}
 - AI 辅助：素材整理、事实卡片与初稿生成；事实、成稿、发音和听感需人工终审
 - 音频：{enclosure_url or Path(stored_audio).name}
-- 封面：{Path(stored_cover).name if stored_cover else '未提供'}
 """
 
 

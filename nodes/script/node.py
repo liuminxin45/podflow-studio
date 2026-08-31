@@ -970,7 +970,6 @@ def _invalidate_downstream_outputs(state: dict[str, Any], generated_at: str) -> 
     artifact_keys = [
         "voice_segments",
         "audio_outputs",
-        "cover_path",
         "review_summary",
         "release_readiness",
         "audio_approval",
@@ -986,7 +985,6 @@ def _invalidate_downstream_outputs(state: dict[str, Any], generated_at: str) -> 
         {
             "voice_segments": [],
             "audio_outputs": {},
-            "cover_path": "",
             "review_summary": {},
             "release_readiness": {},
             "audio_approval": {},
@@ -1003,6 +1001,6 @@ def _invalidate_downstream_outputs(state: dict[str, Any], generated_at: str) -> 
     manifest = state.get("_manifest")
     nodes = manifest.get("nodes") if isinstance(manifest, dict) else None
     if isinstance(nodes, dict):
-        for node_name in ("tts", "audio_postprocess", "assets", "review", "publish"):
+        for node_name in ("tts", "audio_postprocess", "review", "publish"):
             if node_name in nodes and isinstance(nodes[node_name], dict):
                 nodes[node_name]["status"] = "stale"

@@ -45,7 +45,6 @@ class PodcastState:
     production_plan: dict[str, Any] = field(default_factory=dict)
     audio_outputs: dict[str, Any] = field(default_factory=dict)
 
-    cover_path: str = ""
     intro_outro_paths: dict[str, str] = field(default_factory=dict)
 
     review_summary: dict[str, Any] = field(default_factory=dict)

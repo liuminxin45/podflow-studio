@@ -21,7 +21,6 @@ const NODE_STAGE_LABELS = {
   script:            'Draft - script',
   tts:               'Produce - speech synthesis',
   audio_postprocess: 'Produce - audio processing',
-  assets:            'Produce - asset generation',
   review:            'Publish - review',
   publish:           'Publish - archive',
 }
@@ -30,7 +29,7 @@ const NODE_STAGE_LABELS = {
 const RETRYABLE_NODES = new Set([
   'fetch', 'preprocess',
   'research', 'topic_selection', 'script',
-  'assets', 'review',
+  'review',
 ])
 const MAX_RETRIES = 1
 const RETRY_DELAY_MS = 2000
@@ -41,7 +40,7 @@ const PIPELINE_NODES = [
   'research', 'topic_selection',
   'facts',
   'script',
-  'tts', 'audio_postprocess', 'assets',
+  'tts', 'audio_postprocess',
   'review',
   'publish'
 ]
@@ -102,7 +101,6 @@ function applyRuntimeStorageDefaults(nodeName, loadedConfig) {
   const config = { ...(loadedConfig || {}) }
   if (nodeName === 'tts') config.output_dir = path.join(dataDir, 'voice-segments')
   if (nodeName === 'audio_postprocess') config.output_dir = path.join(dataDir, 'episodes')
-  if (nodeName === 'assets') config.output_dir = path.join(dataDir, 'assets')
   if (nodeName === 'publish') {
     config.local_base_dir = path.join(dataDir, 'publish', 'episodes')
     config.rss_output_dir = path.join(dataDir, 'publish', 'rss')
@@ -204,7 +202,7 @@ function create(ctx) {
       const nodeName = nodes[i]
       const stageLabel = NODE_STAGE_LABELS[nodeName] || nodeName
 
-      if (['tts', 'audio_postprocess', 'assets'].includes(nodeName)) {
+      if (['tts', 'audio_postprocess'].includes(nodeName)) {
         currentWorkflow.state.audio_approval = {}
         currentWorkflow.state.review_summary = {}
         currentWorkflow.state.release_readiness = {}

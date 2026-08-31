@@ -287,35 +287,6 @@ def test_audio_postprocess_no_segments():
 
 
 # ---------------------------------------------------------------------------
-# Assets Node
-# ---------------------------------------------------------------------------
-
-
-def test_assets_node():
-    """Assets node generates a cover image."""
-    import tempfile
-
-    state = create_state_for_node("assets")
-    from nodes.assets.config import AssetsConfig
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config = AssetsConfig(output_dir=tmpdir, generate_cover=True)
-        result = _run_node("assets", state, config)
-    _assert_no_crash(result, "assets")
-    assert result.get("cover_path", "")
-
-
-def test_assets_node_skip_cover():
-    """Assets node skips cover when generate_cover=False."""
-    state = create_state_for_node("assets")
-    from nodes.assets.config import AssetsConfig
-
-    config = AssetsConfig(generate_cover=False)
-    result = _run_node("assets", state, config)
-    _assert_no_crash(result, "assets")
-
-
-# ---------------------------------------------------------------------------
 # Review Node
 # ---------------------------------------------------------------------------
 

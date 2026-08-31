@@ -7,7 +7,6 @@ const PIPELINE_NODES = [
   'script',
   'tts',
   'audio_postprocess',
-  'assets',
   'review',
   'publish',
 ]
@@ -21,7 +20,6 @@ const NODE_OUTPUTS = {
   script: ['script', 'edited_script', 'generation_request', 'generation_meta', 'script_snapshots', 'writing_meta'],
   tts: ['voice_segments', 'production_plan', 'audio_approval'],
   audio_postprocess: ['audio_outputs', 'subtitle_path', 'audio_approval'],
-  assets: ['cover_path', 'intro_outro_paths', 'audio_approval'],
   review: ['review_summary', 'release_readiness', 'run_report'],
   publish: ['publish_outputs'],
 }
@@ -47,7 +45,6 @@ const EMPTY_VALUES = {
   production_plan: {},
   audio_outputs: {},
   subtitle_path: '',
-  cover_path: '',
   intro_outro_paths: {},
   review_summary: {},
   audio_approval: {},
@@ -77,7 +74,6 @@ const FIELD_LABELS = {
   production_plan: '制作计划',
   audio_outputs: '音频成片',
   subtitle_path: '字幕',
-  cover_path: '封面',
   intro_outro_paths: '片头片尾',
   review_summary: '审核结果',
   release_readiness: '发布就绪状态',

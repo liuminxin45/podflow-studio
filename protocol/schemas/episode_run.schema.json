@@ -20,7 +20,7 @@
     "run_report"
   ],
   "properties": {
-    "schema_version": { "const": 2 },
+    "schema_version": { "const": 3 },
     "episode_id": { "type": "string", "minLength": 1 },
     "created_at": { "type": "string" },
     "preset": {
@@ -83,7 +83,6 @@
     "voice_segments": { "type": "array", "items": { "$ref": "#/$defs/voiceSegment" } },
     "production_plan": { "$ref": "#/$defs/productionPlan" },
     "audio_outputs": { "$ref": "#/$defs/audioOutputs" },
-    "cover_path": { "type": "string" },
     "intro_outro_paths": { "type": "object", "additionalProperties": { "type": "string" } },
     "review_summary": { "type": "object" },
     "audio_approval": {

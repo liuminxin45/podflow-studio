@@ -69,7 +69,7 @@ declare global {
     closeWorkflow: (id: string) => Promise<{ success: boolean }>
     updateWorkflowMeta: (
       id: string,
-      meta: { title: string; description: string; previewPath: string }
+      meta: { title: string; description: string }
     ) => Promise<Workflow>
     duplicateWorkflow: (id: string) => Promise<Workflow>
     deleteWorkflow: (id: string) => Promise<{ success: boolean }>
@@ -127,6 +127,14 @@ declare global {
       dataUrl?: string
     }>
     selectAudioFile: () => Promise<{ success: boolean; canceled?: boolean; path?: string }>
+    selectSeriesCover: () => Promise<{
+      success: boolean
+      canceled?: boolean
+      error?: string
+      path?: string
+      width?: number
+      height?: number
+    }>
     onWorkflowUpdate: (callback: (data: Workflow | null) => void) => (() => void) | void
     onNeedApproval: (callback: (data: any) => void) => (() => void) | void
     saveNodeConfig: (nodeName: string, config: Record<string, any>) => Promise<{ success: boolean; error?: string }>

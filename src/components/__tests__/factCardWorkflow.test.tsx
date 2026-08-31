@@ -52,7 +52,7 @@ function createWorkflow(state: Partial<PodcastState>): Workflow {
     state: {
       episode_id: 'episode_test',
       created_at: '2026-07-01T00:00:00.000Z',
-      schema_version: 2,
+      schema_version: 3,
       preset: {},
       source_inputs: [],
       runtime_config: {},
@@ -69,7 +69,6 @@ function createWorkflow(state: Partial<PodcastState>): Workflow {
       edited_script: {},
       voice_segments: [],
       audio_outputs: {},
-      cover_path: '',
       intro_outro_paths: {},
       review_summary: {},
       publish_outputs: {},

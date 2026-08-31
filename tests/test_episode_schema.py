@@ -44,14 +44,25 @@ def test_episode_run_payload_validates_with_model():
     assert ok, errors
 
 
-def test_episode_run_v1_is_rejected_without_migration():
+@pytest.mark.parametrize("legacy_version", [1, 2])
+def test_legacy_episode_runs_are_rejected_without_migration(legacy_version: int):
     state = create_base_state()
-    state["schema_version"] = 1
+    state["schema_version"] = legacy_version
 
     ok, errors = validate_episode_run_payload(state)
 
     assert ok is False
-    assert "Input should be 2" in errors[0]
+    assert "Input should be 3" in errors[0]
+
+
+def test_episode_cover_field_is_rejected():
+    state = create_base_state()
+    state["cover_path"] = "cover.png"
+
+    ok, errors = validate_episode_run_payload(state)
+
+    assert ok is False
+    assert "cover_path" in errors[0]
 
 
 def test_fact_card_legacy_source_fields_are_rejected():
