@@ -491,7 +491,7 @@ export default function EpisodeManager({
                 <small>PNG 或 JPEG，1400–3000 像素正方形；未设置时使用占位图。</small>
               </div>
               <div className="series-manager-defaults">
-                <label className="ui-field"><span>更新节奏</span><Select value={seriesCadence} onChange={setSeriesCadence} options={[{ value: 'daily', label: '每日' }, { value: 'weekly', label: '每周' }]} /></label>
+                <div className="ui-field"><span>更新节奏</span><Select aria-label="更新节奏" value={seriesCadence} onChange={setSeriesCadence} options={[{ value: 'daily', label: '每日' }, { value: 'weekly', label: '每周' }]} /></div>
                 <label className="ui-field"><span>默认时长（分钟）</span><Input type="number" min={1} max={240} value={seriesDuration} onChange={event => setSeriesDuration(Number(event.target.value || 14))} /></label>
                 <label className="ui-field"><span>RSS 作者</span><Input value={seriesAuthor} onChange={event => setSeriesAuthor(event.target.value)} /></label>
               </div>

@@ -135,6 +135,37 @@ describe('节目库与播放器', () => {
     await waitFor(() => expect(window.electronAPI.selectSeriesCover).toHaveBeenCalledTimes(1))
   })
 
+  it('changes the cadence in the series creation form', async () => {
+    const onUpsertSeries = vi.fn(async patch => ({ ...series, ...patch, id: 'weekly' } as Series))
+    render(<EpisodeManager
+      episodes={[]}
+      loading={false}
+      series={[]}
+      hasElectronBackend
+      onCreate={vi.fn()}
+      onOpen={vi.fn()}
+      onPlay={vi.fn()}
+      onShowArtifact={vi.fn()}
+      onRerun={vi.fn()}
+      onDelete={vi.fn()}
+      onImport={vi.fn()}
+      onExport={vi.fn()}
+      onEdit={vi.fn()}
+      onUpsertSeries={onUpsertSeries}
+      onAssignSeries={vi.fn()}
+      onReorderSeries={vi.fn()}
+      onGenerateSeriesFeed={vi.fn()}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: '栏目' }))
+    fireEvent.change(screen.getByRole('textbox', { name: '栏目名称' }), { target: { value: '每周观察' } })
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '更新节奏' }))
+    fireEvent.click(await screen.findByText('每周'))
+    fireEvent.click(screen.getByRole('button', { name: '保存栏目' }))
+
+    await waitFor(() => expect(onUpsertSeries).toHaveBeenCalledWith(expect.objectContaining({ cadence: 'weekly' })))
+  })
+
   it('links the current script segment to its fact source', async () => {
     const workflow = {
       id: 'ep-1',
