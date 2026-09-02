@@ -7,6 +7,11 @@ vi.mock('../components/ApprovalModal', () => ({ default: () => null }))
 vi.mock('../components/SoundStudio', () => ({ default: () => null }))
 vi.mock('../components/PublishLayer', () => ({ default: () => null }))
 vi.mock('../components/SettingsPage', () => ({ default: () => null }))
+vi.mock('../components/briefing/BriefingHome', () => ({
+  default: ({ onOpenLibrary }: { onOpenLibrary: () => void }) => (
+    <button type="button" onClick={onOpenLibrary}>打开节目库</button>
+  ),
+}))
 vi.mock('../components/WorkflowSidebar', () => ({
   default: ({ onSave }: { onSave: () => Promise<unknown> | unknown }) => (
     <button type="button" onClick={() => void onSave()}>保存节目</button>
@@ -172,9 +177,14 @@ describe('App discover-to-draft handoff', () => {
     ;(window as any).electronAPI = originalElectronAPI
   })
 
+  const openTestWorkflow = () => {
+    fireEvent.click(screen.getByRole('button', { name: '打开节目库' }))
+    fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
+  }
+
   it('keeps all discovery selections while sending only ready units to draft', async () => {
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
+    openTestWorkflow()
     expect(await screen.findByText('发现已选 3 条')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '进入整理' }))
@@ -203,7 +213,7 @@ describe('App discover-to-draft handoff', () => {
     } as unknown as Workflow
 
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
+    openTestWorkflow()
     fireEvent.click(await screen.findByRole('button', { name: '进入整理' }))
     fireEvent.click(await screen.findByRole('button', { name: '使用 ready 新闻成稿' }))
     fireEvent.click(await screen.findByRole('button', { name: '编辑口播' }))
@@ -245,7 +255,7 @@ describe('App discover-to-draft handoff', () => {
     }
 
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
+    openTestWorkflow()
     fireEvent.click(await screen.findByRole('button', { name: '进入整理' }))
 
     await waitFor(() => {
@@ -292,7 +302,7 @@ describe('App discover-to-draft handoff', () => {
     } as unknown as Workflow
 
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
+    openTestWorkflow()
     fireEvent.click(await screen.findByRole('button', { name: '进入整理' }))
 
     await waitFor(() => {
@@ -343,7 +353,7 @@ describe('App discover-to-draft handoff', () => {
     } as unknown as Workflow
 
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
+    openTestWorkflow()
     fireEvent.click(await screen.findByRole('button', { name: '进入整理' }))
     fireEvent.click(await screen.findByRole('button', { name: '删除无链接来源' }))
 
@@ -359,7 +369,7 @@ describe('App discover-to-draft handoff', () => {
 
   it('waits for the latest organize workspace before saving the workflow', async () => {
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
+    openTestWorkflow()
     fireEvent.click(await screen.findByRole('button', { name: '进入整理' }))
     await screen.findByRole('button', { name: '使用 ready 新闻成稿' })
 
@@ -385,7 +395,7 @@ describe('App discover-to-draft handoff', () => {
     { button: '删除合并来源', remaining: ['痴迷'], ready: [], count: 1 },
   ])('synchronizes every discovery selection surface after $button', async ({ button, remaining, ready, count }) => {
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '打开 123123' }))
+    openTestWorkflow()
     fireEvent.click(await screen.findByRole('button', { name: '进入整理' }))
     fireEvent.click(await screen.findByRole('button', { name: button }))
 

@@ -1,9 +1,18 @@
 const fs = require('fs')
 const path = require('path')
+const { spawnSync } = require('child_process')
 
 const projectRoot = path.resolve(__dirname, '..')
 const docsRoot = path.join(projectRoot, 'docs')
 const docsIndex = path.join(docsRoot, 'README.md')
+
+function isGitIgnored(filePath) {
+  const result = spawnSync('git', ['check-ignore', '--quiet', '--', filePath], {
+    cwd: projectRoot,
+    windowsHide: true,
+  })
+  return result.status === 0
+}
 
 function markdownFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true })
@@ -28,7 +37,8 @@ function localMarkdownTargets(filePath) {
 }
 
 const failures = []
-const filesToCheck = [path.join(projectRoot, 'README.md'), ...markdownFiles(docsRoot)]
+const documentationFiles = markdownFiles(docsRoot).filter(filePath => !isGitIgnored(filePath))
+const filesToCheck = [path.join(projectRoot, 'README.md'), ...documentationFiles]
 
 for (const filePath of filesToCheck) {
   for (const target of localMarkdownTargets(filePath)) {
@@ -40,7 +50,7 @@ for (const filePath of filesToCheck) {
 }
 
 const indexContent = fs.readFileSync(docsIndex, 'utf8')
-for (const filePath of markdownFiles(docsRoot)) {
+for (const filePath of documentationFiles) {
   if (filePath === docsIndex) continue
   const relativeTarget = path.relative(docsRoot, filePath).split(path.sep).join('/')
   if (!indexContent.includes(`(${relativeTarget})`)) {

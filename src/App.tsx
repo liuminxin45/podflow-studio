@@ -10,6 +10,7 @@ import SettingsPage from './components/SettingsPage'
 import WorkflowSidebar from './components/WorkflowSidebar'
 import EpisodeManager from './components/EpisodeManager'
 import GlobalPlayer from './components/GlobalPlayer'
+import BriefingHome from './components/briefing/BriefingHome'
 import { STAGES } from './components/workflowStages'
 import { detectAndPersistLocalAgentsOnStartup } from './services/settings/localAgentDetection'
 import { llmConfigResolver } from './services/settings/llmConfigResolver'
@@ -27,11 +28,29 @@ import {
 } from './utils'
 import { contentIdentity } from './utils/contentIdentity'
 import { isCurrentResearchSession } from './services/organizeEvidence'
+import {
+  BRIEFING_NODES,
+  PUBLIC_SAMPLE_URL,
+  buildBriefingFetchConfig,
+  inspectBriefingReadiness,
+  isQuickBriefWorkflow,
+  latestBriefingFailure,
+  parseBriefingMaterials,
+  type BriefingReadiness,
+  type BriefingRequest,
+} from './services/briefingRun'
 
 const { Content } = Layout
 const EMPTY_FACTS: PodcastState['facts'] = []
 const EMPTY_SELECTED_TOPICS: PodcastState['selected_topics'] = []
 const EMPTY_MATERIALS: ContentItem[] = []
+const LOADING_BRIEFING_READINESS: BriefingReadiness = {
+  loading: true,
+  ready: false,
+  issues: [],
+  llmLabel: '检查中',
+  voiceLabel: '检查中',
+}
 
 type UiNotice = {
   type: 'success' | 'warning' | 'error' | 'info'
@@ -156,8 +175,9 @@ function App() {
   const [playingEpisode, setPlayingEpisode] = useState<WorkflowSummary | null>(null)
   const [playingWorkflow, setPlayingWorkflow] = useState<Workflow | null>(null)
   const [recovery, setRecovery] = useState<{ workflowId: string; plan: RecoveryPlan; running: boolean } | null>(null)
-  const [homePage, setHomePage] = useState<'blank' | 'episodes'>('episodes')
-  const [createEpisodeRequested, setCreateEpisodeRequested] = useState(false)
+  const [homePage, setHomePage] = useState<'blank' | 'briefing' | 'episodes'>('briefing')
+  const [briefingRunning, setBriefingRunning] = useState(false)
+  const [briefingReadiness, setBriefingReadiness] = useState<BriefingReadiness>(LOADING_BRIEFING_READINESS)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [approvalVisible, setApprovalVisible] = useState(false)
   const [approvalData, setApprovalData] = useState<any>(null)
@@ -181,10 +201,25 @@ function App() {
   const [publishVisible, setPublishVisible] = useState(false)
   const [settingsVisible, setSettingsVisible] = useState(false)
   const [settingsReturnTarget, setSettingsReturnTarget] = useState<{
-    homePage: 'blank' | 'episodes'
+    homePage: 'blank' | 'briefing' | 'episodes'
     stageId: string | null
   } | null>(null)
   const hasElectronBackend = Boolean(window.electronAPI?.listWorkflows)
+
+  const refreshBriefingReadiness = useCallback(async () => {
+    setBriefingReadiness(LOADING_BRIEFING_READINESS)
+    try {
+      setBriefingReadiness(await inspectBriefingReadiness())
+    } catch (error) {
+      setBriefingReadiness({
+        loading: false,
+        ready: false,
+        issues: [`运行配置检查失败：${getErrorMessage(error)}`],
+        llmLabel: '检查失败',
+        voiceLabel: '检查失败',
+      })
+    }
+  }, [])
 
   useEffect(() => {
     if (!window.electronAPI?.runtimePing || !window.electronAPI?.notifyRendererReady) return
@@ -454,6 +489,7 @@ function App() {
     const target = settingsReturnTarget
     setSettingsVisible(false)
     setSettingsReturnTarget(null)
+    void refreshBriefingReadiness()
 
     if (target?.stageId && workflow) {
       openStage(target.stageId)
@@ -466,25 +502,38 @@ function App() {
       return
     }
 
-    setHomePage(workflow ? 'blank' : 'episodes')
+    if (target?.homePage === 'briefing') {
+      setHomePage('briefing')
+      void loadWorkflowSummaries()
+      return
+    }
+
+    setHomePage(workflow ? 'blank' : 'briefing')
   }
 
   const returnToEpisodeManager = () => {
+    closeAllPanels()
+    setHomePage('briefing')
+    void loadWorkflowSummaries()
+  }
+
+  const openLibrary = () => {
     closeAllPanels()
     setHomePage('episodes')
     void loadWorkflowSummaries()
   }
 
-  const openCreateEpisode = () => {
+  const openBriefingHome = () => {
     closeAllPanels()
-    setHomePage('episodes')
-    setCreateEpisodeRequested(true)
+    setHomePage('briefing')
+    void loadWorkflowSummaries()
   }
 
   useEffect(() => {
     void loadWorkflowSummaries()
     void loadSeries()
-  }, [loadSeries, loadWorkflowSummaries])
+    void refreshBriefingReadiness()
+  }, [loadSeries, loadWorkflowSummaries, refreshBriefingReadiness])
 
   useEffect(() => {
     if (!hasElectronBackend) return
@@ -577,6 +626,91 @@ function App() {
     }
   }
 
+  const handleStartBriefing = async ({ topic, materialText }: BriefingRequest) => {
+    let createdWorkflowId = ''
+    try {
+      if (!window.electronAPI?.createWorkflow || !window.electronAPI?.discoverRun) {
+        showNotice('warning', '当前页面没有连接 Electron 后端，无法生成节目')
+        return
+      }
+      const readiness = await inspectBriefingReadiness()
+      setBriefingReadiness(readiness)
+      if (!readiness.ready) {
+        showNotice('warning', readiness.issues[0] || '请先完成 AI 和声音服务配置')
+        return
+      }
+      const canContinue = await confirmSaveBeforeReplace()
+      if (!canContinue) return
+
+      setBriefingRunning(true)
+      closeAllPanels()
+      setHomePage('briefing')
+      const requestedAt = new Date().toISOString()
+      const sourceInputs = parseBriefingMaterials(materialText)
+      const result = await window.electronAPI.createWorkflow({
+        autoRun: false,
+        auto_execute: true,
+        quick_brief: {
+          requested_at: requestedAt,
+          topic,
+          material_text: materialText,
+        },
+      })
+      createdWorkflowId = result.workflowId
+      const created = await window.electronAPI.getWorkflow(result.workflowId)
+      if (!created) throw new Error('节目创建后无法读取当前工作流')
+
+      const seeded = await window.electronAPI.updateWorkflowState(result.workflowId, {
+        source_inputs: sourceInputs,
+        generation_request: {
+          mode: 'initial',
+          require_llm: true,
+          requested_at: requestedAt,
+          draft_snapshot: {},
+        },
+        discover_ui: {
+          selectedCount: 0,
+          selectedItems: [],
+          lastRunStartedAt: requestedAt,
+        },
+      })
+      setWorkflow(seeded)
+      setHasUnsavedChanges(true)
+      await loadWorkflowSummaries()
+
+      const loadedFetchConfig = await window.electronAPI.loadNodeConfig('fetch')
+      const fetchConfig = buildBriefingFetchConfig(loadedFetchConfig, topic)
+      const discovered = await window.electronAPI.discoverRun(result.workflowId, fetchConfig)
+      setWorkflow(discovered)
+      setHasUnsavedChanges(true)
+      await loadWorkflowSummaries()
+
+      const completed = await window.electronAPI.runWorkflowNodes(result.workflowId, [...BRIEFING_NODES])
+      setWorkflow(completed)
+      await window.electronAPI.saveWorkflow(result.workflowId)
+      setHasUnsavedChanges(false)
+      await loadWorkflowSummaries()
+
+      if (completed.status === 'failed') {
+        const failure = latestBriefingFailure(completed)
+        throw new Error(failure?.message || '节目生成失败')
+      }
+      if (!completed.state.audio_outputs?.final_audio_path) {
+        throw new Error('工作流已结束，但没有生成可播放音频')
+      }
+      showNotice('success', '今日节目已经生成，可以开始试听')
+    } catch (error) {
+      if (createdWorkflowId && window.electronAPI?.getWorkflow) {
+        const failed = await window.electronAPI.getWorkflow(createdWorkflowId).catch(() => null)
+        if (failed) setWorkflow(failed)
+      }
+      await loadWorkflowSummaries()
+      showNotice('error', `节目生成失败：${getErrorMessage(error)}`)
+    } finally {
+      setBriefingRunning(false)
+    }
+  }
+
   const ensureWorkflow = async () => {
     if (workflow) return workflow
     if (!window.electronAPI?.createWorkflow) {
@@ -656,7 +790,7 @@ function App() {
     setWorkflow(null)
     setHasUnsavedChanges(false)
     closeAllPanels()
-    setHomePage('episodes')
+    setHomePage('briefing')
     await loadWorkflowSummaries()
   }
 
@@ -679,7 +813,7 @@ function App() {
         setWorkflow(null)
         setHasUnsavedChanges(false)
         closeAllPanels()
-        setHomePage('episodes')
+        setHomePage('briefing')
       }
       await loadWorkflowSummaries()
       showNotice('success', '节目已删除')
@@ -762,7 +896,12 @@ function App() {
 
   const handlePlayEpisode = async (workflowId: string) => {
     try {
-      const summary = workflowSummaries.find(item => item.id === workflowId)
+      let summary = workflowSummaries.find(item => item.id === workflowId)
+      if (!summary?.audioPath && window.electronAPI?.listWorkflows) {
+        const summaries = await window.electronAPI.listWorkflows()
+        setWorkflowSummaries(summaries)
+        summary = summaries.find(item => item.id === workflowId)
+      }
       if (!summary?.audioPath) throw new Error('这期节目还没有可播放的音频成片')
       const mediaWorkflow = await window.electronAPI.getWorkflow(workflowId)
       if (!mediaWorkflow) throw new Error('无法读取节目稿件和事实来源')
@@ -970,13 +1109,37 @@ function App() {
               hasUnsavedChanges={hasUnsavedChanges}
               onSave={saveActiveWorkflow}
               onClose={handleCloseWorkflow}
-              homeActive={homePage === 'episodes' && !settingsVisible}
+              homeActive={homePage === 'briefing' && !settingsVisible}
+              libraryActive={homePage === 'episodes' && !settingsVisible}
               settingsActive={settingsVisible}
-              hasElectronBackend={hasElectronBackend}
-              onHome={handleCloseWorkflow}
-              onCreate={openCreateEpisode}
+              onHome={openBriefingHome}
+              onLibrary={openLibrary}
             />
-            <main className={`app-main ${homePage === 'episodes' ? 'is-library' : 'is-stage'}`}>
+            <main className={`app-main ${homePage === 'briefing' || homePage === 'episodes' ? 'is-library' : 'is-stage'}`}>
+              {homePage === 'briefing' && (
+                <BriefingHome
+                  workflow={workflow}
+                  episodes={workflowSummaries}
+                  libraryLoading={libraryLoading}
+                  busy={briefingRunning || Boolean(isQuickBriefWorkflow(workflow) && workflow?.status === 'running')}
+                  hasElectronBackend={hasElectronBackend}
+                  readiness={briefingReadiness}
+                  onStart={handleStartBriefing}
+                  onOpenSettings={openSettings}
+                  onOpenSample={() => {
+                    if (!window.electronAPI?.openExternal) {
+                      showNotice('warning', '当前页面没有连接 Electron 后端，无法打开试听样例')
+                      return
+                    }
+                    void window.electronAPI.openExternal(PUBLIC_SAMPLE_URL).catch(error => {
+                      showNotice('error', `无法打开试听样例：${getErrorMessage(error)}`)
+                    })
+                  }}
+                  onOpenLibrary={openLibrary}
+                  onPlay={workflowId => void handlePlayEpisode(workflowId)}
+                  onOpenStudio={openStage}
+                />
+              )}
               {homePage === 'episodes' && (
                 <EpisodeManager
                   episodes={workflowSummaries}
@@ -1002,8 +1165,6 @@ function App() {
                   onAssignSeries={handleAssignSeries}
                   onReorderSeries={handleReorderSeries}
                   onGenerateSeriesFeed={handleGenerateSeriesFeed}
-                  createRequested={createEpisodeRequested}
-                  onCreateRequestHandled={() => setCreateEpisodeRequested(false)}
                 />
               )}
             </main>

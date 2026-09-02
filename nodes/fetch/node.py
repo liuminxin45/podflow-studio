@@ -9,6 +9,7 @@ import importlib.util
 import re
 import sys
 from nodes.fetch.config import FetchConfig
+from nodes.fetch.manual_inputs import collect_manual_inputs
 
 
 def run(state: dict[str, Any], config: FetchConfig = None) -> dict[str, Any]:
@@ -19,8 +20,21 @@ def run(state: dict[str, Any], config: FetchConfig = None) -> dict[str, Any]:
 
     logs.append("[FetchNode] Starting fetch")
 
+    manual_items, manual_input_errors = collect_manual_inputs(state.get("source_inputs", []))
+    discover_meta = state.get("discover_meta") if isinstance(state.get("discover_meta"), dict) else {}
+    state["discover_meta"] = {
+        **discover_meta,
+        "manual_input_errors": manual_input_errors,
+    }
+    if manual_items:
+        logs.append(f"[FetchNode] Loaded {len(manual_items)} manual input items")
+    for entry in manual_input_errors:
+        logs.append(
+            f"[FetchNode] Manual input warning: {entry.get('input', '')}: {entry.get('message', '')}"
+        )
+
     sources_dir = Path(__file__).parent / "sources"
-    if not sources_dir.exists():
+    if not sources_dir.exists() and not manual_items:
         errors.append(
             {
                 "node": "fetch",
@@ -33,18 +47,18 @@ def run(state: dict[str, Any], config: FetchConfig = None) -> dict[str, Any]:
         state["errors"] = errors
         return state
 
-    available_sources = _list_sources(sources_dir)
+    available_sources = _list_sources(sources_dir) if sources_dir.exists() else []
     enabled_sources = _resolve_enabled_sources(config, available_sources)
     logs.append(f"[FetchNode] Enabled sources: {enabled_sources}")
 
-    if not enabled_sources:
-        logs.append("[FetchNode] No sources selected; skipping fetch")
+    if not enabled_sources and not manual_items:
+        logs.append("[FetchNode] No sources or manual inputs selected; skipping fetch")
         state["fetch_contents"] = []
         state["logs"] = logs
         state["errors"] = errors
         return state
 
-    all_contents: list[dict[str, Any]] = []
+    all_contents: list[dict[str, Any]] = _normalize_items(manual_items, "manual", logs)
 
     per_source_cap = _resolve_per_source_cap(config)
 

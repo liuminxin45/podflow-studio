@@ -113,6 +113,11 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
     await new Promise(resolve => setTimeout(resolve, 1500))
     const result = await evaluate(`(async () => {
       window.__acceptanceWorkflowId = ${JSON.stringify(workflowId)}
+      const libraryButton = [...document.querySelectorAll('button')].find(button =>
+        button.textContent?.trim() === '节目库'
+      )
+      libraryButton?.click()
+      await new Promise(resolve => setTimeout(resolve, 800))
       const openButton = [...document.querySelectorAll('[aria-label^="打开节目："]')][0]
       openButton?.click()
       await new Promise(resolve => setTimeout(resolve, 1200))
@@ -122,9 +127,9 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
       )
       stage?.click()
       await new Promise(resolve => setTimeout(resolve, 800))
-      return { opened: Boolean(openButton), stageFound: Boolean(stage), body: document.body.innerText }
+      return { libraryFound: Boolean(libraryButton), opened: Boolean(openButton), stageFound: Boolean(stage), body: document.body.innerText }
     })()`)
-    if (!result?.opened || !result?.stageFound) {
+    if (!result?.libraryFound || !result?.opened || !result?.stageFound) {
       throw new Error(`Unable to open ${stageLabel} stage for acceptance screenshot`)
     }
     return result
@@ -153,6 +158,8 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
       hasMediaRecorder: typeof MediaRecorder !== 'undefined'
     }))()`)
     assert('首页 DOM 可读取', Boolean(domState?.body?.trim()), `bodyLength=${domState?.body?.length || 0}`)
+    assert('默认进入今日简报', /今天想听什么|生成今日节目/.test(domState?.body || ''), String(domState?.body || ''))
+    assert('今日简报解释自动化边界', /不会自动发布/.test(domState?.body || ''), String(domState?.body || ''))
     assert('未出现剪枝后的精简主路径', !/LeanSettings|精简组件|剪枝/.test(domState?.body || ''), 'DOM 中不应包含剪枝标记')
     assert('Electron API 已注入', Boolean(domState?.hasElectronAPI), 'window.electronAPI 必须存在')
     assert('媒体 API 可用', Boolean(domState?.hasMediaDevices && domState?.hasMediaRecorder), 'getUserMedia 与 MediaRecorder 必须存在')

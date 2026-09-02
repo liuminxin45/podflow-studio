@@ -1,4 +1,4 @@
-import { CheckCircle, GearSix, House, Plus, Radio } from '@phosphor-icons/react'
+import { Books, CheckCircle, GearSix, House, Radio } from '@phosphor-icons/react'
 import { CloseOutlined } from '../icons/antdCompat'
 import type { Workflow } from '../types/workflow'
 import { deriveWorkflowStageStatuses, type DerivedStageStatus } from '../services/workflowStageStatus'
@@ -16,10 +16,10 @@ interface Props {
   onSave: () => Promise<unknown> | unknown
   onClose: () => void
   homeActive?: boolean
+  libraryActive?: boolean
   settingsActive?: boolean
-  hasElectronBackend?: boolean
   onHome?: () => void
-  onCreate?: () => void
+  onLibrary?: () => void
 }
 
 function WorkflowStep({ derived, active, onStageClick }: {
@@ -58,10 +58,10 @@ export default function WorkflowSidebar({
   onSave,
   onClose,
   homeActive = false,
+  libraryActive = false,
   settingsActive = false,
-  hasElectronBackend = false,
   onHome = () => undefined,
-  onCreate = () => undefined,
+  onLibrary = () => undefined,
 }: Props) {
   const statuses = deriveWorkflowStageStatuses(workflow)
   const failure = latestWorkflowFailure(workflow)
@@ -75,10 +75,10 @@ export default function WorkflowSidebar({
 
       <nav className="workflow-primary-nav" aria-label="主导航">
         <button type="button" className={homeActive ? 'is-active' : ''} aria-current={homeActive ? 'page' : undefined} onClick={onHome}>
-          <House weight={homeActive ? 'fill' : 'regular'} /><span>节目库</span>
+          <House weight={homeActive ? 'fill' : 'regular'} /><span>今日简报</span>
         </button>
-        <button type="button" disabled={!hasElectronBackend} onClick={onCreate}>
-          <Plus /><span>新建节目</span>
+        <button type="button" className={libraryActive ? 'is-active' : ''} aria-current={libraryActive ? 'page' : undefined} onClick={onLibrary}>
+          <Books weight={libraryActive ? 'fill' : 'regular'} /><span>节目库</span>
         </button>
       </nav>
 

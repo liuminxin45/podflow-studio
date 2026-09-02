@@ -13,6 +13,11 @@ vi.mock('../components/OrganizePanel', async () => {
 vi.mock('../components/SoundStudio', () => ({ default: () => null }))
 vi.mock('../components/PublishLayer', () => ({ default: () => null }))
 vi.mock('../components/SettingsPage', () => ({ default: () => null }))
+vi.mock('../components/briefing/BriefingHome', () => ({
+  default: ({ onOpenLibrary }: { onOpenLibrary: () => void }) => (
+    <button type="button" onClick={onOpenLibrary}>打开节目库</button>
+  ),
+}))
 vi.mock('../components/EpisodeManager', () => ({
   default: ({ onOpen }: { onOpen: (workflowId: string) => Promise<void> | void }) => (
     <button type="button" onClick={() => void onOpen('workflow-notice-test')}>打开节目</button>
@@ -56,6 +61,7 @@ describe('App 关键操作反馈', () => {
   it('opens feedback for opening and saving a program', async () => {
     render(<App />)
 
+    fireEvent.click(screen.getByRole('button', { name: '打开节目库' }))
     fireEvent.click(screen.getByRole('button', { name: '打开节目' }))
     expect(await screen.findByText('已打开节目')).toBeTruthy()
 
