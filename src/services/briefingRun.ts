@@ -158,7 +158,8 @@ function hasLLMCredential(config: Record<string, any> | null): boolean {
 }
 
 function hasVoiceCredential(config: Record<string, any> | null): boolean {
-  const engine = String(config?.engine || 'edge-tts')
+  if (!config) return false
+  const engine = String(config.engine || '')
   if (engine === 'edge-tts') return true
   if (engine === 'mock') return false
   if (engine === 'doubao_tts' || engine === 'voice_clone') {
@@ -181,24 +182,37 @@ export async function inspectBriefingReadiness(): Promise<BriefingReadiness> {
     }
   }
 
-  const [scriptConfig, ttsConfig] = await Promise.all([
+  const [appSettings, scriptConfig, ttsConfig] = await Promise.all([
+    window.electronAPI.loadNodeConfig('app_settings'),
     window.electronAPI.loadNodeConfig('script'),
     window.electronAPI.loadNodeConfig('tts'),
   ])
+  const defaultAITarget = String(appSettings?.apiConfig?.global?.defaultAITarget || '').trim()
+  const configuredAudioProvider = String(appSettings?.apiConfig?.global?.audioProvider || '').trim()
+  const llmReady = hasLLMCredential(scriptConfig)
+  const voiceReady = hasVoiceCredential(ttsConfig)
   const issues: string[] = []
-  if (!hasLLMCredential(scriptConfig)) issues.push('尚未配置可用的 AI 成稿目标')
-  if (!hasVoiceCredential(ttsConfig)) issues.push('当前声音配置只能生成 mock 音频或缺少凭据')
+  if (!llmReady) {
+    issues.push(defaultAITarget
+      ? '默认 AI 已选择，但尚未保存为可运行的成稿配置'
+      : '尚未选择默认 AI 目标')
+  }
+  if (!voiceReady) {
+    issues.push(configuredAudioProvider
+      ? '声音输出已选择，但尚未保存为可运行配置'
+      : '尚未配置可用的声音输出')
+  }
 
   return {
     loading: false,
     ready: issues.length === 0,
     issues,
-    llmLabel: hasLLMCredential(scriptConfig)
+    llmLabel: llmReady
       ? String(scriptConfig?.llm_model || scriptConfig?.local_agent_id || '已配置')
-      : '未配置',
-    voiceLabel: hasVoiceCredential(ttsConfig)
-      ? String(ttsConfig?.engine || 'edge-tts')
-      : '未配置',
+      : defaultAITarget ? '待保存' : '未选择',
+    voiceLabel: voiceReady
+      ? String(ttsConfig?.engine)
+      : configuredAudioProvider ? '待保存' : '未配置',
   }
 }
 

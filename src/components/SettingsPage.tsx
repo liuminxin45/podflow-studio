@@ -51,6 +51,7 @@ interface Props {
   workflow: Workflow | null
   onClose: () => void
   onClearLogs?: () => void | Promise<void>
+  initialSection?: SettingsSection
 }
 
 const CAPABILITY_TO_GLOBAL_PREFIX: Record<NodeCapabilityType, 'text' | 'audio'> = {
@@ -373,7 +374,13 @@ function SubsectionBlock({ title, desc, children, collapsible = false }: {
 // Main Component
 // ============================================================
 
-export default function SettingsPage({ visible, workflow, onClose, onClearLogs }: Props) {
+export default function SettingsPage({
+  visible,
+  workflow,
+  onClose,
+  onClearLogs,
+  initialSection = 'creation',
+}: Props) {
   const [activeSection, setActiveSection] = useState<SettingsSection>('creation')
   const [settings, setSettings] = useState<AppSettings>(() => structuredClone(DEFAULT_SETTINGS))
   const [hasChanges, setHasChanges] = useState(false)
@@ -386,6 +393,7 @@ export default function SettingsPage({ visible, workflow, onClose, onClearLogs }
     if (!visible) return
 
     let cancelled = false
+    setActiveSection(initialSection)
 
     const loadSettings = async () => {
       setSaveSuccess(false)
@@ -420,7 +428,7 @@ export default function SettingsPage({ visible, workflow, onClose, onClearLogs }
     return () => {
       cancelled = true
     }
-  }, [visible])
+  }, [initialSection, visible])
 
   // Update helper
   const updateSettings = useCallback(<K extends keyof AppSettings>(

@@ -17,6 +17,7 @@ import { llmConfigResolver } from './services/settings/llmConfigResolver'
 import { postProcessDiscoverItems, type DiscoverPostProcessProgressHandler } from './services/discoverPostProcess'
 import { canEnterStage } from './services/workflowStageStatus'
 import type { Workflow, WorkflowSummary, ContentItem, PodcastState, RecoveryPlan, Series } from './types/workflow'
+import type { SettingsSection } from './types/settings'
 import {
   buildOrganizeUiPatch,
   contentOriginKeys,
@@ -200,6 +201,7 @@ function App() {
   const [soundStudioVisible, setSoundStudioVisible] = useState(false)
   const [publishVisible, setPublishVisible] = useState(false)
   const [settingsVisible, setSettingsVisible] = useState(false)
+  const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSection>('creation')
   const [settingsReturnTarget, setSettingsReturnTarget] = useState<{
     homePage: 'blank' | 'briefing' | 'episodes'
     stageId: string | null
@@ -475,7 +477,8 @@ function App() {
     return null
   }, [discoverVisible, draftVisible, organizeVisible, publishVisible, soundStudioVisible])
 
-  const openSettings = () => {
+  const openSettings = (initialSection: SettingsSection = 'creation') => {
+    setSettingsInitialSection(initialSection)
     setSettingsReturnTarget({
       homePage,
       stageId: getCurrentStageId(),
@@ -1105,7 +1108,7 @@ function App() {
               workflow={navigationWorkflow}
               activeStageId={activeStageId}
               onStageClick={openStage}
-              onOpenSettings={openSettings}
+              onOpenSettings={() => openSettings()}
               hasUnsavedChanges={hasUnsavedChanges}
               onSave={saveActiveWorkflow}
               onClose={handleCloseWorkflow}
@@ -1125,7 +1128,7 @@ function App() {
                   hasElectronBackend={hasElectronBackend}
                   readiness={briefingReadiness}
                   onStart={handleStartBriefing}
-                  onOpenSettings={openSettings}
+                  onOpenSettings={() => openSettings('api-config')}
                   onOpenSample={() => {
                     if (!window.electronAPI?.openExternal) {
                       showNotice('warning', '当前页面没有连接 Electron 后端，无法打开试听样例')
@@ -1616,6 +1619,7 @@ function App() {
         <SettingsPage
           visible={settingsVisible}
           workflow={workflow}
+          initialSection={settingsInitialSection}
           onClose={closeSettings}
           onClearLogs={async () => {
             if (!workflow?.id || !window.electronAPI?.clearWorkflowLogs) throw new Error('当前环境无法清空执行日志')

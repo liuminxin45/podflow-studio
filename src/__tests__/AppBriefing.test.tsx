@@ -12,7 +12,11 @@ vi.mock('../components/OrganizePanel', async () => {
 })
 vi.mock('../components/SoundStudio', () => ({ default: () => null }))
 vi.mock('../components/PublishLayer', () => ({ default: () => null }))
-vi.mock('../components/SettingsPage', () => ({ default: () => null }))
+vi.mock('../components/SettingsPage', () => ({
+  default: ({ visible, initialSection }: { visible: boolean; initialSection?: string }) => (
+    visible ? <div>设置定位：{initialSection}</div> : null
+  ),
+}))
 vi.mock('../components/EpisodeManager', () => ({ default: () => null }))
 vi.mock('../components/WorkflowSidebar', () => ({ default: () => null }))
 vi.mock('../components/GlobalPlayer', () => ({ default: () => null }))
@@ -126,5 +130,20 @@ describe('App quick briefing orchestration', () => {
     const nodes = runWorkflowNodes.mock.calls[0][1] as string[]
     expect(nodes).toContain('review')
     expect(nodes).not.toContain('publish')
+  })
+
+  it('opens the intelligent capability settings from a missing-target warning', async () => {
+    vi.mocked(window.electronAPI.loadNodeConfig).mockImplementation(async (node: string) => {
+      if (node === 'app_settings') {
+        return { apiConfig: { global: { defaultAITarget: '', audioProvider: 'edge-tts' } } }
+      }
+      return null
+    })
+
+    render(<App />)
+
+    expect(await screen.findByText('尚未选择默认 AI 目标')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '打开设置' }))
+    expect(await screen.findByText('设置定位：api-config')).toBeTruthy()
   })
 })

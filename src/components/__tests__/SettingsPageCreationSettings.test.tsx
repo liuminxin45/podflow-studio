@@ -60,4 +60,24 @@ describe('SettingsPage creation settings', () => {
       }),
     ))
   }, 15_000)
+
+  it('opens the intelligent capability section when requested by a configuration warning', async () => {
+    ;(window as any).electronAPI = {
+      ...(originalElectronAPI || {}),
+      loadNodeConfig: vi.fn(async () => structuredClone(DEFAULT_SETTINGS)),
+      saveNodeConfig: vi.fn(async () => ({ success: true })),
+    }
+
+    render(
+      <SettingsPage
+        visible
+        workflow={null}
+        initialSection="api-config"
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(await screen.findByText('默认 AI 目标')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /智能能力接口/ }).className).toContain('is-active')
+  })
 })
