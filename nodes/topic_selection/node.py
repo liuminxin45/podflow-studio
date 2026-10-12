@@ -17,10 +17,12 @@ def run(state: dict[str, Any], config: TopicSelectionConfig = None) -> dict[str,
     runtime_config = state.get("runtime_config", {})
     organize_config = runtime_config.get("organize", {})
     is_ai_mode = organize_config.get("mode") == "ai"
+    intent = runtime_config.get("quick_brief", {})
+    focused = bool(intent.get("requested_at"))
     contents = state.get("researched_contents", [])
 
     # Get LLM config from script node if not set
-    if ctx.auto_execute and is_ai_mode:
+    if ctx.auto_execute and (is_ai_mode or focused):
         script_config = runtime_config.get("script", {})
         if apply_llm_config_from_mapping(
             config,
@@ -35,6 +37,8 @@ def run(state: dict[str, Any], config: TopicSelectionConfig = None) -> dict[str,
     # In auto_execute mode, always use analyze_relevance with target_topic from runtime_config
     discover_config = runtime_config.get("discover", {})
     target_topic_from_runtime = discover_config.get("target_topic", "")
+    if focused:
+        target_topic_from_runtime = str(intent.get("topic") or "围绕提供的素材，选择同一核心问题的相关证据")
     time_range_from_runtime = discover_config.get("time_range_hours", 72)
 
     if ctx.auto_execute and target_topic_from_runtime:
@@ -65,8 +69,21 @@ def run(state: dict[str, Any], config: TopicSelectionConfig = None) -> dict[str,
             # Auto selection mode: select multiple relevant materials by topic
             ctx.log(f"Auto-selection for topic: {config.target_topic}")
             selected, rejected = _analyze_relevance(
-                contents, config, ctx.logs, debug_mode=ctx.debug_mode
+                contents, config, ctx.logs, debug_mode=ctx.debug_mode, require_llm=focused
             )
+
+            if focused:
+                if not selected:
+                    raise ValueError("没有与本期主题相关的可用证据，请补充素材")
+                if any(
+                    not str(item.get("url") or "").startswith(("https://", "http://"))
+                    or not str(item.get("content") or item.get("summary") or "").strip()
+                    for item in selected
+                ):
+                    raise ValueError("选定素材缺少来源链接或正文，不能交给事实核验")
+                # Ready means the source packet is organized, NOT fact-verified.
+                # FactsNode must still verify every claim against this evidence.
+                selected = [{**item, "_status": "ready"} for item in selected]
 
             if ctx.auto_execute:
                 state["selected_materials"] = selected
@@ -254,7 +271,8 @@ def _keyword_prefilter(contents: list[dict], topic: str, cap: int) -> tuple:
 
 
 def _analyze_relevance(
-    contents: list[dict], config: TopicSelectionConfig, logs: list[str], debug_mode: bool = False
+    contents: list[dict], config: TopicSelectionConfig, logs: list[str], debug_mode: bool = False,
+    *, require_llm: bool = False,
 ) -> tuple:
     """Analyze content relevance using LLM. Returns (selected, rejected)."""
     logs.append(
@@ -273,6 +291,8 @@ def _analyze_relevance(
         return [], contents
 
     if not has_llm_runtime_config(config):
+        if require_llm:
+            raise ValueError("选题 AI 不可用，未使用未经筛选的素材代替")
         logs.append(
             f"[TopicSelection] No usable LLM runtime ({target.masked_summary()}), skipping AI analysis"
         )
@@ -324,6 +344,8 @@ def _analyze_relevance(
         )
         return selected, rejected
     except Exception as e:
+        if require_llm:
+            raise RuntimeError(f"选题 AI 执行失败，未静默降级：{e}") from e
         logs.append(f"[TopicSelection] ✗ LLM analysis failed: {type(e).__name__}: {str(e)}")
         import traceback
 

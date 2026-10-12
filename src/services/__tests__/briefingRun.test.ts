@@ -81,11 +81,21 @@ describe('briefing run helpers', () => {
       ready: false,
       issues: [
         '尚未选择默认 AI 目标',
-        '声音输出已选择，但尚未保存为可运行配置',
       ],
       llmLabel: '未选择',
       voiceLabel: '待保存',
     })
+  })
+
+  it('treats a paused script as normal but reports missing attempted audio', () => {
+    const workflow = { status: 'completed', nodeExecutions: { script: { status: 'completed' } }, state: {
+      runtime_config: { quick_brief: { requested_at: 'now' } }, script: { segments: [{ text: '稿件' }] },
+    } } as unknown as Workflow
+    expect(latestBriefingFailure(workflow)).toBeNull()
+    workflow.nodeExecutions.tts = { status: 'completed' }
+    expect(latestBriefingFailure(workflow)).toBeNull()
+    workflow.state.production_plan = { clips: [{ id: 'clip' }] } as any
+    expect(latestBriefingFailure(workflow)?.message).toContain('没有生成可播放音频')
   })
 
   it('accepts the saved local-agent and Edge TTS runtime configs', async () => {

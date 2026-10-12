@@ -36,11 +36,13 @@ def _ready_state(tmp_path: Path) -> dict:
     }]
     state["script"] = {"generated_by": "llm"}
     state["edited_script"] = {"segments": [
+        {"id": "opening", "type": "opening", "text": "本期聚焦一个问题。"},
         *[
             {"id": f"quick_{index}", "type": "quick_news", "text": "快讯", "source_fact_ids": ["fact_001"], "source_claim_ids": ["claim_001"]}
             for index in range(6)
         ],
         {"id": "deep_1", "type": "deep_dive", "text": "深度稿", "source_fact_ids": ["fact_001"], "source_claim_ids": ["claim_001"]},
+        {"id": "closing", "type": "closing", "text": "本期到这里。"},
     ]}
     state["generation_meta"] = {"editorial_quality": {
         "version": "editorial_quality_v1", "status": "passed", "model": "editor-model",
@@ -103,3 +105,28 @@ def test_current_human_approval_promotes_preview_to_publish_ready(tmp_path: Path
     }
 
     assert build_release_readiness(state)["status"] == "publish_ready"
+
+
+@pytest.mark.parametrize("count", [1, 2, 8])
+def test_evidence_backed_short_or_long_episode_still_requires_human_review(tmp_path, count):
+    state = _ready_state(tmp_path)
+    segments = state["edited_script"]["segments"]
+    template = segments[1]
+    state["edited_script"]["segments"] = [segments[0], *[{**template, "id": f"part_{i}"} for i in range(count)], segments[-1]]
+    readiness = build_release_readiness(state)
+    assert readiness["gates"]["script"]["status"] == "passed"
+    assert readiness["status"] == "preview_ready"
+    state["facts"][0]["claims"][0]["status"] = "insufficient"
+    assert build_release_readiness(state)["status"] == "blocked"
+
+
+@pytest.mark.parametrize("mutation", ["empty", "duplicate_id", "unbound_custom"])
+def test_flexible_format_does_not_accept_invalid_structure(tmp_path, mutation):
+    state = _ready_state(tmp_path)
+    if mutation == "empty":
+        state["edited_script"]["segments"] = []
+    elif mutation == "duplicate_id":
+        state["edited_script"]["segments"][1]["id"] = state["edited_script"]["segments"][0]["id"]
+    else:
+        state["edited_script"]["segments"][0]["type"] = "custom"
+    assert build_release_readiness(state)["gates"]["script"]["status"] == "failed"

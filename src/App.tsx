@@ -11,6 +11,7 @@ import WorkflowSidebar from './components/WorkflowSidebar'
 import EpisodeManager from './components/EpisodeManager'
 import GlobalPlayer from './components/GlobalPlayer'
 import BriefingHome from './components/briefing/BriefingHome'
+import ContentWorkbench from './components/briefing/ContentWorkbench'
 import { STAGES } from './components/workflowStages'
 import { detectAndPersistLocalAgentsOnStartup } from './services/settings/localAgentDetection'
 import { llmConfigResolver } from './services/settings/llmConfigResolver'
@@ -629,7 +630,7 @@ function App() {
     }
   }
 
-  const handleStartBriefing = async ({ topic, materialText }: BriefingRequest) => {
+  const handleStartBriefing = async ({ topic, materialText, audience, takeaway }: BriefingRequest) => {
     let createdWorkflowId = ''
     try {
       if (!window.electronAPI?.createWorkflow || !window.electronAPI?.discoverRun) {
@@ -640,6 +641,10 @@ function App() {
       setBriefingReadiness(readiness)
       if (!readiness.ready) {
         showNotice('warning', readiness.issues[0] || '请先完成 AI 和声音服务配置')
+        return
+      }
+      if (!topic.trim() && !materialText.trim()) {
+        showNotice('warning', '请填写一个主题或提供素材')
         return
       }
       const canContinue = await confirmSaveBeforeReplace()
@@ -657,6 +662,8 @@ function App() {
           requested_at: requestedAt,
           topic,
           material_text: materialText,
+          audience,
+          takeaway,
         },
       })
       createdWorkflowId = result.workflowId
@@ -698,10 +705,13 @@ function App() {
         const failure = latestBriefingFailure(completed)
         throw new Error(failure?.message || '节目生成失败')
       }
-      if (!completed.state.audio_outputs?.final_audio_path) {
-        throw new Error('工作流已结束，但没有生成可播放音频')
+      if (!completed.state.script?.segments?.length) {
+        throw new Error('工作流已结束，但没有生成可审阅稿件')
       }
-      showNotice('success', '今日节目已经生成，可以开始试听')
+      closeAllPanels()
+      setHomePage('blank')
+      setDraftVisible(true)
+      showNotice('success', '稿件已生成，请核对内容与来源，确认后再制作声音')
     } catch (error) {
       if (createdWorkflowId && window.electronAPI?.getWorkflow) {
         const failed = await window.electronAPI.getWorkflow(createdWorkflowId).catch(() => null)
@@ -764,6 +774,10 @@ function App() {
     }
     try {
       if (workflow?.id === workflowId) {
+        if (isQuickBriefWorkflow(workflow)) {
+          openBriefingHome()
+          return
+        }
         openStage('discover')
         return
       }
@@ -777,7 +791,11 @@ function App() {
       closeAllPanels()
       await loadWorkflowSummaries()
       showNotice('success', '已打开节目')
-      openStage('discover')
+      if (isQuickBriefWorkflow(opened)) {
+        setHomePage('briefing')
+      } else {
+        openStage('discover')
+      }
     } catch (error) {
       showNotice('error', `打开失败：${getErrorMessage(error)}`)
     }
@@ -1507,9 +1525,34 @@ function App() {
           }}
         />
 
+        {workflow && isQuickBriefWorkflow(workflow) && <ContentWorkbench
+          key={`content-${workflow.id}`}
+          visible={draftVisible}
+          workflow={workflow}
+          onClose={returnToEpisodeManager}
+          onSources={() => { closeAllPanels(); setOrganizeVisible(true) }}
+          onDraftPatchChange={queueDraftPatch}
+          onRegenerate={async () => {
+            await flushPendingDraftPatch()
+            await updateWorkflowPatch({ generation_request: {
+              mode: 'regenerate', require_llm: true, requested_at: new Date().toISOString(),
+              draft_snapshot: {},
+            } })
+            const updated = await runWorkflowNodes(['script'])
+            if (!updated || updated.status === 'failed') throw new Error(latestBriefingFailure(updated || workflow)?.message || '重新成稿失败')
+          }}
+          onConfirm={async patch => {
+            await flushPendingDraftPatch()
+            await updateWorkflowPatch(patch)
+            const saved = await saveActiveWorkflow({ notify: false })
+            if (!saved) throw new Error('稿件保存失败，请重试')
+            closeAllPanels()
+            setSoundStudioVisible(true)
+          }}
+        />}
         <EpisodeDraftStudio
           key={`draft-${workflow?.id || 'none'}`}
-          visible={draftVisible}
+          visible={draftVisible && !isQuickBriefWorkflow(workflow)}
           onClose={returnToEpisodeManager}
           onBackToOrganize={() => {
             closeAllPanels()

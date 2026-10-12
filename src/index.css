@@ -5807,6 +5807,15 @@ body {
   gap: 8px;
 }
 
+.briefing-optional > summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.briefing-optional[open] > .briefing-field {
+  margin-top: 20px;
+}
+
 .briefing-field > span {
   color: var(--text-primary);
   font-size: 13px;

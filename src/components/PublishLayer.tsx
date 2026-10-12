@@ -236,7 +236,7 @@ export default function PublishLayer({
   return (
     <div className="stage-workbench publish-workbench">
       <StageHeader
-        title="发布"
+        title="试听交付 · 终审与导出"
         center={<span className="publish-header-note">本地优先 · 文件透明 · 随时可迁移</span>}
         previous={view !== 'publishing' ? { onClick: onBackToProduce || onClose } : undefined}
       />

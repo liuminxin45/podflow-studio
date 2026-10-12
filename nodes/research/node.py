@@ -15,6 +15,7 @@ def run(state: dict[str, Any], config: ResearchConfig = None) -> dict[str, Any]:
     runtime_config = state.get("runtime_config", {})
     organize_config = runtime_config.get("organize", {})
     is_ai_mode = organize_config.get("mode") == "ai"
+    focused = bool(runtime_config.get("quick_brief", {}).get("requested_at"))
     cleaned = state.get("cleaned_contents", [])
 
     ctx.log_start(
@@ -24,7 +25,7 @@ def run(state: dict[str, Any], config: ResearchConfig = None) -> dict[str, Any]:
     )
 
     # Get LLM config from script node if research node config is not set
-    if ctx.auto_execute and is_ai_mode:
+    if ctx.auto_execute and (is_ai_mode or focused):
         script_config = runtime_config.get("script", {})
         if apply_llm_config_from_mapping(
             config,
@@ -43,7 +44,13 @@ def run(state: dict[str, Any], config: ResearchConfig = None) -> dict[str, Any]:
     researched = []
 
     try:
-        if ctx.auto_execute:
+        if focused:
+            if not has_llm_runtime_config(config):
+                raise ValueError("本期研究需要可用的 AI 配置，未跳过研究")
+            researched = _ai_research_with_llm(cleaned, config, ctx.logs, debug_mode=ctx.debug_mode)
+            if not researched or any(not item.get("verified") for item in researched):
+                raise ValueError("部分素材研究失败，请查看节点日志并重试；未将失败素材标记为已整理")
+        elif ctx.auto_execute:
             # In auto_execute mode, pass all items through without LLM calls.
             # topic_selection will do AI-powered filtering by topic on the full pool.
             ctx.log("Auto-execute模式: 直传所有条目 (topic_selection将按主题过滤)")

@@ -22,13 +22,15 @@ export default function BriefingComposer({
 }: Props) {
   const [topic, setTopic] = useState('')
   const [materialText, setMaterialText] = useState('')
+  const [audience, setAudience] = useState('')
+  const [takeaway, setTakeaway] = useState('')
 
   return (
     <section className="briefing-composer" aria-labelledby="briefing-composer-title">
       <header>
-        <h1 id="briefing-composer-title">今天想听什么？</h1>
-        <p>输入一个关注主题，也可以粘贴链接或素材文字。留空则从已配置的推荐来源生成今日晨报。</p>
-        <p>生成会自动完成研究、成稿、配音和机器审核，但不会自动发布。</p>
+        <h1 id="briefing-composer-title">开始一集</h1>
+        <p>今天想讲清楚什么？一个问题就够了，也可以从你提供的素材开始。</p>
+        <p>先核验来源、生成稿件。你确认内容后再制作声音；不会自动发布。</p>
       </header>
 
       <div className="briefing-composer-form">
@@ -42,6 +44,16 @@ export default function BriefingComposer({
             maxLength={120}
           />
         </label>
+        <details className="briefing-optional">
+          <summary>补充素材与听众（可选）</summary>
+        <label className="briefing-field">
+          <span>讲给谁听（可选）</span>
+          <Input value={audience} onChange={event => setAudience(event.target.value)} disabled={busy} maxLength={200} placeholder="例如：想了解 AI 工具的普通上班族" />
+        </label>
+        <label className="briefing-field">
+          <span>希望听众带走什么（可选）</span>
+          <Input value={takeaway} onChange={event => setTakeaway(event.target.value)} disabled={busy} maxLength={300} placeholder="例如：理解哪些工作值得交给 AI，以及它的边界" />
+        </label>
         <label className="briefing-field">
           <span>指定素材</span>
           <Input.TextArea
@@ -52,14 +64,15 @@ export default function BriefingComposer({
             autoSize={{ minRows: 4, maxRows: 8 }}
           />
         </label>
+        </details>
       </div>
 
       <div className="briefing-composer-footer">
         <div className={`briefing-readiness ${readiness.ready ? 'is-ready' : 'is-blocked'}`}>
           {readiness.loading ? (
-            <span>正在检查 AI 和声音服务</span>
+            <span>正在检查成稿服务</span>
           ) : readiness.ready ? (
-            <span>AI：{readiness.llmLabel}<b aria-hidden="true">/</b>声音：{readiness.voiceLabel}</span>
+            <span>AI：{readiness.llmLabel} · 声音服务可在审稿后配置</span>
           ) : (
             <>
               <span>{readiness.issues[0] || '还没有完成运行配置'}</span>
@@ -74,10 +87,10 @@ export default function BriefingComposer({
           icon={<ArrowRight />}
           iconPosition="end"
           loading={busy}
-          disabled={!hasElectronBackend || readiness.loading || !readiness.ready}
-          onClick={() => void onStart({ topic: topic.trim(), materialText: materialText.trim() })}
+          disabled={!hasElectronBackend || readiness.loading || !readiness.ready || !(topic.trim() || materialText.trim())}
+          onClick={() => void onStart({ topic: topic.trim(), materialText: materialText.trim(), audience: audience.trim(), takeaway: takeaway.trim() })}
         >
-          生成今日节目
+          研究并生成稿件
         </Button>
       </div>
 

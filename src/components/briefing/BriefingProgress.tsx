@@ -37,12 +37,12 @@ export default function BriefingProgress({ workflow, onOpenStudio, onStartNew }:
   return (
     <section className="briefing-run-state" aria-labelledby="briefing-progress-title">
       <header>
-        <span>正在制作今天的节目</span>
+        <span>正在准备本期稿件</span>
         <h1 id="briefing-progress-title">可以先去做别的事</h1>
         <p>{currentBriefingDetail(workflow)}</p>
       </header>
       <ol className="briefing-phase-list">
-        {BRIEFING_PHASES.map(phase => {
+        {BRIEFING_PHASES.filter(phase => phase.id !== 'voice').map(phase => {
           const status = phaseStatus(workflow, phase)
           return (
             <li key={phase.id} className={`is-${status}`}>

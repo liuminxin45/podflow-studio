@@ -102,6 +102,8 @@ def build_episode_script_prompt(
         "template_variant": structure["template_variant"],
         "topic_title": topic.get("title", "今日新闻早报"),
         "topic_description": topic.get("description", ""),
+        "audience": topic.get("audience", ""),
+        "listener_takeaway": topic.get("takeaway", ""),
         "show_name": topic.get("show_name", ""),
         "host_name": topic.get("host_name", ""),
         "episode_date": topic.get("episode_date", ""),

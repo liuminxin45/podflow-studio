@@ -8,14 +8,13 @@ import subprocess
 from nodes.review.config import ReviewConfig
 from protocol.artifact_utils import file_fingerprint
 from protocol.release_readiness import build_release_readiness
+from protocol.episode_policy import MIN_EPISODE_SECONDS, MAX_EPISODE_SECONDS
 
 # Each check: (condition_ok, fail_level, fail_msg, pass_msg)
 # fail_level is "error" or "warning"
 type CheckSpec = tuple[bool, str, str, str]
 
 
-MIN_AUDIO_DURATION_WARN = 30  # seconds – warn below this
-MIN_AUDIO_DURATION_ERROR = 10  # seconds – error below this
 MIN_SEGMENTS = 2  # at least 2 segments for meaningful content
 MIN_AVG_SEGMENT_CHARS = 20  # average chars per segment; below this suggests placeholder text
 MAX_CLIP_SECONDS = 30.0
@@ -66,7 +65,7 @@ def _build_checks(
     script = state.get("edited_script", {})
     segments = script.get("segments", []) if isinstance(script, dict) else []
     audio_outputs = state.get("audio_outputs", {})
-    actual_duration = audio_outputs.get("duration_seconds", 0) if isinstance(audio_outputs, dict) else 0
+    actual_duration = (measured_audio or {}).get("duration_seconds", 0)
 
     avg_chars = sum(len(s.get("text", "")) for s in segments) / len(segments) if segments else 0
     plan = state.get("production_plan") if isinstance(state.get("production_plan"), dict) else {}
@@ -79,6 +78,15 @@ def _build_checks(
     expected_bridges = sum(join.get("type") == "bridge" for join in joins)
     rendered_stings = sum(str(item).startswith("sting_after_") for item in operations)
     rendered_bridges = sum(str(item).startswith("bridge_after_") for item in operations)
+    clips = [clip for clip in plan.get("clips", []) if isinstance(clip, dict)]
+    clip_ids = [clip.get("id") for clip in clips]
+    plan_complete = (
+        bool(clips) and all(clip_ids) and len(set(clip_ids)) == len(clip_ids)
+        and {clip.get("parent_segment_id") for clip in clips} == {segment.get("id") for segment in segments}
+        and [join.get("after_clip_id") for join in joins] == clip_ids[:-1]
+    )
+    expected_cues = sorted(f"{join['type']}_after_{join.get('after_clip_id')}" for join in joins if join.get("type") in {"sting", "bridge"})
+    rendered_cues = sorted(str(item) for item in operations if str(item).startswith(("sting_after_", "bridge_after_")))
     measured_audio = measured_audio or {}
 
     checks: list[CheckSpec] = [
@@ -96,10 +104,12 @@ def _build_checks(
             f"{len(segments)} segments ready",
         ),
         (plan.get("version") == 4 and plan.get("quality_profile") == "podflow_morning_v4", "error", "Production plan is not v4", "Production plan v4 ready"),
+        (plan_complete, "error", "Production plan does not cover every script segment and join", "Production plan covers the complete script"),
+        (expected_cues == rendered_cues, "error", "Rendered cues do not match planned clip boundaries", "Every cue matches its planned boundary"),
         (not overlong, "error", f"TTS clips exceed 30 seconds: {', '.join(map(str, overlong))}", "All TTS clips are at most 30 seconds"),
         (not prosody_failures, "error", f"Prosody checks require review: {', '.join(map(str, prosody_failures))}", "Speech rate and non-silent dynamics passed"),
-        (expected_stings == 5 and rendered_stings == 5, "error", f"Expected/rendered quick-news stings: {expected_stings}/{rendered_stings}", "Exactly 5 quick-news stings rendered"),
-        (expected_bridges == 1 and rendered_bridges == 1, "error", f"Expected/rendered deep-dive bridges: {expected_bridges}/{rendered_bridges}", "Exactly 1 deep-dive bridge rendered"),
+        (expected_stings == rendered_stings, "error", f"Expected/rendered quick-news stings: {expected_stings}/{rendered_stings}", f"All {expected_stings} planned stings rendered"),
+        (expected_bridges == rendered_bridges, "error", f"Expected/rendered deep-dive bridges: {expected_bridges}/{rendered_bridges}", f"All {expected_bridges} planned bridges rendered"),
         (INTRO_OPERATION in operations, "error", "Intro cue is missing from final timeline", "Intro cue rendered with voice overlap"),
         (OUTRO_OPERATION in operations, "error", "Outro cue is missing from final timeline", "Outro cue rendered with voice overlap"),
         (measured_audio.get("codec") == "mp3", "error", "Final audio codec is not MP3", "Final codec is MP3"),
@@ -120,31 +130,12 @@ def _build_checks(
             )
         )
 
-    if actual_duration > 0:
-        if actual_duration < MIN_AUDIO_DURATION_ERROR:
-            checks.append(
-                (
-                    False,
-                    "error",
-                    f"Audio too short: {actual_duration:.1f}s (min {MIN_AUDIO_DURATION_ERROR}s)",
-                    f"Audio duration OK: {actual_duration:.1f}s",
-                )
-            )
-        elif actual_duration < MIN_AUDIO_DURATION_WARN:
-            checks.append(
-                (
-                    False,
-                    "warning",
-                    f"Audio very short: {actual_duration:.1f}s (recommended ≥{MIN_AUDIO_DURATION_WARN}s)",
-                    f"Audio duration OK: {actual_duration:.1f}s",
-                )
-            )
-        elif actual_duration > 900:
-            checks.append((False, "error", f"Audio exceeds 15 minutes: {actual_duration:.1f}s", "Audio is within the 12-15 minute range"))
-        elif actual_duration < 720:
-            checks.append((False, "error", f"Audio is below 12 minutes: {actual_duration:.1f}s", "Audio is within the 12-15 minute range"))
-        else:
-            checks.append((True, "error", "", f"Audio is within the 12-15 minute range: {actual_duration:.1f}s"))
+    checks.append((
+        MIN_EPISODE_SECONDS <= actual_duration <= MAX_EPISODE_SECONDS,
+        "error",
+        f"Measured audio duration is missing or outside {MIN_EPISODE_SECONDS}–{MAX_EPISODE_SECONDS}s: {actual_duration:.1f}s",
+        f"Measured audio duration is within the supported range: {actual_duration:.1f}s",
+    ))
 
     if segments:
         checks.append(

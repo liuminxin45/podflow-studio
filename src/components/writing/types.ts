@@ -21,6 +21,7 @@ export interface WritingSegment {
   label: string
   content: string
   sourceFactIds?: string[]
+  sourceClaimIds?: string[]
   tone: SegmentTone
   estimatedSeconds: number
   isCompleted: boolean
@@ -38,6 +39,7 @@ export interface WritingLayerProps {
   initialScript?: Script
   embedded?: boolean
   headerTitle?: string
+  proceedLabel?: string
   headerLeadingActions?: ReactNode
   leadingPanel?: ReactNode
   characterTargets?: WritingCharacterTargets

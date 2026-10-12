@@ -99,6 +99,8 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
 
   async function screenshot(name) {
     const filePath = path.join(screenshotDir, `${name}.png`)
+    // Warm the hidden window's compositor before recording the current frame.
+    await webContents.capturePage()
     const image = await webContents.capturePage()
     fs.writeFileSync(filePath, image.toPNG())
     screenshots.push(filePath)
@@ -121,6 +123,7 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
       const openButton = [...document.querySelectorAll('[aria-label^="打开节目："]')][0]
       openButton?.click()
       await new Promise(resolve => setTimeout(resolve, 1200))
+      document.querySelectorAll('.workflow-stage-list details').forEach(details => { details.open = true })
       const stage = [...document.querySelectorAll('button')].find(button =>
         button.title?.startsWith(${JSON.stringify(`${stageLabel}：`)})
         || button.textContent?.trim() === ${JSON.stringify(stageLabel)}
@@ -158,7 +161,7 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
       hasMediaRecorder: typeof MediaRecorder !== 'undefined'
     }))()`)
     assert('首页 DOM 可读取', Boolean(domState?.body?.trim()), `bodyLength=${domState?.body?.length || 0}`)
-    assert('默认进入今日简报', /今天想听什么|生成今日节目/.test(domState?.body || ''), String(domState?.body || ''))
+    assert('默认进入开始一集', /研究并生成稿件/.test(domState?.body || ''), String(domState?.body || ''))
     assert('今日简报解释自动化边界', /不会自动发布/.test(domState?.body || ''), String(domState?.body || ''))
     assert('未出现剪枝后的精简主路径', !/LeanSettings|精简组件|剪枝/.test(domState?.body || ''), 'DOM 中不应包含剪枝标记')
     assert('Electron API 已注入', Boolean(domState?.hasElectronAPI), 'window.electronAPI 必须存在')
@@ -303,7 +306,7 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
     recordStep('facts 与写作状态保存', 'PASS', `facts=${cdpFacts.length}, segments=${cdpEditedSegments.length}`)
     await openWorkflowStage(workflowResult.workflowId, '发现')
     await screenshot('02-discover-fetch-state')
-    await openWorkflowStage(workflowResult.workflowId, '成稿')
+    await openWorkflowStage(workflowResult.workflowId, '打磨内容')
     await screenshot('02-script-state')
 
     // Keep upstream generation failures visible in the assertions above, but provide
@@ -413,7 +416,7 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
     assert('离线音频装配输入已保存', assemblyFile.exists && assemblyFile.size > 0, `${recordingResult?.assemblySaved?.path} size=${assemblyFile.size}`)
     assert('录音段写入 workflow state', Boolean(recordingResult?.workflow?.state?.voice_segments?.[0]?.path), JSON.stringify(recordingResult?.workflow?.state?.voice_segments || []))
     recordStep('真人录制与保存', 'PASS', `path=${recordingPath}, blobSize=${recordingResult?.blobSize}`)
-    await openWorkflowStage(workflowResult.workflowId, '制作')
+    await openWorkflowStage(workflowResult.workflowId, '试听交付')
     await screenshot('03-recording-state')
 
     const audioWorkflow = await evaluate(`(async () => {
@@ -464,6 +467,32 @@ async function runCdpAcceptance({ app, mainWindow, projectRoot, artifactDir, sui
     })()`)
     assert('发布准备页展示本地交付清单', /把这一期整理成可带走的文件/.test(publishReadyUi || '') && /生成发布文件/.test(publishReadyUi || ''), String(publishReadyUi || ''))
     await screenshot('04-publish-ready-state')
+
+    // Exercise the default content editor with an isolated UI-only source fixture.
+    await evaluate(`(async () => {
+      const id = window.__acceptanceWorkflowId
+      const workflow = await window.electronAPI.getWorkflow(id)
+      await window.electronAPI.updateWorkflowState(id, {
+        facts: [{ id: 'acceptance_fact', title: '验收来源', summary: '仅用于离线界面验收，不可正式发布。', confidence: 'low',
+          claims: [{ id: 'acceptance_claim', text: '这是待核验的界面样例', status: 'insufficient', evidence_ids: ['acceptance_evidence'], confidence: 'low', verifier_model: '', verified_at: '' }],
+          evidence: [{ id: 'acceptance_evidence', url: 'https://example.com/acceptance-source', title: '验收原文链接', source_role: 'independent', published_at: '', excerpt: '界面夹具，不代表真实新闻。' }]
+        }],
+        runtime_config: { ...workflow.state.runtime_config, quick_brief: {
+          requested_at: new Date().toISOString(), topic: '离线验收主题', audience: '普通听众', takeaway: '理解来源与边界'
+        } }
+      })
+      await window.electronAPI.saveWorkflow(id)
+    })()`)
+    await openWorkflowStage(workflowResult.workflowId, '打磨内容')
+    const focusedUi = await evaluate(`(async () => {
+      const sourceButton = [...document.querySelectorAll('button')].find(button => button.textContent?.trim() === '来源与核验')
+      sourceButton?.click()
+      await new Promise(resolve => setTimeout(resolve, 400))
+      return { body: document.body.innerText, sourceButton: Boolean(sourceButton) }
+    })()`)
+    assert('默认编辑器提供审稿确认和来源核验', focusedUi.sourceButton && /确认内容，进入试听交付/.test(focusedUi.body) && /理解来源与边界/.test(focusedUi.body) && /验收原文链接/.test(focusedUi.body) && /证据不足/.test(focusedUi.body), focusedUi.body)
+    await screenshot('04-focused-content-sources')
+    await evaluate(`(() => { document.querySelector('.ant-drawer-close')?.click() })()`)
 
     const settingsUi = await evaluate(`(async () => {
       const settingsButton = [...document.querySelectorAll('button')].find(button => button.textContent?.trim() === '设置')

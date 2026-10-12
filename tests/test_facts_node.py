@@ -24,6 +24,19 @@ class _FactRuntime:
         return self.output
 
 
+def test_default_journey_does_not_truncate_to_morning_news_quota(monkeypatch):
+    monkeypatch.setattr("nodes.facts.node._verify_claims", lambda facts, config, ctx: None)
+    state = create_base_state()
+    state["runtime_config"] = {"quick_brief": {"requested_at": "2026-10-12T00:00:00Z"}}
+    state["selected_materials"] = [
+        {"title": f"新闻 {index}", "content": f"不同主题的事实依据 {index}。", "url": f"https://example.com/{index}", "source": "来源", "_status": "ready"}
+        for index in range(8)
+    ]
+    result = facts_run(state, FactsConfig(selected_topic_count=7))
+    assert len(result["facts"]) == 8
+    assert len(result["selected_topics"]) == 8
+
+
 def _fact_for_verifier() -> list[dict]:
     return [{
         "id": "fact_001", "title": "事实", "summary": "证据支持事实", "confidence": "low",

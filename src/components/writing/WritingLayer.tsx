@@ -83,6 +83,7 @@ export default function WritingLayer({
   episodeDesc = '',
   embedded = false,
   headerTitle = '口播稿',
+  proceedLabel = '进入制作',
   headerLeadingActions,
   leadingPanel,
   characterTargets,
@@ -163,6 +164,7 @@ export default function WritingLayer({
       title: segment.label,
       text: segment.content.trim(),
       source_fact_ids: explicitSourceFactIds(segment),
+      source_claim_ids: segment.sourceClaimIds || [],
       estimated_seconds: estimateReadingSeconds(segment.content),
       speaker: 'Host A',
       is_completed: true,
@@ -212,6 +214,7 @@ export default function WritingLayer({
           label: segment.title || SEGMENT_TYPE_CONFIG[normalizeWritingSegmentType(segment.type, index)].label,
           content: String(segment.text || ''),
           sourceFactIds: Array.isArray(segment.source_fact_ids) ? segment.source_fact_ids : [],
+          sourceClaimIds: Array.isArray(segment.source_claim_ids) ? segment.source_claim_ids : [],
           estimatedSeconds: estimateReadingSeconds(String(segment.text || '')),
           isCompleted: Boolean(String(segment.text || '').trim()),
         }))
@@ -222,6 +225,7 @@ export default function WritingLayer({
             label: segment.title || SEGMENT_TYPE_CONFIG[normalizeWritingSegmentType(segment.type, index)].label,
             content: String(segment.text || ''),
             sourceFactIds: Array.isArray(segment.source_fact_ids) ? segment.source_fact_ids : [],
+            sourceClaimIds: Array.isArray(segment.source_claim_ids) ? segment.source_claim_ids : [],
             estimatedSeconds: estimateReadingSeconds(String(segment.text || '')),
             isCompleted: Boolean(String(segment.text || '').trim()),
           }))
@@ -236,6 +240,7 @@ export default function WritingLayer({
           label: item.label,
           content: item.content,
           sourceFactIds: item.sourceFactIds || [],
+          sourceClaimIds: item.sourceClaimIds || [],
           tone: 'default',
           estimatedSeconds: item.estimatedSeconds,
           isCompleted: Boolean(item.content.trim()),
@@ -437,7 +442,7 @@ export default function WritingLayer({
         title={headerTitle}
         actions={headerLeadingActions}
         previous={onBackToDraft ? { onClick: onBackToDraft } : undefined}
-        next={{ label: '进入制作', onClick: handleProceed }}
+        next={{ label: proceedLabel, onClick: handleProceed, disabled: !segments.some(segment => segment.content.trim()) }}
       />
 
       {/* ==================== BODY ==================== */}

@@ -43,6 +43,7 @@ export default function BriefingHome({
   const hasFailure = Boolean(latestBriefingFailure(quickWorkflow))
   const showProgress = Boolean(quickWorkflow && !composeNew && (busy || quickWorkflow.status === 'running' || hasFailure) && !hasAudio)
   const showResult = Boolean(quickWorkflow && !composeNew && hasAudio)
+  const showDraft = Boolean(quickWorkflow?.state.script?.segments?.length && !composeNew && !showProgress && !showResult)
   const recentEpisodes = episodes.filter(item => item.audioPath).slice(0, 4)
 
   return (
@@ -63,6 +64,16 @@ export default function BriefingHome({
           onOpenPublish={() => onOpenStudio('publish')}
           onStartNew={() => setComposeNew(true)}
         />
+      ) : showDraft && quickWorkflow ? (
+        <section className="briefing-run-state">
+          <h1>稿件等你审阅</h1>
+          <p>{quickWorkflow.state.script?.title || '本期节目'} · 尚未制作声音</p>
+          <p>核对事实、解释与听众收获，再决定是否值得做成音频。</p>
+          <div className="briefing-state-actions">
+            <Button type="primary" onClick={() => onOpenStudio('draft')}>打磨内容</Button>
+            <Button onClick={() => setComposeNew(true)}>开始另一集</Button>
+          </div>
+        </section>
       ) : (
         <BriefingComposer
           busy={busy}

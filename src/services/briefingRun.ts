@@ -6,9 +6,6 @@ export const BRIEFING_NODES = [
   'topic_selection',
   'facts',
   'script',
-  'tts',
-  'audio_postprocess',
-  'review',
 ] as const
 
 export const DEFAULT_BRIEFING_NEWSNOW_SOURCES = [
@@ -29,6 +26,8 @@ export const PUBLIC_SAMPLE_URL = 'https://www.liuminxin.cn/works/podflow-studio#
 export interface BriefingRequest {
   topic: string
   materialText: string
+  audience: string
+  takeaway: string
 }
 
 export interface BriefingReadiness {
@@ -197,11 +196,6 @@ export async function inspectBriefingReadiness(): Promise<BriefingReadiness> {
       ? '默认 AI 已选择，但尚未保存为可运行的成稿配置'
       : '尚未选择默认 AI 目标')
   }
-  if (!voiceReady) {
-    issues.push(configuredAudioProvider
-      ? '声音输出已选择，但尚未保存为可运行配置'
-      : '尚未配置可用的声音输出')
-  }
 
   return {
     loading: false,
@@ -242,7 +236,7 @@ export function currentBriefingDetail(workflow: Workflow | null): string {
     fetch: '正在读取推荐来源和你提供的素材。',
     preprocess: '正在清理重复内容并保留可用信息。',
     research: '正在补充背景并核对来源。',
-    topic_selection: '正在确定本期快讯和重点解读。',
+    topic_selection: '正在筛选与本期问题相关的证据。',
     facts: '正在生成可追踪的事实卡片。',
     script: '正在根据事实卡片撰写口播稿。',
     tts: '正在把确认后的稿件转换成声音。',
@@ -271,7 +265,8 @@ export function latestBriefingFailure(workflow: Workflow | null): { node: string
     const attemptedNodes = Object.keys(workflow.nodeExecutions || {})
     const missingAudio = isQuickBriefWorkflow(workflow)
       && workflow.status !== 'running'
-      && attemptedNodes.length > 0
+      && attemptedNodes.some(node => ['tts', 'audio_postprocess'].includes(node))
+      && Boolean(workflow.state.production_plan?.clips?.length)
       && !workflow.state.audio_outputs?.final_audio_path
     if (!missingAudio) return null
     return {

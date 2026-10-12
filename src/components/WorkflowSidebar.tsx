@@ -75,7 +75,7 @@ export default function WorkflowSidebar({
 
       <nav className="workflow-primary-nav" aria-label="主导航">
         <button type="button" className={homeActive ? 'is-active' : ''} aria-current={homeActive ? 'page' : undefined} onClick={onHome}>
-          <House weight={homeActive ? 'fill' : 'regular'} /><span>今日简报</span>
+          <House weight={homeActive ? 'fill' : 'regular'} /><span>开始一集</span>
         </button>
         <button type="button" className={libraryActive ? 'is-active' : ''} aria-current={libraryActive ? 'page' : undefined} onClick={onLibrary}>
           <Books weight={libraryActive ? 'fill' : 'regular'} /><span>节目库</span>
@@ -89,11 +89,17 @@ export default function WorkflowSidebar({
             <strong>{workflow.state?.selected_topic?.title || workflow.state?.script?.title || '未命名节目'}</strong>
           </header>
           <div className="workflow-stage-list">
-            {statuses.map((derived) => (
+            {statuses.filter(derived => derived.stage.id === 'draft' || derived.stage.id === 'produce').map((derived) => (
               <div key={derived.stage.id}>
-                <WorkflowStep derived={derived} active={activeStageId === derived.stage.id} onStageClick={onStageClick} />
+                <WorkflowStep derived={{ ...derived, stage: { ...derived.stage, label: derived.stage.id === 'draft' ? '打磨内容' : '试听交付' } }} active={activeStageId === derived.stage.id || (derived.stage.id === 'produce' && activeStageId === 'publish')} onStageClick={onStageClick} />
               </div>
             ))}
+            <details open={['discover', 'organize'].includes(activeStageId || '') ? true : undefined}>
+              <summary>素材与专业工具</summary>
+              {statuses.filter(derived => ['discover', 'organize', 'publish'].includes(derived.stage.id)).map(derived => (
+                <WorkflowStep key={derived.stage.id} derived={derived} active={activeStageId === derived.stage.id} onStageClick={onStageClick} />
+              ))}
+            </details>
           </div>
         </>
       )}

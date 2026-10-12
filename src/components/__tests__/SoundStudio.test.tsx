@@ -70,7 +70,7 @@ describe('SoundStudio production workflow', () => {
 
     await waitFor(() => expect(loadNodeConfig).toHaveBeenCalledTimes(2))
     fireEvent.click(screen.getByText('正文'))
-    expect(screen.getByText('声音制作')).toBeTruthy()
+    expect(screen.getByText('试听交付')).toBeTruthy()
     expect(screen.getByText('这是经过事实核验的节目正文。')).toBeTruthy()
     expect(screen.getByText('Edge TTS')).toBeTruthy()
     expect(screen.getByText(/段间停顿/)).toBeTruthy()
@@ -289,7 +289,7 @@ describe('SoundStudio production workflow', () => {
     expect(screen.queryByText('payload.exe')).toBeNull()
     expect(screen.queryByRole('button', { name: '制作报告' })).toBeNull()
     expect(screen.queryByRole('button', { name: '试听真实文件' })).toBeNull()
-    expect((screen.getByRole('button', { name: '进入发布' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: '终审与导出' }) as HTMLButtonElement).disabled).toBe(true)
 
     const completed = workflow(
       { status: 'completed' },

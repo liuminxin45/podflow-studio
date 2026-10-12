@@ -181,6 +181,10 @@ def _verify_claims(facts: list[dict[str, Any]], config: FactsConfig, ctx: Any) -
 
 def run(state: dict[str, Any], config: FactsConfig = None) -> dict[str, Any]:
     config = config or FactsConfig()
+    intent = state.get("runtime_config", {}).get("quick_brief")
+    focused = isinstance(intent, dict) and bool(intent.get("requested_at"))
+    if focused:
+        config = config.model_copy(update={"require_semantic_verification": True})
     ctx = NodeContext("FactsNode", state)
     materials = state.get("selected_materials", [])
 
@@ -255,7 +259,7 @@ def run(state: dict[str, Any], config: FactsConfig = None) -> dict[str, Any]:
                 # script writer can support a substantially richer segment.
                 deep_fact["summary"] = deep_body[:6000]
         state["facts"] = facts
-        selected_topics = select_news_topics(facts, config.selected_topic_count)
+        selected_topics = select_news_topics(facts, len(facts) if focused else config.selected_topic_count)
         if isinstance(deep_fact, dict):
             deep_fact_id = str(deep_fact.get("id") or "")
             deep_topic = {

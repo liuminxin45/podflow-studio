@@ -5,6 +5,7 @@ import type { Workflow } from '../types/workflow'
 
 vi.mock('../components/ApprovalModal', () => ({ default: () => null }))
 vi.mock('../components/EpisodeDraftStudio', () => ({ default: () => null }))
+vi.mock('../components/briefing/ContentWorkbench', () => ({ default: ({ visible }: { visible: boolean }) => visible ? <h1>打磨内容</h1> : null }))
 vi.mock('../components/DiscoverPanel', () => ({ default: () => null }))
 vi.mock('../components/OrganizePanel', async () => {
   const { forwardRef } = await import('react')
@@ -73,8 +74,8 @@ describe('App quick briefing orchestration', () => {
         state: {
           ...workflow.state,
           selected_topic: { title: 'AI 编程日报' },
-          script: { title: 'AI 编程日报', segments: [] },
-          audio_outputs: { final_audio_path: 'final.mp3', duration_seconds: 600 },
+          script: { title: 'AI 编程日报', segments: [{ id: 'seg-1', title: '主题', text: '真实稿件', type: 'quick_news', source_fact_ids: [], source_claim_ids: [], estimated_seconds: 10 }] },
+          audio_outputs: {},
           release_readiness: { status: 'blocked' },
         },
       }
@@ -118,18 +119,23 @@ describe('App quick briefing orchestration', () => {
     ;(window as any).electronAPI = originalElectronAPI
   })
 
-  it('creates one workflow, runs through review, and never calls publish', async () => {
+  it('stops at a saved draft without voice configuration or automatic production', async () => {
+    const load = window.electronAPI.loadNodeConfig
+    vi.mocked(window.electronAPI.loadNodeConfig).mockImplementation(async node => node === 'tts' ? null : node === 'script' ? { provider_kind: 'ollama', api_base: 'http://localhost:11434', llm_model: 'test' } : {})
     render(<App />)
-    const generate = await screen.findByRole('button', { name: '生成今日节目' })
-    await waitFor(() => expect((generate as HTMLButtonElement).disabled).toBe(false))
+    const generate = await screen.findByRole('button', { name: '研究并生成稿件' })
     fireEvent.change(screen.getByRole('textbox', { name: '关注主题' }), { target: { value: 'AI 编程' } })
+    await waitFor(() => expect((generate as HTMLButtonElement).disabled).toBe(false))
     fireEvent.click(generate)
 
-    expect(await screen.findByRole('heading', { name: 'AI 编程日报' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '打磨内容' })).toBeTruthy()
     expect(runWorkflowNodes).toHaveBeenCalledTimes(1)
     const nodes = runWorkflowNodes.mock.calls[0][1] as string[]
-    expect(nodes).toContain('review')
+    expect(nodes).toEqual(['preprocess', 'research', 'topic_selection', 'facts', 'script'])
+    expect(nodes).not.toContain('tts')
     expect(nodes).not.toContain('publish')
+    expect(window.electronAPI.saveWorkflow).toHaveBeenCalledWith(workflow.id)
+    expect(load).toHaveBeenCalled()
   })
 
   it('opens the intelligent capability settings from a missing-target warning', async () => {

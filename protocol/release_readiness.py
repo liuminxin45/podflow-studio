@@ -7,6 +7,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from protocol.artifact_utils import file_fingerprint
+from protocol.episode_policy import valid_episode_structure
 
 
 GATE_VERSION = 1
@@ -117,23 +118,19 @@ def build_release_readiness(state: dict[str, Any]) -> dict[str, Any]:
     source_gate, facts_gate = _source_and_fact_gates(state)
 
     script = state.get("edited_script") if isinstance(state.get("edited_script"), dict) else {}
-    news = [segment for segment in script.get("segments", []) if isinstance(segment, dict)]
-    quick_count = sum(segment.get("type") == "quick_news" for segment in news)
-    deep_count = sum(segment.get("type") == "deep_dive" for segment in news)
     generated_by = str((state.get("script") or {}).get("generated_by") or "")
     editorial = (state.get("generation_meta") or {}).get("editorial_quality") or {}
     script_ok = (
-        quick_count == 6
-        and deep_count == 1
+        valid_episode_structure(script)
         and generated_by == "llm"
         and editorial.get("version") == "editorial_quality_v1"
         and editorial.get("status") == "passed"
         and bool(str(editorial.get("model") or ""))
     )
     script_gate = (
-        _gate("passed", "", "The 6+1 LLM script passed editorial quality checks.")
+        _gate("passed", "", "The evidence-backed LLM script passed editorial quality checks.")
         if script_ok
-        else _gate("failed", "SCRIPT_QUALITY_INCOMPLETE", "The script lacks a passing LLM editorial-quality result or the required 6+1 structure.")
+        else _gate("failed", "SCRIPT_QUALITY_INCOMPLETE", "The script lacks a passing LLM editorial-quality result or a valid evidence-backed structure.")
     )
 
     unresolved = sorted({

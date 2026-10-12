@@ -13,7 +13,7 @@ class PublishConfig(NodeConfigBase):
     rss_output_dir: str = Field(default="out/rss", description="RSS输出目录")
     public_base_url: str = Field(default="", description="公开访问根 URL，用于 RSS enclosure")
     podcast_title: str = Field(default="PodFlow 晨报", description="播客标题")
-    podcast_description: str = Field(default="每天 6 条快讯和 1 条重点解读，保留来源与判断边界。", description="播客描述")
+    podcast_description: str = Field(default="围绕值得理解的问题，保留事实来源与判断边界。", description="播客描述")
     podcast_author: str = Field(default="PodFlow Studio", description="播客作者")
     podcast_language: str = Field(default="zh-CN", description="播客语言")
     podcast_category: str = Field(default="News", description="播客分类")

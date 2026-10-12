@@ -1041,7 +1041,7 @@ export default function ProductionStudio({
   return (
     <div className="stage-workbench produce-workbench">
       <StageHeader
-        title="声音制作"
+        title="试听交付"
         center={
           <div className="produce-mode-switch" role="group" aria-label="制作方式">
             <button
@@ -1097,7 +1097,7 @@ export default function ProductionStudio({
           onClick: onBackToWriting,
         } : undefined}
         next={{
-          label: '进入发布',
+          label: '终审与导出',
           disabled: !finalAudioPath || isBusy,
           tooltip: finalAudioPath ? undefined : '先生成可用的成品音频',
           onClick: onProceedToPublish,

@@ -220,6 +220,7 @@ def _episode_payload(
 
 
 def _validate_public_readiness(state: dict[str, Any], audio_outputs: dict[str, Any]) -> None:
+    from protocol.episode_policy import MIN_EPISODE_SECONDS, MAX_EPISODE_SECONDS, valid_episode_structure
     episode_id = str(state.get("episode_id") or "")
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?", episode_id):
         raise RuntimeError("Public publishing requires an immutable date-based episode ID.")
@@ -236,8 +237,8 @@ def _validate_public_readiness(state: dict[str, Any], audio_outputs: dict[str, A
     if true_peak_db is None or float(true_peak_db) > -1.0:
         raise RuntimeError("Public publishing requires true peak no higher than -1 dBTP.")
     duration_seconds = int(float(audio_outputs.get("duration_seconds") or 0))
-    if not 720 <= duration_seconds <= 900:
-        raise RuntimeError("Public publishing requires a 12-15 minute final episode.")
+    if not MIN_EPISODE_SECONDS <= duration_seconds <= MAX_EPISODE_SECONDS:
+        raise RuntimeError("Public publishing requires a complete episode between 30 seconds and 120 minutes.")
     audio_artifact = audio_outputs.get("audio_artifact") or {}
     if int(audio_artifact.get("size_bytes") or 0) < duration_seconds * 16_000:
         raise RuntimeError("Public publishing requires at least a 128 kbps MP3 payload size.")
@@ -251,11 +252,8 @@ def _validate_public_readiness(state: dict[str, Any], audio_outputs: dict[str, A
     if approval.get("status") != "approved" or approval.get("audio_sha256") != audio_artifact.get("sha256"):
         raise RuntimeError("Public publishing requires human approval bound to the final MP3 SHA256.")
     script = state.get("edited_script") if isinstance(state.get("edited_script"), dict) else {}
-    segments = [segment for segment in script.get("segments", []) if isinstance(segment, dict)]
-    quick_count = sum(segment.get("type") == "quick_news" for segment in segments)
-    deep_count = sum(segment.get("type") == "deep_dive" for segment in segments)
-    if (quick_count, deep_count) != (6, 1):
-        raise RuntimeError("Public PodFlow 晨报 episodes require exactly 6 quick news segments and 1 deep dive.")
+    if not valid_episode_structure(script):
+        raise RuntimeError("Public publishing requires a valid evidence-backed episode structure.")
     if not _collect_sources(state.get("facts", [])):
         raise RuntimeError("Public publishing requires at least one traceable source.")
     pending_terms = sorted({

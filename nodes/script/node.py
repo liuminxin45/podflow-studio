@@ -430,6 +430,15 @@ def run(state: dict[str, Any], config: ScriptConfig = None) -> dict[str, Any]:
             ctx.log_end("输出: (无脚本 — 缺少已选主题)")
             return ctx.finalize(state)
 
+        intent = state.get("runtime_config", {}).get("quick_brief")
+        if isinstance(intent, dict) and intent.get("requested_at"):
+            config = _focused_episode_config(config, state, facts)
+            topic = {
+                **topic,
+                "title": str(intent.get("topic") or topic.get("title") or "本期节目"),
+                "audience": str(intent.get("audience") or ""),
+                "takeaway": str(intent.get("takeaway") or ""),
+            }
         preset = _preset_from_config(config)
         state["preset"] = preset
         script_facts = _select_script_facts(state, facts, config)
@@ -794,6 +803,45 @@ def _assess_editorial_quality(
         "repair_count": repair_count,
         "segment_issues": segment_issues,
     }
+
+
+def _focused_episode_config(
+    config: ScriptConfig, state: dict[str, Any], facts: list[dict[str, Any]]
+) -> ScriptConfig:
+    """Budget the actual selected evidence, not a seven-story morning template.
+
+    Depth still requires the existing evidence-backed research decision; this
+    path does not manufacture a deep-dive fact or relax any quality gate.
+    """
+    selected_ids = {item.get("fact_id") for item in state.get("selected_topics", [])}
+    selected = [fact for fact in facts if fact.get("id") in selected_ids]
+    count = len(selected)
+    if not 1 <= count <= 20:
+        raise ValueError("本期需要 1–20 条已核验并选定的事实卡片")
+    deep_count = int(any(fact.get("is_deep_dive") for fact in selected))
+    quick_count = count - deep_count
+    minimum = 260 + quick_count * 320 + deep_count * config.deep_dive_chars_min
+    maximum = 420 + quick_count * 600 + deep_count * config.deep_dive_chars_max
+    duration = max(1, round((minimum + maximum) / 2 / config.words_per_minute))
+    return ScriptConfig.model_validate({
+        **config.model_dump(),
+        "recommended_news_item_count": count,
+        "quick_news_recommended_count": quick_count,
+        "deep_dive_recommended_count": deep_count,
+        "allow_custom_news_item_count": False,
+        "quick_news_chars_min": 320,
+        "quick_news_chars_max": 600,
+        "episode_chars_min": min(minimum, duration * config.words_per_minute),
+        "episode_chars_max": max(maximum, duration * config.words_per_minute),
+        "target_duration_minutes": duration,
+        "content_tendency": "analysis",
+        "content_guidance": (
+            "围绕本期问题形成连贯解释，不做无关新闻拼盘，不凑固定条数。"
+            "根据听众背景说明事实意味着什么、依据是什么、有哪些限制。"
+            "事实卡没有支持的原因、影响与比较必须留白或明确说明未知，不得补造。"
+            "不要以早报、今日七条等固定节目模板开场。"
+        ),
+    })
 
 
 def _preset_from_config(config: ScriptConfig) -> dict[str, Any]:
