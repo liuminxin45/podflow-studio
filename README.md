@@ -14,6 +14,14 @@
 
 </div>
 
+PodFlow Studio is a local-first AI news-podcast workspace for source-linked research, fact cards, editable scripts, narration, audio review, and RSS-ready release packages. Formal publishing requires human review.
+
+## 选用前先了解
+
+适合希望将资料研究、审稿和音频制作放在同一流程中的独立创作者或小型编辑团队。可以先配置成稿能力，核对稿件后再配置声音服务，不必一次接入所有服务。
+
+本地优先指工作区和产物的组织方式，不代表模型、搜索或语音处理全部离线。外部服务按各自配置和政策运行；离线 demo 产物不能作为正式节目发布。
+
 ## PodFlow Studio 是什么
 
 制作一期新闻播客，需要收集来源、核对事实、写稿、配音，再装配音频和准备发布。PodFlow Studio 面向独立创作者和小型编辑团队，把这些步骤放进一个可检查、可编辑、可恢复的桌面工作台。
